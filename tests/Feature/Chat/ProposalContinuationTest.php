@@ -31,6 +31,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalPlanService;
 use Relaticle\Chat\Services\TurnContinuationService;
+use Relaticle\Chat\Support\TurnPresence;
 use Tests\Helpers\AnthropicSse;
 
 mutates(TurnContinuationService::class);
@@ -97,6 +98,39 @@ it('resumes the assistant when an approval leaves nothing pending', function ():
             && $job->conversationId === $this->convId
             && $job->message === "The user decided the proposals above:\n- APPROVED (written): create company \"Continuation Co\"",
     );
+});
+
+it('does not resume a turn that is retrying, which reports the decided card itself', function (): void {
+    Queue::fake();
+
+    $turnId = (string) Str::ulid();
+    $proposal = continuationProposal($this->user, $this->convId, $turnId, 'Retrying Co');
+    TurnPresence::begin($this->convId, turnId: $turnId, message: 'Create it');
+    TurnPresence::markRetried($this->convId, $turnId);
+
+    Livewire::test(ProposalCard::class)
+        ->dispatch('proposal:set-active', id: (string) $proposal->getKey(), context: 'conversation')
+        ->call('createCurrent', resolve(PendingActionService::class));
+
+    Queue::assertNotPushed(ProcessChatMessage::class);
+
+    TurnPresence::clear($this->convId, $turnId);
+
+    expect(resolve(TurnContinuationService::class)->resume($this->user, $this->convId, $turnId))->toBeTrue();
+});
+
+it('still resumes behind a turn that is streaming and has not retried', function (): void {
+    Queue::fake();
+
+    $turnId = (string) Str::ulid();
+    $proposal = continuationProposal($this->user, $this->convId, $turnId, 'Streaming Co');
+    TurnPresence::begin($this->convId, turnId: $turnId, message: 'Create it');
+
+    Livewire::test(ProposalCard::class)
+        ->dispatch('proposal:set-active', id: (string) $proposal->getKey(), context: 'conversation')
+        ->call('createCurrent', resolve(PendingActionService::class));
+
+    Queue::assertPushed(ProcessChatMessage::class, fn (ProcessChatMessage $job): bool => $job->origin === MessageOrigin::Resume);
 });
 
 it('resumes after a rejection too, so a discarded card is not a dead end', function (): void {
@@ -262,9 +296,9 @@ it('names every record of the resumed decisions instead of leaving them unnamed'
         fn (ProcessChatMessage $job): bool => $job->message === implode("\n", [
             'The user decided the proposals above:',
             '- APPROVED (written): update 3 people records:',
-            '    - "Update person Ada Lovelace"',
-            '    - "Update person Grace Hopper"',
-            '    - "Update person Alan Turing"',
+            '    - "Ada Lovelace"',
+            '    - "Grace Hopper"',
+            '    - "Alan Turing"',
             '- APPROVED (written): delete company "Acme"',
         ]) && ! str_contains($job->message, '(unnamed)'),
     );
@@ -275,12 +309,13 @@ it('does not resume while another step of the plan is still pending', function (
 
     $turnId = (string) Str::ulid();
     $first = continuationProposal($this->user, $this->convId, $turnId, 'Step One Co');
-    continuationProposal($this->user, $this->convId, $turnId, 'Step Two Co');
+    continuationProposal($this->user, $this->convId, $turnId, 'Step Two Co')->update(['entity_type' => 'workspace_invitations']);
 
     Livewire::test(ProposalCard::class)
         ->dispatch('proposal:set-active', id: (string) $first->getKey(), context: 'conversation')
-        ->call('approveStep', (string) $first->getKey(), resolve(ProposalPlanService::class));
+        ->call('approveAll', resolve(ProposalPlanService::class));
 
+    expect($first->refresh()->status)->toBe(PendingActionStatus::Approved);
     Queue::assertNotPushed(ProcessChatMessage::class);
 });
 
@@ -330,6 +365,8 @@ it('hands the resume back when the queued turn finds a step still pending', func
 });
 
 it('skips the resume when the workspace is out of credits', function (): void {
+    withHostedBilling();
+
     Queue::fake();
 
     AiCreditBalance::query()
@@ -344,6 +381,8 @@ it('skips the resume when the workspace is out of credits', function (): void {
 });
 
 it('charges one credit for the resumed turn', function (): void {
+    withHostedBilling();
+
     Queue::fake();
 
     $before = AiCreditBalance::query()->where('workspace_id', $this->user->currentWorkspace->getKey())->value('credits_remaining');

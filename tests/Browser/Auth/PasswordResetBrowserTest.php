@@ -35,6 +35,7 @@ it('can reset password using a valid reset link', function (): void {
     $this->visit('/app/login')
         ->navigate($resetUrl)
         ->assertSee('Reset password')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->type('[id="form.password"]', 'new-secure-password')
         ->type('[id="form.passwordConfirmation"]', 'new-secure-password')
         ->press('Reset password')

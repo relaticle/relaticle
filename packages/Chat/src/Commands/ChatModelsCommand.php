@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Commands;
 
+use App\Console\Concerns\ReadsStringOptions;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -15,6 +16,8 @@ use Relaticle\Chat\Support\ModelDescriptor;
 #[Signature('chat:models {--probe= : Verify this model id against its provider}')]
 final class ChatModelsCommand extends Command
 {
+    use ReadsStringOptions;
+
     public function handle(ModelRegistry $registry): int
     {
         $rows = array_map(static fn (ModelDescriptor $m): array => [
@@ -29,9 +32,9 @@ final class ChatModelsCommand extends Command
 
         $this->table(['id', 'provider', 'model', 'available', 'min_plan', 'tools', 'write_guard'], $rows);
 
-        $probe = $this->option('probe');
+        $probe = $this->stringOption('probe');
 
-        if (! is_string($probe) || $probe === '') {
+        if ($probe === null) {
             return self::SUCCESS;
         }
 

@@ -26,16 +26,6 @@
                 .slice(0, 8);
         },
 
-        initials(name) {
-            return String(name ?? '')
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((word) => word.charAt(0).toUpperCase())
-                .join('') || '?';
-        },
-
         optionVisible(option) {
             if (option.type === 'person') {
                 return ! this.selectedIds.includes(option.id);
@@ -51,7 +41,6 @@
                 await $wire.addMassRecipient(option.id);
             }
 
-            this.selectedIds = $wire.massRecipients.map((recipient) => recipient.personId);
             this.query = '';
             this.activeIndex = 0;
         },
@@ -73,7 +62,7 @@
     <label class="sr-only">{{ __('filament/emails/composer.mass_send.add_recipients') }}</label>
 
     <div class="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 transition focus-within:border-primary-500 focus-within:ring-1 focus-within:ring-primary-500 dark:border-white/10 dark:bg-gray-900 dark:focus-within:border-primary-500">
-        <x-heroicon-o-plus class="h-4 w-4 shrink-0 text-gray-400" />
+        <x-lucide-plus class="h-4 w-4 shrink-0 text-gray-400" />
         <input
             type="text"
             x-model="query"
@@ -99,7 +88,7 @@
                     x-bind:class="index === activeIndex ? 'bg-gray-50 dark:bg-white/5' : ''"
                     x-on:click="choose(chip)"
                 >
-                    <x-email-integration::recipient-avatar box="size-7" glyph="size-4" initials-size="text-[11px]" />
+                    <x-email-integration::recipient-avatar box="size-7" glyph="size-4" />
                     <span
                         class="min-w-0 flex-1"
                         x-tooltip="{ content: optionTooltip(chip), theme: $store.theme }"

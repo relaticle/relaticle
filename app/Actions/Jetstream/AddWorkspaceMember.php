@@ -22,6 +22,8 @@ use Laravel\Jetstream\Rules\Role;
 
 final readonly class AddWorkspaceMember implements AddsTeamMembers
 {
+    public function __construct(private CancelInactivityDeletion $cancelInactivityDeletion) {}
+
     /**
      * Add a new workspace member to the given workspace.
      */
@@ -40,6 +42,8 @@ final readonly class AddWorkspaceMember implements AddsTeamMembers
         try {
             DB::transaction(function () use ($workspace, $newWorkspaceMember, $role, $email): void {
                 $workspace->users()->attach($newWorkspaceMember, ['role' => $role]);
+
+                $this->cancelInactivityDeletion->execute($workspace);
 
                 // However they got here, any invitation to this workspace for the same
                 // address is spent; leaving it strands a banner on every page.

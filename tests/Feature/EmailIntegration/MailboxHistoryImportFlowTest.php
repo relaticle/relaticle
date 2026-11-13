@@ -23,6 +23,7 @@ use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
+use Relaticle\EmailIntegration\Enums\MailboxImportPass;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
@@ -34,6 +35,7 @@ use Relaticle\EmailIntegration\Notifications\MailboxHistoryImportCompletedNotifi
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
+use Tests\Helpers\PresentedMailboxImport;
 
 mutates(
     CompleteMailboxHistoryImportAction::class,
@@ -675,9 +677,313 @@ it('keeps the failure summary visible after retry is queued while store jobs rer
         ->and($account->fresh()?->syncDisplayPercent())->toBe(0);
 });
 
+it('starts syncing new mail once the recent pass is listed and queues the full history', function (): void {
+    Notification::fake();
+    Bus::fake([InitialEmailSyncJob::class]);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->azure()->create());
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->once()->with(90, null)->andReturn(new MailBackfillPage(
+        messageIds: collect(['recent-1']), nextPageToken: null, cursor: 'recent-cursor',
+    ));
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    app()->call(
+        [new InitialEmailSyncJob($account, historyImportBatchId: $batchId)->forPass(MailboxImportPass::Recent), 'handle'],
+        ['mailFactory' => $factory],
+    );
+
+    expect($account->fresh())
+        ->sync_cursor->toBe('recent-cursor')
+        ->status->toBe(EmailAccountStatus::ACTIVE)
+        ->isEmailHistoryImportRunning()->toBeTrue();
+
+    Bus::assertDispatched(fn (InitialEmailSyncJob $job): bool => $job->pass === MailboxImportPass::Full
+        && $job->pageToken === null
+        && $job->historyImportBatchId === $batchId
+        && $job->queue === null);
+    Notification::assertNothingSent();
+});
+
+it('adopts the cursor of the full history and reports the import done', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->azure()->create([
+        'sync_cursor' => 'recent-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->once()->with(null, null)->andReturn(new MailBackfillPage(
+        messageIds: collect(), nextPageToken: null, cursor: 'full-cursor',
+    ));
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    app()->call(
+        [new InitialEmailSyncJob($account, historyImportBatchId: $batchId), 'handle'],
+        ['mailFactory' => $factory],
+    );
+
+    expect($account->fresh())
+        ->sync_cursor->toBe('full-cursor')
+        ->isEmailHistoryImportRunning()->toBeFalse()
+        ->and(PresentedMailboxImport::of($account->user->notifications()->sole())['status'])->toBe('success');
+});
+
+it('starts syncing new mail from the first page when the provider returns its cursor there', function (): void {
+    Notification::fake();
+    Bus::fake([InitialEmailSyncJob::class]);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->once()->andReturn(new MailBackfillPage(
+        messageIds: collect(['M1']), nextPageToken: 'page-2', cursor: 'history-1',
+    ));
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    app()->call([new InitialEmailSyncJob($account, historyImportBatchId: $batchId), 'handle'], ['mailFactory' => $factory]);
+
+    expect($account->fresh())
+        ->sync_cursor->toBe('history-1')
+        ->status->toBe(EmailAccountStatus::ACTIVE)
+        ->isEmailHistoryImportRunning()->toBeTrue();
+
+    Bus::assertDispatched(fn (InitialEmailSyncJob $job): bool => $job->pageToken === 'page-2' && $job->pass === MailboxImportPass::Full);
+    Notification::assertNothingSent();
+});
+
+it('does not rewind a cursor that moved on while the history was listed', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create([
+        'sync_cursor' => 'history-9',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('initialBackfill')->once()->andReturn(new MailBackfillPage(
+        messageIds: collect(), nextPageToken: null, cursor: null,
+    ));
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->andReturn($service);
+
+    app()->call(
+        [new InitialEmailSyncJob($account, 'page-2', 'history-1', $batchId), 'handle'],
+        ['mailFactory' => $factory],
+    );
+
+    expect($account->fresh()?->sync_cursor)->toBe('history-9')
+        ->and(PresentedMailboxImport::of($account->user->notifications()->sole())['status'])->toBe('success');
+});
+
+it('does not report the import done while the history is still being listed', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markHistoryListingPending($batchId);
+
+    $batch = Bus::findBatch($batchId);
+    $batch->add([new StoreEmailJob($account, 'older-message')]);
+    $batch->recordSuccessfulJob('older-job');
+
+    expect($account->user->notifications()->count())->toBe(0)
+        ->and($account->fresh()?->isEmailHistoryImportRunning())->toBeTrue()
+        ->and($account->fresh()?->mailboxHistoryImportSummary()?->finished)->toBeFalse()
+        ->and($import->progressPercent($account->fresh()))->toBe(99);
+
+    $import->markHistoryListingFinished($batchId);
+    resolve(CompleteMailboxHistoryImportAction::class)->execute((string) $account->getKey(), $batchId);
+
+    expect(PresentedMailboxImport::of($account->user->notifications()->sole())['status'])->toBe('success')
+        ->and($account->fresh()?->isEmailHistoryImportRunning())->toBeFalse();
+});
+
+it('keeps an empty import running after the cursor is written until the history is listed', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markHistoryListingPending($batchId);
+
+    expect($import->isRunning($account->fresh()))->toBeTrue()
+        ->and($import->progressPercent($account->fresh()))->toBe(0);
+
+    $import->markHistoryListingFinished($batchId);
+
+    expect($import->isRunning($account->fresh()))->toBeFalse()
+        ->and($import->progressPercent($account->fresh()))->toBe(100);
+});
+
+it('stops listing history for an import that was restarted', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $supersededBatchId = attachHistoryImportBatch($account);
+    attachHistoryImportBatch($account);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldNotReceive('make');
+
+    app()->call(
+        [new InitialEmailSyncJob($account->fresh(), 'page-7', null, $supersededBatchId), 'handle'],
+        ['mailFactory' => $factory],
+    );
+
+    Queue::assertNotPushed(InitialEmailSyncJob::class);
+});
+
+it('keeps a live mailbox syncing and reports the unfinished history when the listing fails', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markHistoryListingPending($batchId);
+
+    $batch = Bus::findBatch($batchId);
+    $batch->add([new StoreEmailJob($account, 'recent-1')]);
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('Graph is down'));
+
+    expect($import->isHistoryListingPending($batchId))->toBeFalse()
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and($account->user->notifications()->count())->toBe(0);
+
+    $batch->recordSuccessfulJob('recent-job');
+
+    $notification = $account->user->notifications()->sole();
+
+    expect(PresentedMailboxImport::of($notification)['status'])->toBe('warning')
+        ->and(PresentedMailboxImport::of($notification)['body'])->toContain(__('filament/notifications/mailbox-import-complete.email_history_did_not_finish'))
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and($account->fresh()?->isEmailHistoryImportRunning())->toBeFalse();
+});
+
+it('reports the unfinished history when the listing fails after every listed message is stored', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    $batch = Bus::findBatch($batchId);
+    $batch->add([new StoreEmailJob($account, 'recent-1')]);
+    $batch->recordSuccessfulJob('recent-job');
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('Graph is down'));
+
+    expect(PresentedMailboxImport::of($account->user->notifications()->sole())['status'])->toBe('warning');
+});
+
+it('parks a live mailbox for reconnection and keeps the error when the listing fails on a rejected token', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('invalid_grant: Bad Request'));
+
+    expect($account->fresh())
+        ->status->toBe(EmailAccountStatus::REAUTH_REQUIRED)
+        ->last_error->toBe('invalid_grant: Bad Request')
+        ->and(PresentedMailboxImport::of($account->user->notifications()->sole())['status'])->toBe('warning');
+});
+
+it('fails a mailbox that was not syncing yet when the listing fails', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => null,
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    resolve(MailboxHistoryImportService::class)->markHistoryListingPending($batchId);
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('Graph is down'));
+
+    expect($account->fresh())
+        ->status->toBe(EmailAccountStatus::ERROR)
+        ->last_error->toBe('Graph is down')
+        ->and($account->user->notifications()->count())->toBe(0);
+});
+
+it('lists the history again when the owner retries an import whose listing failed', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $owner = mailboxOwnerInWorkspace($account);
+    $batchId = attachHistoryImportBatch($account);
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markHistoryListingPending($batchId);
+
+    new InitialEmailSyncJob($account, historyImportBatchId: $batchId)
+        ->failed(new RuntimeException('Graph is down'));
+
+    $queued = resolve(RetryMailboxHistoryImportFailuresAction::class)->execute($owner, $account->fresh(), $batchId);
+
+    expect($queued)->toBeTrue()
+        ->and($import->isHistoryListingPending($batchId))->toBeTrue()
+        ->and($account->fresh()?->isEmailHistoryImportRunning())->toBeTrue();
+
+    Queue::assertPushed(fn (InitialEmailSyncJob $job): bool => $job->historyImportBatchId === $batchId
+        && $job->pageToken === null
+        && $job->pass === MailboxImportPass::Full);
+});
+
+it('never moves the import percent backwards when the full history adds messages', function (): void {
+    Queue::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'sync_cursor' => 'live-cursor',
+    ]));
+    $batchId = attachHistoryImportBatch($account);
+    $import = resolve(MailboxHistoryImportService::class);
+    $import->markHistoryListingPending($batchId);
+
+    $batch = Bus::findBatch($batchId);
+    $batch->add([new StoreEmailJob($account, 'recent-1'), new StoreEmailJob($account, 'recent-2')]);
+    $batch->recordSuccessfulJob('recent-job');
+
+    expect($import->progressPercent($account->fresh()))->toBe(50);
+
+    $batch->add([new StoreEmailJob($account, 'old-1'), new StoreEmailJob($account, 'old-2')]);
+
+    expect($import->progressPercent($account->fresh()))->toBe(50);
+});
+
 it('waits for pagination before notifying even when a page finishes storing early', function (): void {
     Queue::fake();
-    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create());
     $batchId = attachHistoryImportBatch($account);
     $batch = Bus::findBatch($batchId);
     $batch->add([new StoreEmailJob($account, 'early-message')]);
@@ -695,15 +1001,16 @@ it('waits for pagination before notifying even when a page finishes storing earl
 
     app()->call([new InitialEmailSyncJob($account, historyImportBatchId: $batchId), 'handle'], ['mailFactory' => $factory]);
 
-    expect($account->user->notifications()->sole()->data['status'])->toBe('success');
+    expect(PresentedMailboxImport::of($account->user->notifications()->sole())['status'])->toBe('success');
 });
 
 it('notifies after retry when every failed import job eventually succeeds', function (): void {
     Queue::fake();
-    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create([
         'sync_cursor' => 'history-done',
     ]));
     $batchId = attachHistoryImportBatch($account);
+    $account->update(['history_import_notified_batch_id' => $batchId]);
 
     resolve(MailboxHistoryImportService::class)->markAwaitingRetrySuccessNotice($batchId);
 
@@ -720,15 +1027,15 @@ it('notifies after retry when every failed import job eventually succeeds', func
 
     $notification = $account->user->notifications()->sole();
 
-    expect($notification->data['status'])->toBe('success')
-        ->and($notification->data['title'])->toBe(__('filament/notifications/mailbox-import-complete.retry_success.title'));
+    expect(PresentedMailboxImport::of($notification)['status'])->toBe('success')
+        ->and(PresentedMailboxImport::of($notification)['title'])->toBe(__('filament/notifications/mailbox-import-complete.retry_success.title'));
 
     Queue::assertPushed(SendQueuedNotifications::class);
 });
 
 it('notifies with issues when the import batch finishes with failed jobs', function (): void {
     Queue::fake();
-    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->withOwnerInWorkspace()->create([
         'sync_cursor' => 'history-done',
     ]));
     $batchId = attachHistoryImportBatch($account);
@@ -745,11 +1052,11 @@ it('notifies with issues when the import batch finishes with failed jobs', funct
 
     $notification = $account->user->notifications()->sole();
 
-    expect($notification->data['title'])->toBe(__('filament/notifications/mailbox-import-complete.title_with_issues'))
-        ->and($notification->data['status'])->toBe('warning')
-        ->and($notification->data['viewData']['kind'])->toBe('partial')
-        ->and($notification->data['body'])->toContain("1 message couldn't be imported")
-        ->and(collect($notification->data['actions'] ?? [])->pluck('name')->all())->toBe(['retry']);
+    expect(PresentedMailboxImport::of($notification)['title'])->toBe(__('filament/notifications/mailbox-import-complete.title_with_issues'))
+        ->and(PresentedMailboxImport::of($notification)['status'])->toBe('warning')
+        ->and($notification->data['kind'])->toBe('partial')
+        ->and(PresentedMailboxImport::of($notification)['body'])->toContain("1 message couldn't be imported")
+        ->and(collect(PresentedMailboxImport::of($notification)['actions'] ?? [])->pluck('name')->all())->toBe(['retry']);
 
     Queue::assertPushed(SendQueuedNotifications::class);
 
@@ -850,7 +1157,7 @@ it('recovers the failed email through the notification retry using the real queu
         ->and(DB::table('failed_jobs')->count())->toBe(1)
         ->and($account->emails()->count())->toBe(0)
         ->and($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1)
-        ->and($user->notifications()->sole()->data['title'])->toBe(__('filament/notifications/mailbox-import-complete.title_with_issues'));
+        ->and(PresentedMailboxImport::of($user->notifications()->sole())['title'])->toBe(__('filament/notifications/mailbox-import-complete.title_with_issues'));
 
     expect(resolve(RetryMailboxHistoryImportFailuresAction::class)->execute($user, $account->fresh(), $batchId))->toBeTrue();
 
@@ -867,15 +1174,11 @@ it('recovers the failed email through the notification retry using the real queu
     expect(Bus::findBatch($batchId)->failedJobIds)->toBe([]);
     expect($account->fresh()->showsMailboxHistoryImportFailureSummary())->toBeFalse();
     expect($import->hasAwaitingRetrySuccessNotice($batchId))->toBeFalse();
-    expect($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(2);
-    $importNotifications = $user->notifications()
-        ->where('type', MailboxHistoryImportCompletedNotification::class)
-        ->get();
-    expect($importNotifications->pluck('data.title')->all())
-        ->toContain(__('filament/notifications/mailbox-import-complete.title_with_issues'))
-        ->toContain(__('filament/notifications/mailbox-import-complete.retry_success.title'));
+    expect($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1);
+    expect(PresentedMailboxImport::of($user->notifications()->sole())['title'])
+        ->toBe(__('filament/notifications/mailbox-import-complete.retry_success.title'));
     expect(resolve(RetryMailboxHistoryImportFailuresAction::class)->execute($user, $account->fresh(), $batchId))->toBeFalse();
-    expect($user->notifications()->count())->toBe(2);
+    expect($user->notifications()->count())->toBe(1);
 
     livewire(EmailAccountsPage::class)
         ->assertSee(__('filament/pages/email-accounts.in_sync'));
@@ -911,7 +1214,7 @@ it('does not send a retry-success notice until every failed import job succeeds'
     Artisan::call('queue:work', ['connection' => 'database', '--queue' => 'emails-import', '--once' => true]);
 
     expect($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1)
-        ->and($user->notifications()->sole()->data['title'])->toBe(__('filament/notifications/mailbox-import-complete.title_with_issues'));
+        ->and(PresentedMailboxImport::of($user->notifications()->sole())['title'])->toBe(__('filament/notifications/mailbox-import-complete.title_with_issues'));
 
     expect(resolve(RetryMailboxHistoryImportFailuresAction::class)->execute($user, $account->fresh(), $batchId))->toBeTrue();
 
@@ -927,9 +1230,9 @@ it('does not send a retry-success notice until every failed import job succeeds'
 
     expect($account->emails()->sole()->provider_message_id)->toBe('retry-twice-message');
     expect($account->fresh()->showsMailboxHistoryImportFailureSummary())->toBeFalse();
-    expect($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(2);
-    expect($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->get()->pluck('data.title')->all())
-        ->toContain(__('filament/notifications/mailbox-import-complete.retry_success.title'));
+    expect($user->notifications()->where('type', MailboxHistoryImportCompletedNotification::class)->count())->toBe(1);
+    expect(PresentedMailboxImport::of($user->notifications()->sole())['title'])
+        ->toBe(__('filament/notifications/mailbox-import-complete.retry_success.title'));
 });
 
 it('does not treat a missing failed job record as retried', function (): void {

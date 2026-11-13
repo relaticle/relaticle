@@ -9,7 +9,7 @@ paths:
 
 # Queries: the read path
 
-A reusable read is a query class. An action is a write. One filter language answers a list
+A reusable read is a query class, never an action. One filter language answers a list
 question the same way on the REST API, MCP and chat. It lives in `app/Queries`. The design
 records are `docs/superpowers/specs/2026-10-02-crm-filter-language-design.md` for the filter
 language and `docs/superpowers/specs/2026-10-06-queries-read-layer-design.md` for the read path.
@@ -172,7 +172,8 @@ the REST guide. Update those by hand.
   Make it public in the change that adds the first caller, with a test for that caller. The
   builder is authorized and workspace-bound already. Refine it with `where` and `whereHas`
   only, and put any `or` inside a `where(fn ...)` group. A top-level `orWhere` escapes the
-  workspace bound wherever `CurrentWorkspace` is not set, such as a queued job. Never call
+  workspace bound, because the list query removes the ambient `WorkspaceScope` and bounds
+  itself with one `whereBelongsTo`. Never call
   `withTrashed()` or `withoutGlobalScopes()` on it. Never rebuild the allowlists in the caller:
   `tests/Arch/ArchTest.php` fails a Spatie query built outside a query layer ("builds a list
   query only in a query layer").

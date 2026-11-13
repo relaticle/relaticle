@@ -5,11 +5,13 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Support\Icons\Heroicon;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\OutboxTab;
+use Relaticle\EmailIntegration\Enums\SendFailureRemedy;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -122,7 +124,7 @@ it('failed tab filters to failed emails', function (): void {
         ->assertCanNotSeeTableRecords([$queued]);
 });
 
-it('locked failed mode lists every failed email owned by the user', function (): void {
+it('the failed filter lists every failed email the user owns with its error', function (): void {
     $firstAccountFailure = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED, [
         'last_error' => 'SMTP bounce',
     ]);
@@ -150,48 +152,33 @@ it('locked failed mode lists every failed email owned by the user', function ():
     ]));
     $otherTeamFailure = makeOutboxEmail($otherUser, $otherAccount, EmailStatus::FAILED);
 
-    $component = livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
+    livewire(OutboxTable::class)
+        ->assertTableColumnHidden('last_error')
+        ->filterTable('status_tab', 'failed')
         ->assertCanSeeTableRecords([$firstAccountFailure, $secondAccountFailure])
         ->assertCanNotSeeTableRecords([$queued, $teammateFailure, $otherTeamFailure])
         ->assertTableColumnVisible('last_error');
-
-    expect($component->instance()->getTable()->getFilter('status_tab'))->toBeNull();
 });
 
-it('locked failed mode has a dedicated empty state', function (): void {
-    $component = livewire(OutboxTable::class, ['lockedStatus' => EmailStatus::FAILED])
-        ->assertSee(__('filament/pages/email-inbox.failed.empty.heading'))
-        ->assertSee(__('filament/pages/email-inbox.failed.empty.description'));
+it('opens on the failed filter from the send failure retry link', function (): void {
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
 
-    expect($component->instance()->getTable()->getEmptyStateIcon())
-        ->toBe(Heroicon::OutlinedExclamationCircle);
+    parse_str((string) parse_url(SendFailureRemedy::Retry->url($this->workspace), PHP_URL_QUERY), $query);
+
+    Livewire::withQueryParams($query)
+        ->test(OutboxTable::class)
+        ->assertCanSeeTableRecords([$failed])
+        ->assertCanNotSeeTableRecords([$queued]);
 });
 
 it('uses an outlined clock for the outbox empty state', function (): void {
-    $component = livewire(OutboxTable::class, ['includeFailedFilter' => false])
+    $component = livewire(OutboxTable::class)
         ->assertSee(__('filament/pages/email-inbox.outbox.empty.heading'))
         ->assertSee(__('filament/pages/email-inbox.outbox.empty.description'));
 
     expect($component->instance()->getTable()->getEmptyStateIcon())
-        ->toBe(Heroicon::OutlinedClock);
-});
-
-it('can exclude failed from the status filter without changing standalone outbox', function (): void {
-    $emailPageOptions = livewire(OutboxTable::class, ['includeFailedFilter' => false])
-        ->instance()
-        ->getTable()
-        ->getFilter('status_tab')
-        ?->getOptions();
-
-    $standaloneOptions = livewire(OutboxTable::class)
-        ->instance()
-        ->getTable()
-        ->getFilter('status_tab')
-        ?->getOptions();
-
-    expect($emailPageOptions)
-        ->not->toHaveKey('failed')
-        ->and($standaloneOptions)->toHaveKey('failed');
+        ->toBe('lucide-clock');
 });
 
 it('cancel row action moves a queued email to CANCELLED', function (): void {
@@ -291,4 +278,25 @@ it('bulkCancel skips a row that raced to SENDING and still cancels the rest', fu
     expect($queuedA->refresh()->status)->toBe(EmailStatus::CANCELLED)
         ->and($queuedB->refresh()->status)->toBe(EmailStatus::CANCELLED)
         ->and($racing->refresh()->status)->toBe(EmailStatus::SENDING);
+});
+
+it('names the status it shows and lets only a non-default one be removed', function (string $status, bool $removable): void {
+    $component = livewire(OutboxTable::class)->filterTable('status_tab', $status);
+
+    $indicators = $component->instance()->getTable()->getFilterIndicators();
+    $label = OutboxTab::from($status)->getLabel();
+
+    expect($indicators)->toHaveCount(1)
+        ->and((string) $indicators[0]->getLabel())->toBe("Status: {$label}")
+        ->and($indicators[0]->isRemovable())->toBe($removable);
+})->with([
+    'queued' => ['queued', false],
+    'scheduled' => ['scheduled', true],
+]);
+
+it('returns to queued when the status filter is removed', function (): void {
+    livewire(OutboxTable::class)
+        ->filterTable('status_tab', 'scheduled')
+        ->removeTableFilter('status_tab')
+        ->assertSet('tableFilters.status_tab.value', 'queued');
 });

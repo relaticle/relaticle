@@ -75,8 +75,8 @@ final class CreateCompanyTool extends BaseWriteCreateTool
         }
 
         return [
-            'title' => 'Create Company',
-            'summary' => "Create company \"{$name}\"",
+            'title' => $this->proposalEntity()->createTitle(),
+            'summary' => $this->proposalEntity()->createSummary($name),
             'fields' => $fields,
         ];
     }

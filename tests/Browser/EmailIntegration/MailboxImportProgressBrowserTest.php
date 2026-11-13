@@ -20,11 +20,7 @@ it('shows the synced count without a percent while a mailbox is still being list
     ]));
     setHistoryImportBatchProgress(attachHistoryImportBatch($account), 1250, 40);
 
-    $page = visit('/app/login')->{$theme}()
-        ->type('[id="form.email"]', $user->email)
-        ->click('button[type="submit"]')
-        ->type('[id="form.password"]', 'password')
-        ->click('button[type="submit"]')
+    $page = loginViaBrowser($user, $theme)
         ->assertPathIs("/app/{$workspace->slug}")
         ->assertSee(__('filament/pages/dashboard.meetings.syncing.title'))
         ->assertSee(trans_choice('filament/pages/dashboard.meetings.syncing.emails_processed', 1210, ['count' => 1210]))

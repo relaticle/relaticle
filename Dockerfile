@@ -3,7 +3,7 @@
 ###########################################
 # Stage 1: Composer dependencies
 ###########################################
-FROM composer:2 AS composer
+FROM composer:2@sha256:d0c32820c62cc860fddd22adceed4eeda7698b093a7a88d503414172ce400626 AS composer
 
 WORKDIR /app
 
@@ -19,7 +19,7 @@ RUN composer install \
 ###########################################
 # Stage 2: Build frontend assets
 ###########################################
-FROM node:26-alpine AS frontend
+FROM node:26-alpine@sha256:9bd229b644e391df00fb989efa732335aefc6170a05d8c163c5c8ca9870da401 AS frontend
 
 WORKDIR /app
 
@@ -33,17 +33,17 @@ RUN npm install -g "$(node -p 'require("./package.json").packageManager')" \
 COPY vite.config.js ./
 COPY resources ./resources
 COPY public ./public
+COPY app ./app
 COPY packages ./packages
 
-# Copy vendor for Filament theme CSS
-COPY --from=composer /app/vendor ./vendor
-
-RUN pnpm run build
+# Filament themes import vendor CSS and scan vendor views
+RUN --mount=type=bind,from=composer,source=/app/vendor,target=/app/vendor \
+    pnpm run build
 
 ###########################################
 # Stage 3: Production image
 ###########################################
-FROM serversideup/php:8.5-fpm-nginx AS production
+FROM serversideup/php:8.5-fpm-nginx@sha256:0b3d79815a1c8f06bb923a4cfdaf515ff9b466271c41428d61f08b29e6c4ac5a AS production
 
 LABEL org.opencontainers.image.title="Relaticle CRM"
 LABEL org.opencontainers.image.description="Modern, open-source CRM platform"
@@ -75,6 +75,26 @@ COPY --chown=www-data:www-data --from=composer /app/vendor ./vendor
 # Copy built frontend assets
 COPY --chown=www-data:www-data --from=frontend /app/public/build ./public/build
 
+# Serve Reverb's websocket from the app's own origin, so the browser needs no second
+# host, port or certificate. The upstream is resolved per request: the app boots
+# without a reverb service, and the chat then settles each turn over HTTP.
+COPY --chown=www-data:www-data <<'NGINX' /etc/nginx/server-opts.d/reverb.conf
+location /reverb/app/ {
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $reverb http://reverb:8080;
+    rewrite ^/reverb(/.*)$ $1 break;
+    proxy_pass $reverb;
+    proxy_http_version 1.1;
+    proxy_set_header Host $http_host;
+    proxy_set_header Scheme $scheme;
+    proxy_set_header SERVER_PORT $server_port;
+    proxy_set_header REMOTE_ADDR $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "Upgrade";
+}
+NGINX
+
 # Generate optimized autoloader
 RUN composer dump-autoload --optimize --no-dev
 
@@ -97,6 +117,8 @@ ENV AUTORUN_LARAVEL_ROUTE_CACHE=true
 ENV AUTORUN_LARAVEL_VIEW_CACHE=true
 ENV AUTORUN_LARAVEL_EVENT_CACHE=true
 ENV AUTORUN_LARAVEL_OPTIMIZE=false
+# Web and workers must share one cache: the turn marker, the cancel flag and locks live there.
+ENV CACHE_STORE=redis
 ENV PHP_OPCACHE_ENABLE=1
 ENV SSL_MODE=off
 

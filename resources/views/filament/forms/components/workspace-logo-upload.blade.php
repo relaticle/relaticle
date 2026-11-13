@@ -132,7 +132,7 @@
             : (previewUrl ? 'border-transparent' : 'border-gray-300 text-gray-400 hover:border-primary-400 hover:text-primary-500 dark:border-white/15 dark:text-gray-500 dark:hover:border-primary-400 dark:hover:text-primary-400')"
         class="group relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed bg-gray-50 transition duration-150 outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed dark:bg-white/5"
     >
-        <x-filament::icon icon="ri-image-add-line" class="size-6" x-show="! previewUrl" />
+        <x-filament::icon icon="lucide-image-plus" class="size-6" x-show="! previewUrl" />
 
         <img
             x-show="previewUrl"
@@ -147,7 +147,7 @@
             x-cloak
             class="absolute inset-0 flex items-center justify-center bg-gray-950/50 text-white opacity-0 transition duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
         >
-            <x-filament::icon icon="ri-upload-2-line" class="size-5" />
+            <x-filament::icon icon="lucide-upload" class="size-5" />
         </span>
 
         <span
@@ -183,6 +183,7 @@
         type="file"
         class="sr-only"
         tabindex="-1"
+        aria-hidden="true"
         accept="{{ implode(',', $acceptedFileTypes) }}"
         x-on:change="handle($event.target.files[0]); $event.target.value = ''"
         @disabled($isDisabled)

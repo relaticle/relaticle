@@ -23,8 +23,8 @@ enum SortField: string implements HasIcon, HasLabel
     public function getIcon(): string
     {
         return match ($this) {
-            self::Count => 'heroicon-o-hashtag',
-            self::Value => 'heroicon-o-language',
+            self::Count => 'lucide-hash',
+            self::Value => 'lucide-languages',
         };
     }
 }

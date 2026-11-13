@@ -23,13 +23,13 @@ final readonly class ValidWorkspaceSlug implements ValidationRule
         $value = (string) $value;
 
         if (mb_strlen($value) < 3) {
-            $fail('The :attribute must be at least 3 characters.');
+            $fail(__('workspaces.validation.slug_too_short'));
 
             return;
         }
 
         if (! preg_match(Workspace::SLUG_REGEX, $value)) {
-            $fail('The :attribute may only contain lowercase letters, numbers, and hyphens.');
+            $fail(__('workspaces.validation.slug_format'));
 
             return;
         }
@@ -39,7 +39,7 @@ final readonly class ValidWorkspaceSlug implements ValidationRule
         }
 
         if (in_array($value, Workspace::RESERVED_SLUGS, true)) {
-            $fail('The :attribute is reserved and cannot be used.');
+            $fail(__('workspaces.validation.slug_reserved'));
         }
     }
 }

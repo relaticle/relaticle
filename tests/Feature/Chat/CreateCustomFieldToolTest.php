@@ -13,6 +13,7 @@ use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
@@ -74,13 +75,14 @@ it('creates a pending proposal for a select field with options', function (): vo
     expect($decoded['type'])->toBe('pending_action')
         ->and($decoded['operation'])->toBe('create')
         ->and($decoded['entity_type'])->toBe('custom_field')
-        ->and($decoded['meta']['agent_should_stop'])->toBeTrue();
+        ->and($decoded['meta']['agent_should_stop'])->toBeTrue()
+        ->and(array_keys($decoded))->toBe(['type', 'pending_action_id', 'turn_id', 'action', 'entity_type', 'operation', 'data', 'display', 'summary', 'meta']);
 
     $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
 
     expect($pending->action_class)->toBe(CreateCustomField::class)
         ->and($pending->operation)->toBe(PendingActionOperation::Create)
-        ->and($pending->entity_type)->toBe('custom_field')
+        ->and($pending->entity_type)->toBe(ProposalEntity::CustomField)
         ->and($pending->action_data['name'])->toBe('Priority')
         ->and($pending->action_data['type'])->toBe('select')
         ->and($pending->action_data['entity_type'])->toBe('company')
@@ -178,6 +180,129 @@ it('returns error for a non-allowlisted field type', function (): void {
 
     expect($decoded)->toHaveKey('error')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses to propose a domain field', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Second domains',
+        'type' => 'domain',
+    ]);
+
+    expect($decoded)->toHaveKey('error')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('creates a currency field that pins the default currency settings', function (): void {
+    proposeCustomFields($this->convId, ['entity_type' => 'opportunity', 'name' => 'Retainer', 'type' => 'currency']);
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    expect($pending->action_data['settings'])->toEqual(['currency_code' => 'USD', 'display_type' => 'symbol', 'decimal_places' => 2])
+        ->and(array_column($pending->display_data['fields'], 'value', 'label'))->toMatchArray(['Type' => 'Currency', 'Currency' => 'USD', 'Display' => 'Symbol', 'Decimal Places' => '2'])
+        ->and($pending->display_data['summary'])->toBe('Create "Retainer" (Currency) on opportunity')
+        ->and(collect($pending->display_data['fields'])->firstWhere('label', 'Type')['icon'])->toStartWith('M');
+
+    $field = approveSoleFieldProposal($pending, $this->owner);
+
+    expect($field->type)->toBe('currency')
+        ->and($field->settings->additional)->toEqual(['currency_code' => 'USD', 'display_type' => 'symbol', 'decimal_places' => 2]);
+});
+
+it('creates a currency field in the requested currency with its own decimals', function (): void {
+    proposeCustomFields($this->convId, [
+        'entity_type' => 'opportunity',
+        'name' => 'Retainer',
+        'type' => 'currency',
+        'settings' => ['currency_code' => 'JPY', 'display_type' => 'code', 'visible_in_list' => false],
+    ]);
+
+    $field = approveSoleFieldProposal(PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail(), $this->owner);
+
+    expect($field->settings->additional)->toEqual(['currency_code' => 'JPY', 'display_type' => 'code', 'decimal_places' => 0])
+        ->and($field->settings->visible_in_list)->toBeFalse();
+});
+
+it('refuses a setting the field type does not take', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Region',
+        'type' => 'text',
+        'settings' => ['currency_code' => 'EUR'],
+    ]);
+
+    expect($decoded['error'])->toContain('A text field does not accept: currency_code.')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses a currency the panel does not offer', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'opportunity',
+        'name' => 'Retainer',
+        'type' => 'currency',
+        'settings' => ['currency_code' => 'XXX'],
+    ]);
+
+    expect($decoded['error'])->toContain('currency_code must be an uppercase ISO 4217 code')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('creates a record field linked to the requested record type', function (): void {
+    proposeCustomFields($this->convId, [
+        'entity_type' => 'opportunity',
+        'name' => 'Partner',
+        'type' => 'record',
+        'lookup_type' => 'company',
+    ]);
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    expect($pending->action_data['lookup_type'])->toBe('company')
+        ->and(array_column($pending->display_data['fields'], 'value', 'label'))->toMatchArray(['Links to' => 'Companies']);
+
+    $field = approveSoleFieldProposal($pending, $this->owner);
+
+    expect($field->type)->toBe('record')
+        ->and($field->lookup_type)->toBe('company');
+});
+
+it('refuses a record field without a lookup type', function (): void {
+    $decoded = proposeCustomFields($this->convId, ['entity_type' => 'opportunity', 'name' => 'Partner', 'type' => 'record']);
+
+    expect($decoded['error'])->toContain('A record field needs lookup_type')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses a lookup type the workspace cannot link to', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'opportunity',
+        'name' => 'Partner',
+        'type' => 'record',
+        'lookup_type' => 'user',
+    ]);
+
+    expect($decoded['error'])->toContain('Invalid lookup_type "user"')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses a lookup type on a field that is not a record field', function (): void {
+    $decoded = proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Region',
+        'type' => 'text',
+        'lookup_type' => 'company',
+    ]);
+
+    expect($decoded['error'])->toContain('Field type "text" does not take a lookup_type.')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('creates a rich editor field', function (): void {
+    proposeCustomFields($this->convId, ['entity_type' => 'company', 'name' => 'Account plan', 'type' => 'rich-editor']);
+
+    $field = approveSoleFieldProposal(PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail(), $this->owner);
+
+    expect($field->type)->toBe('rich-editor');
 });
 
 it('rejects when over the max_custom_fields_per_entity cap', function (): void {
@@ -496,7 +621,7 @@ it('proposes fields across two entities as one batch approved item by item', fun
         ->and($decoded)->not->toHaveKey('skipped_records')
         ->and($pending->action_data['records'])->toHaveCount(3)
         ->and($pending->display_data['summary'])->toBe('Create 3 custom fields')
-        ->and($pending->display_data['items'][2]['summary'])->toBe('Create "Tier" (select) on people with options: Gold, Silver');
+        ->and($pending->display_data['items'][2]['summary'])->toBe('Create "Tier" (Select) on people with options: Gold, Silver');
 
     $service = resolve(PendingActionService::class);
     $service->approveItem($pending, $this->owner, 0);
@@ -658,3 +783,16 @@ it('refuses more fields than one proposal holds', function (): void {
     expect($decoded['error'])->toBe('Too many records: at most 1 per proposal.')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
+
+function approveSoleFieldProposal(PendingAction $pending, User $owner): CustomField
+{
+    resolve(PendingActionService::class)->approve($pending, $owner);
+
+    TenantContextService::setTenantId($owner->currentWorkspace->getKey());
+
+    return CustomField::query()
+        ->withoutGlobalScope(CustomFieldsActivableScope::class)
+        ->where('tenant_id', $owner->currentWorkspace->getKey())
+        ->where('name', $pending->action_data['name'])
+        ->sole();
+}

@@ -82,8 +82,8 @@ final class CreateOpportunityTool extends BaseWriteCreateTool
         }
 
         return [
-            'title' => 'Create Opportunity',
-            'summary' => "Create opportunity \"{$name}\"",
+            'title' => $this->proposalEntity()->createTitle(),
+            'summary' => $this->proposalEntity()->createSummary($name),
             'fields' => $fields,
         ];
     }

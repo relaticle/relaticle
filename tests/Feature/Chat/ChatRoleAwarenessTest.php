@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
-use App\Features\Billing;
 use App\Models\Company;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -11,7 +10,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
@@ -110,7 +108,7 @@ test('still proposes a create for a member', function (): void {
 });
 
 test('offers the billing link only to a user who can manage billing', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->actingAs($this->owner);
     Filament::setTenant($this->workspace);

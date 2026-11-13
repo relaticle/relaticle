@@ -43,8 +43,9 @@ final readonly class CreateSetupConversation
         $conversationId = (string) Str::uuid7();
         $now = now();
 
+        // A savepoint, so the caller's transaction survives the violation and the catch can still query.
         try {
-            DB::table('agent_conversations')->insert([
+            DB::transaction(fn (): bool => DB::table('agent_conversations')->insert([
                 'id' => $conversationId,
                 'participant_type' => $owner->getMorphClass(),
                 'participant_id' => (string) $owner->getKey(),
@@ -53,7 +54,7 @@ final readonly class CreateSetupConversation
                 'purpose' => AgentConversation::PURPOSE_SETUP,
                 'created_at' => $now,
                 'updated_at' => $now,
-            ]);
+            ]));
         } catch (UniqueConstraintViolationException) {
             $existingId = $workspace->setupConversation()->value('id');
 

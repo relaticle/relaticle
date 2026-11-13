@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 
@@ -33,7 +34,7 @@ function proposeIn(User $user, string $conversationId): PendingAction
         conversationId: $conversationId,
         actionClass: CreatePeople::class,
         operation: PendingActionOperation::Create,
-        entityType: 'people',
+        entityType: ProposalEntity::People,
         actionData: ['name' => 'Jane Doe'],
         displayData: ['title' => 'Jane Doe', 'summary' => 'Create person "Jane Doe"', 'fields' => []],
     );

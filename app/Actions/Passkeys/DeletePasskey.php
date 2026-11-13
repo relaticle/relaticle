@@ -4,15 +4,12 @@ declare(strict_types=1);
 
 namespace App\Actions\Passkeys;
 
-use App\Enums\SocialiteProvider;
-use App\Features\SocialAuth;
 use App\Models\User;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\Passkeys\Actions\DeletePasskey as VendorDeletePasskey;
 use Laravel\Passkeys\Passkey;
-use Laravel\Pennant\Feature;
 
 final class DeletePasskey extends VendorDeletePasskey
 {
@@ -28,8 +25,7 @@ final class DeletePasskey extends VendorDeletePasskey
             $ownedPasskey = $lockedUser->passkeys()->whereKey($passkey->getKey())->firstOrFail();
             $hasAlternative = $lockedUser->hasPassword()
                 || $lockedUser->passkeys()->whereKeyNot($ownedPasskey->getKey())->exists()
-                || (Feature::for($lockedUser)->active(SocialAuth::class)
-                    && $lockedUser->socialAccounts()->whereIn('provider_name', SocialiteProvider::cases())->exists());
+                || $lockedUser->socialAccounts()->available()->exists();
 
             if (! $hasAlternative) {
                 throw ValidationException::withMessages(['identity' => __('auth.link.last_method')]);

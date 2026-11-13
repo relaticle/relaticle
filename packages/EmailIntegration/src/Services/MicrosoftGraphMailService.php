@@ -26,6 +26,8 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     /** Well-known folders whose mail never syncs. Their subfolders are skipped with them. */
     private const array EXCLUDED_FOLDERS = ['junkemail', 'deleteditems', 'outbox', 'conversationhistory', 'clutter', 'syncissues'];
 
+    private const array BULK_PRECEDENCE = ['bulk', 'junk'];
+
     private const int CURSOR_VERSION = 2;
 
     public const string PENDING_MESSAGE_ID_PREFIX = 'ms-pending-';
@@ -120,7 +122,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     public function fetchMessage(string $providerMessageId): FetchedEmailData
     {
         $message = $this->getMessageJson($providerMessageId, [
-            '$select' => 'id,internetMessageId,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,body',
+            '$select' => 'id,internetMessageId,internetMessageHeaders,conversationId,subject,bodyPreview,receivedDateTime,sentDateTime,isRead,hasAttachments,parentFolderId,from,toRecipients,ccRecipients,bccRecipients,replyTo,body',
             // Pull attachment metadata (not bytes) alongside the message so has-attachment
             // rows expose a downloadable list; bytes are fetched on demand via downloadAttachment().
             // contentId lives on fileAttachment; Graph answers 400 when it is selected on the base type.
@@ -132,6 +134,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             ...$this->mapAddresses('to', array_column($message['toRecipients'] ?? [], 'emailAddress')),
             ...$this->mapAddresses('cc', array_column($message['ccRecipients'] ?? [], 'emailAddress')),
             ...$this->mapAddresses('bcc', array_column($message['bccRecipients'] ?? [], 'emailAddress')),
+            ...$this->mapAddresses('reply_to', array_column($message['replyTo'] ?? [], 'emailAddress')),
         ];
 
         $sentAt = Date::parse((string) ($message['receivedDateTime'] ?? $message['sentDateTime'] ?? now()->toIso8601String()));
@@ -148,7 +151,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             threadId: (string) ($message['conversationId'] ?? ''),
             inReplyTo: null,
             subject: $message['subject'] ?? null,
-            snippet: mb_substr(strip_tags((string) ($message['bodyPreview'] ?? '')), 0, 255),
+            snippet: mb_substr(Str::squish((string) ($message['bodyPreview'] ?? '')), 0, 255),
             sentAt: $sentAt,
             direction: $isOutbound ? EmailDirection::OUTBOUND : EmailDirection::INBOUND,
             folder: $folder,
@@ -159,6 +162,22 @@ final class MicrosoftGraphMailService implements MailServiceInterface
             participants: $participants,
             attachments: $this->mapInboundAttachments($message['attachments'] ?? []),
             reconciliationMessageId: $this->reconciliationMessageId($message),
+            isBulkMail: ! $isOutbound && $this->hasBulkMailHeaders($message),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $message
+     */
+    private function hasBulkMailHeaders(array $message): bool
+    {
+        return array_any(
+            $message['internetMessageHeaders'] ?? [],
+            fn (array $header): bool => match (Str::lower((string) ($header['name'] ?? ''))) {
+                'list-unsubscribe' => true,
+                'precedence' => in_array(Str::lower(trim((string) ($header['value'] ?? ''))), self::BULK_PRECEDENCE, true),
+                default => false,
+            },
         );
     }
 
@@ -347,7 +366,6 @@ final class MicrosoftGraphMailService implements MailServiceInterface
      * @param array{
      *     subject: string,
      *     body_html: string,
-     *     body_text?: string,
      *     to: array<int, array{email: string, name: ?string}>,
      *     cc?: array<int, array{email: string, name: ?string}>,
      *     bcc?: array<int, array{email: string, name: ?string}>,

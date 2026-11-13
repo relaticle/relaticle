@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -36,14 +36,10 @@ final readonly class StoreEmailAction
      */
     public function execute(ConnectedAccount $connectedAccount, FetchedEmailData $data): Email
     {
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($connectedAccount->workspace_id);
-
-        try {
-            return $this->storeForAccount($connectedAccount, $data);
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        return resolve(CurrentWorkspace::class)->within(
+            $connectedAccount->workspace_id,
+            fn (): Email => $this->storeForAccount($connectedAccount, $data),
+        );
     }
 
     /**
@@ -63,10 +59,9 @@ final readonly class StoreEmailAction
 
         try {
             $email = DB::transaction(function () use ($connectedAccount, $data, &$storedInlinePaths): Email {
-                $email = Email::query()->create([
+                $email = $connectedAccount->emails()->chaperone()->create([
                     'workspace_id' => $connectedAccount->workspace_id,
                     'user_id' => $connectedAccount->user_id,
-                    'connected_account_id' => $connectedAccount->getKey(),
                     'rfc_message_id' => $data->rfcMessageId,
                     'provider_message_id' => $data->providerMessageId,
                     'thread_id' => $data->threadId,

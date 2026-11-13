@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
-use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\ColumnHeaderLabel;
+use App\Filament\Tables\Concerns\HasColumnMenu;
+use App\Filament\Tables\Concerns\HasResizableColumns;
+use App\Filament\Tables\Concerns\HasTableLayouts;
+use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\CustomField;
-use Filament\Support\Icons\Heroicon;
+use BackedEnum;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
@@ -16,6 +19,14 @@ use Relaticle\CustomFields\Facades\CustomFields;
 
 trait HasCustomFieldColumns
 {
+    use HasColumnMenu;
+    use HasResizableColumns;
+    use HasTableLayouts;
+    use PersistsTableState;
+
+    /** @var array<string, Htmlable> */
+    private array $columnHeaderLabels = [];
+
     public function table(Table $table): Table
     {
         $builder = CustomFields::table()->forModel($this->getModel());
@@ -27,48 +38,56 @@ trait HasCustomFieldColumns
                 $field = $fields->get($column->getName());
 
                 return $field instanceof CustomField
-                    ? $column->label(ColumnHeaderLabel::make($field->name, $field->typeData->icon))
+                    ? $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $field->name, $field->typeData->icon))
                     : $column;
             })
             ->all();
 
-        $titleColumn = CrmEntity::tryFromModel(new ($this->getModel()))?->titleColumn();
+        $titleColumn = $this->getTableTitleColumn();
 
         foreach ($table->getColumns() as $column) {
             $label = $column->getLabel();
-
-            if ($column->getName() === $titleColumn) {
-                continue;
-            }
 
             if ($label instanceof Htmlable) {
                 continue;
             }
 
-            $column->label(ColumnHeaderLabel::make($label, self::nativeColumnIcon($column->getName())));
+            $icon = $column->getName() === $titleColumn ? null : self::nativeColumnIcon($column->getName());
+
+            $column->label(fn (): Htmlable => $this->columnHeaderLabel($column->getName(), $label, $icon));
         }
 
-        return $table
-            ->modifyQueryUsing(function (Builder $query): void {
-                $query->with('customFieldValues.customField');
-            })
-            ->deferFilters(false)
-            ->pushColumns($columns)
-            ->pushFilters($builder->filters()->all());
+        return $this->stampResizableColumns(
+            $table
+                ->modifyQueryUsing(function (Builder $query): void {
+                    $query->with('customFieldValues.customField');
+                })
+                ->deferFilters(false)
+                ->pushColumns($columns)
+                ->pushFilters($builder->filters()->all()),
+        );
     }
 
-    private static function nativeColumnIcon(string $name): Heroicon
+    private function columnHeaderLabel(string $columnName, string $original, string|BackedEnum|null $icon): Htmlable
+    {
+        $label = $this->tableColumnLabel($columnName, $original);
+
+        // Stacked rows print the label in every cell, so each label is built once per request.
+        return $this->columnHeaderLabels["{$columnName}\0{$label}"] ??= ColumnHeaderLabel::make($label, $icon);
+    }
+
+    private static function nativeColumnIcon(string $name): string
     {
         return match ($name) {
-            'accountOwner.name' => Heroicon::OutlinedUser,
-            'creator.name' => Heroicon::OutlinedUserCircle,
-            'assignees.name' => Heroicon::OutlinedUsers,
-            'company.name' => Heroicon::OutlinedBuildingOffice2,
-            'relations' => Heroicon::OutlinedLink,
-            'created_at' => Heroicon::OutlinedCalendar,
-            'updated_at' => Heroicon::OutlinedClock,
-            'deleted_at' => Heroicon::OutlinedTrash,
-            default => Heroicon::OutlinedBars3BottomLeft,
+            'accountOwner.name' => 'lucide-user',
+            'creator.name' => 'lucide-circle-user',
+            'assignees.name' => 'lucide-users',
+            'company.name' => 'lucide-building-complex',
+            'relations' => 'lucide-link',
+            'created_at' => 'lucide-calendar',
+            'updated_at' => 'lucide-clock',
+            'deleted_at' => 'lucide-trash',
+            default => 'lucide-text-align-start',
         };
     }
 }

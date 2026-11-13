@@ -6,16 +6,50 @@ use App\Enums\OnboardingReferralSource;
 use App\Enums\OnboardingUseCase;
 use App\Features\SetupConversation;
 use App\Filament\Pages\CreateWorkspace;
+use App\Filament\Pages\SetupWorkspace;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Services\WorkspaceActivationFacts;
 use Illuminate\Support\Facades\Queue;
 use Laravel\Pennant\Feature;
-use Symfony\Component\DomCrawler\Crawler;
+use Pest\Browser\Api\AwaitableWebpage;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
-mutates(CreateWorkspace::class);
+mutates(CreateWorkspace::class, SetupWorkspace::class);
+
+const FOCUSED_HEADING = 'new Promise(resolve => { const end = Date.now() + 3000; const poll = () => { const focused = document.activeElement; focused?.tagName === "H1" || Date.now() > end ? resolve(focused?.tagName === "H1" ? focused.innerText.trim() : focused?.tagName) : setTimeout(poll, 50); }; poll(); })';
+
+const ACTION_MODALS_READY = 'new Promise(resolve => { const ready = () => document.querySelector(\'[x-data^="filamentActionModals"]\')?._x_dataStack !== undefined; const poll = () => ready() ? resolve(true) : setTimeout(poll, 25); poll(); })';
+
+function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWebpage
+{
+    return loginViaBrowser($user)
+        ->assertPathIs('/app/new')
+        ->navigate('/app/new')
+        ->type('[id="form.name"]', $name)
+        ->type('[id="form.slug"]', $slug)
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('How did you hear about us?')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertPathIs("/app/{$slug}/setup");
+}
 
 it('records onboarding conversions after navigation without counting them again', function (string $event): void {
     $page = visit('/app/login');
-    $page->script('window.fathomEvents = []; window.fathomPageviews = []; window.fathom = { trackEvent: event => window.fathomEvents.push(event), trackPageview: options => window.fathomPageviews.push(options.url) };');
+    $page->script(<<<'JS'
+        window.fathomEvents = [];
+        window.fathomPageviews = [];
+        const capture = payload => {
+            if (payload.name) {
+                window.fathomEvents.push(payload.name);
+            } else if (!payload.dp) {
+                window.fathomPageviews.push(payload.p);
+            }
+        };
+        window.fathom = { send: capture, beacon: capture, isTrackingEnabled: () => true };
+        JS);
 
     $environment = app()->environment();
     app()->instance('env', 'production');
@@ -23,30 +57,42 @@ it('records onboarding conversions after navigation without counting them again'
     session()->put('fathom.track_'.$event, true);
 
     try {
-        $html = view('filament.app.analytics')->render();
+        $html = json_encode(view('filament.app.analytics')->render(), JSON_THROW_ON_ERROR);
     } finally {
         app()->instance('env', $environment);
     }
 
-    foreach (new Crawler($html)->filter('script:not([src])') as $script) {
-        $source = json_encode($script->textContent, JSON_THROW_ON_ERROR);
-        $page->script('(() => { const script = document.createElement("script"); script.textContent = '.$source.'; document.head.append(script); })()');
-    }
+    $page->script(<<<JS
+        (() => {
+            const append = document.head.appendChild.bind(document.head);
+            document.head.appendChild = element => element.src === 'https://cdn.usefathom.com/script.js' ? element : append(element);
+            const markup = new DOMParser().parseFromString({$html}, 'text/html');
+            document.head.appendChild(markup.querySelector('[data-relaticle-analytics]'));
+            const script = document.createElement('script');
+            script.textContent = markup.querySelector('script:not([type])').textContent;
+            document.head.appendChild(script);
+            document.head.appendChild = append;
+        })();
+        JS);
+
+    $page->assertScript('window.fathomEvents', [$event])
+        ->assertScript('window.fathomPageviews', ['/login']);
 
     $page->script('Livewire.navigate("/app/login?tracking=first")');
     $page->assertScript('window.location.search', '?tracking=first')
         ->assertScript('window.fathomEvents', [$event])
-        ->assertScript('window.fathomPageviews.map(url => new URL(url).pathname + new URL(url).search)', ['/login']);
+        ->assertScript('window.fathomPageviews', ['/login', '/login']);
 
     $page->script('Livewire.navigate("/app/login?tracking=second")');
     $page->assertScript('window.location.search', '?tracking=second')
         ->assertScript('window.fathomEvents', [$event])
-        ->assertScript('window.fathomPageviews.map(url => new URL(url).pathname + new URL(url).search)', ['/login', '/login'])
+        ->assertScript('window.fathomPageviews', ['/login', '/login', '/login'])
         ->assertNoJavaScriptErrors();
 })->with(['signup', 'workspace_created']);
 
-it('new user without workspaces is directed to onboarding wizard', function (): void {
+it('walks a new owner through every setup screen to the setup conversation', function (): void {
     Feature::define(SetupConversation::class, true);
+    config()->set('services.azure.client_id', 'azure-client');
     Queue::fake();
 
     $user = User::factory()->create();
@@ -56,18 +102,28 @@ it('new user without workspaces is directed to onboarding wizard', function (): 
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
         ->assertSee('Your name')
-        // Step 1: Create workspace
         ->type('[id="form.name"]', 'My First Workspace')
         ->type('[id="form.slug"]', 'my-first-workspace')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        // Step 2: Attribution (optional, just proceed)
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertPathIs('/app/my-first-workspace/setup')
+        ->assertNoJavaScriptErrors()
+        ->assertSee('Continue with Google')
+        ->assertSee('Continue with Microsoft')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
-        // Step 3: Use case (select "Other" which has no sub-options)
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Invite your team')
         ->press('Get started')
-        ->assertPathContains('/my-first-workspace/chats/');
+        ->assertPathContains('/my-first-workspace/chats/')
+        ->assertNoJavaScriptErrors();
 
     $user->refresh();
 
@@ -75,8 +131,144 @@ it('new user without workspaces is directed to onboarding wizard', function (): 
 
     expect($user->ownedWorkspaces)->toHaveCount(1)
         ->and($workspace->name)->toBe('My First Workspace')
+        ->and($workspace->onboarding_step)->toBeNull()
         ->and($workspace->setupConversation)->not->toBeNull();
 });
+
+it('returns an owner who left mid-setup to the step they were on', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    walkToMailboxStep($user, 'Resume Workspace', 'resume-workspace')
+        ->navigate('/app/resume-workspace')
+        ->waitForEvent('networkidle')
+        ->assertPathIs('/app/resume-workspace/setup')
+        ->assertSee('Start with the people you already email')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->navigate('/app/resume-workspace/companies')
+        ->assertPathIs('/app/resume-workspace/setup')
+        ->assertSee('Help us customize your workspace')
+        ->assertDontSee('Start with the people you already email');
+});
+
+it('stores the sharing level an owner picks after a mailbox is connected', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    $page = walkToMailboxStep($user, 'Northwind Studio', 'northwind-studio');
+
+    $mailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => Workspace::query()->where('slug', 'northwind-studio')->value('id'),
+        'email_address' => 'olivia@northwind.test',
+    ]));
+
+    app()->forgetInstance(WorkspaceActivationFacts::class);
+
+    $page->navigate('/app/northwind-studio/setup')
+        ->waitForText('Choose what your team sees')
+        ->assertSee('olivia@northwind.test')
+        ->assertSee('Subject line and participants')
+        ->click('[data-tier="subject"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Help us customize your workspace')
+        ->assertDontSee('Choose what your team sees');
+
+    expect($mailbox->refresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
+});
+
+it('moves the preview panel with the setup step', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $activeNavigation = 'document.querySelector("[data-preview-nav][data-active]")?.dataset.previewNav';
+    $visibleStages = '[...document.querySelectorAll("[data-preview-stage]")].filter(stage => stage.offsetParent !== null).map(stage => stage.dataset.previewStage)';
+
+    walkToMailboxStep($user, 'Hiring Desk', 'hiring-desk')
+        ->assertScript($activeNavigation, 'people')
+        ->assertScript($visibleStages, [])
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript($activeNavigation, 'dashboard')
+        ->assertScript($visibleStages, [])
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[for$="onboarding_use_case-recruiting"]')
+        ->waitForText('Pick what applies to you.')
+        ->assertScript($activeNavigation, 'opportunities')
+        ->assertScript($visibleStages, array_keys(OnboardingUseCase::Recruiting->pipelineStages()))
+        ->press('Back')
+        ->waitForText('Start with the people you already email')
+        ->assertScript($activeNavigation, 'people')
+        ->assertScript($visibleStages, []);
+});
+
+it('changes the invite button when an address is typed and confirms the copied link', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[for$="onboarding_use_case-other"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Invite your team')
+        ->assertDontSee('Send invites and get started')
+        ->type('[id="form.emails"]', 'maya@acme.com')
+        ->assertSee('Send invites and get started');
+
+    $page->assertSee('Copy link')
+        ->script('navigator.clipboard.writeText = () => Promise.resolve()');
+
+    $page->assertDontSee('Link copied.')
+        ->press('Copy link')
+        ->assertSee('Link copied.');
+});
+
+it('shows the invite link to copy by hand when the clipboard is unavailable', function (string $clipboard): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+    $manualLink = '[data-invite-link-manual]';
+
+    $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[for$="onboarding_use_case-other"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Invite your team')
+        ->assertMissing($manualLink);
+
+    $token = Workspace::query()->where('slug', 'acme-sales')->value('invite_link_token');
+
+    $page->script("(() => { {$clipboard} })()");
+
+    $page->press('Copy link')
+        ->assertVisible($manualLink)
+        ->assertScript("new URL(document.querySelector('{$manualLink}').value).pathname", route('workspaces.join', ['token' => $token], absolute: false))
+        ->assertScript("(field => field.selectionStart === 0 && field.selectionEnd === field.value.length)(document.querySelector('{$manualLink}'))", true)
+        ->assertDontSee('Link copied.');
+})->with([
+    'write rejected' => "navigator.clipboard.writeText = () => Promise.reject(new Error('denied'))",
+    'no clipboard api' => "Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })",
+]);
 
 it('stores the use case and its sub-option chosen in the browser', function (): void {
     Queue::fake();
@@ -88,15 +280,24 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
         ->type('[id="form.name"]', 'Hiring Desk')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-recruiting"]')
         ->waitForText('Pick what applies to you.')
         ->click('[for$="onboarding_context-sourcing"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Invite your team')
         ->press('Get started')
-        ->assertPathContains('/hiring-desk');
+        ->assertPathIs('/app/hiring-desk')
+        ->assertSee('Workspace created');
 
     $user->refresh();
 
@@ -105,6 +306,66 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
     expect($workspace->onboarding_use_case)->toBe(OnboardingUseCase::Recruiting)
         ->and($workspace->onboarding_context)->toBe(['sourcing'])
         ->and($workspace->name)->toBe('Hiring Desk');
+});
+
+it('moves focus to the heading of each new wizard and setup step', function (): void {
+    Queue::fake();
+
+    $user = User::factory()->create();
+
+    loginViaBrowser($user)
+        ->assertPathIs('/app/new')
+        ->navigate('/app/new')
+        ->waitForText('Create your workspace')
+        ->assertScript('new Promise(resolve => { const end = Date.now() + 3000; const poll = () => document.activeElement?.id === "form.name" || Date.now() > end ? resolve(document.activeElement?.id) : setTimeout(poll, 50); poll(); })', 'form.name')
+        ->type('[id="form.name"]', 'Hiring Desk')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('How did you hear about us?')
+        ->assertScript(FOCUSED_HEADING, 'How did you hear about us?')
+        ->press('button:visible:has-text("Back")')
+        ->assertScript(FOCUSED_HEADING, 'Create your workspace')
+        ->press('button:visible:has-text("Continue")')
+        ->assertScript(FOCUSED_HEADING, 'How did you hear about us?')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertScript(FOCUSED_HEADING, 'Start with the people you already email')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(FOCUSED_HEADING, 'Help us customize your workspace')
+        ->press('button:visible:has-text("Back")')
+        ->waitForText('Start with the people you already email')
+        ->assertScript(FOCUSED_HEADING, 'Start with the people you already email')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[for$="onboarding_use_case-other"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Invite your team')
+        ->assertScript(FOCUSED_HEADING, 'Invite your team');
+});
+
+it('clears the required details error as soon as a detail is ticked', function (): void {
+    $user = User::factory()->create();
+
+    walkToMailboxStep($user, 'Hiring Desk', 'hiring-desk')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
+        ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[for$="onboarding_use_case-recruiting"]')
+        ->waitForText('Pick what applies to you.')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('The use case details field is required.')
+        ->click('[for$="onboarding_context-sourcing"]')
+        ->assertScript('new Promise(resolve => { const end = Date.now() + 3000; const poll = () => { const shown = document.body.innerText.includes("The use case details field is required."); shown && Date.now() < end ? setTimeout(poll, 50) : resolve(shown); }; poll(); })', false);
 });
 
 it('stores the assistant and the question behind an AI referral picked in the browser', function (): void {
@@ -117,18 +378,29 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->navigate('/app/new')
         ->assertSee('Create your workspace')
         ->type('[id="form.name"]', 'Assistant Desk')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
         ->assertDontSee('Which assistant was it?')
-        ->click('[for$="onboarding_referral_source-ai"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[id$="onboarding_referral_source-ai"]')
         ->waitForText('Which assistant was it?')
-        ->click('[for$="onboarding_referral_detail-claude"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
+        ->click('[id$="onboarding_referral_detail-claude"]')
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
-        ->press('Continue')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Start with the people you already email')
+        ->assertScript(ACTION_MODALS_READY, true)
+        ->press("I'll add people and companies myself")
+        ->waitForText('Continue without your mailbox?')
+        ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
+        ->press('button:visible:has-text("Continue")')
+        ->waitForText('Invite your team')
         ->press('Get started')
-        ->assertPathContains('/assistant-desk');
+        ->assertPathIs('/app/assistant-desk')
+        ->assertSee('Workspace created');
 
     $workspace = $user->refresh()->ownedWorkspaces->first();
 

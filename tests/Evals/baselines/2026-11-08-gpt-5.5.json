@@ -1,0 +1,464 @@
+{
+    "model": "gpt-5.5",
+    "judge": "claude-opus-5-5",
+    "started_at": "2026-11-08T23:00:18+00:00",
+    "cases": [
+        {
+            "name": "it never prints a raw id",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 47038,
+            "tokens_out": 66,
+            "replayed_bytes": 6899,
+            "tool_calls": 1,
+            "duration_ms": 5506,
+            "reasons": []
+        },
+        {
+            "name": "it never answers with a markdown table",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 45634,
+            "tokens_out": 246,
+            "replayed_bytes": 1319,
+            "tool_calls": 1,
+            "duration_ms": 9203,
+            "reasons": []
+        },
+        {
+            "name": "it never opens a section with a heading line",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 44993,
+            "tokens_out": 250,
+            "replayed_bytes": 674,
+            "tool_calls": 1,
+            "duration_ms": 6568,
+            "reasons": []
+        },
+        {
+            "name": "it never writes an em dash",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 51949,
+            "tokens_out": 336,
+            "replayed_bytes": 25526,
+            "tool_calls": 1,
+            "duration_ms": 8098,
+            "reasons": []
+        },
+        {
+            "name": "it never narrates what it is about to do",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 47245,
+            "tokens_out": 53,
+            "replayed_bytes": 4227,
+            "tool_calls": 1,
+            "duration_ms": 4469,
+            "reasons": []
+        },
+        {
+            "name": "it counts with the summary tool when asked how many",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 44847,
+            "tokens_out": 94,
+            "replayed_bytes": 182,
+            "tool_calls": 1,
+            "duration_ms": 4890,
+            "reasons": []
+        },
+        {
+            "name": "it proposes the task unassigned and offers the invitation for an unknown assignee",
+            "passed": false,
+            "samples": 3,
+            "tokens_in": 90347,
+            "tokens_out": 380,
+            "replayed_bytes": 626,
+            "tool_calls": 3,
+            "duration_ms": 12532,
+            "reasons": [
+                "Sample #1: LlmJudge scored 0.5 (threshold: 0.7). [Partially meets the criteria] The reply proposes an unassigned task and clearly states that Ahmed couldn't be found as a workspace member or person. It does not offer to invite him, which is a required element of the criteria. Two of three elements are met.\nFailed asserting that 0.5 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it points at mass send instead of sending one email per person",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 22355,
+            "tokens_out": 567,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 10086,
+            "reasons": []
+        },
+        {
+            "name": "it offers to create a note when the list comes back empty",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 44790,
+            "tokens_out": 73,
+            "replayed_bytes": 67,
+            "tool_calls": 1,
+            "duration_ms": 4275,
+            "reasons": []
+        },
+        {
+            "name": "it offers nothing to create when the email list comes back empty",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 67875,
+            "tokens_out": 221,
+            "replayed_bytes": 737,
+            "tool_calls": 2,
+            "duration_ms": 9490,
+            "reasons": []
+        },
+        {
+            "name": "it tells a viewer that an owner or admin can do it and links no page",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 20170,
+            "tokens_out": 100,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 3248,
+            "reasons": []
+        },
+        {
+            "name": "it answers a Persian message in Persian script",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 49958,
+            "tokens_out": 83,
+            "replayed_bytes": 9957,
+            "tool_calls": 1,
+            "duration_ms": 5295,
+            "reasons": []
+        },
+        {
+            "name": "it answers a Spanish message in Spanish",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 47398,
+            "tokens_out": 76,
+            "replayed_bytes": 5011,
+            "tool_calls": 1,
+            "duration_ms": 4671,
+            "reasons": []
+        },
+        {
+            "name": "it answers a request for a new table with custom fields from the docs",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 45350,
+            "tokens_out": 290,
+            "replayed_bytes": 1940,
+            "tool_calls": 1,
+            "duration_ms": 7518,
+            "reasons": []
+        },
+        {
+            "name": "it searches the docs first for a product question",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 68195,
+            "tokens_out": 294,
+            "replayed_bytes": 1980,
+            "tool_calls": 2,
+            "duration_ms": 8303,
+            "reasons": []
+        },
+        {
+            "name": "it declines an out of scope request in one sentence and offers one CRM action",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 22352,
+            "tokens_out": 123,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 3242,
+            "reasons": []
+        },
+        {
+            "name": "it asks for web access once when the user wants the web",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 68356,
+            "tokens_out": 392,
+            "replayed_bytes": 1030,
+            "tool_calls": 2,
+            "duration_ms": 9923,
+            "reasons": []
+        },
+        {
+            "name": "it answers a credit question from the balance tool",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 22354,
+            "tokens_out": 43,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 3196,
+            "reasons": [
+                "ToolCallMatch scored 0 (threshold: 0.7). Missing tool calls: GetCreditBalanceTool. Matched: .\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it answers a judgement question with a subset, never a bulk update offer",
+            "passed": false,
+            "samples": 3,
+            "tokens_in": 56074,
+            "tokens_out": 180,
+            "replayed_bytes": 33631,
+            "tool_calls": 1,
+            "duration_ms": 5794,
+            "reasons": [
+                "Sample #1: LlmJudge scored 0 (threshold: 0.7). [Completely fails to meet the criteria] The criterion says the reply must never offer to update every listed task. The output explicitly asks, \"Want me to update all of these tasks to Waiting on others?\" That is exactly the forbidden behavior. It neither proposes a subset nor asks which tasks to move. This is a complete failure.\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it does not repeat the same task table when asked to investigate",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 28257,
+            "tokens_out": 68,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 3586,
+            "reasons": []
+        },
+        {
+            "name": "it answers a how many question from the summary, not from a list",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 44919,
+            "tokens_out": 46,
+            "replayed_bytes": 674,
+            "tool_calls": 1,
+            "duration_ms": 5420,
+            "reasons": [
+                "ToolCallMatch scored 0 (threshold: 0.7). Missing tool calls: GetCrmSummaryTool. Matched: .\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it lists companies in a short reply with no table and no heading",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 47487,
+            "tokens_out": 83,
+            "replayed_bytes": 5006,
+            "tool_calls": 1,
+            "duration_ms": 5210,
+            "reasons": []
+        },
+        {
+            "name": "it does not claim to show the first page as everything when more rows exist",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 49418,
+            "tokens_out": 52,
+            "replayed_bytes": 7514,
+            "tool_calls": 1,
+            "duration_ms": 4703,
+            "reasons": []
+        },
+        {
+            "name": "it keeps the replayed task list under ten kilobytes",
+            "passed": false,
+            "samples": 1,
+            "tokens_in": 51813,
+            "tokens_out": 145,
+            "replayed_bytes": 21422,
+            "tool_calls": 1,
+            "duration_ms": 5711,
+            "reasons": [
+                "ReplayedBytesUnder scored 0 (threshold: 0.7). Replayed 21422 bytes, limit 10000\nFailed asserting that 0.0 is equal to 0.7 or is greater than 0.7."
+            ]
+        },
+        {
+            "name": "it reads recent activity with the activity tool",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 56749,
+            "tokens_out": 119,
+            "replayed_bytes": 29575,
+            "tool_calls": 1,
+            "duration_ms": 5172,
+            "reasons": []
+        },
+        {
+            "name": "it looks up workspace members with the members tool",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 44840,
+            "tokens_out": 56,
+            "replayed_bytes": 296,
+            "tool_calls": 1,
+            "duration_ms": 4257,
+            "reasons": []
+        },
+        {
+            "name": "it says person and company where the user did not say contact",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 45197,
+            "tokens_out": 56,
+            "replayed_bytes": 662,
+            "tool_calls": 1,
+            "duration_ms": 4543,
+            "reasons": []
+        },
+        {
+            "name": "it may say contact when the user said contact",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 45261,
+            "tokens_out": 108,
+            "replayed_bytes": 662,
+            "tool_calls": 1,
+            "duration_ms": 5177,
+            "reasons": []
+        },
+        {
+            "name": "it greets a new sales workspace with people and companies, briefly, without tools",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 22494,
+            "tokens_out": 161,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 3651,
+            "reasons": []
+        },
+        {
+            "name": "it says plainly that a sample only workspace holds sample data",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 44887,
+            "tokens_out": 140,
+            "replayed_bytes": 182,
+            "tool_calls": 1,
+            "duration_ms": 5028,
+            "reasons": []
+        },
+        {
+            "name": "it looks a company up with lookup true before it updates it",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 67800,
+            "tokens_out": 115,
+            "replayed_bytes": 969,
+            "tool_calls": 2,
+            "duration_ms": 7251,
+            "reasons": []
+        },
+        {
+            "name": "it creates five companies in one call",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 45201,
+            "tokens_out": 59,
+            "replayed_bytes": 1329,
+            "tool_calls": 1,
+            "duration_ms": 4730,
+            "reasons": []
+        },
+        {
+            "name": "it chains a company and a person with a plan reference",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 67658,
+            "tokens_out": 84,
+            "replayed_bytes": 920,
+            "tool_calls": 2,
+            "duration_ms": 7151,
+            "reasons": []
+        },
+        {
+            "name": "it reads the custom field before it removes cents from Amount",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 68084,
+            "tokens_out": 125,
+            "replayed_bytes": 1870,
+            "tool_calls": 2,
+            "duration_ms": 7345,
+            "reasons": []
+        },
+        {
+            "name": "it ends a note proposal with at most one question",
+            "passed": true,
+            "samples": 3,
+            "tokens_in": 67689,
+            "tokens_out": 139,
+            "replayed_bytes": 904,
+            "tool_calls": 2,
+            "duration_ms": 9538,
+            "reasons": []
+        },
+        {
+            "name": "it proposes an invitation and does not say it was sent",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 44887,
+            "tokens_out": 40,
+            "replayed_bytes": 466,
+            "tool_calls": 1,
+            "duration_ms": 4421,
+            "reasons": []
+        },
+        {
+            "name": "it reports an approved company as created after the user decides",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 22820,
+            "tokens_out": 33,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 2314,
+            "reasons": []
+        },
+        {
+            "name": "it reports a rejected task as not written",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 22748,
+            "tokens_out": 24,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 2216,
+            "reasons": []
+        },
+        {
+            "name": "it never calls a superseded note approved",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 22656,
+            "tokens_out": 176,
+            "replayed_bytes": 0,
+            "tool_calls": 0,
+            "duration_ms": 4169,
+            "reasons": []
+        },
+        {
+            "name": "it proposes deleting only the company and never claims a cascade",
+            "passed": true,
+            "samples": 1,
+            "tokens_in": 68045,
+            "tokens_out": 111,
+            "replayed_bytes": 1143,
+            "tool_calls": 2,
+            "duration_ms": 7117,
+            "reasons": []
+        }
+    ],
+    "totals": {
+        "cases": 40,
+        "passed": 35,
+        "pass_rate": 0.875,
+        "tokens_in_mean": 47154.8,
+        "replayed_bytes_mean": 4185
+    }
+}

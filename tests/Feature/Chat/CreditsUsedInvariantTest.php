@@ -55,6 +55,8 @@ it('revocation adjustments do not touch credits_used', function (): void {
 });
 
 it('reserve + settle + refund cycles move credits_used in lockstep with the chat ledger', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->delete();

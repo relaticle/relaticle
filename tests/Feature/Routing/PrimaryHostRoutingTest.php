@@ -7,33 +7,31 @@ use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
 use App\Http\Middleware\RedirectToPrimaryHost;
 use App\Models\Export;
 use App\Models\User;
+use Laravel\Socialite\Facades\Socialite;
+use Laravel\Socialite\Two\GoogleProvider;
+use Laravel\Socialite\Two\InvalidStateException;
 
 mutates(RedirectToPrimaryHost::class, DenyIndexingOnSecondaryHosts::class);
 
 describe('public pages on secondary hosts', function () {
-    it('permanently redirects a marketing page to the primary host', function (): void {
-        $this->get('http://sysadmin.relaticle.test/pricing')
+    it('permanently redirects a public page to the primary host', function (): void {
+        $this->get('http://sysadmin.relaticle.test/.well-known/security.txt')
             ->assertStatus(301)
-            ->assertRedirect('http://relaticle.test/pricing');
+            ->assertRedirect('http://relaticle.test/.well-known/security.txt');
     });
 
     it('preserves the path and query string when redirecting', function (): void {
-        $this->get('http://api.relaticle.test/compare/relaticle-vs-espocrm?utm_source=newsletter')
-            ->assertRedirect('http://relaticle.test/compare/relaticle-vs-espocrm?utm_source=newsletter');
-    });
-
-    it('redirects documentation pages', function (): void {
-        $this->get('http://mcp.relaticle.test/help')
-            ->assertRedirect('http://relaticle.test/help');
+        $this->get('http://api.relaticle.test/.well-known/security.txt?utm_source=newsletter')
+            ->assertRedirect('http://relaticle.test/.well-known/security.txt?utm_source=newsletter');
     });
 
     it('redirects on any unrecognised subdomain, not only configured ones', function (): void {
-        $this->get('http://landing-typo.relaticle.test/pricing')
-            ->assertRedirect('http://relaticle.test/pricing');
+        $this->get('http://landing-typo.relaticle.test/.well-known/security.txt')
+            ->assertRedirect('http://relaticle.test/.well-known/security.txt');
     });
 
     it('serves public pages normally on the primary host', function (): void {
-        $this->get('http://relaticle.test/pricing')
+        $this->get('http://relaticle.test/.well-known/security.txt')
             ->assertOk()
             ->assertHeaderMissing('X-Robots-Tag');
     });
@@ -84,6 +82,40 @@ describe('app plumbing on secondary hosts', function () {
         expect(urldecode($location))->toContain('redirect_uri=http://app.relaticle.test/auth/callback/google');
     });
 
+    it('exchanges the socialite code with the redirect_uri of the requesting host', function (): void {
+        config([
+            'services.google.client_id' => 'test-client-id',
+            'services.google.redirect' => '/auth/callback/google',
+        ]);
+
+        $driver = Mockery::mock(GoogleProvider::class);
+        $driver->shouldReceive('redirectUrl')->once()->with('http://app.relaticle.test/auth/callback/google')->andReturnSelf();
+        $driver->shouldReceive('user')->once()->andThrow(new InvalidStateException);
+        Socialite::shouldReceive('driver')->with('google')->andReturn($driver);
+
+        $this->get('http://app.relaticle.test/auth/callback/google?code=accepted')
+            ->assertRedirect();
+    });
+
+    it('keeps an absolute socialite callback as configured', function (): void {
+        config([
+            'services.google.client_id' => 'test-client-id',
+            'services.google.redirect' => 'https://login.example.com/auth/callback/google',
+        ]);
+
+        $location = (string) $this->get('http://app.relaticle.test/auth/redirect/google')
+            ->assertStatus(302)
+            ->headers->get('Location');
+
+        expect(urldecode($location))->toContain('redirect_uri=https://login.example.com/auth/callback/google');
+    });
+
+    it('serves the guest passkey sign-in options on the app host so the ceremony stays same-origin', function (): void {
+        $this->get('http://app.relaticle.test/passkeys/login/options')
+            ->assertOk()
+            ->assertJsonStructure(['options' => ['challenge']]);
+    });
+
     it('leaves filament export downloads untouched', function (): void {
         $user = User::factory()->withPersonalWorkspace()->create();
 
@@ -106,7 +138,7 @@ describe('app plumbing on secondary hosts', function () {
 
 describe('indexing on secondary hosts', function () {
     it('marks every secondary-host response noindex', function (): void {
-        $this->get('http://sysadmin.relaticle.test/pricing')
+        $this->get('http://sysadmin.relaticle.test/.well-known/security.txt')
             ->assertHeader('X-Robots-Tag', 'noindex, nofollow');
     });
 

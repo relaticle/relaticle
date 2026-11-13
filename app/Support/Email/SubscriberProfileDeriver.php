@@ -8,6 +8,7 @@ use App\Enums\SubscriberTagEnum;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Database\Eloquent\Model;
@@ -91,7 +92,7 @@ final readonly class SubscriberProfileDeriver
         $workspaceIds = $user->allWorkspaces()->pluck('id');
 
         foreach ([Company::class, People::class, Opportunity::class] as $entity) {
-            $query = $entity::query()->whereIn('workspace_id', $workspaceIds);
+            $query = $entity::query()->withoutGlobalScope(WorkspaceScope::class)->whereIn('workspace_id', $workspaceIds);
 
             if ($excluding instanceof $entity) {
                 $query->whereKeyNot($excluding->getKey());

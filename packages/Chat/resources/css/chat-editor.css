@@ -2,20 +2,20 @@
 
 /* Placeholder for empty editor. The Placeholder extension adds .is-editor-empty
    and data-placeholder; we render the text via ::before. */
-.ProseMirror p.is-editor-empty:first-child::before {
+.chat-editor p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     float: left;
     color: var(--color-gray-400);
     pointer-events: none;
     height: 0;
 }
-.dark .ProseMirror p.is-editor-empty:first-child::before {
+.dark .chat-editor p.is-editor-empty:first-child::before {
     color: var(--color-gray-500);
 }
 
 /* Mention chips inside the editor, matching the existing chip styling so
    atomic delete looks the same as historical-message rendering. */
-.ProseMirror span[data-mention-id] {
+.chat-editor span[data-mention-id] {
     display: inline-flex;
     align-items: center;
     cursor: default;
@@ -23,9 +23,9 @@
 }
 
 /* Caret/selection sanity inside ProseMirror */
-.ProseMirror:focus {
+.chat-editor:focus {
     outline: none;
 }
-.ProseMirror p {
+.chat-editor p {
     margin: 0;
 }

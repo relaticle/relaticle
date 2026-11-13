@@ -1,22 +1,39 @@
+@use(App\Filament\Actions\PreviewRecordAction)
 @php
     $chips = $getChips();
     $url = $getUrl();
+    $previewAction = $getPreviewActionName();
+    $recordKey = $getRecordKey();
 @endphp
 
-<div class="flex flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2 text-sm text-gray-950 dark:text-white">
-    @forelse ($chips as $chip)
-        @if (filled($url))
-            <a
-                href="{{ $url }}"
-                @if ($shouldOpenUrlInNewTab()) target="_blank" @endif
-                class="text-primary-600 hover:underline dark:text-primary-400"
-            >
+<div
+    class="flex w-full items-center gap-2 px-3 py-2 text-sm text-gray-950 dark:text-white"
+    @if ($previewAction)
+        x-effect="$el.closest('tr')?.classList.toggle('fi-record-previewing', $wire.mountedActions.at(-1)?.name === @js($previewAction) && $wire.mountedActions.at(-1)?.context?.recordKey === @js($recordKey))"
+    @endif
+>
+    <div class="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+        @forelse ($chips as $chip)
+            @if (filled($url))
+                {{-- Filament wraps a cell with a URL in its own link, and a nested anchor gets pulled out of the cell. --}}
+                <span class="min-w-0 max-w-full text-primary-600 hover:underline dark:text-primary-400">{{ $chip }}</span>
+            @else
                 {{ $chip }}
-            </a>
-        @else
-            {{ $chip }}
-        @endif
-    @empty
-        <span class="text-gray-400 dark:text-gray-500">{{ $getPlaceholder() }}</span>
-    @endforelse
+            @endif
+        @empty
+            <span class="fi-linked-records-cell-empty">{{ $getPlaceholder() }}</span>
+        @endforelse
+    </div>
+
+    @if ($previewAction)
+        <x-filament::icon-button
+            icon="lucide-panel-right"
+            color="gray"
+            size="xs"
+            :label="__('filament/record-page.actions.open_preview')"
+            :tooltip="__('filament/record-page.actions.open_preview')"
+            x-on:click.prevent.stop="{{ PreviewRecordAction::open(['position' => null], ['table' => true, 'recordKey' => $recordKey]) }}"
+            class="fi-record-preview-trigger"
+        />
+    @endif
 </div>

@@ -128,7 +128,7 @@ final readonly class OpportunityAggregatesQuery
         $rows = DB::select(
             "SELECT COALESCE(c.name, 'No Company') as label, COUNT(*) as count, {$amountSelect}
              FROM opportunities o
-             LEFT JOIN companies c ON c.id = o.company_id AND c.deleted_at IS NULL
+             LEFT JOIN companies c ON c.id = o.company_id AND c.workspace_id = o.workspace_id AND c.deleted_at IS NULL
              {$amountJoin}
              WHERE o.workspace_id = ? AND o.deleted_at IS NULL{$dateClause}
              GROUP BY c.id, c.name

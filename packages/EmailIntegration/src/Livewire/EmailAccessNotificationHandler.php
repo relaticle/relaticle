@@ -12,13 +12,13 @@ use Filament\Schemas\Concerns\InteractsWithSchemas;
 use Filament\Schemas\Contracts\HasSchemas;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Js;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RetryMailboxHistoryImportFailuresAction;
-use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -42,9 +42,15 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
 
     public const string LIVEWIRE_ALIAS = 'email-integration.access-request-handler';
 
-    private const string DATABASE_NOTIFICATIONS_MODAL_ID = 'database-notifications';
-
+    #[Url(as: 'email')]
     public ?string $selectedEmailId = null;
+
+    public function mount(): void
+    {
+        if ($this->selectedEmailId !== null) {
+            $this->openEmailReader($this->selectedEmailId);
+        }
+    }
 
     #[On('open-email-from-access-request')]
     public function selectEmail(string $emailId): void
@@ -100,20 +106,8 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         return EmailAccessRequest::query()
             ->with('requester')
             ->where('email_id', $email->getKey())
-            ->where('status', EmailAccessRequestStatus::PENDING)
+            ->open()
             ->get();
-    }
-
-    #[On('approve-email-access-request')]
-    public function approveFromNotification(string $requestId): void
-    {
-        $this->decideOwnedReaderAccessRequest($requestId, approve: true);
-    }
-
-    #[On('deny-email-access-request')]
-    public function denyFromNotification(string $requestId): void
-    {
-        $this->decideOwnedReaderAccessRequest($requestId, approve: false);
     }
 
     #[On('retry-mailbox-history-import')]
@@ -124,7 +118,6 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         $account = ConnectedAccount::query()
             ->whereKey($accountId)
             ->where('user_id', $user->getKey())
-            ->where('workspace_id', $user->current_workspace_id)
             ->first();
 
         if (! $account instanceof ConnectedAccount) {
@@ -161,25 +154,25 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         $email = Email::query()
             ->whereKey($emailId)
             ->where('user_id', $user->getKey())
-            ->where('workspace_id', $user->current_workspace_id)
             ->first();
 
         if (! $email instanceof Email) {
+            Notification::make()
+                ->title(__('filament/concerns/email-compose.notifications.not_found.title'))
+                ->danger()
+                ->send();
+
             return;
         }
 
         try {
             resolve(CancelQueuedEmailAction::class)->execute($email);
             $this->dispatch('outbox:changed');
-            Notification::make()
-                ->title(__('filament/concerns/email-compose.notifications.cancelled.title'))
-                ->success()
-                ->send();
+            $this->notifyCancelled();
         } catch (RuntimeException) {
-            Notification::make()
-                ->title(__('filament/concerns/email-compose.notifications.too_late.title'))
-                ->danger()
-                ->send();
+            $email->refresh()->status === EmailStatus::CANCELLED
+                ? $this->notifyCancelled()
+                : $this->notifyTooLate();
         }
     }
 
@@ -193,13 +186,23 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
 
     private function closeNotificationsPanel(): void
     {
-        $this->dispatch('close-modal', id: self::DATABASE_NOTIFICATIONS_MODAL_ID);
+        $this->dispatch('inbox:close');
+    }
 
-        // Livewire's default dispatch targets this component's element. Filament's
-        // slide-over listens on window, so close it there as well.
-        $this->js(
-            'window.dispatchEvent(new CustomEvent("close-modal", { bubbles: true, detail: '.Js::from(['id' => self::DATABASE_NOTIFICATIONS_MODAL_ID]).' }))',
-        );
+    private function notifyCancelled(): void
+    {
+        Notification::make()
+            ->title(__('filament/concerns/email-compose.notifications.cancelled.title'))
+            ->success()
+            ->send();
+    }
+
+    private function notifyTooLate(): void
+    {
+        Notification::make()
+            ->title(__('filament/concerns/email-compose.notifications.too_late.title'))
+            ->danger()
+            ->send();
     }
 
     private function authUser(): User

@@ -17,8 +17,8 @@ enum NotificationChannel: string
     public function icon(): string
     {
         return match ($this) {
-            self::InApp => 'ri-smartphone-line',
-            self::Email => 'ri-mail-line',
+            self::InApp => 'lucide-smartphone',
+            self::Email => 'lucide-mail',
         };
     }
 }

@@ -36,7 +36,7 @@ final class MassSendBulkAction extends BulkAction
     {
         return $this
             ->label(__('filament/actions/mass-send.label'))
-            ->icon('heroicon-o-paper-airplane')
+            ->icon('lucide-send')
             ->visible(function (): bool {
                 /** @var User|null $user */
                 $user = auth()->user();

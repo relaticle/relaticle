@@ -199,7 +199,8 @@ final readonly class CustomFieldSettingsSchema
         return match (true) {
             is_bool($value) => $value ? (string) __('Yes') : (string) __('No'),
             $value === null || $value === '' => (string) __('None'),
-            $key === 'display_type' => (string) __("custom-fields::custom-fields.currency.display_options.{$value}"),
+            $key === 'display_type' && $value === 'symbol' => (string) __('Symbol'),
+            $key === 'display_type' && $value === 'code' => (string) __('Code'),
             default => (string) $value,
         };
     }
@@ -215,18 +216,38 @@ final readonly class CustomFieldSettingsSchema
         ];
     }
 
+    // The settings form pins every type setting on a new field and derives the decimals
+    // from the currency, so a JPY field starts at 0 decimals rather than USD's 2.
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array<string, mixed>
+     */
+    public static function withTypeDefaults(string $type, array $settings): array
+    {
+        return [...$settings, ...self::resolvedTypeValues($type, $settings)];
+    }
+
     /**
      * @return array<string, mixed>
      */
     private static function typeValues(CustomField $field): array
     {
-        $class = CustomFieldsType::getFieldType($field->type)?->settingsDataClass;
+        return self::resolvedTypeValues($field->type, $field->settings->additional);
+    }
+
+    /**
+     * @param  array<string, mixed>  $additional
+     * @return array<string, mixed>
+     */
+    private static function resolvedTypeValues(string $type, array $additional): array
+    {
+        $class = CustomFieldsType::getFieldType($type)?->settingsDataClass;
 
         if ($class === null || ! class_exists($class) || ! method_exists($class, 'fromAdditional')) {
             return [];
         }
 
-        return $class::fromAdditional($field->settings->additional)->toArray();
+        return $class::fromAdditional($additional)->toArray();
     }
 
     /**

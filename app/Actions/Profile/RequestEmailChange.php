@@ -6,6 +6,7 @@ namespace App\Actions\Profile;
 
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\Auth\EmailProbeLimiter;
 use App\Support\EmailAddress;
 use Filament\Auth\Notifications\NoticeOfEmailChangeRequest;
 use Filament\Auth\Notifications\VerifyEmailChange;
@@ -20,6 +21,8 @@ final readonly class RequestEmailChange
 {
     public function execute(User $user, string $newEmail): void
     {
+        resolve(EmailProbeLimiter::class)->hit($user);
+
         $newEmail = EmailAddress::canonicalize($newEmail);
 
         Validator::make(['email' => $newEmail], [

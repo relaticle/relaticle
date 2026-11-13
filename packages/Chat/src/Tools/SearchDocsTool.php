@@ -11,11 +11,12 @@ use Laravel\Ai\Tools\Request;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Documentation\Support\DocUrl;
 
 /**
  * Phase 2 of the No Dead Ends contract. GuideToPageTool escorts the user to a
  * page they can act on; this answers the question outright from Relaticle's own
- * help centre and developer guides, so "how do I connect my own agent" stops
+ * help center and developer guides, so "how do I connect my own agent" stops
  * being a dead end for a capability the product ships.
  *
  * Ranking runs over the same section-level index the public docs search uses,
@@ -35,7 +36,7 @@ final readonly class SearchDocsTool implements Tool
     /**
      * One well-matched article otherwise wins every slot with its own
      * sub-headings, burying the second article that answers the other half of
-     * the question. The help centre covers connecting Claude, the developer
+     * the question. The help center covers connecting Claude, the developer
      * guide covers connecting anything else.
      */
     private const int MAX_SECTIONS_PER_PAGE = 2;
@@ -69,7 +70,7 @@ final readonly class SearchDocsTool implements Tool
 
     public function description(): string
     {
-        return 'Search Relaticle\'s own product documentation, both the help centre and the developer guides, '
+        return 'Search Relaticle\'s own product documentation, both the help center and the developer guides, '
             .'and get back the matching sections plus a link to each. Covers connecting external AI assistants '
             .'and MCP clients (Claude, ChatGPT, Cursor, Codex), access tokens, the REST API, self-hosting, '
             .'billing and plans, AI credits, imports, exports, custom fields, and every in-app feature. '
@@ -103,7 +104,7 @@ final readonly class SearchDocsTool implements Tool
             return (string) json_encode([
                 'results' => [],
                 'note' => 'The documentation has no section on this. Tell the user it is not covered and '
-                    .'link the help centre: '.route('help.index'),
+                    .'link the help center: '.DocUrl::area(DocUrl::HELP),
             ], JSON_UNESCAPED_SLASHES);
         }
 
@@ -328,7 +329,7 @@ final readonly class SearchDocsTool implements Tool
     private function readable(string $markdown): string
     {
         $text = preg_replace('/!\[[^\]]*]\([^)]*\)/', '', $markdown) ?? $markdown;
-        $text = preg_replace('/]\(\/(?!\/)/', ']('.rtrim(url('/'), '/').'/', $text) ?? $text;
+        $text = preg_replace('/]\(\/(?!\/)/', ']('.DocUrl::root().'/', $text) ?? $text;
         $text = preg_replace('/\n{3,}/', "\n\n", $text) ?? $text;
 
         return Str::limit(trim($text), self::CONTENT_LIMIT);

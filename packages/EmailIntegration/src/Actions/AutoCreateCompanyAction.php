@@ -8,8 +8,8 @@ use App\Enums\CreationSource;
 use App\Enums\CustomFields\CompanyField;
 use App\Models\Company;
 use App\Support\CurrentSource;
+use App\Support\CurrentWorkspace;
 use App\Support\Database\AdvisoryLock;
-use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 use Relaticle\EmailIntegration\Support\PublicSuffixList;
 
@@ -63,10 +63,7 @@ final readonly class AutoCreateCompanyAction
      */
     private function createCompany(string $domain, string $workspaceId): Company
     {
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($workspaceId);
-
-        try {
+        return resolve(CurrentWorkspace::class)->within($workspaceId, function () use ($domain, $workspaceId): Company {
             $company = Company::query()->create([
                 'name' => $this->domainToCompanyName($domain),
                 'workspace_id' => $workspaceId,
@@ -80,9 +77,7 @@ final readonly class AutoCreateCompanyAction
             $company->touch();
 
             return $company;
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+        });
     }
 
     /**

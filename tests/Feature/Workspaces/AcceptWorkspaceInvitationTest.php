@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Jetstream\AcceptWorkspaceInvitation;
+use App\Enums\DeletionReason;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
@@ -68,6 +69,19 @@ test('accepting an invitation lands the user in the app panel with a visible con
     $this->get($redirect->headers->get('Location'))
         ->assertOk()
         ->assertSee(__('workspaces.accept.joined', ['workspace' => $this->workspace->name]));
+});
+
+test('the accept page names the account that will join', function () {
+    $invitation = WorkspaceInvitation::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'email' => $this->user->email,
+        'role' => 'member',
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('workspace-invitations.token.accept', ['token' => rawTokenFor($invitation)]))
+        ->assertOk()
+        ->assertSeeInOrder([__('workspaces.invite_link.join.joining_as'), $this->user->email]);
 });
 
 test('expired invitation shows the expired state', function () {
@@ -192,7 +206,7 @@ test('accepting invitation deletes the invitation record', function () {
     expect(WorkspaceInvitation::count())->toBe(0);
 });
 
-test('user with scheduled deletion cannot accept invitation', function () {
+test('a user scheduled for deletion is sent to the deletion interstitial instead of the invitation', function () {
     $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
 
     $workspace = Workspace::factory()->create();
@@ -203,11 +217,15 @@ test('user with scheduled deletion cannot accept invitation', function () {
         'expires_at' => now()->addDays(7),
     ]);
 
-    $joinUrl = route('workspace-invitations.token.join', ['token' => rawTokenFor($invitation)]);
+    $raw = rawTokenFor($invitation);
 
     $this->actingAs($user)
-        ->post($joinUrl)
-        ->assertForbidden();
+        ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
+        ->assertRedirect(route('filament.app.scheduled-deletion'));
+
+    $this->actingAs($user)
+        ->post(route('workspace-invitations.token.join', ['token' => $raw]))
+        ->assertRedirect(route('filament.app.scheduled-deletion'));
 
     expect($workspace->fresh()->hasUser($user))->toBeFalse();
 });
@@ -227,10 +245,30 @@ test('a workspace scheduled for deletion cannot be joined', function (): void {
 
     $this->actingAs($this->user)
         ->post($joinUrl)
-        ->assertStatus(410);
+        ->assertStatus(410)
+        ->assertSee(__('workspaces.accept.deleting.heading', ['workspace' => $workspace->name]));
 
     expect($workspace->fresh()->hasUser($this->user))->toBeFalse();
     expect(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
+});
+
+test('an invitation to a workspace scheduled for deletion says so instead of offering to join', function (): void {
+    $workspace = Workspace::factory()->create();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    /** @var WorkspaceInvitation $invitation */
+    $invitation = $workspace->workspaceInvitations()->create([
+        'email' => $this->user->email,
+        'role' => 'member',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $this->actingAs($this->user)
+        ->get(route('workspace-invitations.token.accept', ['token' => rawTokenFor($invitation)]))
+        ->assertStatus(410)
+        ->assertSee(__('workspaces.accept.deleting.heading', ['workspace' => $workspace->name]))
+        ->assertSee(__('workspaces.accept.deleting.body'))
+        ->assertDontSee(__('workspaces.accept.ready.action', ['workspace' => $workspace->name]));
 });
 
 test('a GET on the accept link never joins the workspace', function (): void {
@@ -375,6 +413,20 @@ test('a revoked invitation shows the expired state rather than a false success b
         ->assertSee(__('workspaces.accept.expired.heading'));
 
     expect($this->workspace->users()->where('users.id', $invitee->id)->exists())->toBeFalse();
+});
+
+test('an unverified account is refused by the accept action itself', function (): void {
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'admin']);
+    $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->unverified()->create(['email' => 'invitee@example.test']);
+
+    expect(fn () => resolve(AcceptWorkspaceInvitation::class)->execute($invitee, $invitation))
+        ->toThrow(HttpException::class, __('workspaces.accept.email_unverified'));
+
+    expect($this->workspace->users()->where('users.id', $invitee->id)->exists())->toBeFalse()
+        ->and(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
 });
 
 test('an expired-in-flight invitation refuses even though the caller saw it as valid', function (): void {
@@ -621,4 +673,26 @@ test('the accept page counts the people already in the workspace', function (): 
         ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
         ->assertOk()
         ->assertSee('1 person is already in this workspace');
+});
+
+test('an invitation to a workspace on an inactivity countdown joins it and stops the countdown', function (): void {
+    $workspace = Workspace::factory()->create();
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(10), 'deletion_reason' => DeletionReason::Inactivity])->save();
+
+    /** @var WorkspaceInvitation $invitation */
+    $invitation = $workspace->workspaceInvitations()->create([
+        'email' => $this->user->email,
+        'role' => 'member',
+        'expires_at' => now()->addDays(7),
+    ]);
+
+    $this->actingAs($this->user)
+        ->post(route('workspace-invitations.token.join', ['token' => rawTokenFor($invitation)]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+
+    $workspace->refresh();
+
+    expect($workspace->hasUser($this->user))->toBeTrue()
+        ->and($workspace->scheduled_deletion_at)->toBeNull()
+        ->and($workspace->deletion_reason)->toBeNull();
 });

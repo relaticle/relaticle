@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\UserSocialAccount;
@@ -27,8 +28,8 @@ test('user belongs to many tasks', function () {
 
     $user->tasks()->attach($task);
 
-    expect($user->tasks->first())->toBeInstanceOf(Task::class)
-        ->and($user->tasks->first()->id)->toBe($task->id);
+    expect($user->tasks()->withoutGlobalScope(WorkspaceScope::class)->first())->toBeInstanceOf(Task::class)
+        ->and($user->tasks()->withoutGlobalScope(WorkspaceScope::class)->first()->id)->toBe($task->id);
 });
 
 test('user can access tenants', function () {

@@ -1,7 +1,7 @@
 <div class="space-y-3">
     @if ($this->blocklistEntries->isNotEmpty())
         <div class="overflow-hidden rounded-xl border border-gray-200 dark:border-white/10">
-            <table class="w-full table-auto divide-y divide-gray-200 text-sm dark:divide-white/10">
+            <table class="ei-stacked-table w-full table-auto divide-y divide-gray-200 text-sm dark:divide-white/10">
                 <thead class="bg-gray-50 dark:bg-white/5">
                     <tr>
                         <th class="px-4 py-3 text-start font-medium text-gray-950 dark:text-white">
@@ -24,13 +24,19 @@
                 <tbody class="divide-y divide-gray-200 dark:divide-white/10">
                     @foreach ($this->blocklistEntries as $entry)
                         <tr wire:key="blocklist-entry-{{ $entry->getKey() }}">
-                            <td class="px-4 py-3 font-medium text-gray-950 dark:text-white">
+                            <td class="ei-stacked-table-heading px-4 py-3 font-medium text-gray-950 dark:text-white">
                                 {{ $entry->value }}
                             </td>
-                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                            <td
+                                data-label="{{ __('filament/pages/email-privacy-settings.blocklist.table.type') }}"
+                                class="px-4 py-3 text-gray-600 dark:text-gray-300"
+                            >
                                 {{ $entry->type->getLabel() }}
                             </td>
-                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                            <td
+                                data-label="{{ __('filament/pages/email-account-settings.blocklist.include_subdomains_column') }}"
+                                class="px-4 py-3 text-gray-600 dark:text-gray-300"
+                            >
                                 @if ($entry->type->value === 'domain')
                                     <label class="inline-flex items-center gap-2">
                                         <input
@@ -47,10 +53,13 @@
                                     <span class="text-gray-400 dark:text-gray-500">{{ '—' }}</span>
                                 @endif
                             </td>
-                            <td class="px-4 py-3 text-gray-600 dark:text-gray-300">
+                            <td
+                                data-label="{{ __('filament/pages/email-privacy-settings.blocklist.table.added_by') }}"
+                                class="px-4 py-3 text-gray-600 dark:text-gray-300"
+                            >
                                 {{ $entry->creator?->name ?? $entry->user?->name ?? __('filament/pages/email-privacy-settings.blocklist.table.unknown_user') }}
                             </td>
-                            <td class="px-4 py-3 text-end">
+                            <td class="ei-stacked-table-actions px-4 py-3 text-end">
                                 {{ ($this->deleteBlocklistEntryAction)(['entry_id' => $entry->getKey()]) }}
                             </td>
                         </tr>

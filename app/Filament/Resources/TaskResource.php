@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Actions\Task\UpdateTask;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Actions\CopyToClipboardAction;
+use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
+use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\Filters\RecordSelectFilter;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Components\Tables\RecordChipColumn;
@@ -17,16 +19,18 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\CustomField;
 use App\Models\Task;
-use App\Models\User;
+use App\Models\Workspace;
+use App\Support\CanonicalRecordUrl;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
 use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
+use Filament\Actions\ViewAction;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Column;
@@ -39,6 +43,7 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Gate;
 use Relaticle\CustomFields\Contracts\ValueResolvers;
 
 final class TaskResource extends Resource
@@ -83,11 +88,12 @@ final class TaskResource extends Resource
     public static function table(Table $table): Table
     {
         /** @var Collection<string, CustomField> $customFields */
-        $customFields = CustomField::query()->whereIn('code', ['status', 'priority'])->get()->keyBy('code');
+        $customFields = CustomField::query()->with('options')->whereIn('code', ['status', 'priority'])->get()->keyBy('code');
         /** @var ValueResolvers $valueResolver */
         $valueResolver = resolve(ValueResolvers::class);
 
         return $table
+            ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/task.empty_state.description')))
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
             ->searchable()
@@ -115,16 +121,13 @@ final class TaskResource extends Resource
             ]))
             ->recordActions([
                 ActionGroup::make([
-                    EditAction::make()
-                        ->using(function (Task $record, array $data): Task {
-                            /** @var User $user */
-                            $user = auth()->user();
-
-                            return resolve(UpdateTask::class)->execute($user, $record, $data);
-                        }),
+                    self::copyActions(),
+                    EditTaskAction::make(),
                     RestoreAction::make(),
                     DeleteAction::make(),
                     ForceDeleteAction::make(),
+                    ViewAction::make()
+                        ->visible(fn (Task $record): bool => Gate::denies('update', $record)),
                 ]),
             ])
             ->toolbarActions([
@@ -150,6 +153,7 @@ final class TaskResource extends Resource
                 ->toggleable(),
             RecordChipColumn::make('assignees.name')
                 ->label(__('filament/resources/task.fields.assignees.label'))
+                ->collapsed()
                 ->searchable()
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('creator.name')
@@ -157,10 +161,12 @@ final class TaskResource extends Resource
                 ->searchable()
                 ->sortable()
                 ->toggleable()
+                ->visibleFrom('sm')
                 ->getStateUsing(fn (Task $record): string => $record->createdBy),
             TextColumn::make('created_at')
                 ->dateTime()
                 ->sortable()
+                ->visibleFrom('sm')
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('updated_at')
                 ->dateTime()
@@ -172,6 +178,27 @@ final class TaskResource extends Resource
                 ->toggleable()
                 ->toggledHiddenByDefault(),
         ];
+    }
+
+    public static function copyActions(): ActionGroup
+    {
+        return ActionGroup::make([
+            CopyToClipboardAction::make('copyTaskUrl')
+                ->label(__('filament/resources/task.actions.copy_url'))
+                ->copies(
+                    fn (Task $record): string => resolve(CanonicalRecordUrl::class)->buildOrFail(CrmEntity::Task, $record->getKey(), self::currentWorkspace()),
+                    __('filament/record-page.notifications.url_copied'),
+                ),
+            CopyToClipboardAction::make('copyTaskId')
+                ->label(__('filament/resources/task.actions.copy_id'))
+                ->copies(fn (Task $record): string => $record->getKey(), __('filament/record-page.notifications.id_copied')),
+        ])->dropdown(false);
+    }
+
+    private static function currentWorkspace(): Workspace
+    {
+        /** @var Workspace */
+        return Filament::getTenant();
     }
 
     public static function getPages(): array

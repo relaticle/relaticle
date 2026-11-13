@@ -2,8 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
+use App\Enums\WorkspaceRole;
+use App\Filament\Actions\MoveCardAction;
+use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
@@ -11,12 +15,16 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Opportunity;
 use App\Models\User;
+use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Str;
 use Relaticle\Flowforge\Board;
+use Relaticle\Flowforge\Grouping;
+use Relaticle\Flowforge\Lane;
 
-mutates(OpportunitiesBoard::class);
+mutates(OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -106,6 +114,45 @@ it('orders the company filter alphabetically and chips each option', function ()
     expect($labels)->toBe(['Acme Corp', 'Zeta Industries']);
 });
 
+it('labels the filter trigger and offers a clear button only while a filter is active', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::bootCurrentPanel();
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeText(__('filament/pages/boards.filters_button.label'))
+        ->assertDontSeeHtml('fi-board-filter-clear')
+        ->set('tableFilters.companies.values', [$company->getKey()])
+        ->assertSeeHtml('fi-board-filter-clear')
+        ->assertSeeHtml('wire:click="removeTableFilters"')
+        ->call('removeTableFilters')
+        ->assertSet('tableFilters.companies.values', [])
+        ->assertDontSeeHtml('fi-board-filter-clear');
+});
+
+it('keeps the board clear button off the opportunity list table', function (): void {
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::bootCurrentPanel();
+
+    livewire(ListOpportunities::class)
+        ->filterTable('creation_source', CreationSource::WEB->value)
+        ->assertSeeHtml('fi-ta-filter-indicators')
+        ->assertDontSeeHtml('fi-board-filter-clear');
+});
+
+it('offers a company lane only for companies with an opportunity on the board', function (): void {
+    $withOpportunity = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $withoutOpportunity = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->for($withOpportunity)->create();
+
+    $board = livewire(OpportunitiesBoard::class, ['groupBy' => 'company'])->instance()->getBoard();
+    $laneNames = collect($board->getActiveGrouping()->getLanes($board->getQuery()))
+        ->map(fn (Lane $lane): string => $lane->getName());
+
+    expect($laneNames)->toContain($withOpportunity->getKey())
+        ->not->toContain($withoutOpportunity->getKey());
+});
+
 it('does not show opportunities from other workspaces', function (): void {
     $otherUser = User::factory()->withWorkspace()->create();
     $otherOpportunity = Opportunity::factory()->for($otherUser->currentWorkspace)->create();
@@ -149,9 +196,219 @@ it('moves a card between columns via moveCard', function (): void {
     expect($updatedValue)->toBe($qualification->getKey());
 });
 
+it('moves a card between two cards of another column', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
+
+    [$above, $below, $opportunity] = Opportunity::factory()->count(3)->recycle([$this->user, $this->workspace])->create()->all();
+    $above->saveCustomFieldValue($this->stageField, $qualification->getKey());
+    $below->saveCustomFieldValue($this->stageField, $qualification->getKey());
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+    $above->forceFill(['order_column' => 1000])->saveQuietly();
+    $below->forceFill(['order_column' => 2000])->saveQuietly();
+
+    livewire(OpportunitiesBoard::class)
+        ->call('moveCard', (string) $opportunity->id, (string) $qualification->getKey(), (string) $above->id, (string) $below->id)
+        ->assertDispatched('kanban-card-moved');
+
+    $opportunity->refresh();
+    $storedValue = $opportunity->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($qualification->getKey())
+        ->and((float) $opportunity->order_column)->toBeGreaterThan(1000.0)->toBeLessThan(2000.0);
+});
+
+it('moves a card to another company lane', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    [$from, $to] = Company::factory()->count(2)->recycle([$this->user, $this->workspace])->create()->all();
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $from->id]);
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $to->id]);
+
+    livewire(OpportunitiesBoard::class, ['groupBy' => 'company'])
+        ->call('moveCard', (string) $opportunity->id, (string) $prospecting->getKey(), null, null, (string) $from->id, (string) $to->id)
+        ->assertDispatched('kanban-card-moved');
+
+    expect($opportunity->fresh()->company_id)->toBe($to->id);
+});
+
+it('moves a card into the no company lane', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    livewire(OpportunitiesBoard::class, ['groupBy' => 'company'])
+        ->call('moveCard', (string) $opportunity->id, (string) $prospecting->getKey(), null, null, (string) $company->id, Grouping::EMPTY_LANE)
+        ->assertDispatched('kanban-card-moved');
+
+    expect($opportunity->fresh()->company_id)->toBeNull();
+});
+
+it('refuses a move with a message when the user cannot update the card', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('moveCard', (string) $opportunity->id, (string) $qualification->getKey())
+        ->assertNotified(__('filament/pages/boards.move_denied'))
+        ->assertNotDispatched('kanban-card-moved');
+
+    $storedValue = $opportunity->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($prospecting->getKey());
+});
+
+it('moves a card to the stage picked from its move to sheet', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $closedWon = $this->stageField->options->firstWhere('name', 'Closed Won');
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    livewire(OpportunitiesBoard::class)
+        ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $opportunity->id])
+        ->assertMountedActionModalSee(['Prospecting', 'Closed Won'])
+        ->call('callMountedAction', ['to' => (string) $closedWon->getKey()])
+        ->assertHasNoActionErrors()
+        ->assertNotified(__('filament/pages/boards.move_to.moved', ['column' => 'Closed Won']));
+
+    $storedValue = $opportunity->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($closedWon->getKey());
+});
+
+it('keeps a card in its stage when a viewer picks another from the move to sheet', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('mountAction', 'moveTo', [], ['recordKey' => (string) $opportunity->id])
+        ->call('callMountedAction', ['to' => (string) $qualification->getKey()])
+        ->assertNotDispatched('kanban-card-moved');
+
+    $storedValue = $opportunity->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($prospecting->getKey());
+});
+
+it('shows a viewer no menu on a card they cannot change', function (): void {
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $this->stageField->options->firstWhere('name', 'Prospecting')->getKey());
+
+    livewire(OpportunitiesBoard::class)->assertSeeHtml('ff-card-actions');
+
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+    $viewer->switchWorkspace($this->workspace);
+    $this->actingAs($viewer);
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSee($opportunity->name)
+        ->assertDontSeeHtml('ff-card-actions');
+});
+
+it('rejects a move to a stage option the board does not own', function (string $targetKind): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    User::factory()->withWorkspace()->create();
+    $foreignOptionId = CustomField::query()
+        ->withoutGlobalScopes()
+        ->forEntity(Opportunity::class)
+        ->where('code', OpportunityField::STAGE)
+        ->where('tenant_id', '!=', $this->workspace->getKey())
+        ->firstOrFail()
+        ->options()
+        ->withoutGlobalScopes()
+        ->firstOrFail()
+        ->getKey();
+
+    $targetId = $targetKind === 'foreign' ? (string) $foreignOptionId : 'not-an-option';
+
+    livewire(OpportunitiesBoard::class)
+        ->call('moveCard', (string) $opportunity->id, $targetId)
+        ->assertNotified(__('flowforge::flowforge.unknown_column'))
+        ->assertNotDispatched('kanban-card-moved');
+
+    $storedValue = $opportunity->fresh()->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($prospecting->getKey());
+})->with(['foreign workspace option' => 'foreign', 'garbage id' => 'garbage']);
+
+it('rejects a card created in a stage option the board does not own', function (string $targetKind): void {
+    User::factory()->withWorkspace()->create();
+    $foreignOptionId = CustomField::query()
+        ->withoutGlobalScopes()
+        ->forEntity(Opportunity::class)
+        ->where('code', OpportunityField::STAGE)
+        ->where('tenant_id', '!=', $this->workspace->getKey())
+        ->firstOrFail()
+        ->options()
+        ->withoutGlobalScopes()
+        ->firstOrFail()
+        ->getKey();
+
+    $targetId = $targetKind === 'foreign' ? (string) $foreignOptionId : 'not-an-option';
+
+    livewire(OpportunitiesBoard::class)
+        ->assertActionDisabled(TestAction::make('create')->arguments(['column' => $targetId]))
+        ->call('mountAction', 'create', ['column' => $targetId])
+        ->set('mountedActions.0.data.name', 'Rejected deal')
+        ->call('callMountedAction')
+        ->assertOk();
+
+    expect(Opportunity::query()->where('name', 'Rejected deal')->exists())->toBeFalse();
+})->with(['foreign workspace option' => 'foreign', 'garbage id' => 'garbage']);
+
+it('creates a card in a stage option the board owns', function (): void {
+    $qualification = $this->stageField->options->firstWhere('name', 'Qualification');
+
+    livewire(OpportunitiesBoard::class)
+        ->call('mountAction', 'create', ['column' => (string) $qualification->getKey()])
+        ->set('mountedActions.0.data.name', 'Accepted deal')
+        ->call('callMountedAction')
+        ->assertOk();
+
+    $opportunity = Opportunity::query()->where('name', 'Accepted deal')->firstOrFail();
+    $storedValue = $opportunity->customFieldValues()
+        ->where('custom_field_id', $this->stageField->getKey())
+        ->value($this->stageField->getValueColumn());
+
+    expect($storedValue)->toBe($qualification->getKey());
+});
+
 it('opens the edit action when a card is clicked', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
-
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
     $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
 
@@ -163,6 +420,36 @@ it('opens the edit action when a card is clicked', function (): void {
         ->call('mountAction', 'edit', [], ['recordKey' => (string) $opportunity->id])
         ->assertSet('mountedActions.0.data.name', $opportunity->name);
 });
+
+it('opens the record preview from the button beside a card menu', function (): void {
+    $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Rooftop pilot']);
+    $opportunity->saveCustomFieldValue($this->stageField, $prospecting->getKey());
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSeeHtml(['fi-board-card-preview-trigger', e(PreviewRecordAction::openForRecord($opportunity))])
+        ->mountAction(PreviewRecordAction::getDefaultName(), ['record' => $opportunity->getKey()])
+        ->assertActionMounted(PreviewRecordAction::getDefaultName())
+        ->assertMountedActionModalSeeHtml(['fi-record-embedded-page', 'Rooftop pilot']);
+});
+
+it('opens no preview for a card that is gone or belongs to another workspace', function (string $state): void {
+    $outsider = User::factory()->withWorkspace()->create();
+    $foreign = Opportunity::factory()->recycle([$outsider, $outsider->currentWorkspace])->create();
+    $deleted = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $deleted->delete();
+
+    $key = match ($state) {
+        'foreign' => $foreign->getKey(),
+        'deleted' => $deleted->getKey(),
+        'unknown' => (string) Str::ulid(),
+    };
+
+    livewire(OpportunitiesBoard::class)
+        ->mountAction(PreviewRecordAction::getDefaultName(), ['record' => $key])
+        ->assertOk()
+        ->assertSet('mountedActions', []);
+})->with(['foreign', 'deleted', 'unknown']);
 
 it('labels the contact select point of contact when adding an opportunity to a column', function (): void {
     $prospecting = $this->stageField->options->firstWhere('name', 'Prospecting');

@@ -198,3 +198,35 @@ it('does not log an empty account owner on a company created without one', funct
 
     expect($created->attribute_changes['attributes'] ?? [])->not->toHaveKey('account_owner');
 });
+
+it('offers the full text of a change too long for its row, and ships it once', function (): void {
+    $body = '<p>'.str_repeat('a renewal note that keeps going. ', 200).'</p><p>closing words</p>';
+
+    seedActivityRow($this->company, 'custom_field_changes', null, [], ['custom_field_changes' => [[
+        'code' => 'description',
+        'label' => 'Description',
+        'type' => 'rich-editor',
+        'old' => ['value' => '<p>Draft</p>', 'label' => '<p>Draft</p>'],
+        'new' => ['value' => $body, 'label' => $body],
+    ]]]);
+
+    $entry = $this->company->timeline()->get()->first();
+    $html = (new MergedActivityRenderer)->render($entry)->render();
+
+    expect($html)
+        ->toContain(__('workspaces.activity.full_change.show'))
+        ->toContain("going.\nclosing words")
+        ->not->toContain('&lt;p&gt;')
+        ->and(substr_count($html, 'closing words'))->toBe(1);
+})->mutates(MergedActivityRenderer::class);
+
+it('offers no full text toggle for a change that fits its row', function (): void {
+    seedActivityRow($this->company, 'updated', '77777777-7777-7777-7777-777777777777', [
+        'attributes' => ['name' => 'New name'], 'old' => ['name' => 'Old name'],
+    ]);
+
+    $entry = $this->company->timeline()->get()->first();
+    $html = (new MergedActivityRenderer)->render($entry)->render();
+
+    expect($html)->not->toContain(__('workspaces.activity.full_change.show'));
+})->mutates(MergedActivityRenderer::class);

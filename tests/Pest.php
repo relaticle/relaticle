@@ -14,30 +14,54 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
+use App\Enums\Notifications\NotificationReason;
+use App\Enums\WorkspaceSetupStep;
+use App\Features\Billing;
+use App\Filament\Pages\CreateWorkspace;
+use App\Filament\Pages\SetupWorkspace;
+use App\Models\Notification as NotificationRow;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Http\HostResolver;
 use Filament\Actions\Action;
 use Filament\Actions\Testing\TestAction;
+use Filament\Facades\Filament;
+use Filament\Notifications\NotificationMailbox;
 use Illuminate\Contracts\Broadcasting\Broadcaster as BroadcasterContract;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Foundation\Testing\LazilyRefreshDatabase;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Passport\AccessToken;
 use Laravel\Passport\Client;
+use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
 use Pest\Browser\Api\AwaitableWebpage;
 use Pest\Browser\Playwright\Playwright;
+use Pest\Evals\Drivers\LaravelAiJudge;
+use Pest\Evals\Plugin;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
+use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
+use Tests\Evals\EvalTestCase;
+use Tests\Evals\Support\EvalReport;
+use Tests\Evals\Support\RelaTurn;
+use Tests\Evals\Support\TurnEnvelope;
+use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\PestTiaRuntime;
 use Tests\TestCase;
 
@@ -45,7 +69,44 @@ PestTiaRuntime::configure(dirname(__DIR__), array_slice($_SERVER['argv'], 1));
 
 pest()->extend(TestCase::class)
     ->use(LazilyRefreshDatabase::class)
-    ->in('Feature', 'Smoke', 'Browser');
+    ->in('Feature', 'Smoke', 'Browser', '../packages/Cloud/tests');
+
+pest()->extend(EvalTestCase::class)
+    ->use(LazilyRefreshDatabase::class)
+    ->in('Evals');
+
+pest()->evals()->judgeUsing(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL));
+
+pest()->afterEach(function (): void {
+    if (! Plugin::isEvalMode()) {
+        return;
+    }
+
+    $status = $this->status();
+
+    if ($status->isSkipped()) {
+        return;
+    }
+
+    $failure = $status->isSuccess() ? null : $status->message();
+
+    if (! RelaTurn::$last instanceof TurnEnvelope) {
+        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')]);
+        EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
+
+        return;
+    }
+
+    EvalReport::record(
+        $this->getPrintableTestCaseMethodName(),
+        $status->isSuccess(),
+        RelaTurn::$last,
+        array_values(array_filter([$failure, RelaTurn::$last->error])),
+        count(RelaTurn::$turns),
+    );
+    EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
+    RelaTurn::forget();
+})->in('Evals');
 
 if (class_exists(Playwright::class)) {
     Playwright::setTimeout(30_000);
@@ -60,6 +121,17 @@ if (class_exists(Playwright::class)) {
 function livewire(string $component, array $params = []): Testable
 {
     return Livewire::test($component, $params);
+}
+
+/**
+ * @return Collection<int, array<string, mixed>>
+ */
+function flashedNotifications(): Collection
+{
+    $mailbox = resolve(NotificationMailbox::class);
+    $mailbox->flush();
+
+    return collect($mailbox->pull());
 }
 
 /**
@@ -184,6 +256,80 @@ function bindMailboxOAuthWorkspace(User $user, ?Workspace $workspace = null): vo
     session()->put(RedirectController::WORKSPACE_SESSION_KEY, $workspace->getKey());
 }
 
+/** @param  array<string, mixed>  $attributes */
+function pendingEmailAccessRequest(User $owner, Workspace $workspace, string $subject, string $requesterName, EmailAccessRequestStatus $status = EmailAccessRequestStatus::PENDING, array $attributes = []): EmailAccessRequest
+{
+    $requester = User::factory()->create(['name' => $requesterName]);
+    $workspace->users()->attach($requester, ['role' => 'member']);
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $owner->id,
+    ]));
+
+    $email = Email::factory()->private()->create([
+        'workspace_id' => $workspace->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $account->getKey(),
+        'subject' => $subject,
+    ]);
+
+    return EmailAccessRequest::factory()->forTier(EmailPrivacyTier::FULL)->create([
+        'requester_id' => $requester->id,
+        'owner_id' => $owner->id,
+        'email_id' => $email->getKey(),
+        'status' => $status,
+        ...$attributes,
+    ]);
+}
+
+function denyRequestMidDecision(EmailAccessRequest $request): void
+{
+    $loads = 0;
+
+    EmailAccessRequest::retrieved(function (EmailAccessRequest $retrieved) use ($request, &$loads): void {
+        if ($retrieved->isNot($request) || ++$loads < 2) {
+            return;
+        }
+
+        Event::forget('eloquent.retrieved: '.EmailAccessRequest::class);
+
+        DB::table('email_access_requests')->where('id', $request->getKey())->update(['status' => EmailAccessRequestStatus::DENIED->value]);
+    });
+}
+
+function bellAccessRequestNotice(User $owner, EmailAccessRequest $request): NotificationRow
+{
+    return NotificationRow::factory()->create([
+        'type' => EmailAccessRequestedNotification::class,
+        'notifiable_type' => $owner->getMorphClass(),
+        'notifiable_id' => $owner->getKey(),
+        'data' => [
+            'title' => 'Requester requested email access',
+            'body' => $request->email?->subject,
+            'viewData' => ['request_id' => (string) $request->getKey()],
+        ],
+    ]);
+}
+
+function inboxAccessRequestNotice(User $owner, EmailAccessRequest $request): NotificationRow
+{
+    return NotificationRow::factory()->create([
+        'type' => EmailAccessRequestedNotification::class,
+        'notifiable_type' => $owner->getMorphClass(),
+        'notifiable_id' => $owner->getKey(),
+        'workspace_id' => $request->workspace_id,
+        'actor_id' => $request->requester_id,
+        'reason' => NotificationReason::Requested,
+        'subject_type' => $request->getMorphClass(),
+        'subject_id' => $request->getKey(),
+        'data' => [
+            'email_subject' => $request->email?->subject,
+            'email_id' => $request->email_id,
+        ],
+    ]);
+}
+
 function mailboxOAuthRedirectUrl(string $provider, Workspace $workspace): string
 {
     return MailboxOAuthWorkspace::redirectUrl($provider, $workspace);
@@ -233,13 +379,26 @@ function assertActionHasMailboxOAuthUrl(
  * Log in through the real two-step login form: type the email and submit to
  * reveal the password field, then type the password and submit again.
  */
-function loginViaBrowser(User $user): AwaitableWebpage
+function loginViaBrowser(User $user, ?string $theme = null, ?AwaitableWebpage $page = null): AwaitableWebpage
 {
-    return test()->visit('/app/login')
+    $page ??= test()->visit('/app/login');
+
+    if ($theme !== null) {
+        $page = $page->{$theme}();
+    }
+
+    return $page
         ->type('[id="form.email"]', $user->email)
         ->click('button[type="submit"]')
+        ->assertVisible('[id="form.password"]')
+        ->assertScript(asyncAlpineComponentsLoaded())
         ->type('[id="form.password"]', 'password')
         ->click('button[type="submit"]');
+}
+
+function asyncAlpineComponentsLoaded(): string
+{
+    return 'document.querySelector("[x-load][x-ignore]") === null';
 }
 
 function pdfBytes(): string
@@ -348,4 +507,55 @@ function actAsOAuthClient(User $user, array $scopes, ?Workspace $workspace): voi
 
     auth()->guard('api')->setUser($user);
     auth()->shouldUse('api');
+}
+
+/**
+ * @param  array<string, mixed>  $workspace
+ * @param  array<string, mixed>  $useCase
+ */
+function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboarding_use_case' => 'other']): Workspace
+{
+    test()->actingAs($user);
+
+    livewire(CreateWorkspace::class)
+        ->fillForm($workspace)
+        ->call('register')
+        ->assertHasNoFormErrors();
+
+    $created = $user->fresh()->currentWorkspace;
+
+    Filament::setTenant($created);
+
+    $setup = livewire(SetupWorkspace::class);
+
+    if ($created->onboarding_step === WorkspaceSetupStep::Email) {
+        $setup->callAction('skipMailbox');
+    }
+
+    $setup->fillForm($useCase)->call('saveUseCase')->assertHasNoFormErrors();
+
+    if ($created->fresh()->onboarding_step === WorkspaceSetupStep::Invite) {
+        $setup->call('finish');
+    }
+
+    return $created->fresh();
+}
+
+function useProFirstAutoChain(): void
+{
+    config()->set('chat.models', [
+        ChatCatalog::entry(['label' => 'Opus 5', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'credit_multiplier' => 3.0]),
+        ChatCatalog::entry(),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+}
+
+function withHostedBilling(): void
+{
+    if (! class_exists('Relaticle\Cloud\CloudServiceProvider')) {
+        test()->markTestSkipped('Hosted billing needs the cloud package.');
+    }
+
+    Feature::define(Billing::class, true);
+    Feature::purge(Billing::class);
 }

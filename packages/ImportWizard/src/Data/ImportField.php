@@ -23,7 +23,7 @@ final class ImportField extends Data
      * @param  string|null  $example  Example value for display
      * @param  bool  $isCustomField  Whether this is a custom field
      * @param  FieldDataType|null  $type  The data type
-     * @param  string|null  $icon  The display icon (Heroicon name)
+     * @param  string|null  $icon  The display icon name
      * @param  int|null  $sortOrder  Display order for custom fields
      * @param  bool  $acceptsArbitraryValues  Whether field accepts arbitrary values (email, phone, tags)
      * @param  array<int, array{label: string, value: string}>|null  $options  Choice options for select fields
@@ -66,7 +66,7 @@ final class ImportField extends Data
             rules: ['nullable', 'ulid'],
             guesses: ['id', 'record_id', 'ulid', 'record id'],
             example: '01KCCFMZ52QWZSQZWVG0AP704V',
-            icon: 'heroicon-o-finger-print',
+            icon: 'lucide-fingerprint-pattern',
         );
     }
 

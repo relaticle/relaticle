@@ -17,6 +17,7 @@ use App\Mcp\Tools\Task\ListTasksTool;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
@@ -79,6 +80,7 @@ const FILTER_OPERATORS_BY_TYPE = [
     'email' => LIST_OPERATORS,
     'phone' => LIST_OPERATORS,
     'link' => LIST_OPERATORS,
+    'domain' => LIST_OPERATORS,
 ];
 
 const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
@@ -792,6 +794,24 @@ it('applies every operator of every custom field type alike on the api and mcp',
     ], ['acme.com']],
 ]);
 
+it('filters company domains by any spelling on the api and mcp', function (): void {
+    $domains = WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains');
+    unlinkedRecord($this->user, 'companies', 'Acme')->saveCustomFieldValue($domains, ['acme.com']);
+    unlinkedRecord($this->user, 'companies', 'Globex')->saveCustomFieldValue($domains, ['globex.com']);
+    unlinkedRecord($this->user, 'companies', 'Unset');
+    $on = fn (array $condition): array => ['custom_fields' => ['domains' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'companies', [
+        [$on(['$has_any' => ['https://www.ACME.com/about?x=1']]), ['Acme']],
+        [$on(['$has_any' => ['acme.com', 'GLOBEX.com']]), ['Acme', 'Globex']],
+        [$on(['$has_none' => ['https://acme.com/']]), ['Globex', 'Unset']],
+        [$on(['$is_empty' => true]), ['Unset']],
+        [$on(['$is_empty' => false]), ['Acme', 'Globex']],
+    ]);
+
+    expectErrorOnEverySurface($this, $this->user, 'companies', $on(['domain' => ['$in' => ['acme.com']]]), 'filter.custom_fields.domains.domain', 'domains does not support domain.');
+});
+
 it('rejects a custom field that takes no filter on the api and mcp', function (string $type): void {
     resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Probe', 'code' => 'probe', 'type' => $type]);
 
@@ -869,7 +889,7 @@ it('accepts a filter at each limit on the api and mcp', function (): void {
     unlinkedRecord($this->user, 'companies', 'Acme', ['creation_source' => CreationSource::API]);
     unlinkedRecord($this->user, 'companies', 'Globex', ['creation_source' => CreationSource::WEB]);
     $named = ['name' => ['$eq' => 'Acme']];
-    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Renewal', 'company_id' => Company::query()->where('name', 'Acme')->value('id'), 'contact_id' => null]);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Renewal', 'company_id' => Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Acme')->value('id'), 'contact_id' => null]);
     Task::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Call'])->opportunities()->attach($opportunity);
 
     expectTitlesOnEverySurface($this, $this->user, 'companies', [
@@ -877,7 +897,7 @@ it('accepts a filter at each limit on the api and mcp', function (): void {
         [['$not' => ['$or' => [['$and' => [$named]]]]], ['Globex']],
         [['creation_source' => ['$in' => [...array_fill(0, 99, 'api'), 'web']]], ['Acme', 'Globex']],
     ]);
-    unlinkedRecord($this->user, 'people', 'Ana', ['company_id' => Company::query()->where('name', 'Acme')->value('id')]);
+    unlinkedRecord($this->user, 'people', 'Ana', ['company_id' => Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Acme')->value('id')]);
     unlinkedRecord($this->user, 'opportunities', 'Pilot');
     expectTitlesOnEverySurface($this, $this->user, 'people', [
         [['$or' => array_fill(0, 10, ['company' => ['$is_empty' => false, 'name' => ['$eq' => 'Acme']]])], ['Ana']],

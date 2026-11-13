@@ -33,10 +33,9 @@ final readonly class MarkEmailsSendFailedAction
         ]));
 
         $emails->pluck('batch_id')->filter()->unique()
-            ->each(fn (string $batchId) => $this->syncBatchCounters->execute($batchId));
+            ->each(fn (string $batchId) => $this->syncBatchCounters->execute($batchId, reportFailures: in_array($batchId, $retriedBatchIds, true)));
 
-        // A first-run batch failure is reported once, when the batch finishes; a retried one on its own.
-        $failed->filter(fn (Email $email): bool => $email->batch_id === null || in_array($email->batch_id, $retriedBatchIds, true))
+        $failed->filter(fn (Email $email): bool => $email->batch_id === null)
             ->groupBy(fn (Email $email): string => "{$email->user_id}|{$email->workspace_id}|{$email->connected_account_id}")
             ->each(function (Collection $senderEmails): void {
                 /** @var Email $first */
@@ -47,6 +46,7 @@ final readonly class MarkEmailsSendFailedAction
                     $first->connectedAccount,
                     $senderEmails->count(),
                     $senderEmails->count() === 1 ? $first->subject : null,
+                    EmailSendFailedNotification::emailGroupKey((string) $first->getKey()),
                 ));
             });
     }

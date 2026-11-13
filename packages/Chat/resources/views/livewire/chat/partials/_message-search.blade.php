@@ -26,7 +26,7 @@
 >
     <div class="w-full max-w-lg overflow-hidden rounded-xl border border-gray-200 bg-white shadow-2xl dark:border-gray-700 dark:bg-gray-900">
         <div class="flex items-center gap-2 border-b border-gray-200 px-3 py-2.5 dark:border-gray-700">
-            <x-heroicon-o-magnifying-glass class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+            <x-lucide-search class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
             <input
                 x-ref="messageSearchInput"
                 x-model="searchQuery"
@@ -82,7 +82,7 @@
                         class="flex w-full items-start gap-2 px-3 py-2 text-start text-sm text-gray-700 transition focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200"
                         :class="idx === searchActiveIndex ? 'bg-gray-50 dark:bg-white/5' : ''"
                     >
-                        <x-heroicon-o-chat-bubble-left class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+                        <x-lucide-message-square class="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
                         <span class="line-clamp-2 [overflow-wrap:anywhere]" x-text="match.snippet"></span>
                     </button>
                 </template>
@@ -101,7 +101,7 @@
     aria-live="polite"
 >
     <span class="inline-flex items-center gap-2 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-3 py-1.5 text-xs font-medium text-gray-700 shadow-lg backdrop-blur-sm dark:text-gray-200">
-        <x-heroicon-o-arrow-path class="h-3.5 w-3.5 motion-safe:animate-spin" aria-hidden="true" />
+        <x-lucide-refresh-cw class="h-3.5 w-3.5 motion-safe:animate-spin" aria-hidden="true" />
         {{ __('Loading earlier messages…') }}
     </span>
 </div>

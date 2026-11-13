@@ -4,12 +4,13 @@
 ])
 
 @php
+    use App\Enums\CrmEntity;
     use Illuminate\Support\Str;
 
     $wireModel = $attributes->wire('model')->value();
     $listboxId = Str::slug($wireModel ?: 'recipients').'-suggestions';
     $removeLabel = __('filament/emails/composer.actions.remove_recipient');
-    $avatarColor = static fn (string $name): string => ['primary', 'success', 'warning', 'danger', 'info'][abs(crc32(mb_strtolower($name))) % 5];
+    $personIconPath = CrmEntity::People->iconPath();
     $optionEmails = collect($options)
         ->pluck('email')
         ->filter()
@@ -23,9 +24,8 @@
             'description' => null,
             'email' => $suggestion,
             'avatarUrl' => null,
-            'iconPath' => null,
+            'iconPath' => $personIconPath,
             'circular' => true,
-            'avatarColor' => $avatarColor($suggestion),
         ])
         ->values()
         ->all();
@@ -38,6 +38,7 @@
         activeIndex: 0,
         popoverStyle: {},
         options: @js([...$options, ...$manualOptions]),
+        personIconPath: @js($personIconPath),
         removeLabel: @js($removeLabel),
 
         get matches() {
@@ -73,20 +74,9 @@
                 label: value,
                 email: value,
                 avatarUrl: null,
-                iconPath: null,
+                iconPath: this.personIconPath,
                 circular: true,
-                avatarColor: 'primary',
             };
-        },
-
-        initials(name) {
-            return String(name ?? '')
-                .trim()
-                .split(/\s+/)
-                .filter(Boolean)
-                .slice(0, 2)
-                .map((word) => word.charAt(0).toUpperCase())
-                .join('') || '?';
         },
 
         chipTooltip(chip) {
@@ -264,19 +254,20 @@
     }"
     x-effect="if (isOpen) updatePopover()"
     x-on:resize.window="updatePopover()"
-    x-on:scroll.window="updatePopover()"
+    {{-- Capture: a reply or forward sits in the email's own scroll region, whose scroll never reaches the window. --}}
+    x-on:scroll.window.capture="updatePopover()"
     @if ($wireModel) wire:ignore @endif
     {{ $attributes->whereDoesntStartWith('wire:model')->merge(['class' => 'flex min-h-10 min-w-0 flex-wrap content-start items-center gap-2 py-2']) }}
 >
     <template x-for="chip in selectedChips" :key="chip.value">
         <span
-            class="inline-flex max-w-48 items-center gap-1 rounded-full bg-gray-100 py-0.5 pl-0.5 pr-0.5 text-[11px] font-medium leading-4 text-gray-800 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
+            class="inline-flex max-w-48 items-center gap-1 rounded-full max-sm:max-w-[calc(100%-4.5rem)] bg-gray-100 py-0.5 pl-0.5 pr-0.5 text-[11px] font-medium leading-4 text-gray-800 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-200 dark:ring-white/10"
             x-tooltip="{ content: chipTooltip(chip), theme: $store.theme }"
         >
-            <x-email-integration::recipient-avatar box="size-4" glyph="size-2.5" initials-size="text-[9px]" />
+            <x-email-integration::recipient-avatar box="size-4" glyph="size-2.5" />
             <span class="min-w-0 truncate" x-text="chip.label"></span>
             <button type="button" x-on:click="remove(chip.value)" :aria-label="removeLabel + ': ' + chip.value" class="shrink-0 rounded-full p-px text-gray-400 transition hover:bg-gray-950/5 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200">
-                <x-heroicon-m-x-mark class="h-2.5 w-2.5" />
+                <x-lucide-x class="h-2.5 w-2.5" />
             </button>
         </span>
     </template>
@@ -293,7 +284,7 @@
         x-bind:aria-controls="'{{ $listboxId }}'"
         role="combobox"
         autocomplete="off"
-        class="h-6 min-w-[8rem] flex-1 border-0 bg-transparent p-0 text-sm leading-6 focus:outline-none focus:ring-0"
+        class="h-6 min-w-16 flex-1 sm:min-w-[8rem] border-0 bg-transparent p-0 text-sm leading-6 focus:outline-none focus:ring-0"
     />
 
     <template x-teleport="body">
@@ -315,7 +306,7 @@
                     class="flex min-h-11 w-full items-center gap-2.5 px-2.5 py-2 text-left transition focus:outline-none"
                     x-bind:class="index === activeIndex ? 'bg-gray-100 dark:bg-white/10' : 'hover:bg-gray-50 dark:hover:bg-white/5'"
                 >
-                    <x-email-integration::recipient-avatar box="size-7" glyph="size-4" initials-size="text-[11px]" />
+                    <x-email-integration::recipient-avatar box="size-7" glyph="size-4" />
                     <span class="min-w-0 flex-1">
                         <span class="block truncate text-sm font-medium text-gray-900 dark:text-gray-100" x-text="chip.label"></span>
                         <span class="block truncate text-xs text-gray-500 dark:text-gray-400" x-text="chip.description"></span>

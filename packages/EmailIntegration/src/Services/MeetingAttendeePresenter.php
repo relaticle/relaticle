@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\People;
 use App\Models\User;
-use App\Services\AvatarService;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Enums\AttendeeResponseStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -18,7 +17,6 @@ final readonly class MeetingAttendeePresenter
     public function __construct(
         private WorkspaceMemberDirectory $workspaceMembers,
         private MailboxDisplayNameDirectory $mailboxNames,
-        private AvatarService $avatars,
     ) {}
 
     /**
@@ -45,10 +43,9 @@ final readonly class MeetingAttendeePresenter
 
         $name = $named ?? ($email !== '' ? $email : __('filament/resources/meeting.attendees.guest'));
 
-        $avatar = ($contact instanceof People ? $contact->avatar : null)
-            ?? ($mailboxPerson !== null ? $mailboxPerson['avatar'] : null)
+        $avatar = ($mailboxPerson !== null ? $mailboxPerson['avatar'] : null)
             ?? ($member !== null ? $member['avatar'] : null)
-            ?? ($named !== null ? $this->avatars->generateAuto($named) : '');
+            ?? '';
 
         return [
             'name' => $name,

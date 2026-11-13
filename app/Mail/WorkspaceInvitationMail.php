@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Mail\Contracts\EssentialMail;
 use App\Models\WorkspaceInvitation;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeEncrypted;
@@ -11,7 +12,10 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Str;
 use Laravel\Jetstream\Jetstream;
 
 /**
@@ -19,7 +23,9 @@ use Laravel\Jetstream\Jetstream;
  * only as a hash, so it must not sit in clear text in the payload or in a
  * failed_jobs row that outlives the invitation.
  */
-final class WorkspaceInvitationMail extends Mailable implements ShouldBeEncrypted, ShouldQueue
+#[Tries(3)]
+#[Backoff(60, 300)]
+final class WorkspaceInvitationMail extends Mailable implements EssentialMail, ShouldBeEncrypted, ShouldQueue
 {
     use Queueable, SerializesModels;
 
@@ -46,8 +52,8 @@ final class WorkspaceInvitationMail extends Mailable implements ShouldBeEncrypte
             markdown: 'mail.workspace-invitation',
             with: [
                 'acceptUrl' => route('workspace-invitations.token.accept', ['token' => $this->rawToken]),
-                'inviterName' => $this->invitation->inviter?->name,
-                'workspaceName' => $this->invitation->workspace->name,
+                'inviterName' => $this->invitation->inviter === null ? null : Str::squish($this->invitation->inviter->name),
+                'workspaceName' => Str::squish($this->invitation->workspace->name),
                 'roleName' => Jetstream::findRole($this->invitation->role)?->name,
             ],
         );

@@ -2,43 +2,64 @@
 
 declare(strict_types=1);
 
+use App\Actions\Auth\DeleteUnclaimedAccount;
 use App\Actions\Auth\LinkSocialAccount;
 use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
+use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Pages\Security;
 use App\Http\Controllers\Auth\CallbackController;
 use App\Http\Controllers\Auth\LinkSocialAccountCallbackController;
 use App\Http\Controllers\Auth\LinkSocialAccountRedirectController;
 use App\Http\Controllers\Auth\RedirectController;
+use App\Http\Middleware\EnsureSocialiteProviderIsAvailable;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
 use Illuminate\Foundation\Testing\CachedState;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
+use SocialiteProviders\Microsoft\Provider as MicrosoftProvider;
 
 mutates(
     CallbackController::class,
+    DeleteUnclaimedAccount::class,
     RedirectController::class,
     LinkSocialAccount::class,
     LinkSocialAccountRedirectController::class,
     LinkSocialAccountCallbackController::class,
+    EnsureSocialiteProviderIsAvailable::class,
 );
 
-function makeSocialiteUser(string $id, string $name, string $email): SocialiteUser
+function makeSocialiteUser(string $id, string $name, ?string $email, bool $emailVerified = true, ?string $hostedDomain = null): SocialiteUser
 {
     $user = new SocialiteUser;
     $user->id = $id;
     $user->name = $name;
     $user->email = $email;
+    $user->setRaw(array_filter(['sub' => $id, 'email' => $email, 'email_verified' => $emailVerified, 'hd' => $hostedDomain], fn (mixed $value): bool => $value !== null));
+
+    return $user;
+}
+
+function makeMicrosoftUser(string $id, string $email, ?string $tenantId): SocialiteUser
+{
+    $user = new SocialiteUser;
+    $user->id = $id;
+    $user->name = 'Maya';
+    $user->email = $email;
+    $user->setRaw(['id' => $id, 'userPrincipalName' => $email, 'tid' => $tenantId]);
 
     return $user;
 }
@@ -201,6 +222,196 @@ test('a matching-email link suggestion survives a subsequent password login', fu
     expect(AuthenticationSession::linkSuggestion())->not->toBe([]);
 });
 
+test('a google identity replaces an unverified password account nobody claimed', function (): void {
+    $squatter = User::factory()->unverified()->withConfirmedMfa()->create(['email' => 'maya@example.com']);
+    DB::table('sessions')->insert([
+        'id' => 'squatter-session',
+        'user_id' => $squatter->getKey(),
+        'payload' => '',
+        'last_activity' => now()->getTimestamp(),
+    ]);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya Real', 'maya@example.com', hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect();
+
+    $owner = User::query()->where('email', 'maya@example.com')->sole();
+
+    expect(User::query()->find($squatter->getKey()))->toBeNull()
+        ->and($owner->getKey())->not->toBe($squatter->getKey())
+        ->and($owner->hasVerifiedEmail())->toBeTrue()
+        ->and($owner->hasPassword())->toBeFalse()
+        ->and($owner->two_factor_secret)->toBeNull()
+        ->and($owner->name)->toBe('Maya Real')
+        ->and($owner->socialAccounts()->where('provider_id', 'maya-google-id')->exists())->toBeTrue();
+
+    $this->assertAuthenticatedAs($owner);
+});
+
+test('replacing an unclaimed account logs both accounts once the replacement commits', function (): void {
+    $squatter = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', hostedDomain: 'example.com'));
+    Log::spy();
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    $owner = User::query()->where('email', 'maya@example.com')->sole();
+
+    Log::shouldHaveReceived('info')
+        ->with('A provider sign-up replaced an unclaimed account', Mockery::on(fn (array $context): bool => $context['deleted_user_id'] === $squatter->getKey()
+            && $context['deleted_email'] === 'maya@example.com'
+            && $context['user_id'] === $owner->getKey()
+            && $context['provider'] === 'google'))
+        ->once();
+});
+
+test('an unclaimed account survives, unlogged, when the replacement sign-up is refused', function (): void {
+    Exceptions::fake();
+    $squatter = User::factory()->unverified()->create(['email' => 'burner@mailinator.com']);
+    Socialite::fake('google', makeSocialiteUser('burner-google-id', 'Burner', 'burner@mailinator.com', hostedDomain: 'mailinator.com'));
+    Log::spy();
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertSessionHasErrors(['login' => __('validation.indisposable')]);
+
+    expect($squatter->fresh())->not->toBeNull();
+    Log::shouldNotHaveReceived('info', ['A provider sign-up replaced an unclaimed account', Mockery::any()]);
+});
+
+test('an unverified account that is a member of another workspace is never replaced', function (): void {
+    $member = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    User::factory()->withWorkspace()->create()->ownedWorkspaces()->first()->users()->attach($member, ['role' => 'member']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    $this->assertGuest('web');
+    expect($member->fresh())->not->toBeNull();
+});
+
+test('an unverified account already linked to a provider is never replaced', function (): void {
+    $linked = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    $linked->socialAccounts()->create(['provider_name' => 'microsoft', 'provider_id' => 'maya-microsoft-id']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    $this->assertGuest('web');
+    expect($linked->fresh())->not->toBeNull();
+});
+
+test('a gmail identity replaces an unclaimed gmail account without a hosted domain', function (): void {
+    $squatter = User::factory()->unverified()->create(['email' => 'maya@gmail.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@gmail.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    expect(User::query()->find($squatter->getKey()))->toBeNull();
+    $this->assertAuthenticatedAs(User::query()->where('email', 'maya@gmail.com')->sole());
+});
+
+test('a personal google account on a company address never replaces an unclaimed account', function (): void {
+    $holder = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertSessionHasErrors(['login' => __('auth.link.account_exists_password', ['provider' => 'Google'])]);
+
+    $this->assertGuest('web');
+    expect($holder->fresh())->not->toBeNull();
+});
+
+test('a microsoft work account replaces an unclaimed account', function (): void {
+    $squatter = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    Socialite::fake('microsoft', makeMicrosoftUser('maya-microsoft-id', 'maya@example.com', 'a1b2c3d4-0000-0000-0000-000000000001'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'microsoft', 'code' => 'accepted']));
+
+    expect(User::query()->find($squatter->getKey()))->toBeNull();
+    $this->assertAuthenticatedAs(User::query()->where('email', 'maya@example.com')->sole());
+});
+
+test('a personal microsoft account never replaces an unclaimed account', function (?string $tenantId): void {
+    $holder = User::factory()->unverified()->create(['email' => 'maya@outlook.com']);
+    Socialite::fake('microsoft', makeMicrosoftUser('maya-microsoft-id', 'maya@outlook.com', $tenantId));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'microsoft', 'code' => 'accepted']))
+        ->assertSessionHasErrors(['login' => __('auth.link.account_exists_password', ['provider' => 'Microsoft'])]);
+
+    $this->assertGuest('web');
+    expect($holder->fresh())->not->toBeNull();
+})->with([
+    'personal account tenant' => [MicrosoftProvider::MS_ENTRA_CONSUMER_TENANT_ID],
+    'no tenant claim' => [null],
+]);
+
+test('the microsoft sign-in carries the tenant from the validated id token', function (): void {
+    $squatter = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    $driver = Mockery::mock(MicrosoftProvider::class);
+    $driver->shouldReceive('redirectUrl')->andReturnSelf();
+    $driver->shouldReceive('user')->andReturn(makeMicrosoftUser('maya-microsoft-id', 'maya@example.com', null));
+    $driver->shouldReceive('getClaims')->andReturn((object) ['tid' => 'a1b2c3d4-0000-0000-0000-000000000001']);
+    Socialite::shouldReceive('driver')->with('microsoft')->andReturn($driver);
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'microsoft', 'code' => 'accepted']));
+
+    expect(User::query()->find($squatter->getKey()))->toBeNull();
+});
+
+test('a verified password account is left alone and the person is told to sign in with their password', function (): void {
+    $user = User::factory()->withWorkspace()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect(route('login'))
+        ->assertSessionHasErrors(['login' => __('auth.link.account_exists_password', ['provider' => 'Google'])]);
+
+    $this->assertGuest('web');
+    expect($user->fresh())->not->toBeNull()
+        ->and($user->socialAccounts()->exists())->toBeFalse();
+});
+
+test('an unverified account that already belongs to a workspace is never replaced', function (): void {
+    $user = User::factory()->unverified()->withWorkspace()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest('web');
+    expect($user->fresh())->not->toBeNull()
+        ->and(User::query()->where('email', 'maya@example.com')->count())->toBe(1);
+});
+
+test('an unverified account is never replaced by a google identity whose email google has not verified', function (): void {
+    $user = User::factory()->unverified()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', emailVerified: false, hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest('web');
+    expect($user->fresh())->not->toBeNull();
+});
+
+test('an account with no password and no available provider is told to reset its password', function (): void {
+    $user = User::factory()->withWorkspace()->socialOnly()->create(['email' => 'maya@example.com']);
+    $user->socialAccounts()->create(['provider_name' => 'github', 'provider_id' => 'legacy-github-id']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']))
+        ->assertSessionHasErrors(['login' => __('auth.link.account_exists_reset')]);
+});
+
+test('the sign-in form is pre-filled with the address a provider just matched', function (): void {
+    User::factory()->withWorkspace()->create(['email' => 'maya@example.com']);
+    Socialite::fake('google', makeSocialiteUser('maya-google-id', 'Maya', 'maya@example.com', hostedDomain: 'example.com'));
+
+    $this->get(route('auth.socialite.callback', ['provider' => 'google', 'code' => 'accepted']));
+
+    livewire(Login::class)->assertSet('data.email', 'maya@example.com');
+});
+
 test('an existing linked account still signs in when the provider now reports a different email', function (): void {
     $user = User::factory()->withWorkspace()->create(['email' => 'old-address@example.com']);
     UserSocialAccount::factory()->create([
@@ -243,6 +454,50 @@ test('callback from socialite provider handles missing code parameter', function
     expect($errors->first('login'))->toBe('Authorization was cancelled or failed. Please try again.');
 });
 
+test('a throttled social callback returns to the sign-in page instead of a bare error page', function () {
+    $this->freezeTime();
+
+    foreach (range(1, 10) as $attempt) {
+        $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value]));
+    }
+
+    $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirect(route('login'));
+
+    FilamentNotification::assertNotified(
+        FilamentNotification::make()
+            ->title(__('auth.provider.failed_title'))
+            ->body(__('auth.throttle', ['seconds' => 60]))
+            ->danger()
+            ->persistent(),
+    );
+});
+
+test('a throttled provider step returns a signed-in user to the page that started it', function (string $routeName) {
+    $this->freezeTime();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $startedOn = Security::getUrl(tenant: $user->personalWorkspace());
+
+    $this->actingAs($user);
+
+    foreach (range(1, 10) as $attempt) {
+        $this->get(route($routeName, ['provider' => SocialiteProvider::GOOGLE->value]));
+    }
+
+    $this->withSession(['url.intended' => $startedOn])
+        ->get(route($routeName, ['provider' => SocialiteProvider::GOOGLE->value]))
+        ->assertRedirect($startedOn);
+
+    FilamentNotification::assertNotified(
+        FilamentNotification::make()
+            ->title(__('auth.provider.failed_title'))
+            ->body(__('auth.throttle', ['seconds' => 60]))
+            ->danger()
+            ->persistent(),
+    );
+})->with(['identity confirmation' => 'auth.socialite.confirm.callback', 'account link' => 'auth.socialite.link.callback']);
+
 test('callback from socialite provider rejects a disposable email address', function () {
     Exceptions::fake();
 
@@ -271,6 +526,44 @@ test('callback from socialite provider rejects a disposable email address', func
  * than merely incomplete, and it is the undercount that made the Fathom
  * signup series disagree with the users table.
  */
+test('callback refuses to create an account from a google identity whose email google has not verified', function () {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('unverified-google-id', 'Squatter', 'owner@example.com', emailVerified: false),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', [
+        'provider' => SocialiteProvider::GOOGLE->value,
+        'code' => 'test-code',
+    ]));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['login' => __('auth.provider.unverified_email')]);
+
+    $this->assertDatabaseMissing('users', ['email' => 'owner@example.com']);
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'unverified-google-id']);
+    $this->assertGuest();
+});
+
+test('callback refuses to create an account when the provider shares no email address', function () {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('no-email-google-id', 'No Email', null),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', [
+        'provider' => SocialiteProvider::GOOGLE->value,
+        'code' => 'test-code',
+    ]));
+
+    $response->assertRedirect(route('login'));
+    $response->assertSessionHasErrors(['login' => __('auth.provider.unverified_email')]);
+
+    $this->assertDatabaseMissing('user_social_accounts', ['provider_id' => 'no-email-google-id']);
+    $this->assertDatabaseCount('users', 0);
+    $this->assertGuest();
+});
+
 test('callback flags the signup event when the OAuth user is new', function () {
     Socialite::fake(
         SocialiteProvider::GOOGLE->value,
@@ -332,6 +625,13 @@ test('github callback route is gone', function () {
 
 test('callback rejects unknown providers', function () {
     $this->get('/auth/callback/bitbucket?code=x')->assertNotFound();
+});
+
+test('a provider without a client id has no sign-in routes', function (): void {
+    config(['services.microsoft.client_id' => null]);
+
+    $this->get('/auth/redirect/microsoft')->assertNotFound();
+    $this->get('/auth/callback/microsoft?code=x')->assertNotFound();
 });
 
 test('link redirect requires a fresh identity confirmation', function (): void {
@@ -481,6 +781,7 @@ test('link callback rejects a grant minted before the password was rotated', fun
     $this->get(route('auth.socialite.link.redirect', ['provider' => SocialiteProvider::GOOGLE->value]));
 
     $user->forceFill(['password' => Hash::make('a-brand-new-password')])->save();
+    session()->put('password_hash_web', $user->getAuthPassword());
 
     Socialite::fake(
         SocialiteProvider::GOOGLE->value,

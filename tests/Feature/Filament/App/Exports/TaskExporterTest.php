@@ -14,7 +14,12 @@ use App\Models\Export;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
+use Filament\Actions\Exports\Enums\ExportFormat;
+use Filament\Actions\Exports\Jobs\ExportCompletion;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
@@ -27,6 +32,8 @@ mutates(TaskExporter::class);
 beforeEach(function () {
     Event::fake()->except([
         WorkspaceCreated::class,
+        Authenticated::class,
+        TenantSet::class,
         'eloquent.creating: App\\Models\\Workspace',
     ]);
 
@@ -126,6 +133,25 @@ test('export generates CSV with correct data', function () {
     expect($headers)->toContain('Title')
         ->and($headers)->toContain('Status')
         ->and($data)->toContain('Fix login bug');
+});
+
+test('export completion notice carries the workspace the export ran in', function () {
+    Task::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    Livewire::test(ManageTasks::class)
+        ->callAction('export')
+        ->assertHasNoFormErrors();
+
+    $completion = new ExportCompletion(Export::latest()->first(), ['title' => 'Title'], [ExportFormat::Csv], [], 'web');
+    $completion->onConnection('database');
+
+    resolve(CurrentWorkspace::class)->within($this->workspace, fn () => $completion->handle());
+
+    $notice = $this->user->notifications()->sole();
+
+    expect($notice->workspace_id)->toBe($this->workspace->id)
+        ->and($notice->reason)->toBeNull()
+        ->and($notice->data['actions'][0]['name'])->toBe('download_csv');
 });
 
 test('export datetimes name and use the requesting user timezone', function () {

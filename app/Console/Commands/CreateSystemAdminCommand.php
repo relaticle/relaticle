@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsStringOptions;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -22,6 +23,8 @@ use function Laravel\Prompts\text;
                             {--password= : The password for the system administrator}')]
 final class CreateSystemAdminCommand extends Command
 {
+    use ReadsStringOptions;
+
     /**
      * Execute the console command.
      */
@@ -52,14 +55,14 @@ final class CreateSystemAdminCommand extends Command
             }
 
             // Get administrator details
-            $name = $this->option('name') ?? text(
+            $name = $this->stringOption('name') ?? text(
                 label: 'Name',
                 placeholder: 'John Doe',
                 required: true,
                 validate: fn (string $value): ?string => strlen($value) < 2 ? 'Name must be at least 2 characters' : null
             );
 
-            $email = $this->option('email') ?? text(
+            $email = $this->stringOption('email') ?? text(
                 label: 'Email address',
                 placeholder: 'admin@example.com',
                 required: true,
@@ -77,7 +80,7 @@ final class CreateSystemAdminCommand extends Command
             );
 
             // Validate email from command option
-            if ($this->option('email')) {
+            if ($this->stringOption('email')) {
                 if (! filter_var($email, FILTER_VALIDATE_EMAIL)) {
                     $this->error('Invalid email address provided.');
 
@@ -91,7 +94,7 @@ final class CreateSystemAdminCommand extends Command
                 }
             }
 
-            $password = $this->option('password') ?? password(
+            $password = $this->stringOption('password') ?? password(
                 label: 'Password',
                 placeholder: 'Minimum 8 characters',
                 required: true,
@@ -99,7 +102,7 @@ final class CreateSystemAdminCommand extends Command
             );
 
             // Validate password from command option
-            if ($this->option('password') && strlen($password) < 8) {
+            if ($this->stringOption('password') && strlen($password) < 8) {
                 $this->error('Password must be at least 8 characters.');
 
                 return self::FAILURE;

@@ -38,6 +38,29 @@ test('interstitial component renders for user with scheduled deletion', function
         ->assertSee('Records in shared workspaces will remain without your profile.');
 });
 
+test('interstitial footer links the configured legal pages', function () {
+    config()->set('relaticle.legal.privacy_url', 'https://legal.example.test/privacy');
+    config()->set('relaticle.legal.terms_url', 'https://legal.example.test/terms');
+
+    $this->actingAs(User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create());
+
+    livewire(ScheduledDeletionInterstitial::class)
+        ->assertSee('href="https://legal.example.test/privacy"', escape: false)
+        ->assertSee('href="https://legal.example.test/terms"', escape: false);
+});
+
+test('interstitial footer shows no legal links when none are configured', function () {
+    config()->set('relaticle.legal.privacy_url', null);
+    config()->set('relaticle.legal.terms_url', null);
+
+    $this->actingAs(User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create());
+
+    livewire(ScheduledDeletionInterstitial::class)
+        ->assertSeeHtml('&copy; '.date('Y').' Relaticle')
+        ->assertDontSee(__('auth.footer.privacy_policy'))
+        ->assertDontSee(__('auth.footer.terms_of_service'));
+});
+
 test('cancel confirmation explains that account access will be restored', function () {
     $user = User::factory()->withPersonalWorkspace()->scheduledForDeletion()->create();
 

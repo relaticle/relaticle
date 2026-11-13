@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Validation\ValidationException;
@@ -32,6 +33,7 @@ final readonly class TenantFkValidator
             }
 
             $owned = $modelClass::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
                 ->where('workspace_id', $workspaceId)
                 ->whereKey($value)
                 ->exists();
@@ -68,6 +70,7 @@ final readonly class TenantFkValidator
             $unique = array_values(array_unique(array_map(strval(...), $values)));
 
             $owned = $modelClass::query()
+                ->withoutGlobalScope(WorkspaceScope::class)
                 ->where('workspace_id', $workspaceId)
                 ->whereIn((new $modelClass)->getKeyName(), $unique)
                 ->count();

@@ -43,7 +43,7 @@ final class NoteImporter extends BaseImporter
                     'note subject', 'summary',
                 ])
                 ->example('Meeting Notes')
-                ->icon('heroicon-o-pencil-square'),
+                ->icon('lucide-square-pen'),
         ]);
     }
 

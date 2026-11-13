@@ -29,14 +29,34 @@ production: message ordering, approval races, duplicate proposals.
   single card and approved once (`ProposalPlanService`). A new foreign key on a
   write tool must be listed in `ownedForeignKeys()`/`ownedForeignKeyLists()`, or
   it will accept neither reference validation nor ownership checks.
+- A write that leaves the workspace is approved on its own: an email send and a
+  workspace invitation. `ProposalEntity::needsOwnApproval()` owns that list.
+  `ProposalPlanService::approveAll()` skips such a step: it stays pending, shown in
+  full, with its own button, and the keyboard shortcut never approves it.
+  `SendEmailTool` takes one email per call, and `PendingAction::isEmailSend()` makes
+  `approveStep()` refuse a batch of them. An invitation step may hold several
+  addresses, and its button sends them all. `tests/Feature/Chat/EmailToolsTest.php`
+  and `tests/Feature/Chat/InviteWorkspaceMemberToolTest.php` fail when approving the
+  plan, or its shortcut, sends either.
+- `Relaticle\Chat\Enums\ProposalEntity` owns every fact that follows from what a proposal
+  writes: its title key, its core fields, its verbs, and whether it is approved on its own.
+  `PendingAction::entity_type` is cast to it. A new kind of proposal is a new case, and every
+  `match` in the enum lists each case with no `default`, so PHPStan fails a case that a
+  fact forgot. Strings remain only where another vocabulary starts: the custom-fields
+  bridge, `RecordReferenceResolver`, and payloads sent to the browser or the model.
 - Resolve a reference only at approval time (`PlanReferenceResolver`), never at
   proposal time, and never let a `$ref` fall out of a card's display: a plan card
   that hides the link being approved is the failure this design exists to
   prevent (`RecordNameResolver` renders it as "Name (step N)").
 - Read tools take `lookup: true` to skip the `display_block`; the prompt tells
-  the model to use it (or `SearchCrmTool`) when it only needs ids. Every read
-  result without that flag renders, so a new read tool must either emit a block
-  or be named in the prompt's no-block list.
+  the model to use it (or `SearchCrmTool`) when it only needs ids, or when it
+  re-reads records already shown in the conversation to judge them. A message
+  that asks to see records renders them, even ones shown before: 5 of 7 repeated
+  tables in production answered such a message, so the app never suppresses a
+  repeat. The `investigate` case in `tests/Evals/Rela/ReadsTest.php` fails a
+  re-read that renders the same table again. Every read result without the flag
+  renders, so a new read tool must either emit a block or be named in the
+  prompt's no-block list.
 - A new list tool needs `availableIncludes()` (copy its sibling `Get*Tool`'s
   allowlist) or the prompt's related-records rule has nothing to call for it.
 - Replayed proposal tool results are NEVER rewritten: mutating an earlier

@@ -66,25 +66,25 @@
             <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3 dark:border-gray-700">
                 <h3 class="text-sm font-semibold text-gray-900 dark:text-white">{{ __('Chats') }}</h3>
 
-                <div class="flex items-center gap-1">
+                <div class="flex items-center gap-1 max-sm:gap-2">
                     <a
                         href="{{ $newChatUrl }}"
                         wire:navigate
                         @click="$wire.close()"
                         aria-label="{{ __('New chat') }}"
                         title="{{ __('New chat') }}"
-                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
+                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition max-sm:size-11 hover:bg-gray-100 hover:text-primary-600 dark:hover:bg-white/5 dark:hover:text-primary-400"
                     >
-                        <x-heroicon-o-plus class="h-4 w-4" />
+                        <x-lucide-plus class="h-4 w-4" />
                     </a>
 
                     <button
                         type="button"
                         @click="$wire.close()"
                         aria-label="{{ __('Close all chats panel') }}"
-                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
+                        class="flex h-7 w-7 items-center justify-center rounded-md text-gray-500 transition max-sm:size-11 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/5 dark:hover:text-gray-200"
                     >
-                        <x-heroicon-o-x-mark class="h-4 w-4" />
+                        <x-lucide-x class="h-4 w-4" />
                     </button>
                 </div>
             </div>
@@ -98,7 +98,7 @@
                     aria-label="{{ __('Search chats') }}"
                     class="w-full rounded-md border border-gray-200 bg-white px-2 py-1.5 pe-8 text-sm text-gray-900 placeholder-gray-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 dark:border-gray-700 dark:bg-gray-900 dark:text-white"
                 />
-                <x-heroicon-o-arrow-path
+                <x-lucide-refresh-cw
                     wire:loading
                     wire:target="search"
                     class="absolute end-5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400 motion-safe:animate-spin"
@@ -189,7 +189,7 @@
                                     @click="$wire.close()"
                                     class="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 transition hover:bg-gray-50 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500 dark:text-gray-200 dark:hover:bg-white/5"
                                 >
-                                    <x-heroicon-o-chat-bubble-left class="h-4 w-4 text-gray-400" />
+                                    <x-lucide-message-square class="h-4 w-4 text-gray-400" />
                                     <span data-title title="{{ $rawTitle }}" class="truncate pe-16">{{ $displayTitle }}</span>
                                 </a>
                             </template>
@@ -221,7 +221,7 @@
                                 title="{{ __('Rename chat') }}"
                                 class="absolute inset-y-0 end-9 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-primary-400"
                             >
-                                <x-heroicon-o-pencil-square class="h-4 w-4" />
+                                <x-lucide-square-pen class="h-4 w-4" />
                             </button>
 
                             <button
@@ -233,7 +233,7 @@
                                 title="{{ __('Delete chat') }}"
                                 class="absolute inset-y-0 end-3 my-auto flex h-6 w-6 items-center justify-center rounded-md text-gray-400 opacity-0 transition hover:bg-gray-100 hover:text-danger-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 dark:hover:bg-white/5 dark:hover:text-danger-400"
                             >
-                                <x-heroicon-o-trash class="h-4 w-4" />
+                                <x-lucide-trash class="h-4 w-4" />
                             </button>
                         </li>
                     @endforeach

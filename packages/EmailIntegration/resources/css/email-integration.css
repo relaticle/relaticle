@@ -262,17 +262,62 @@
 
 /* ── Email visibility table (workspace privacy settings) ───────────────────
    Custom Blade table with a described enforcement picker per row. */
-.ei-visibility-search {
-    display: flex;
-    justify-content: end;
+.ei-visibility-search .fi-ta-search-field {
+    @apply w-full;
 }
 
-.ei-visibility-search .fi-ta-search-field {
-    @apply w-full max-w-xs;
+/* Below sm a row is a card, as list tables stack: the heading cell heads it, then one label and value per line, the value under its label on the narrowest phones. */
+.ei-stacked-table {
+    @apply max-sm:block;
+
+    & > thead {
+        @apply max-sm:hidden;
+    }
+
+    & > tbody,
+    & > tbody > tr,
+    & > tbody > tr > td {
+        @apply max-sm:block;
+    }
+
+    & > tbody > tr {
+        @apply max-sm:relative max-sm:py-3;
+    }
+
+    & > tbody > tr > td {
+        @apply max-sm:py-1;
+    }
+
+    & > tbody > tr > td[data-label] {
+        @apply max-sm:grid max-sm:grid-cols-[8.5rem_minmax(0,1fr)] max-sm:items-center max-sm:gap-x-3 max-[360px]:grid-cols-1! max-[360px]:gap-y-0.5;
+
+        &::before {
+            @apply max-sm:truncate max-sm:text-gray-500 max-sm:content-[attr(data-label)] dark:max-sm:text-gray-400;
+        }
+    }
+
+    & .ei-stacked-table-heading {
+        @apply max-sm:pe-14 max-sm:pb-2;
+    }
+
+    & .ei-stacked-table-actions {
+        @apply max-sm:absolute max-sm:end-2 max-sm:top-2 max-sm:p-0;
+    }
 }
 
 .ei-enforcement-picker-option[aria-selected='true'] {
     @apply bg-gray-50 dark:bg-white/5;
+}
+
+/* iOS clips a sheet to the touch-scrolling box it opens from, so on a phone the email stops scrolling while a
+   menu from the reply composer is open. Hidden keeps the scroll offset. */
+[data-email-scroll-region]:has(.fi-dropdown-panel[x-ref='panel'][style*='display: block']) {
+    @apply max-sm:overflow-hidden!;
+}
+
+/* On a phone the picker is a bottom sheet, so its options sit as rounded rows like the panel's sheet menus. */
+.ei-enforcement-picker-option {
+    @apply max-sm:rounded-lg max-sm:border-b-0;
 }
 
 /* ── Email list: direction badge ───────────────────────────────────────────
@@ -326,4 +371,30 @@
 
 .fi-meetings-date:hover .fi-fo-date-time-picker-display-text-input {
     @apply text-gray-900 dark:text-white;
+}
+
+/* Empty picker copy is a caption. The same row style as a real choice reads as a signature or template named "No …". */
+.composer-picker-note {
+    @apply px-2 py-1.5 text-start text-xs italic text-gray-400 dark:text-gray-500;
+}
+
+/* Email settings panes: a mailbox's tabs sit beside the panel like the custom fields entity list, and above it on a phone. */
+.ei-email-settings {
+    & .fi-sc-tabs.fi-vertical {
+        @apply max-md:flex-col;
+
+        & > .fi-tabs {
+            @apply min-w-48 shrink-0 self-start max-md:mx-auto max-md:max-w-full max-md:flex-row max-md:overflow-x-auto;
+        }
+
+        & > .fi-sc-tabs-tab.fi-active {
+            @apply min-w-0 max-md:ms-0 max-md:mt-6;
+        }
+    }
+
+    /* An uncontained section is a grid with an auto column, so the sharing cards would widen it past a phone screen. */
+    &.fi-section-not-contained,
+    & .fi-section-not-contained {
+        @apply grid-cols-1;
+    }
 }

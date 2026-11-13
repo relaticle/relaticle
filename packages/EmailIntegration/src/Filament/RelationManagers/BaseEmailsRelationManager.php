@@ -11,13 +11,13 @@ use App\Models\User;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
-use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
@@ -40,7 +40,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     protected static string $relationship = 'emails';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-envelope';
+    protected static string|\BackedEnum|null $icon = 'lucide-mail';
 
     protected static ?string $badgeColor = 'gray';
 
@@ -64,7 +64,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
             return null;
         }
 
-        return resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user);
+        return once(fn (): ?string => resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user));
     }
 
     public function table(Table $table): Table
@@ -104,9 +104,9 @@ abstract class BaseEmailsRelationManager extends RelationManager
             ->with(['from', 'labels', 'participants', 'shares', 'user', 'connectedAccount.user'])
             ->withReadStateFor($user->getKey())
             ->withExists([
-                'accessRequests as viewer_has_pending_access_request' => fn (Builder $query) => $query
+                'accessRequests as viewer_has_pending_access_request' => fn (EloquentBuilder $requests): EloquentBuilder => $requests
                     ->where('requester_id', $user->getKey())
-                    ->where('status', EmailAccessRequestStatus::PENDING),
+                    ->scopes(['open']),
             ]);
 
         if (filled($this->search)) {

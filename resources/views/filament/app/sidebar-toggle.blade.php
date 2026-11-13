@@ -1,23 +1,28 @@
-{{--
-    Collapses and expands the app panel's sidebar. Rendered into
-    `TENANT_MENU_AFTER` so it sits in the workspace switcher's row when the
-    sidebar is open, and directly beneath the workspace avatar on the collapsed
-    rail. `.fi-sidebar-toggle-btn` holds it a fixed distance from the panel's
-    trailing edge in both states, so it rides that edge as the width animates.
---}}
+{{-- Only one placement shows at a time, so no control travels across the panel while it animates. --}}
+@php
+    $isSidebarPlacement = $placement === 'sidebar';
+    $label = $isSidebarPlacement
+        ? __('filament-panels::layout.actions.sidebar.collapse.label')
+        : __('filament-panels::layout.actions.sidebar.expand.label');
+@endphp
+
 <button
     type="button"
-    data-sidebar-workspace-toggle
+    data-sidebar-toggle
+    @if ($isSidebarPlacement)
+        data-sidebar-workspace-toggle
+    @else
+        data-sidebar-expand-toggle
+        x-cloak
+        x-show="! $store.sidebar.isOpen"
+        x-bind:class="{ 'fi-sidebar-collapsed': ! $store.sidebar.isOpen }"
+        x-transition:enter="fi-transition-enter"
+        x-transition:enter-start="fi-transition-enter-start"
+        x-transition:enter-end="fi-transition-enter-end"
+    @endif
     aria-controls="fi-main-sidebar"
+    aria-label="{{ $label }}"
     x-data="{
-        get isOpen() {
-            return $store.sidebar.isOpen
-        },
-        get label() {
-            return this.isOpen
-                ? @js(__('filament-panels::layout.actions.sidebar.collapse.label'))
-                : @js(__('filament-panels::layout.actions.sidebar.expand.label'))
-        },
         get shortcut() {
             return (navigator.userAgentData?.platform ?? navigator.platform ?? '')
                 .toLowerCase()
@@ -26,25 +31,42 @@
                 : 'Ctrl+\\'
         },
         toggle() {
-            this.isOpen ? $store.sidebar.close() : $store.sidebar.open()
+            const hadFocus = document.activeElement === $el
+
+            $store.sidebar.isOpen ? $store.sidebar.close() : $store.sidebar.open()
+
+            if (hadFocus) {
+                $nextTick(() => requestAnimationFrame(() => {
+                    [...document.querySelectorAll('[data-sidebar-toggle]')]
+                        .find((button) => button !== $el)
+                        ?.focus()
+                }))
+            }
         },
     }"
     x-on:click="toggle()"
-    x-on:keydown.window="
-        if ((event.metaKey || event.ctrlKey) && event.key === '\\' && ! event.repeat) {
-            event.preventDefault()
-            toggle()
-        }
-    "
-    x-bind:aria-expanded="isOpen"
-    x-bind:aria-label="label"
+    @if ($isSidebarPlacement)
+        x-on:keydown.window="
+            if ((event.metaKey || event.ctrlKey) && event.key === '\\' && ! event.repeat) {
+                event.preventDefault()
+                toggle()
+            }
+        "
+    @endif
+    x-bind:aria-expanded="$store.sidebar.isOpen"
     x-tooltip="{
-        content: `${label} &nbsp; ${shortcut}`,
+        content: `${@js($label)} &nbsp; ${shortcut}`,
         placement: document.dir === 'rtl' ? 'left' : 'right',
         theme: $store.theme,
     }"
-    class="fi-sidebar-toggle-btn"
+    @class([
+        'fi-sidebar-toggle-btn' => $isSidebarPlacement,
+        'fi-topbar-expand-sidebar-btn' => ! $isSidebarPlacement,
+    ])
 >
-    <x-ri-sidebar-fold-line class="fi-sidebar-toggle-icon fi-sidebar-toggle-icon-collapse" aria-hidden="true" />
-    <x-ri-sidebar-unfold-line class="fi-sidebar-toggle-icon fi-sidebar-toggle-icon-expand" aria-hidden="true" />
+    @if ($isSidebarPlacement)
+        <x-lucide-panel-left-close class="fi-sidebar-toggle-icon" aria-hidden="true" />
+    @else
+        <x-lucide-panel-left-open class="fi-sidebar-toggle-icon" aria-hidden="true" />
+    @endif
 </button>

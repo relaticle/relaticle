@@ -378,7 +378,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             assistantMsg.content = this.sendTexts.sessionExpired;
             assistantMsg.sessionExpired = true;
         } else if (res.status === 402 && body?.error === 'credits_exhausted') {
-            const resetLabel = body.reset_at ? new Date(body.reset_at).toLocaleDateString() : null;
+            const resetLabel = body.reset_on ?? null;
             assistantMsg.paywall = {
                 heading: this.sendTexts.paywallHeading,
                 body: resetLabel ? this.sendTexts.paywallReset.replace(':date', resetLabel) : this.sendTexts.paywallTopUp,
@@ -407,6 +407,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     async deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachment = null) {
         const isFirstMessage = !this.conversationId;
 
+        this.stopWatchingTurn();
         this.anchorTo(userMsg);
 
         if (isFirstMessage) {
@@ -497,6 +498,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
 
                 userMsg.sendState = 'sent';
                 this.clearDraft(draftConversationId);
+                this.watchTurn();
             } catch (error) {
                 if (error?.name === 'AbortError') {
                     // A deliberate cancel, not a delivery failure: the request
@@ -575,6 +577,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             }
             userMsg.sendState = 'sent';
             this.clearDraft(draftConversationId);
+            this.watchTurn();
         } catch (error) {
             if (error?.name === 'AbortError') {
                 userMsg.sendState = 'sent';

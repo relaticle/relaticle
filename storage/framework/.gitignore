@@ -8,3 +8,5 @@ routes.php
 routes.scanned.php
 schedule-*
 services.json
+deploy.lock
+deployed-commit

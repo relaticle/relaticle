@@ -36,6 +36,10 @@ return [
         ],
     ],
 
+    'empty_state' => [
+        'description' => 'Opportunities you add or import appear here.',
+    ],
+
     'pages' => [
         'list' => [
             'actions' => [

@@ -3,7 +3,7 @@
         <x-filament::tabs :label="__('filament/pages/email-access-requests.tabs.aria')" class="ei-tabs-segmented">
         <x-filament::tabs.item
             :active="$tab === 'incoming'"
-            :icon="\Filament\Support\Icons\Heroicon::OutlinedInboxArrowDown"
+            icon="lucide-inbox"
             :badge="$this->pendingIncomingCount > 0 ? ($this->pendingIncomingCount > 99 ? '99+' : (string) $this->pendingIncomingCount) : null"
             badge-color="primary"
             wire:click="setTab('incoming')"
@@ -13,7 +13,7 @@
 
         <x-filament::tabs.item
             :active="$tab === 'outgoing'"
-            :icon="\Filament\Support\Icons\Heroicon::OutlinedPaperAirplane"
+            icon="lucide-send"
             wire:click="setTab('outgoing')"
         >
             {{ __('filament/pages/email-access-requests.tabs.outgoing') }}

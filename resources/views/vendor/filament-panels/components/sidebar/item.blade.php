@@ -14,6 +14,7 @@
     'first' => false,
     'grouped' => false,
     'icon' => null,
+    'label' => null,
     'last' => false,
     'shouldOpenUrlInNewTab' => false,
     'sidebarCollapsible' => true,
@@ -23,7 +24,11 @@
 ])
 
 @php
+    use Illuminate\Contracts\Support\Htmlable;
+
     $sidebarCollapsible = $sidebarCollapsible && filament()->isSidebarCollapsibleOnDesktop();
+    $tooltip = $label ?? $slot;
+    $labelText = ($tooltip instanceof Htmlable) ? trim(html_entity_decode(strip_tags($tooltip->toHtml()), ENT_QUOTES | ENT_HTML5, 'UTF-8')) : $tooltip;
 @endphp
 
 <li
@@ -43,18 +48,19 @@
         @endif
         x-on:click="window.matchMedia(`(max-width: 1024px)`).matches && $store.sidebar.close()"
         @if ($sidebarCollapsible && (! $subNavigation))
-            x-bind:aria-label="$store.sidebar.isOpen ? null : @js(trim(strip_tags($slot->toHtml())))"
+            x-bind:aria-label="$store.sidebar.isOpen ? null : @js($labelText)"
             x-data="{ tooltip: false }"
             x-effect="
                 tooltip = $store.sidebar.isOpen
                     ? false
                     : {
-                          content: @js($slot->toHtml()),
+                          content: @js(($tooltip instanceof Htmlable) ? $tooltip->toHtml() : $tooltip),
+                          allowHTML: @js($tooltip instanceof Htmlable),
                           placement: document.dir === 'rtl' ? 'left' : 'right',
                           theme: $store.theme,
                       }
             "
-            x-tooltip.html="tooltip"
+            x-tooltip="tooltip"
         @endif
         class="fi-sidebar-item-btn"
     >
@@ -101,7 +107,7 @@
             @endif
             class="fi-sidebar-item-label"
         >
-            {{ $slot }}
+            {{ $label ?? $slot }}
         </span>
 
         @if (filled($badge))
@@ -153,15 +159,14 @@
                     :first="$loop->first"
                     grouped
                     :icon="$childItemIcon"
+                    :label="$childItem->getLabel()"
                     :last="$loop->last"
                     :should-open-url-in-new-tab="$shouldChildItemOpenUrlInNewTab"
                     sub-grouped
                     :sub-navigation="$subNavigation"
                     :url="$childItemUrl"
                     :attributes="\Filament\Support\prepare_inherited_attributes($childItemExtraAttributes)"
-                >
-                    {{ $childItem->getLabel() }}
-                </x-filament-panels::sidebar.item>
+                />
             @endforeach
         </ul>
     @endif

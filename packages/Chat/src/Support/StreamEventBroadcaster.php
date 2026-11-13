@@ -7,23 +7,38 @@ namespace Relaticle\Chat\Support;
 use Carbon\CarbonInterface;
 use Illuminate\Broadcasting\BroadcastException;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Broadcast;
+use Laravel\Ai\Streaming\Events\Citation;
+use Laravel\Ai\Streaming\Events\ProviderToolEvent;
 use Laravel\Ai\Streaming\Events\StreamEnd;
 use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\StreamStart;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Ai\Streaming\Events\ToolResult;
+use Relaticle\Chat\Enums\WebTool;
 use Relaticle\Chat\Models\PendingAction;
 
 final readonly class StreamEventBroadcaster
 {
     // The only stream events chat/stream.js listens for.
-    private const array CLIENT_EVENTS = [StreamStart::class, TextDelta::class, ToolCall::class, ToolResult::class, StreamEnd::class];
+    private const array CLIENT_EVENTS = [StreamStart::class, TextDelta::class, ToolCall::class, ToolResult::class, StreamEnd::class, ProviderToolEvent::class, Citation::class];
+
+    /** @var Collection<string, array<string, bool>> invocation id => url => whether it went out with its title */
+    private Collection $sentSources;
 
     public function __construct(
         private Channel $channel,
-    ) {}
+    ) {
+        $this->sentSources = $this->noSourcesSent();
+    }
+
+    /** @return Collection<string, array<string, bool>> */
+    private function noSourcesSent(): Collection
+    {
+        return new Collection;
+    }
 
     /**
      * Broadcast a stream event over the channel, applying payload discipline.
@@ -37,7 +52,7 @@ final readonly class StreamEventBroadcaster
     {
         $payload = self::payloadFor($event);
 
-        if ($payload === null) {
+        if ($payload === null || ($payload['as'] === 'citation' && ! $this->isNewSource($payload['with']))) {
             return;
         }
 
@@ -52,6 +67,28 @@ final readonly class StreamEventBroadcaster
                 'reason' => $e->getMessage(),
             ]);
         }
+    }
+
+    // The client drops repeat and overflow sources anyway; an Anthropic reply cites
+    // per sentence, so this keeps a 30-citation reply to 10 messages.
+    /**
+     * @param  array<string, mixed>  $source
+     */
+    private function isNewSource(array $source): bool
+    {
+        $invocation = (string) $source['invocation_id'];
+        $sent = $this->sentSources->get($invocation, []);
+        $hasTitle = $source['title'] !== null;
+        $known = array_key_exists($source['url'], $sent);
+
+        if (($known && ($sent[$source['url']] || ! $hasTitle)) || (! $known && count($sent) >= WebSources::LIMIT)) {
+            return false;
+        }
+
+        $sent[$source['url']] = $hasTitle;
+        $this->sentSources->put($invocation, $sent);
+
+        return true;
     }
 
     /**
@@ -76,6 +113,16 @@ final readonly class StreamEventBroadcaster
             return self::payloadForToolCall($event);
         }
 
+        if ($event instanceof ProviderToolEvent) {
+            return self::payloadForProviderTool($event);
+        }
+
+        if ($event instanceof Citation) {
+            $source = WebSources::source($event->citation);
+
+            return $source === null ? null : ['as' => 'citation', 'with' => ['invocation_id' => $event->invocationId, ...$source]];
+        }
+
         return [
             'as' => $event->type(),
             'with' => $event->toArray(),
@@ -92,7 +139,7 @@ final readonly class StreamEventBroadcaster
 
         $decoded = json_decode((string) $raw, true);
 
-        if (! is_array($decoded) || ($decoded['type'] ?? null) !== 'pending_action') {
+        if (! is_array($decoded) || ($decoded['type'] ?? null) !== PendingActionEnvelope::TYPE) {
             return null;
         }
 
@@ -148,5 +195,41 @@ final readonly class StreamEventBroadcaster
                 'tool_name' => $event->toolCall->name,
             ],
         ];
+    }
+
+    // Result blocks carry whole pages and would break Reverb's 10 KB cap, so only
+    // the start and finish of a search or page read reach the client.
+    /**
+     * @return array{as: string, with: array<string, mixed>}|null
+     */
+    private static function payloadForProviderTool(ProviderToolEvent $event): ?array
+    {
+        $status = match ($event->status) {
+            'started', 'in_progress' => 'started',
+            'completed' => 'completed',
+            default => null,
+        };
+        $tool = WebTool::of($event);
+
+        // OpenAI's search start carries no action yet, so it reads as a search.
+        if (! $tool instanceof WebTool && $status === 'started' && $event->type === 'web_search_call') {
+            $tool = WebTool::Search;
+        }
+
+        if ($status === null || ! $tool instanceof WebTool) {
+            return null;
+        }
+
+        $input = $event->type === 'server_tool_use' ? ($event->data['input'] ?? []) : ($event->data['action'] ?? []);
+        $query = is_array($input) && is_string($input['query'] ?? null) ? mb_substr($input['query'], 0, 200) : null;
+        $url = is_array($input) && is_string($input['url'] ?? null) ? WebSources::source(['url' => $input['url']])['url'] ?? null : null;
+
+        return ['as' => 'provider_tool', 'with' => [
+            'invocation_id' => $event->invocationId,
+            'name' => $tool->value,
+            'status' => $status,
+            'query' => $tool === WebTool::Search ? $query : null,
+            'url' => $tool === WebTool::Fetch ? $url : null,
+        ]];
     }
 }

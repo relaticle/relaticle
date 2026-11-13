@@ -11,6 +11,7 @@ use App\Mcp\Tools\People\UpdatePeopleTool;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -48,7 +49,7 @@ it('creates and links a company from a work email on API create', function (): v
         'custom_fields' => ['emails' => ['jane@acme.com']],
     ])->assertCreated();
 
-    $person = People::query()->where('name', 'Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
 
     expect($person->company_id)->not->toBeNull();
     $this->assertDatabaseHas('companies', [
@@ -65,7 +66,7 @@ it('does not create a company from a public domain alone', function (): void {
         'custom_fields' => ['emails' => ['jane@gmail.com']],
     ])->assertCreated();
 
-    $person = People::query()->where('name', 'Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
 
     expect($person->company_id)->toBeNull();
     $this->assertDatabaseMissing('companies', [
@@ -82,7 +83,7 @@ it('uses the work email when the person also has a public address', function ():
         'custom_fields' => ['emails' => ['jane@gmail.com', 'jane@acme.com']],
     ])->assertCreated();
 
-    $person = People::query()->where('name', 'Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
 
     expect($person->company_id)->not->toBeNull();
     $this->assertDatabaseHas('companies', [
@@ -110,10 +111,10 @@ it('links an existing company when auto_create_companies is false', function ():
         'custom_fields' => ['emails' => ['jane@acme.com']],
     ])->assertCreated();
 
-    $person = People::query()->where('name', 'Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
 
     expect($person->company_id)->toBe($company->getKey());
-    expect(Company::query()->where('workspace_id', $this->workspace->id)->count())->toBe(1);
+    expect(Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $this->workspace->id)->count())->toBe(1);
 });
 
 it('does not create a company when the toggle is off and none exists', function (): void {
@@ -126,7 +127,7 @@ it('does not create a company when the toggle is off and none exists', function 
         'custom_fields' => ['emails' => ['jane@newco.com']],
     ])->assertCreated();
 
-    $person = People::query()->where('name', 'Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
 
     expect($person->company_id)->toBeNull();
     $this->assertDatabaseMissing('companies', [
@@ -146,7 +147,7 @@ it('does not overwrite an explicit company_id', function (): void {
         'custom_fields' => ['emails' => ['jane@acme.com']],
     ])->assertCreated();
 
-    $person = People::query()->where('name', 'Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
 
     expect($person->company_id)->toBe($chosen->getKey());
     $this->assertDatabaseMissing('companies', [
@@ -160,7 +161,7 @@ it('links a company when a work email is added later via API', function (): void
 
     $this->postJson('/api/v1/people', ['name' => 'Jane'])->assertCreated();
 
-    $person = People::query()->where('name', 'Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Jane')->firstOrFail();
 
     expect($person->company_id)->toBeNull();
 
@@ -179,7 +180,7 @@ it('creates and links a company from a work email via MCP', function (): void {
         ])
         ->assertOk();
 
-    $person = People::query()->where('name', 'Mcp Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Mcp Jane')->firstOrFail();
 
     expect($person->company_id)->not->toBeNull();
     $this->assertDatabaseHas('companies', [
@@ -212,7 +213,7 @@ it('creates and links a company from a work email on panel create', function ():
         ])
         ->assertHasNoActionErrors();
 
-    $person = People::query()->where('name', 'Panel Jane')->firstOrFail();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Panel Jane')->firstOrFail();
 
     expect($person->company_id)->not->toBeNull();
     $this->assertDatabaseHas('companies', [
@@ -256,7 +257,7 @@ it('creates and links a company from a work email on CSV import', function (): v
 
     ImportExecutionFixture::run($this);
 
-    $person = People::query()
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)
         ->where('workspace_id', $this->workspace->id)
         ->where('name', 'Import Jane')
         ->firstOrFail();

@@ -18,7 +18,7 @@
                 {{-- Header --}}
                 <div class="flex flex-col items-center gap-4 px-8 pt-8 text-center">
                     <div class="flex size-12 items-center justify-center rounded-full bg-danger-50 dark:bg-danger-500/10">
-                        <x-filament::icon icon="ri-delete-bin-line" class="size-6 text-danger-600 dark:text-danger-400" />
+                        <x-filament::icon icon="lucide-trash" class="size-6 text-danger-600 dark:text-danger-400" />
                     </div>
 
                     <h1 class="text-lg font-semibold text-gray-950 dark:text-white">
@@ -81,10 +81,7 @@
     {{-- Footer --}}
     <div class="flex items-center justify-center gap-x-1 py-6 text-xs text-gray-400 dark:text-gray-500">
         <span>&copy; {{ date('Y') }} Relaticle</span>
-        <span>&middot;</span>
-        <a href="{{ url('/privacy-policy') }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">Privacy Policy</a>
-        <span>&middot;</span>
-        <a href="{{ url('/terms-of-service') }}" class="transition hover:text-gray-600 dark:hover:text-gray-300">Terms</a>
+        <x-legal-links class="transition hover:text-gray-600 dark:hover:text-gray-300" />
     </div>
 
     <x-filament-actions::modals />

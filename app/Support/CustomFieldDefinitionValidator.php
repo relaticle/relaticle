@@ -16,6 +16,9 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
+use Relaticle\CustomFields\Data\FieldTypeData;
+use Relaticle\CustomFields\Facades\CustomFieldsType;
+use Relaticle\CustomFields\Facades\Entities;
 
 /**
  * The single rule set for custom-field definitions written outside a Filament form.
@@ -45,30 +48,57 @@ final readonly class CustomFieldDefinitionValidator
         $type = is_string($data['type'] ?? null) ? $data['type'] : '';
         $tenantId = $user->currentWorkspace->getKey();
         $maxOptions = self::maxOptions();
+        $creatableTypes = self::creatableTypes();
+        $lookupTypes = array_keys(Entities::getLookupOptions());
+        $requiresLookupType = in_array($type, $creatableTypes, true) && CustomFieldsType::getFieldType($type)?->requiresLookupType === true;
 
-        return Validator::make(self::normalize($data), [
+        $validated = Validator::make(self::normalize($data), [
             'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType, $proposedAlongside)],
-            'type' => ['required', Rule::in(CreateCustomField::ALLOWED_TYPES)],
+            'type' => ['required', Rule::in($creatableTypes)],
             'name' => ['required', 'string', 'max:50', self::uniqueNameIgnoringCase(
                 $tenantId,
                 $entityType,
                 fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity. Pick a different name, or update the existing field instead.",
             )],
             'code' => ['nullable', 'string', 'max:50', 'alpha_dash', self::uniqueDefinition('code', $tenantId, $entityType)],
+            'lookup_type' => ['nullable', $requiresLookupType ? 'required' : 'prohibited', 'string', Rule::in($lookupTypes)],
             'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
             'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
+            'settings' => ['nullable', 'array'],
         ], [
             'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CrmEntity::morphAliases()).'.',
-            'type.in' => 'Field type ":input" is not supported via chat. Allowed types: '.implode(', ', CreateCustomField::ALLOWED_TYPES).'.',
+            'type.in' => 'Field type ":input" cannot be created. Allowed types: '.implode(', ', $creatableTypes).'.',
             'name.required' => 'A field name is required.',
             'name.max' => 'Field names must be 50 characters or fewer.',
             'code.max' => 'Field codes must be 50 characters or fewer.',
             'code.alpha_dash' => 'Field codes may only contain letters, numbers, dashes, and underscores.',
             'code.unique' => "A field with code \":input\" already exists on {$entityType}. Omit the code to auto-generate a unique one, or pick a different code.",
+            'lookup_type.required' => 'A record field needs lookup_type, the record type it links to: '.implode(', ', $lookupTypes).'.',
+            'lookup_type.prohibited' => "Field type \"{$type}\" does not take a lookup_type. Only record fields link to another record type.",
+            'lookup_type.in' => 'Invalid lookup_type ":input". Must be one of: '.implode(', ', $lookupTypes).'.',
             'options.required' => "Field type \"{$type}\" requires at least one option.",
             'options.prohibited' => "Field type \"{$type}\" does not support options.",
             'options.max' => "Too many options. At most {$maxOptions} per field.",
+            'settings.array' => 'Pass `settings` as an object of setting names to values.',
         ] + self::optionNameMessages())->validate();
+
+        $settings = $validated['settings'] ?? [];
+
+        if ($settings !== []) {
+            $validated['settings'] = self::validatedSettings(new CustomField(['type' => $type, 'entity_type' => $entityType]), $settings);
+        }
+
+        return $validated;
+    }
+
+    /** @return list<string> */
+    public static function creatableTypes(): array
+    {
+        return array_values(CustomFieldsType::toCollection()
+            ->selectable()
+            ->toBase()
+            ->map(fn (FieldTypeData $type): string => $type->key)
+            ->all());
     }
 
     /**
@@ -97,20 +127,8 @@ final readonly class CustomFieldDefinitionValidator
             throw ValidationException::withMessages(['name' => 'Provide at least one of: name, active, settings.']);
         }
 
-        $settingRules = CustomFieldSettingsSchema::rules($field, $settings);
+        $settingRules = self::settingRules($field, $settings);
         $prefixedSettingRules = Arr::prependKeysWith($settingRules, 'settings.');
-        $unsupported = array_diff(array_keys($settings), array_keys($settingRules));
-
-        if ($unsupported !== []) {
-            throw ValidationException::withMessages([
-                'settings' => sprintf(
-                    'This %s field cannot change: %s. It accepts: %s. Some settings only apply alongside another in the same call: max_values needs allow_multiple set to true, list_toggleable_hidden needs visible_in_list set to true, and searchable is unavailable on encrypted fields.',
-                    $field->type,
-                    implode(', ', $unsupported),
-                    implode(', ', array_keys($settingRules)),
-                ),
-            ]);
-        }
 
         $validated = Validator::make($data, [
             'name' => [
@@ -138,6 +156,55 @@ final readonly class CustomFieldDefinitionValidator
         }
 
         return $validated;
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array<string, mixed>
+     *
+     * @throws ValidationException
+     */
+    private static function validatedSettings(CustomField $field, array $settings): array
+    {
+        $settingRules = self::settingRules($field, $settings);
+        $prefixedSettingRules = Arr::prependKeysWith($settingRules, 'settings.');
+
+        $validated = Validator::make(
+            ['settings' => $settings],
+            $prefixedSettingRules,
+            CustomFieldSettingsSchema::messages(),
+            array_combine(array_keys($prefixedSettingRules), array_keys($settingRules)),
+        )->validate();
+
+        return CustomFieldSettingsSchema::withImpliedChanges(
+            $field,
+            CustomFieldSettingsSchema::cast($validated['settings'] ?? [], $settingRules),
+        );
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array<string, array<int, mixed>>
+     *
+     * @throws ValidationException
+     */
+    private static function settingRules(CustomField $field, array $settings): array
+    {
+        $settingRules = CustomFieldSettingsSchema::rules($field, $settings);
+        $unsupported = array_diff(array_keys($settings), array_keys($settingRules));
+
+        if ($unsupported !== []) {
+            throw ValidationException::withMessages([
+                'settings' => sprintf(
+                    'A %s field does not accept: %s. It accepts: %s. Some settings only apply alongside another in the same call: max_values needs allow_multiple set to true, list_toggleable_hidden needs visible_in_list set to true, and searchable is unavailable on encrypted fields.',
+                    $field->type,
+                    implode(', ', $unsupported),
+                    implode(', ', array_keys($settingRules)),
+                ),
+            ]);
+        }
+
+        return $settingRules;
     }
 
     /**

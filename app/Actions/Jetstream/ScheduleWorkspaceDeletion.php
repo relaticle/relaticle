@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
-use App\Actions\Billing\CancelWorkspaceSubscription;
+use App\Contracts\Billing;
+use App\Enums\DeletionReason;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Models\Workspace;
@@ -15,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 final readonly class ScheduleWorkspaceDeletion
 {
-    public function __construct(private CancelWorkspaceSubscription $cancelSubscription) {}
+    public function __construct(private Billing $billing) {}
 
     public function schedule(User $user, Workspace $workspace): void
     {
@@ -27,13 +28,22 @@ final readonly class ScheduleWorkspaceDeletion
             ]);
         }
 
+        if ($this->billing->blocksDeletion($workspace)) {
+            throw ValidationException::withMessages([
+                'workspace' => [__('workspaces.validation.managed_plan_before_deleting')],
+            ]);
+        }
+
         DB::transaction(function () use ($workspace): void {
-            $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(config('relaticle.deletion.grace_period_days'))])->save();
+            $workspace->forceFill([
+                'scheduled_deletion_at' => now()->addDays(config('relaticle.deletion.grace_period_days')),
+                'deletion_reason' => DeletionReason::Requested,
+            ])->save();
 
             $workspace->workspaceInvitations()->delete();
         });
 
-        $this->cancelSubscription->execute($workspace);
+        $this->billing->cancelForDeletion($workspace, immediately: false);
 
         /** @var User $owner */
         $owner = $workspace->owner;

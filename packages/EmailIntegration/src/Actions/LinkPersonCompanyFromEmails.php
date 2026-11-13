@@ -9,10 +9,10 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use App\Support\EmailAddress;
 use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Models\CustomField as BaseCustomField;
-use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Support\CompanyDomainMatcher;
 
 final readonly class LinkPersonCompanyFromEmails
@@ -36,38 +36,39 @@ final readonly class LinkPersonCompanyFromEmails
             return;
         }
 
+        resolve(CurrentWorkspace::class)->within($workspace, function () use ($person, $workspace): void {
+            $this->link($person, $workspace);
+        });
+    }
+
+    private function link(People $person, Workspace $workspace): void
+    {
         $workspaceId = $workspace->getKey();
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($workspaceId);
 
-        try {
-            $person->unsetRelation('customFieldValues');
-            $person->loadMissing('customFieldValues.customField');
+        $person->unsetRelation('customFieldValues');
+        $person->loadMissing('customFieldValues.customField');
 
-            $workDomain = $this->firstWorkDomain(
-                $person,
-                $workspaceId,
-                $this->domainMatcher->skippedHosts($workspaceId),
-            );
+        $workDomain = $this->firstWorkDomain(
+            $person,
+            $workspaceId,
+            $this->domainMatcher->skippedHosts($workspaceId),
+        );
 
-            if ($workDomain === null) {
-                return;
-            }
-
-            $company = $this->domainMatcher->firstMatching($workDomain, $workspaceId);
-
-            if (! $company instanceof Company && $workspace->auto_create_companies) {
-                $company = $this->autoCreateCompany->execute($workDomain, $workspaceId);
-            }
-
-            if (! $company instanceof Company) {
-                return;
-            }
-
-            $person->update(['company_id' => $company->getKey()]);
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
+        if ($workDomain === null) {
+            return;
         }
+
+        $company = $this->domainMatcher->firstMatching($workDomain, $workspaceId);
+
+        if (! $company instanceof Company && $workspace->auto_create_companies) {
+            $company = $this->autoCreateCompany->execute($workDomain, $workspaceId);
+        }
+
+        if (! $company instanceof Company) {
+            return;
+        }
+
+        $person->update(['company_id' => $company->getKey()]);
     }
 
     /**

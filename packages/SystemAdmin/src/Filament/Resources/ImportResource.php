@@ -8,7 +8,6 @@ use Filament\Actions\ViewAction;
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -25,7 +24,7 @@ final class ImportResource extends Resource
 {
     protected static ?string $model = Import::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = Heroicon::OutlinedArrowUpTray;
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-upload';
 
     protected static string|\UnitEnum|null $navigationGroup = 'CRM';
 

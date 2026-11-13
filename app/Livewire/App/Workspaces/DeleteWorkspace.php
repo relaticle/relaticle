@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace App\Livewire\App\Workspaces;
 
-use App\Actions\Jetstream\CancelWorkspaceDeletion;
 use App\Actions\Jetstream\ScheduleWorkspaceDeletion;
+use App\Contracts\Billing;
+use App\Livewire\App\Workspaces\Concerns\CancelsWorkspaceDeletion;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Workspace;
 use Filament\Actions\Action;
@@ -21,6 +22,8 @@ use Livewire\Attributes\Locked;
 
 final class DeleteWorkspace extends BaseLivewireComponent
 {
+    use CancelsWorkspaceDeletion;
+
     #[Locked]
     public Workspace $workspace;
 
@@ -49,20 +52,17 @@ final class DeleteWorkspace extends BaseLivewireComponent
                                 ->color('danger')
                                 ->requiresConfirmation()
                                 ->modalHeading(__('workspaces.sections.delete_workspace.title'))
-                                ->modalDescription(fn (): string => __('workspaces.modals.delete_workspace.notice')
-                                    .($this->workspace->subscribed() ? ' '.__('billing.deletion_notice') : ''))
+                                ->modalDescription(fn (): string => collect([
+                                    __('workspaces.modals.delete_workspace.notice'),
+                                    resolve(Billing::class)->deletionNotice($this->workspace),
+                                ])->filter()->implode(' '))
                                 ->modalSubmitActionLabel(__('workspaces.actions.delete_workspace'))
                                 ->modalCancelAction(false)
                                 ->visible(fn (): bool => ! $this->workspace->isScheduledForDeletion())
                                 ->action(fn () => $this->deleteWorkspace($this->workspace)),
-                            Action::make('cancelDeletionAction')
-                                ->label(__('workspaces.actions.cancel_deletion'))
+                            $this->makeCancelDeletionAction()
                                 ->color('gray')
-                                ->requiresConfirmation()
-                                ->modalHeading(__('workspaces.modals.cancel_deletion.heading'))
-                                ->modalDescription(__('workspaces.modals.cancel_deletion.notice'))
-                                ->visible(fn (): bool => $this->workspace->isScheduledForDeletion())
-                                ->action(fn () => $this->cancelWorkspaceDeletion($this->workspace)),
+                                ->visible(fn (): bool => $this->workspace->isScheduledForDeletion()),
                         ]),
                     ]),
             ]);
@@ -79,6 +79,7 @@ final class DeleteWorkspace extends BaseLivewireComponent
             resolve(ScheduleWorkspaceDeletion::class)->schedule($this->authUser(), $workspace);
 
             $this->sendNotification("Workspace scheduled for deletion on {$workspace->refresh()->scheduled_deletion_at->format('F j, Y')}");
+            $this->reloadPage();
         } catch (AuthorizationException) {
             $this->sendNotification(
                 __('workspaces.notifications.permission_denied.cannot_delete_workspace'),
@@ -86,20 +87,6 @@ final class DeleteWorkspace extends BaseLivewireComponent
             );
         } catch (ValidationException $e) {
             $this->addError('workspace', $e->validator->errors()->first());
-        }
-    }
-
-    public function cancelWorkspaceDeletion(Workspace $workspace): void
-    {
-        try {
-            resolve(CancelWorkspaceDeletion::class)->cancel($this->authUser(), $workspace);
-
-            $this->sendNotification('Workspace deletion cancelled');
-        } catch (AuthorizationException) {
-            $this->sendNotification(
-                __('workspaces.notifications.permission_denied.cannot_cancel_workspace_deletion'),
-                type: 'danger'
-            );
         }
     }
 }

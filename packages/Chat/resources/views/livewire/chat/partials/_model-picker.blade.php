@@ -7,7 +7,7 @@
     <button
         type="button"
         x-on:click="menuOpen = !menuOpen"
-        class="inline-flex h-7 items-center gap-1 rounded-md border px-2 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+        class="inline-flex h-7 items-center gap-1 rounded-md border px-2 max-sm:h-10 text-xs font-medium transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
         :class="menuOpen
             ? 'border-gray-200 bg-gray-50 text-gray-900 dark:border-gray-700 dark:bg-gray-700 dark:text-white'
             : 'border-transparent bg-transparent text-gray-600 hover:border-gray-200 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:border-gray-700 dark:hover:bg-gray-700 dark:hover:text-white'"
@@ -16,13 +16,13 @@
         aria-label="{{ __('Select AI model') }}"
     >
         <span
-            x-show="providerIconHtml(modelProvider(selectedModel))"
+            x-show="selectedModel !== 'auto' && providerIconHtml(modelProvider(selectedModel))"
             x-html="providerIconHtml(modelProvider(selectedModel))"
             :class="providerIconColor(modelProvider(selectedModel)) + ' inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center'"
             aria-hidden="true"
         ></span>
         <span x-text="modelLabel(selectedModel)"></span>
-        <x-heroicon-o-chevron-up-down class="h-3 w-3" aria-hidden="true" />
+        <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true" />
     </button>
     <div
         x-show="menuOpen"
@@ -58,10 +58,10 @@
                         x-show="! allowedModels.includes(opt.value)"
                         class="ms-auto inline-flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-300"
                     >
-                        <x-heroicon-m-lock-closed class="h-2.5 w-2.5" aria-hidden="true" />
+                        <x-lucide-lock class="h-2.5 w-2.5" aria-hidden="true" />
                         <span x-text="trialLocked ? @js(__('Locked')) : @js(__('Pro'))"></span>
                     </span>
-                    <x-heroicon-s-check-circle
+                    <x-lucide-circle-check
                         x-show="selectedModel === opt.value && allowedModels.includes(opt.value)"
                         class="h-3.5 w-3.5 shrink-0 text-primary-600 dark:text-primary-400"
                         aria-hidden="true"

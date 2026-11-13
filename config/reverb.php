@@ -75,9 +75,9 @@ return [
 
         'apps' => [
             [
-                'key' => env('REVERB_APP_KEY'),
-                'secret' => env('REVERB_APP_SECRET'),
-                'app_id' => env('REVERB_APP_ID'),
+                'key' => config('broadcasting.connections.reverb.key'),
+                'secret' => config('broadcasting.connections.reverb.secret'),
+                'app_id' => config('broadcasting.connections.reverb.app_id'),
                 'options' => [
                     'host' => env('REVERB_HOST'),
                     'port' => env('REVERB_PORT', 443),

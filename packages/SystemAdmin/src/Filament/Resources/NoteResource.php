@@ -32,7 +32,7 @@ final class NoteResource extends Resource
 
     protected static ?string $model = Note::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-document-text';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-file-text';
 
     protected static string|\UnitEnum|null $navigationGroup = 'Content';
 

@@ -9,6 +9,7 @@ use App\Enums\WorkspaceRole;
 use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Facades\Gate;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Tools\BaseWriteCreateTool;
 
 final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
@@ -25,7 +26,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
 
     protected function entityType(): string
     {
-        return 'workspace_invitations';
+        return ProposalEntity::WorkspaceInvitation->value;
     }
 
     protected function ownedForeignKeys(): array
@@ -84,6 +85,10 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
             return __('Only workspace owners and admins can invite teammates. Tell the user to ask one, and do not link to any page.');
         }
 
+        if ($workspace->isScheduledForDeletion()) {
+            return __('This workspace is scheduled for deletion, so it cannot take invitations. Tell the user to cancel the deletion in the workspace settings first.');
+        }
+
         $email = (string) ($record['email'] ?? '');
 
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
@@ -113,7 +118,7 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
         $roleLabel = $role->label();
 
         return [
-            'title' => 'Invite Teammate',
+            'title' => $this->proposalEntity()->createTitle(),
             'summary' => "Invite {$email} as {$roleLabel}",
             'fields' => [
                 ['label' => 'Email', 'value' => $email],

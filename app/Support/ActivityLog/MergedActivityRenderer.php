@@ -52,18 +52,14 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
      * Flatten native diff rows and custom-field changes into one ordered list of
      * label / old / new triples for the diff table.
      *
-     * @return list<array{label: string, old: string, new: string}>
+     * @return list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}>
      */
     private function rows(TimelineEntry $entry, ActivityLogSummary $summary): array
     {
         $rows = [];
 
         foreach ($summary->diffRows as $row) {
-            $rows[] = [
-                'label' => $row->label,
-                'old' => ActivityValue::display($row->formattedOld()),
-                'new' => ActivityValue::display($row->formattedNew()),
-            ];
+            $rows[] = ActivityValue::row($row->label, $row->formattedOld(), $row->formattedNew());
         }
 
         /** @var list<array<string, mixed>> $changes */
@@ -71,11 +67,7 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
 
         foreach ($changes as $change) {
             $label = $change['label'] ?? $change['code'] ?? '';
-            $rows[] = [
-                'label' => is_string($label) ? $label : '',
-                'old' => ActivityValue::display($change['old'] ?? null),
-                'new' => ActivityValue::display($change['new'] ?? null),
-            ];
+            $rows[] = ActivityValue::row(is_string($label) ? $label : '', $change['old'] ?? null, $change['new'] ?? null);
         }
 
         return $rows;

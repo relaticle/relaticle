@@ -1,0 +1,146 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Features\EmailIntegration;
+use Laravel\Pennant\Feature;
+use Relaticle\Cloud\Docs\Support\DocsNavigation;
+use Relaticle\Documentation\Support\DocsRepository;
+
+dataset('documentation shell pages', [
+    '/help',
+    '/help/getting-started',
+    '/help/getting-started/create-your-first-company',
+    '/developers',
+    '/developers/mcp',
+]);
+
+mutates(DocsNavigation::class);
+
+it('renders the help hub with category cards', function (): void {
+    $this->get('/help')->assertOk()->assertSee('Getting started', false);
+});
+
+it('renders a category page', function (): void {
+    $this->get('/help/getting-started')
+        ->assertOk()
+        ->assertSee('Getting started', false)
+        ->assertSee('Create your first company', false);
+});
+
+it('renders an article with its rendered body', function (): void {
+    $this->get('/help/getting-started/create-your-first-company')
+        ->assertOk()
+        ->assertSee('Create your first company', false);
+});
+
+it('tells the reader a paused trial workspace is deleted after 60 days with no sign-in', function (): void {
+    $this->get('/help/workspace/billing-and-plans')
+        ->assertOk()
+        ->assertSeeText('We keep a paused trial workspace for 60 days after the last sign-in. If no one signs in or chooses a plan in that time, we delete it and its records. We email the owner twice first.');
+});
+
+it('says the personal workspace cannot be deleted from the delete page only', function (): void {
+    $this->get('/help/workspace/rename-or-delete-your-workspace')
+        ->assertOk()
+        ->assertSeeText("You can't delete your original personal workspace from this page.");
+});
+
+it('offers a direct contact path from the hub and the article footer', function (): void {
+    $this->get('/help')
+        ->assertOk()
+        ->assertSee(route('contact'), false);
+
+    $this->get('/help/getting-started/create-your-first-company')
+        ->assertOk()
+        ->assertSee(route('contact'), false)
+        ->assertSee('Contact support', false);
+});
+
+it('404s an unknown category and an unknown article', function (): void {
+    $this->get('/help/no-such-category')->assertNotFound();
+    $this->get('/help/getting-started/no-such-article')->assertNotFound();
+});
+
+it('lists the email category on the hub while email integration is on', function (): void {
+    Feature::activate(EmailIntegration::class);
+    app()->forgetInstance(DocsRepository::class);
+
+    $this->get('/help')->assertOk()->assertSee('/help/email-and-calendar', false);
+    $this->get('/help/email-and-calendar/connect-your-google-account')->assertOk();
+    $this->get('/help/email-and-calendar/connect-your-microsoft-account')->assertOk();
+});
+
+it('hides the email category and its articles while email integration is off', function (): void {
+    Feature::deactivate(EmailIntegration::class);
+    app()->forgetInstance(DocsRepository::class);
+
+    $this->get('/help')->assertOk()->assertDontSee('/help/email-and-calendar', false);
+    $this->get('/help/email-and-calendar')->assertNotFound();
+    $this->get('/help/email-and-calendar/connect-your-google-account')->assertNotFound();
+    $this->get('/help/email-and-calendar/connect-your-microsoft-account')->assertNotFound();
+    $this->get('/help/search-index.json')->assertOk()->assertDontSee('email-and-calendar', false);
+    $this->get('/llms.txt')->assertOk()->assertDontSee('email-and-calendar', false);
+});
+
+it('serves an article as markdown to an agent', function (): void {
+    $markdown = $this->get('/help/getting-started/create-your-first-company', ['Accept' => 'text/markdown'])
+        ->assertOk()
+        ->getContent();
+
+    expect($markdown)->toContain('Create your first company')
+        ->and($markdown)->not->toContain('Start for free');
+});
+
+it('strips the related-articles nav from the markdown response but keeps the body', function (): void {
+    $markdown = $this->get('/help/getting-started/create-your-first-company', ['Accept' => 'text/markdown'])
+        ->assertOk()
+        ->getContent();
+
+    expect($markdown)->toContain('A company record tracks a business')
+        ->and($markdown)->not->toContain('Add your first person');
+});
+
+it('renders documentation pages in their own shell, not the marketing chrome', function (string $path): void {
+    $html = $this->get($path)->assertOk()->getContent();
+
+    // The marketing header component is the thing the docs surface must not
+    // mount -- its id is the only stable marker of that specific chrome.
+    expect($html)->not->toContain('id="main-header"')
+        ->and($html)->toContain('Search the docs');
+})->with('documentation shell pages');
+
+it('offers both areas in the sidebar of every documentation page', function (string $path): void {
+    $html = $this->get($path)->assertOk()->getContent();
+
+    expect($html)->toContain(route('help.show', ['category' => 'getting-started', 'slug' => 'create-your-first-company']))
+        ->and($html)->toContain(route('documentation.show', ['type' => 'mcp']));
+})->with('documentation shell pages');
+
+it('serves the .md variant the article copy-page action fetches', function (): void {
+    $this->get('/help/getting-started/create-your-first-company.md')
+        ->assertOk()
+        ->assertHeader('content-type', 'text/markdown; charset=UTF-8');
+});
+
+it('keeps the shell chrome out of the markdown variant', function (): void {
+    $markdown = $this->get('/help/getting-started/create-your-first-company', ['Accept' => 'text/markdown'])
+        ->assertOk()
+        ->getContent();
+
+    // Search dialog, off-canvas nav and skip link are browser-only affordances:
+    // an agent asking for markdown has no use for any of them.
+    expect($markdown)->not->toContain('Searching help and developer docs')
+        ->and($markdown)->not->toContain('Browse the docs')
+        ->and($markdown)->not->toContain('Skip to content')
+        ->and($markdown)->toContain('A company record tracks a business');
+});
+
+it('links to help and developers from the marketing header, mobile nav, and footer', function (): void {
+    $html = $this->get('/')->assertOk()->getContent();
+
+    // A future nav refactor that silently drops one of these anchors still
+    // passes an "assertSee" style check -- count the occurrences instead.
+    expect(substr_count($html, route('help.index')))->toBeGreaterThanOrEqual(3)
+        ->and(substr_count($html, route('documentation.index')))->toBeGreaterThanOrEqual(3);
+});

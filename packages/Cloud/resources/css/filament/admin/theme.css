@@ -1,0 +1,4 @@
+@import '../../../../../../resources/css/filament/admin/theme.css';
+
+@source '../../../views/filament';
+@source '../../../../src/Admin';

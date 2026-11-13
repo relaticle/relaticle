@@ -38,6 +38,7 @@ final class RelatedRecordColumns
             ...self::customFields(Task::class, [TaskField::STATUS, TaskField::DUE_DATE]),
             RecordChipColumn::make('assignees.name')
                 ->label(__('filament/resources/task.fields.assignees.label'))
+                ->collapsed()
                 ->searchable(),
         ];
     }

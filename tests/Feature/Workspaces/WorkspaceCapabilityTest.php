@@ -23,6 +23,23 @@ test('grants capabilities on a workspace created after an earlier ownership chec
     expect($owner->hasWorkspaceCapability($newWorkspace->getKey(), WorkspaceCapability::WorkspaceManage))->toBeTrue();
 });
 
+test('lets owners, admins and members send email through an assistant, and not viewers', function (): void {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+
+    $holds = function (WorkspaceRole $role) use ($workspace): bool {
+        $user = User::factory()->create();
+        $workspace->users()->attach($user, ['role' => $role->value]);
+
+        return $user->fresh()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::EmailAgentSend);
+    };
+
+    expect($owner->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::EmailAgentSend))->toBeTrue()
+        ->and($holds(WorkspaceRole::Admin))->toBeTrue()
+        ->and($holds(WorkspaceRole::Member))->toBeTrue()
+        ->and($holds(WorkspaceRole::Viewer))->toBeFalse();
+});
+
 test('keeps ownership separate per workspace on one user instance', function (bool $ownedFirst): void {
     $user = User::factory()->withWorkspace()->create();
     $owned = $user->currentWorkspace;

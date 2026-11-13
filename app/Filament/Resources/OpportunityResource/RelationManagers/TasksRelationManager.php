@@ -5,17 +5,16 @@ declare(strict_types=1);
 namespace App\Filament\Resources\OpportunityResource\RelationManagers;
 
 use App\Filament\Actions\CreateTaskAction;
+use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\LinkedRecordActions;
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
+use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use Filament\Actions\ActionGroup;
-use Filament\Actions\AttachAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\DetachAction;
-use Filament\Actions\DetachBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
@@ -27,7 +26,7 @@ final class TasksRelationManager extends RelationManager
 
     protected static string $relationship = 'tasks';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-clipboard-document-check';
+    protected static string|\BackedEnum|null $icon = 'lucide-clipboard-check';
 
     public function form(Schema $schema): Schema
     {
@@ -40,19 +39,20 @@ final class TasksRelationManager extends RelationManager
             ->recordTitleAttribute('title')
             ->columns(RelatedRecordColumns::tasks())
             ->headerActions([
-                CreateTaskAction::make()->icon('heroicon-o-plus')->size(Size::Small),
-                AttachAction::make(),
+                CreateTaskAction::make()->icon('lucide-plus')->size(Size::Small),
+                LinkedRecordActions::attach(),
             ])
             ->recordActions([
                 ActionGroup::make([
-                    EditAction::make(),
-                    DetachAction::make(),
+                    TaskResource::copyActions(),
+                    EditTaskAction::make(),
+                    LinkedRecordActions::detach(),
                     DeleteAction::make(),
                 ]),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
-                    DetachBulkAction::make(),
+                    LinkedRecordActions::detachBulk(),
                     DeleteBulkAction::make(),
                 ]),
             ]);

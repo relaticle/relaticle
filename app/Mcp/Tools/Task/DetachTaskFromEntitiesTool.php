@@ -46,10 +46,10 @@ final class DetachTaskFromEntitiesTool extends BaseDetachTool
     public function relationshipSchema(JsonSchema $schema): array
     {
         return [
-            'company_ids' => $schema->array()->description('Company IDs to detach from this task.'),
-            'people_ids' => $schema->array()->description('People IDs to detach from this task.'),
-            'opportunity_ids' => $schema->array()->description('Opportunity IDs to detach from this task.'),
-            'assignee_ids' => $schema->array()->description('User IDs to unassign from this task.'),
+            'company_ids' => $schema->array()->items($schema->string())->description('Company IDs to detach from this task.'),
+            'people_ids' => $schema->array()->items($schema->string())->description('People IDs to detach from this task.'),
+            'opportunity_ids' => $schema->array()->items($schema->string())->description('Opportunity IDs to detach from this task.'),
+            'assignee_ids' => $schema->array()->items($schema->string())->description('User IDs to unassign from this task.'),
         ];
     }
 

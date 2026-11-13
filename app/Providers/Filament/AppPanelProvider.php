@@ -6,10 +6,10 @@ namespace App\Providers\Filament;
 
 use App\ActivityLog\AppEventPalette;
 use App\ActivityLog\AppEventRenderer;
+use App\Contracts\Billing;
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
 use App\Enums\WorkspaceCapability;
-use App\Features\Billing as BillingFeature;
 use App\Features\EmailIntegration;
 use App\Features\SupportMenu;
 use App\Filament\Clusters\Settings;
@@ -18,23 +18,30 @@ use App\Filament\Pages\Auth\EmailVerificationPrompt;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\RequestPasswordReset;
 use App\Filament\Pages\Auth\ResetPassword;
-use App\Filament\Pages\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
+use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
+use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Http\Controllers\SyncUserTimezoneController;
 use App\Http\Middleware\ApplyTenantScopes;
 use App\Http\Middleware\CheckScheduledDeletion;
 use App\Http\Middleware\DenySearchIndexing;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
+use App\Http\Middleware\RedirectToWorkspaceSetup;
 use App\Http\Middleware\StopImpersonationOnLogout;
-use App\Listeners\SwitchWorkspace;
+use App\Http\Middleware\SuperviseImpersonation;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Livewire\App\AppSidebar;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
@@ -42,9 +49,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\BrandColors;
 use App\Support\Impersonation\Impersonator;
-use App\Support\OutlinedIcons;
 use App\Support\SupportForms;
-use Asmit\ResizedColumn\ResizedColumnPlugin;
 use Exception;
 use Filament\Actions\Action;
 use Filament\Actions\Contracts\HasActions;
@@ -53,7 +58,6 @@ use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Enums\DatabaseNotificationsPosition;
 use Filament\Enums\GlobalSearchPosition;
-use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Select;
@@ -72,9 +76,9 @@ use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Filament\Tables\View\TablesRenderHook;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
@@ -87,7 +91,6 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
@@ -104,6 +107,8 @@ use Throwable;
 
 final class AppPanelProvider extends PanelProvider
 {
+    public const string SIDEBAR_FOOTER_ACTIONS = 'app::sidebar.footer.actions';
+
     /**
      * Datetime format for this panel, and the only place it is decided. Columns and
      * entries call `->dateTime()` with no argument so they resolve to this; a resource
@@ -126,14 +131,6 @@ final class AppPanelProvider extends PanelProvider
      */
     public function boot(): void
     {
-        /**
-         * Listen and switch workspace if tenant was changed
-         */
-        Event::listen(
-            TenantSet::class,
-            SwitchWorkspace::class,
-        );
-
         Action::configureUsing(fn (Action $action): Action => $action
             ->size(Size::Small)
             ->iconPosition('before')
@@ -169,15 +166,7 @@ final class AppPanelProvider extends PanelProvider
 
         // Table and Schema configuration is global, so both callbacks have to check
         // which panel is actually serving the request before they touch the format.
-        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
-            ? $table
-                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
-                ->reorderableColumns()
-                ->columnManager(! $table->getLivewire() instanceof RelationManager)
-                ->defaultPaginationPageOption(self::DEFAULT_PAGINATION_PAGE_OPTION)
-                ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
-            : $table);
-
+        $this->configureTables();
         $this->formatDateTimesInSchemas();
 
         /**
@@ -198,6 +187,20 @@ final class AppPanelProvider extends PanelProvider
         DateTimePicker::configureUsing(fn (DateTimePicker $picker): DateTimePicker => $this->isCurrentPanel()
             ? $picker->extraAlpineAttributes(['x-init' => $this->todayInViewerZoneExpression()], merge: true)
             : $picker);
+    }
+
+    private function configureTables(): void
+    {
+        Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
+            ? $table
+                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->reorderableColumns()
+                ->stackedOnMobile()
+                ->columnManager(! $table->getLivewire() instanceof RelationManager)
+                ->defaultPaginationPageOption(self::DEFAULT_PAGINATION_PAGE_OPTION)
+                ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
+                ->persistColumnsInSession(false)
+            : $table);
     }
 
     private function formatDateTimesInSchemas(): void
@@ -233,8 +236,8 @@ final class AppPanelProvider extends PanelProvider
     /** @return list<int> */
     private function paginationPageOptions(HasTable $livewire): array
     {
-        $onePage = (int) $livewire->getTable()->getDefaultPaginationPageOption();
-        $pageOptions = [$onePage, $onePage * 2, $onePage * 4];
+        $pageOptions = self::pageSizeOptions($livewire->getTable());
+        $onePage = $pageOptions[0];
 
         // Mount reads these before any query runs; afterwards the count comes from the
         // already-fetched paginator, and a single option is what hides the select.
@@ -247,6 +250,14 @@ final class AppPanelProvider extends PanelProvider
         }
 
         return [$onePage];
+    }
+
+    /** @return list<int> */
+    public static function pageSizeOptions(Table $table): array
+    {
+        $onePage = (int) $table->getDefaultPaginationPageOption();
+
+        return [$onePage, $onePage * 2, $onePage * 4];
     }
 
     /**
@@ -267,6 +278,20 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
+     * @return list<class-string>
+     */
+    private function authMiddleware(): array
+    {
+        return [
+            Authenticate::class,
+            StopImpersonationOnLogout::class,
+            SuperviseImpersonation::class,
+            EnsureAuthenticationComplete::class,
+            CheckScheduledDeletion::class,
+        ];
+    }
+
+    /**
      * Gates the browser timezone detection script below, which posts to an app-panel
      * route. Panel rendering itself no longer reads this; that resolution is global
      * and lives in AppServiceProvider::configureFilament(), because TimezoneManager
@@ -283,16 +308,138 @@ final class AppPanelProvider extends PanelProvider
         return $user instanceof User ? $user : null;
     }
 
-    private function upgradeModal(): string
+    private function registerHeadHooks(Panel $panel): void
+    {
+        $panel
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View|Factory => view('filament.app.analytics')
+            )
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View|Factory => view('filament.app.web-app-meta')
+            )
+            // Filament loads the reveal script on demand, and the password field binds only then,
+            // overwriting anything typed or autofilled before it arrived.
+            ->renderHook(
+                PanelsRenderHook::HEAD_END,
+                fn (): View|Factory => view('filament.app.password-reveal-preload'),
+                scopes: [Login::class, ResetPassword::class],
+            );
+    }
+
+    private function registerSidebarToggles(Panel $panel): void
+    {
+        // Collapse sits in the sidebar, level with the workspace switcher.
+        // Expand sits at the start of the top bar while the rail is collapsed.
+        $panel
+            ->renderHook(
+                PanelsRenderHook::TENANT_MENU_AFTER,
+                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'sidebar'])
+            )
+            ->renderHook(
+                PanelsRenderHook::TOPBAR_START,
+                fn (): View|Factory => view('filament.app.sidebar-toggle', ['placement' => 'topbar'])
+            );
+    }
+
+    /**
+     * BODY_START rather than a topbar slot: a banner has to be present on every
+     * page of the panel, including the ones that render no topbar.
+     */
+    private function registerBanners(Panel $panel): void
+    {
+        $panel
+            ->renderHook(
+                PanelsRenderHook::BODY_START,
+                function (): View|Factory|string {
+                    $user = $this->signedInUser();
+
+                    if (! $user instanceof User || ! resolve(Impersonator::class)->active(request())) {
+                        return '';
+                    }
+
+                    return view('filament.app.impersonation-banner', ['user' => $user]);
+                }
+            )
+            ->renderHook(
+                PanelsRenderHook::BODY_START,
+                $this->workspaceDeletionBanner(...),
+            );
+    }
+
+    private function workspaceDeletionBanner(): string
     {
         $workspace = Filament::getTenant();
-        $user = $this->signedInUser();
 
-        if (! Feature::active(BillingFeature::class) || ! $workspace instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
+        if (! $workspace instanceof Workspace || ! $workspace->isScheduledForDeletion()) {
             return '';
         }
 
-        return Blade::render('@livewire(\App\Livewire\App\Billing\UpgradeModal::class)');
+        return Blade::render(
+            '@livewire(\App\Livewire\App\Workspaces\WorkspaceDeletionBanner::class, [\'workspace\' => $workspace])',
+            ['workspace' => $workspace],
+        );
+    }
+
+    private function registerNotifications(Panel $panel): void
+    {
+        $panel
+            ->databaseNotifications(
+                livewireComponent: AppDatabaseNotifications::class,
+                position: DatabaseNotificationsPosition::Sidebar,
+            )
+            ->databaseNotificationsPolling('120s');
+    }
+
+    private function registerTableHooks(Panel $panel): void
+    {
+        $listPages = [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class];
+
+        $panel
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
+                fn (): View|Factory => view('filament.app.tables.layouts'),
+                scopes: $listPages,
+            )
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_SEARCH_AFTER,
+                fn (): View|Factory => view('filament.app.tables.column-menu'),
+                scopes: $listPages,
+            )
+            ->renderHook(
+                TablesRenderHook::FILTER_INDICATORS,
+                fn (): View|Factory => view('filament.app.board-filter-clear'),
+                scopes: [OpportunitiesBoard::class, TasksBoard::class],
+            );
+    }
+
+    private function registerInvitationHooks(Panel $panel): void
+    {
+        $panel
+            // Mounted on the body: a modal inside the sidebar is clipped to its width.
+            ->renderHook(
+                PanelsRenderHook::BODY_END,
+                $this->inviteMembersModal(...),
+            )
+            ->renderHook(
+                PanelsRenderHook::PAGE_START,
+                fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
+            )
+            ->renderHook(
+                // CreateWorkspace renders a custom view that PAGE_START never fires on.
+                // Scoping to it keeps this off the guest pages sharing that layout.
+                PanelsRenderHook::SIMPLE_LAYOUT_START,
+                fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
+                scopes: CreateWorkspace::class,
+            );
+    }
+
+    private function billingUrl(): ?string
+    {
+        $workspace = Filament::getTenant();
+
+        return $workspace instanceof Workspace ? resolve(Billing::class)->url($workspace) : null;
     }
 
     private function inviteMembersModal(): string
@@ -342,21 +489,16 @@ final class AppPanelProvider extends PanelProvider
             ->strictAuthorization()
             /**
              * Search and notifications share one row at the top of the sidebar,
-             * above the navigation. Both are placed in the sidebar here; AppSidebar
-             * is what puts them on the same row rather than in separate slots.
+             * above the navigation. AppSidebar is what puts them on the same row
+             * rather than in separate slots.
              */
             ->sidebarLivewireComponent(AppSidebar::class)
             ->globalSearch(position: GlobalSearchPosition::Sidebar)
             ->globalSearchKeyBindings(['command+k', 'ctrl+k'])
             /** Filament's own suffix helper renders "⌘+K"; the key cap reads better without the plus. */
             ->globalSearchFieldSuffix(fn (): string => Platform::detect() === Platform::Mac ? '⌘K' : 'Ctrl K')
-            ->databaseNotifications(
-                livewireComponent: AppDatabaseNotifications::class,
-                position: DatabaseNotificationsPosition::Sidebar,
-            )
             ->colors($this->panelColors())
             ->viteTheme('resources/css/filament/app/theme.css')
-            ->icons(OutlinedIcons::aliases())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\\Filament\\Pages')
             ->discoverPages(in: base_path('packages/ImportWizard/src/Filament/Pages'), for: 'Relaticle\\ImportWizard\\Filament\\Pages')
@@ -365,7 +507,7 @@ final class AppPanelProvider extends PanelProvider
             ->discoverClusters(in: app_path('Filament/Clusters'), for: 'App\\Filament\\Clusters')
             ->readOnlyRelationManagersOnResourceViewPagesByDefault(false)
             ->spa()
-            ->sidebarWidth('16rem')
+            ->sidebarWidth('18rem')
             ->maxContentWidth(Width::Full)
             // The socialite entry points answer with a 302 to the provider's own
             // domain, and wire:navigate cannot follow a cross-origin redirect.
@@ -408,7 +550,7 @@ final class AppPanelProvider extends PanelProvider
             ->navigationGroups([
                 NavigationGroup::make()
                     ->label(__('filament/panel.navigation_groups.tasks'))
-                    ->icon('heroicon-o-shopping-cart'),
+                    ->icon('lucide-shopping-cart'),
             ])
             ->middleware([
                 EncryptCookies::class,
@@ -425,22 +567,11 @@ final class AppPanelProvider extends PanelProvider
             ])
             ->authGuard('web')
             ->authPasswordBroker('users')
-            ->authMiddleware([
-                Authenticate::class,
-                StopImpersonationOnLogout::class,
-                EnsureAuthenticationComplete::class,
-                CheckScheduledDeletion::class,
-            ])
+            ->authMiddleware($this->authMiddleware())
             ->persistentMiddleware([
                 EnsureAuthenticationComplete::class,
             ])
-            ->tenantMiddleware(
-                [
-                    EnsureHostedWorkspaceAccess::class,
-                    ApplyTenantScopes::class,
-                ],
-                isPersistent: true
-            )
+            ->tenantMiddleware($this->tenantMiddlewareStack(), isPersistent: true)
             ->plugins([
                 CustomFieldsPlugin::make()
                     ->authorize(function (): bool {
@@ -450,7 +581,6 @@ final class AppPanelProvider extends PanelProvider
                             && $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::FieldsManage);
                     })
                     ->managementPage(CustomFields::class),
-                ResizedColumnPlugin::make(),
                 ActivityLogPlugin::make()
                     ->renderers(array_fill_keys(
                         array_column(AppEventPalette::cases(), 'value'),
@@ -496,37 +626,10 @@ final class AppPanelProvider extends PanelProvider
                 ->discoverPages(in: base_path('packages/EmailIntegration/src/Filament/Pages'), for: 'Relaticle\\EmailIntegration\\Filament\\Pages');
         }
 
+        $this->registerHeadHooks($panel);
+        $this->registerSidebarToggles($panel);
+
         $panel
-            ->renderHook(
-                PanelsRenderHook::HEAD_END,
-                fn (): View|Factory => view('filament.app.analytics')
-            )
-            /**
-             * BODY_START rather than a topbar slot: the banner has to be present on
-             * every page of the panel, including the ones that render no topbar.
-             */
-            ->renderHook(
-                PanelsRenderHook::BODY_START,
-                function (): View|Factory|string {
-                    $user = $this->signedInUser();
-
-                    if (! $user instanceof User || ! resolve(Impersonator::class)->active(request())) {
-                        return '';
-                    }
-
-                    return view('filament.app.impersonation-banner', ['user' => $user]);
-                }
-            )
-            /**
-             * The sidebar collapse toggle is panel chrome, so the panel owns it.
-             * TENANT_MENU_AFTER puts it inside the sidebar, level with the
-             * workspace switcher; `.fi-sidebar-toggle-btn` places it in both the
-             * open and the collapsed rail.
-             */
-            ->renderHook(
-                PanelsRenderHook::TENANT_MENU_AFTER,
-                fn (): View|Factory => view('filament.app.sidebar-toggle')
-            )
             // STYLES_AFTER renders past the panel stylesheet, which is what lets the
             // `html[data-accent]` ramps outrank the `:root` defaults it emits.
             ->renderHook(
@@ -578,48 +681,15 @@ final class AppPanelProvider extends PanelProvider
             ->renderHook(
                 PanelsRenderHook::BODY_END,
                 fn (): View|Factory => view('filament.scripts.identity-confirmation'),
-            )
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                $this->upgradeModal(...),
-            )
-            // Mounted on the body: a modal inside the sidebar is clipped to its width.
-            ->renderHook(
-                PanelsRenderHook::BODY_END,
-                $this->inviteMembersModal(...),
-            )
-            ->renderHook(
-                PanelsRenderHook::PAGE_START,
-                fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
-            )
-            ->renderHook(
-                // CreateWorkspace renders a custom view that PAGE_START never fires on.
-                // Scoping to it keeps this off the guest pages sharing that layout.
-                PanelsRenderHook::SIMPLE_LAYOUT_START,
-                fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
-                scopes: CreateWorkspace::class,
             );
 
-        // Hidden without a bound tenant: the old panel-root fallback sent these
-        // to the dashboard, silently abandoning the create-workspace wizard.
-        $accountMenuItems = [
-            Action::make('settings')
-                ->label(__('filament/panel.user_menu.settings'))
-                ->icon('heroicon-m-cog-6-tooth')
-                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
-                ->url(fn (): string => url(Settings::getUrl())),
-        ];
-
-        if (Features::hasApiFeatures()) {
-            $accountMenuItems[] = Action::make('api_tokens')
-                ->label(__('access-tokens.user_menu'))
-                ->icon('heroicon-o-key')
-                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
-                ->url(fn (): string => url(AccessTokens::getUrl()));
-        }
+        $this->registerBanners($panel);
+        $this->registerInvitationHooks($panel);
+        $this->registerTableHooks($panel);
+        $this->registerNotifications($panel);
 
         $panel->userMenuItems([
-            $accountMenuItems,
+            $this->accountMenuItems(),
             $this->supportMenuItems(),
             [],
         ]);
@@ -634,13 +704,51 @@ final class AppPanelProvider extends PanelProvider
             ->tenantMenuItems([
                 Action::make('billing')
                     ->label(__('billing.title'))
-                    ->icon(Heroicon::OutlinedCreditCard)
+                    ->icon('lucide-credit-card')
                     ->sort(-1)
-                    ->url(fn (): string => Billing::getUrl())
-                    ->visible(fn (): bool => Feature::active(BillingFeature::class)),
+                    ->url(fn (): ?string => $this->billingUrl())
+                    ->visible(fn (): bool => $this->billingUrl() !== null),
             ]);
 
         return $panel;
+    }
+
+    /**
+     * @return list<Action>
+     */
+    private function accountMenuItems(): array
+    {
+        // Hidden without a bound tenant: the old panel-root fallback sent these
+        // to the dashboard, silently abandoning the create-workspace wizard.
+        $items = [
+            Action::make('settings')
+                ->label(__('filament/panel.user_menu.settings'))
+                ->icon('lucide-settings')
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(Settings::getUrl())),
+        ];
+
+        if (Features::hasApiFeatures()) {
+            $items[] = Action::make('api_tokens')
+                ->label(__('access-tokens.user_menu'))
+                ->icon('lucide-key')
+                ->visible(fn (): bool => $this->shouldRegisterMenuItem())
+                ->url(fn (): string => url(AccessTokens::getUrl()));
+        }
+
+        return $items;
+    }
+
+    /**
+     * @return list<class-string>
+     */
+    private function tenantMiddlewareStack(): array
+    {
+        return [
+            EnsureHostedWorkspaceAccess::class,
+            RedirectToWorkspaceSetup::class,
+            ApplyTenantScopes::class,
+        ];
     }
 
     /**

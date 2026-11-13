@@ -1,9 +1,9 @@
-<div class="flex flex-col h-[calc(100dvh-var(--topbar-height)-8.8rem)]">
+<div class="flex flex-col md:h-[calc(100dvh-var(--topbar-height)-8.8rem)]">
     {{-- Step Progress --}}
     @include('import-wizard-new::livewire.partials.step-indicator')
 
     {{-- Step Content (Child Components) --}}
-    <div class="flex-1 min-h-0 overflow-hidden flex flex-col [&>div]:flex-1 [&>div]:min-h-0 [&>div]:flex [&>div]:flex-col">
+    <div class="flex-1 min-h-0 md:overflow-hidden flex flex-col [&>div]:flex-1 [&>div]:min-h-0 [&>div]:flex [&>div]:flex-col">
         @if($currentStep === self::STEP_UPLOAD)
             <livewire:import-wizard-new.steps.upload
                 :entity-type="$entityType"

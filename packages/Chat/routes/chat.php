@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
+use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Relaticle\Chat\Http\Controllers\ChatAttachmentController;
 use Relaticle\Chat\Http\Controllers\ChatController;
@@ -10,7 +11,7 @@ use Relaticle\Chat\Http\Controllers\MessageFeedbackController;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
 use Relaticle\Chat\Http\Controllers\TranscribeController;
 
-Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(function (): void {
+Route::middleware(['auth:web', AuthenticateSession::class, EnsureHostedWorkspaceAccess::class])->group(function (): void {
     Route::get('/r/{type}/{id}', RecordRedirectController::class)
         ->middleware('throttle:60,1,record-redirect')
         ->name('chat.record-redirect');
@@ -31,6 +32,10 @@ Route::middleware(['auth:web', EnsureHostedWorkspaceAccess::class])->group(funct
     Route::get('/chat/conversations/{conversationId}/search', [ChatController::class, 'searchMessages'])
         ->middleware('throttle:60,1,chat-search')
         ->name('chat.conversations.search');
+
+    Route::get('/chat/conversations/{conversationId}/turn', [ChatController::class, 'turn'])
+        ->middleware('throttle:60,1,chat-turn')
+        ->name('chat.turn');
 
     Route::post('/chat/conversations/{conversationId}/cancel', [ChatController::class, 'cancel'])
         ->middleware('throttle:30,1,chat-cancel')

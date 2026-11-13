@@ -22,7 +22,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Relaticle\EmailIntegration\Data\MailboxHistoryImportSummary;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Enums\SyncErrorReason;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
@@ -57,6 +59,8 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property EmailAccountStatus $status
  * @property string|null $last_error
  * @property string|null $history_import_batch_id
+ * @property string|null $history_import_notified_batch_id
+ * @property EmailPrivacyTier|null $sharing_tier
  */
 #[Fillable([
     'workspace_id',
@@ -84,6 +88,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
     'status',
     'last_error',
     'history_import_batch_id',
+    'history_import_notified_batch_id',
     'sync_inbox',
     'sync_sent',
     'daily_send_limit',
@@ -121,6 +126,16 @@ final class ConnectedAccount extends Model
     }
 
     /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function newestConnectedFor(Builder $query, User $user, Workspace $workspace): Builder
+    {
+        return $query->ownedBy($user, $workspace)->connected()->latest();
+    }
+
+    /**
      * Scope to accounts that are connected and authorised (safe to sync/send through).
      *
      * @param  Builder<ConnectedAccount>  $query
@@ -130,6 +145,26 @@ final class ConnectedAccount extends Model
     protected function active(Builder $query): Builder
     {
         return $query->where('status', EmailAccountStatus::ACTIVE);
+    }
+
+    /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function syncable(Builder $query): Builder
+    {
+        return $query->active()->inWorkspaceWithHostedAccess();
+    }
+
+    /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function inWorkspaceWithHostedAccess(Builder $query): Builder
+    {
+        return $query->whereHas('workspace', fn (Builder $workspace): Builder => $workspace->withHostedAccess());
     }
 
     /**
@@ -338,6 +373,11 @@ final class ConnectedAccount extends Model
     {
         return filled($this->last_error)
             && ! $this->showsMailboxHistoryImportFailureSummary();
+    }
+
+    public function syncErrorReason(): ?string
+    {
+        return SyncErrorReason::tryFrom((string) $this->last_error)?->getLabel();
     }
 
     /**
@@ -671,6 +711,7 @@ final class ConnectedAccount extends Model
         return [
             'provider' => EmailProvider::class,
             'status' => EmailAccountStatus::class,
+            'sharing_tier' => EmailPrivacyTier::class,
             'token_expires_at' => 'datetime',
             'last_synced_at' => 'datetime',
             'last_calendar_synced_at' => 'datetime',

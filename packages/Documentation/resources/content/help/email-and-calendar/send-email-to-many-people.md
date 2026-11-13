@@ -2,7 +2,7 @@
 title: Send one email to many people
 description: Select people or companies, write one message with merge tags, and Relaticle sends a separate email to each recipient within your send limits.
 order: 4
-updated: "2026-10-05"
+updated: "2026-11-08"
 related: [help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/connect-your-google-account, help/records/people-records]
 ---
 
@@ -32,9 +32,8 @@ composer and add recipients there.
 Write the message once, then click **Use template** and **Save as template**
 in the composer. Tick **Share with my workspace** to let everyone use it.
 
-Templates are listed under **Emails** in the **Templates** tab, and under
-**Workspace Settings**, **Email and Calendar**, **Templates**. Click
-**New email template** to write one from scratch.
+Templates are listed under **Emails** in the **Templates** tab. Click
+**New template** to write one from scratch.
 
 ## How fast a mass email goes out
 
@@ -44,7 +43,8 @@ so a large send can take hours.
 
 - Watch progress on the **Emails** page under **Outbox**.
 - Cancel what has not gone yet with **Cancel selected**.
-- Change the limits under the account's **Manage** menu, in **General**.
+- Change the limits in the account's settings, under **General**. Click the
+  account in **Workspace Settings**, **Email and Calendar** to open them.
   Leave a limit blank to use the default.
 
 ## If the notice says No valid recipients

@@ -2,7 +2,10 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
+use App\Models\ActivityLog\Activity;
 use App\Models\People;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\StoreMeetingAction;
@@ -14,7 +17,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Factories\NormalizedMeetingPayloadFactory;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 
-mutates(StoreMeetingJob::class, NormalizedMeetingPayloadFactory::class, AutoCreatePersonAction::class);
+mutates(StoreMeetingJob::class, StoreMeetingAction::class, NormalizedMeetingPayloadFactory::class, AutoCreatePersonAction::class);
 
 it('stores a calendar event via StoreMeetingJob', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create(['email_address' => 'me@example.com']));
@@ -47,6 +50,39 @@ it('stores a calendar event via StoreMeetingJob', function (): void {
     expect(Meeting::query()->where('provider_event_id', 'evt-123')->exists())->toBeTrue();
 });
 
+it('stamps the meeting it logs with the mailbox source', function (): void {
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['email_address' => 'me@example.com']));
+
+    $event = new CalendarEventData(
+        providerEventId: 'evt-source',
+        providerRecurringEventId: null,
+        iCalUid: null,
+        title: 'Pipeline review',
+        description: null,
+        startsAt: Date::now()->addDay(),
+        endsAt: Date::now()->addDay()->addHour(),
+        isAllDay: false,
+        location: null,
+        htmlLink: null,
+        status: 'confirmed',
+        visibility: 'default',
+        organizerEmail: null,
+        organizerName: null,
+        attendees: [
+            ['email' => 'me@example.com', 'name' => null, 'response_status' => 'accepted', 'is_organizer' => false],
+        ],
+    );
+
+    (new StoreMeetingJob($account, $event))->handle(
+        app(StoreMeetingAction::class),
+        app(NormalizedMeetingPayloadFactory::class),
+    );
+
+    $logged = Activity::withoutGlobalScopes()->where('event', 'meeting.created')->sole();
+
+    expect($logged->source)->toBe(CreationSource::MAILBOX);
+});
+
 it('stores calendar values longer than 255 characters', function (): void {
     $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create(['email_address' => 'me@example.com']));
     $long = str_repeat('b', 300);
@@ -77,12 +113,14 @@ it('stores calendar values longer than 255 characters', function (): void {
         app(NormalizedMeetingPayloadFactory::class),
     );
 
+    resolve(CurrentWorkspace::class)->set($account->workspace);
+
     $meeting = Meeting::query()->where('provider_event_id', $long)->sole();
 
     expect($meeting->title)->toBe($long)
         ->and($meeting->location)->toBe($long)
         ->and($meeting->organizer_email)->toBe("{$long}@external.test")
-        ->and($meeting->attendees()->value('name'))->toBe($long)
+        ->and($meeting->attendees()->where('email_address', 'me@example.com')->value('name'))->toBe($long)
         ->and(People::query()->where('workspace_id', $account->workspace_id)->pluck('name')->all())
         ->not->toBeEmpty()
         ->each->toHaveLength(255);

@@ -8,6 +8,8 @@ use App\Models\Concerns\HasWorkspace;
 use App\Models\User;
 use Database\Factories\EmailSignatureFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +33,16 @@ final class EmailSignature extends Model
     protected static function newFactory(): EmailSignatureFactory
     {
         return EmailSignatureFactory::new();
+    }
+
+    /**
+     * @param  Builder<EmailSignature>  $query
+     * @return Builder<EmailSignature>
+     */
+    #[Scope]
+    protected function defaultFor(Builder $query, string $accountId): Builder
+    {
+        return $query->where('connected_account_id', $accountId)->where('is_default', true);
     }
 
     /**

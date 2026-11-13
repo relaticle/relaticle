@@ -429,6 +429,22 @@ it('drops a Graph display name that is only the email address', function (): voi
         ->and($from['name'])->toBeNull();
 });
 
+it('lists Graph replyTo addresses as reply_to participants', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/FORM1*' => Http::response(graphMessagePayload([
+            'id' => 'FORM1',
+            'from' => ['emailAddress' => ['address' => 'noreply@forms.example', 'name' => 'Forms']],
+            'replyTo' => [['emailAddress' => ['address' => 'polly@5forests.example', 'name' => 'Polly Hammond']]],
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('FORM1');
+
+    expect(collect($email->participants)->where('role', 'reply_to')->values()->all())
+        ->toBe([['role' => 'reply_to', 'email_address' => 'polly@5forests.example', 'name' => 'Polly Hammond']]);
+});
+
 it('maps a Graph drafts-folder message as an inbound draft', function (): void {
     Http::fake([
         ...graphWellKnownFolderFakes(),
@@ -505,6 +521,47 @@ it('maps a localized Graph sent items folder as sent', function (): void {
 
     expect($email->folder)->toBe(EmailFolder::Sent)
         ->and($email->direction)->toBe(EmailDirection::OUTBOUND);
+});
+
+it('marks received mail with a bulk header as bulk mail', function (array $headers, bool $isBulkMail): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/MSG1*' => Http::response(graphMessagePayload([
+            'internetMessageHeaders' => $headers,
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('MSG1');
+
+    expect($email->isBulkMail)->toBe($isBulkMail);
+
+    Http::assertSent(fn (Request $request): bool => str_contains((string) $request->url(), '/me/messages/MSG1')
+        && str_contains(urldecode((string) $request->url()), 'internetMessageHeaders'));
+})->with([
+    'list-unsubscribe' => [[['name' => 'List-Unsubscribe', 'value' => '<https://example.com/u>']], true],
+    'precedence bulk' => [[['name' => 'Precedence', 'value' => ' Bulk ']], true],
+    'precedence junk' => [[['name' => 'precedence', 'value' => 'junk']], true],
+    'precedence list' => [[['name' => 'Precedence', 'value' => 'list']], false],
+    'a mailing list id alone' => [[['name' => 'List-Id', 'value' => '<sales.example.com>']], false],
+    'an auto reply' => [[['name' => 'Auto-Submitted', 'value' => 'auto-replied']], false],
+    'no headers' => [[], false],
+]);
+
+it('never marks mail the mailbox sent as bulk mail', function (): void {
+    Http::fake([
+        ...graphWellKnownFolderFakes([
+            'sentitems' => ['id' => 'sent-folder-id', 'displayName' => 'Sent Items'],
+        ]),
+        'https://graph.microsoft.com/v1.0/me/messages/SENT1*' => Http::response(graphMessagePayload([
+            'id' => 'SENT1',
+            'parentFolderId' => 'sent-folder-id',
+            'internetMessageHeaders' => [['name' => 'List-Unsubscribe', 'value' => '<https://example.com/u>']],
+        ])),
+    ]);
+
+    $email = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('SENT1');
+
+    expect($email->isBulkMail)->toBeFalse();
 });
 
 it('does not treat a custom folder named Drafts as the well-known drafts folder', function (): void {
@@ -785,7 +842,6 @@ it('POSTs to /me/sendMail and returns provider ids', function (): void {
     $result = $service->sendMessage([
         'subject' => 'Hi',
         'body_html' => '<p>Hi</p>',
-        'body_text' => 'Hi',
         'to' => [['email' => 'b@example.com', 'name' => 'B']],
         'rfc_message_id' => '<local-id@example.com>',
     ]);
@@ -985,6 +1041,20 @@ it('stores Graph inline cid images so the reader can rewrite them', function ():
     expect($html)
         ->toContain(route('email-attachments.inline', $attachment->getKey()))
         ->not->toContain('cid:logo@example.test');
+});
+
+it('keeps angle brackets in the plain-text body preview', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/MSG1*' => Http::response(graphMessagePayload([
+            'bodyPreview' => 'Jane <jane@example.com> wrote: a<b &amp; ready',
+        ])),
+    ]);
+
+    $fetched = resolve(MicrosoftGraphServiceFactory::class)->make(makeAzureAccount())->fetchMessage('MSG1');
+
+    expect($fetched->snippet)->toBe('Jane <jane@example.com> wrote: a<b &amp; ready');
 });
 
 it('fetches a stored rest id after a folder move by translating it to an immutable id', function (): void {

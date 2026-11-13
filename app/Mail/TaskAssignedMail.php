@@ -9,9 +9,13 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class TaskAssignedMail extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
@@ -29,16 +33,18 @@ final class TaskAssignedMail extends Mailable implements ShouldQueue
 
     public function content(): Content
     {
+        $workspaceName = $this->workspaceName === null ? null : Str::squish($this->workspaceName);
+
         return new Content(
             markdown: 'mail.task-assigned',
             with: [
-                'workspaceName' => $this->workspaceName,
-                'preheader' => $this->workspaceName === null
+                'workspaceName' => $workspaceName,
+                'preheader' => $workspaceName === null
                     ? __('mail.task_assigned.preheader_without_workspace')
-                    : __('mail.task_assigned.preheader', ['workspace' => $this->workspaceName]),
+                    : __('mail.task_assigned.preheader', ['workspace' => $workspaceName]),
                 'rows' => array_filter([
-                    ['label' => $this->taskTitle, 'url' => $this->taskUrl],
-                    $this->workspaceName === null ? null : ['label' => __('mail.task_assigned.workspace_label'), 'value' => $this->workspaceName],
+                    ['label' => Str::squish($this->taskTitle), 'url' => $this->taskUrl],
+                    $workspaceName === null ? null : ['label' => __('mail.task_assigned.workspace_label'), 'value' => $workspaceName],
                 ]),
             ],
         );

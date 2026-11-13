@@ -6,18 +6,17 @@ namespace Relaticle\EmailIntegration\ActivityLog;
 
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
-use Filament\Support\Icons\Heroicon;
 
 enum MeetingEventPalette: string implements HasIcon, HasLabel
 {
     case MeetingCreated = 'meeting.created';
     case MeetingCancelled = 'meeting.cancelled';
 
-    public function getIcon(): Heroicon
+    public function getIcon(): string
     {
         return match ($this) {
-            self::MeetingCreated => Heroicon::OutlinedCalendar,
-            self::MeetingCancelled => Heroicon::OutlinedCalendarDays,
+            self::MeetingCreated => 'lucide-calendar',
+            self::MeetingCancelled => 'lucide-calendar-days',
         };
     }
 

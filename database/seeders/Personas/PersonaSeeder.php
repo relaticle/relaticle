@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Personas;
 
+use App\Actions\Onboarding\SaveOnboardingUseCase;
+use App\Enums\OnboardingUseCase;
+use App\Enums\WorkspaceSetupStep;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\CreditService;
 use Throwable;
 
@@ -143,52 +145,30 @@ final readonly class PersonaSeeder
         }
     }
 
-    /**
-     * Creating a personal workspace fires TeamCreated, and the app's own listener
-     * seeds custom fields plus the CRM fixture set for the workspace's
-     * onboarding use case. So the use case is set at creation time and the app
-     * populates the workspace exactly as it would for a real signup.
-     *
-     * A persona with no use case wants an empty workspace, which means
-     * suppressing that listener rather than deleting rows after the fact.
-     */
+    // A persona with records goes through the use case step a signup uses, so it gets the
+    // stage preset and fixtures from the app. A persona without a use case is never in setup.
     private function createWorkspace(User $user, Persona $persona): Workspace
     {
         $attributes = [
             'user_id' => $user->getKey(),
             'personal_workspace' => true,
             'name' => $persona->workspace,
-            'onboarding_use_case' => $persona->useCase,
         ];
 
-        if ($persona->wantsRecords()) {
+        $useCase = $persona->useCase;
+
+        if (! $useCase instanceof OnboardingUseCase) {
             return Workspace::factory()->create($attributes);
         }
 
-        return $this->withoutOnboardSeed(fn (): Workspace => Workspace::factory()->create($attributes));
-    }
+        $workspace = Workspace::factory()->create([...$attributes, 'onboarding_step' => WorkspaceSetupStep::UseCase]);
 
-    /**
-     * The OnboardSeed feature reads config, but Pennant memoises the resolved
-     * value for the request, so the cache has to be flushed on both sides of the
-     * change or the flip is silently ignored.
-     *
-     * @param  callable(): Workspace  $callback
-     */
-    private function withoutOnboardSeed(callable $callback): Workspace
-    {
-        $key = 'relaticle.features.onboard_seed';
-        $previous = config($key);
+        resolve(SaveOnboardingUseCase::class)->execute($user, $workspace, [
+            'onboarding_use_case' => $useCase->value,
+            'onboarding_context' => array_slice(array_keys($useCase->getSubOptions()), 0, 1),
+        ], null);
 
-        config([$key => false]);
-        Feature::flushCache();
-
-        try {
-            return $callback();
-        } finally {
-            config([$key => $previous]);
-            Feature::flushCache();
-        }
+        return $workspace;
     }
 
     /**

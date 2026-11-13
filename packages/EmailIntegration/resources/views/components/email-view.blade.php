@@ -18,11 +18,6 @@
     $isOwner        = $record->user_id === $authUser->getKey();
 
     $senderName = $from?->name ?: $from?->email_address ?: '?';
-    $initials   = collect(explode(' ', trim($senderName)))
-        ->filter()
-        ->take(2)
-        ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
-        ->implode('');
 
     $participantDisplay = static function (?EmailParticipant $participant): ?array {
         if (! $participant instanceof EmailParticipant) {
@@ -87,7 +82,7 @@
     {{-- ── Internal email banner ──────────────────────────────────────────── --}}
     @if ($record->is_internal && $isOwner)
         <div class="flex shrink-0 items-center gap-2.5 border-b border-blue-100 dark:border-blue-900/40 bg-blue-50 dark:bg-blue-950/30 px-6 py-2.5 text-sm text-blue-700 dark:text-blue-300">
-            <x-heroicon-o-lock-closed class="h-4 w-4 shrink-0" />
+            <x-lucide-lock class="h-4 w-4 shrink-0" />
             <span class="font-medium">{{ __('filament/pages/email-inbox.reader.internal') }}</span>
         </div>
     @endif
@@ -108,7 +103,7 @@
                 aria-label="{{ __('filament/pages/email-inbox.back_to_list') }}"
                 class="-ml-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300 lg:hidden"
             >
-                <x-heroicon-o-arrow-left class="h-5 w-5" />
+                <x-lucide-arrow-left class="h-5 w-5" />
             </button>
         @endif
 
@@ -138,9 +133,9 @@
             @if ($canViewSubject && filled($snippet))
                 <p class="mt-1.5 flex items-start gap-1.5 text-sm leading-snug text-gray-500 dark:text-gray-400">
                     @if ($isReply)
-                        <x-ri-reply-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <x-lucide-reply class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                     @else
-                        <x-ri-file-text-line class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                        <x-lucide-file-text class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
                     @endif
                     <span>{{ $snippet }}</span>
                 </p>
@@ -191,9 +186,7 @@
         class="relative z-10 shrink-0 border-b border-gray-100 dark:border-gray-800 px-4 py-3 sm:px-6"
     >
         <div class="flex items-start gap-3">
-            <div class="flex h-8 w-8 aspect-square shrink-0 select-none items-center justify-center rounded-full bg-primary-100 dark:bg-primary-900/40 text-xs font-semibold text-primary-700 dark:text-primary-300">
-                {{ $initials ?: '?' }}
-            </div>
+            <x-email-integration::person-avatar :src="$record->senderMemberAvatarUrl()" :alt="$senderName" />
 
             <div
                 x-data="{ detailsOpen: false }"
@@ -215,7 +208,7 @@
                                 {{ $from?->name ?: $from?->email_address ?: __('filament/pages/email-inbox.reader.unknown_sender') }}
                             </span>
                             @if ($toList->isEmpty() && $ccList->isEmpty())
-                                <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform dark:text-gray-500" x-bind:class="detailsOpen && 'rotate-180'" />
+                                <x-lucide-chevron-down class="h-3.5 w-3.5 shrink-0 text-gray-400 transition-transform dark:text-gray-500" x-bind:class="detailsOpen && 'rotate-180'" />
                             @endif
                         </span>
 
@@ -229,7 +222,7 @@
                                         {{ trans_choice('filament/pages/email-inbox.recipients.more', $otherRecipients, ['count' => $otherRecipients]) }}
                                     @endif
                                 </span>
-                                <x-heroicon-m-chevron-down class="h-3.5 w-3.5 shrink-0 transition-transform" x-bind:class="detailsOpen && 'rotate-180'" />
+                                <x-lucide-chevron-down class="h-3.5 w-3.5 shrink-0 transition-transform" x-bind:class="detailsOpen && 'rotate-180'" />
                             </span>
                         @endif
                     </button>
@@ -280,9 +273,9 @@
             <div class="flex shrink-0 items-center gap-2">
                 @if ($canViewBody)
                     @foreach ([
-                        'reply'     => ['ri-reply-line', __('filament/pages/email-inbox.reply_forward.modal_headings.reply')],
-                        'reply_all' => ['ri-reply-all-line', __('filament/pages/email-inbox.reply_forward.modal_headings.reply_all')],
-                        'forward'   => ['ri-share-forward-line', __('filament/pages/email-inbox.reply_forward.modal_headings.forward')],
+                        'reply'     => ['lucide-reply', __('filament/pages/email-inbox.reply_forward.modal_headings.reply')],
+                        'reply_all' => ['lucide-reply-all', __('filament/pages/email-inbox.reply_forward.modal_headings.reply_all')],
+                        'forward'   => ['lucide-forward', __('filament/pages/email-inbox.reply_forward.modal_headings.forward')],
                     ] as $replyMode => [$icon, $label])
                         {{-- The scroll is driven from here, not from the composer's own
                              x-init: the composer is a nested Livewire component, and
@@ -322,7 +315,7 @@
     {{-- ── Attachments ─────────────────────────────────────────────────────── --}}
     @if ($canViewBody && $downloadAttachments->isNotEmpty())
         <div class="flex max-h-28 shrink-0 flex-wrap items-center gap-2 overflow-y-auto border-b border-gray-100 dark:border-gray-800 px-4 py-2.5 sm:px-6">
-            <x-heroicon-o-paper-clip class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
+            <x-lucide-paperclip class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" />
 
             @foreach ($downloadAttachments as $attachment)
                 @php
@@ -344,7 +337,7 @@
                             aria-label="{{ __('filament/emails/composer.actions.download_attachment') }}"
                             class="shrink-0 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
                         >
-                            <x-heroicon-m-arrow-down-tray class="h-4 w-4" />
+                            <x-lucide-download class="h-4 w-4" />
                         </a>
                     @endif
                 </x-email-integration::attachment-card>
@@ -437,7 +430,7 @@
             <div class="flex flex-col items-center gap-4 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/40 px-8 py-12 text-center">
 
                 <div class="flex h-12 w-12 items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800">
-                    <x-heroicon-o-lock-closed class="h-6 w-6 text-gray-400 dark:text-gray-500" />
+                    <x-lucide-lock class="h-6 w-6 text-gray-400 dark:text-gray-500" />
                 </div>
 
                 <div class="space-y-1">

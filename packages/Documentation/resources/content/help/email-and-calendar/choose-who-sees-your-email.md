@@ -1,39 +1,44 @@
 ---
 title: Choose who sees your email
-description: Pick how much of your synced email your workspace can see, from nothing to the full message, as a default or for one email at a time.
+description: Pick how much of each mailbox your workspace can see, from nothing to the full message, and change the level for one email at a time.
 order: 5
-updated: "2026-10-05"
+updated: "2026-11-08"
 related: [help/email-and-calendar/set-workspace-email-privacy, help/email-and-calendar/request-access-to-an-email, help/email-and-calendar/connect-your-google-account]
 ---
 
-You control how much of your synced email your workspace sees. Set one level
-as your default, then change it for any single email. You always see your
-own email in full.
+You control how much of your synced email your workspace sees. Each mailbox
+has its own level, and you can change the level for any single email. You
+always see your own email in full.
 
 ## The four sharing levels
 
 | Level | What your workspace sees |
 |---|---|
 | **Private** | Nothing. Only you can see the email. |
-| **Metadata only** | The participants and the time. |
-| **Subject line and metadata** | The subject line, the participants, and the time. |
+| **Participants only** | The participants and the time. |
+| **Subject line and participants** | The subject line, the participants, and the time. |
 | **Full access** | The body, the subject line, and the attachments. |
 
-A new workspace starts on **Metadata only**. Teammates see that you were in
+A new workspace starts on **Participants only**. Teammates see that you were in
 touch with a person or company, and not what was said.
 
-## Set your default
+## Set the level for a mailbox
 
 1. Open **Workspace Settings**, then **Email and Calendar**.
-2. Open the menu on your connected account and click **Manage**.
-3. Open the **Sharing** tab.
-4. Pick a level, or **Use workspace default** to follow what your admins set.
-5. Click **Save changes**.
+2. Click your connected account.
+3. On the **General** tab, pick a level under **Email sharing**.
+4. Click **Save changes**.
 
-Your default applies to all your mailboxes. It also updates the email you
-have already synced, except any email you changed individually. Choosing
-**Full access** asks you to type a confirmation first, because it shares
-the body of every email that follows your default.
+The level applies to that mailbox only. Your other mailboxes keep their own
+levels.
+
+Saving also updates the email that mailbox has already synced, except any
+email you changed individually. Choosing **Full access** asks you to type a
+confirmation first, because it shares the body of every email in that mailbox.
+
+Setting up a workspace asks for a level after each mailbox you connect.
+Setup offers **Participants only** and **Subject line and participants**.
+The mailbox's settings offer all four levels afterwards.
 
 ## Change one email
 
@@ -50,9 +55,16 @@ In the same **Sharing** dialog, use **Share with specific teammates** to
 give named people more than the level above allows. Click **Add teammate**,
 choose the **Teammate**, and set their **Access level**.
 
+## When a member leaves a workspace
+
+A member removed from a workspace has their mailboxes there disconnected. Their
+email in that workspace is hidden from everyone, and email they had scheduled
+to send from it is cancelled. The same happens when a member leaves. The same
+mailbox in another workspace is not affected.
+
 ## Keep some senders out of a mailbox
 
-Open your account's **Manage** menu and the **Mailbox-only blocklist** tab.
+Click your connected account and open the **Mailbox-only blocklist** tab.
 Add addresses or domains under **Blocked addresses and domains**. Email
 from them stops appearing in that mailbox, and your other connected
 accounts are not affected.

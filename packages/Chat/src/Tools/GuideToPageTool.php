@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -21,7 +22,7 @@ final readonly class GuideToPageTool implements Tool
             .'cannot do itself: creating, editing, or deleting custom field definitions; bulk-importing records '
             .'from a file; exporting records to a file; or managing workspace members; creating or revoking API '
             .'access tokens and connectors; connecting Claude, ChatGPT or another MCP client to the workspace; or connecting '
-            .'their own mailbox for sending email. '
+            .'their own mailbox for sending email; or reviewing saved email drafts and the email outbox. '
             .'Call this instead of telling the user something is impossible.';
     }
 
@@ -44,9 +45,20 @@ final readonly class GuideToPageTool implements Tool
                     .'"access_tokens" (create or revoke API access tokens and connectors); '
                     .'"connect_assistant" (the help page for connecting Claude, ChatGPT or another MCP client); '
                     .'"email_accounts" (connect the user\'s own Gmail or Microsoft mailbox to send email); '
-                    .'"billing" (see the plan and AI credit usage, change the plan, or buy more AI credits).',
+                    .'"email_drafts" (the Drafts tab of the Emails page, where a saved email draft is reviewed and sent); '
+                    .'"email_outbox" (the Outbox tab of the Emails page, where a queued email can still be undone)'
+                    .($this->offersBilling() ? '; "billing" (see the plan and AI credit usage, change the plan, or buy more AI credits).' : '.'),
                 ),
         ];
+    }
+
+    private function offersBilling(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User
+            && $user->currentWorkspace instanceof Workspace
+            && $this->destinations->resolve('billing', $user->currentWorkspace) !== null;
     }
 
     public function handle(Request $request): string

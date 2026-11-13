@@ -23,6 +23,21 @@ final readonly class CurrentSource
         return Context::scope($callback, hidden: [self::KEY => $source->value]);
     }
 
+    public static function isBound(): bool
+    {
+        return Context::hasHidden(self::KEY);
+    }
+
+    public static function bind(CreationSource $source): void
+    {
+        Context::addHidden(self::KEY, $source->value);
+    }
+
+    public static function forget(): void
+    {
+        Context::forgetHidden(self::KEY);
+    }
+
     public static function get(): CreationSource
     {
         return self::bound() ?? CreationSource::WEB;

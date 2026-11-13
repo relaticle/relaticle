@@ -6,12 +6,15 @@ namespace Relaticle\Chat\Services;
 
 use App\Models\User;
 use Illuminate\Database\QueryException;
+use Illuminate\Validation\ValidationException;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ApprovalFailureMessage;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ProposalPayload;
+use Relaticle\Chat\Support\ProposalProgress;
 use RuntimeException;
+use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
 
 /**
  * A plan is the set of proposals one assistant turn produced.
@@ -139,59 +142,185 @@ final readonly class ProposalPlanService
     }
 
     /**
-     * Approve every remaining step, in order, each in its own transaction.
+     * Pending steps that left-out steps take with them, each mapped to the nearest
+     * left-out steps on its chain of links, in plan order: the same transitive walk
+     * cancelDependentsOf() performs when the rejection actually runs.
      *
-     * Execution stops at the first failure and reports it: the steps before it are
-     * committed and stay committed, because a plan is a sequence of real CRM writes
-     * and undoing the earlier ones would be a second set of writes the user never
-     * approved.
-     *
-     * @return array{approved: int, failed: array{step: int, message: string}|null}
+     * @param  list<PendingAction>  $steps
+     * @param  list<string>  $leftOutIds
+     * @return array<string, list<string>>
      */
-    public function approveAll(PendingAction $action, User $user): array
+    public function dependentsOfLeftOut(array $steps, array $leftOutIds): array
     {
-        $approved = 0;
-        $steps = $this->steps($action);
+        $pending = $this->pendingAmong($steps);
+        $order = array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $pending);
+        $leftOut = array_values(array_intersect($order, $leftOutIds));
+        $links = [];
 
-        // Counted over the steps actually attempted, i.e. the still-pending ones, which
-        // is the same basis the card numbers its rail on. Counting over every proposal
-        // of the turn made "Step 3 could not be completed" appear on a card whose steps
-        // were labelled 1 and 2 once an earlier step had been approved on its own.
-        $position = 0;
+        foreach ($pending as $candidate) {
+            $links[(string) $candidate->getKey()] = $this->dependencyIds($candidate);
+        }
 
-        foreach ($steps as $step) {
-            $step->refresh();
+        $roots = [];
 
-            if ($step->status !== PendingActionStatus::Pending) {
+        do {
+            $grew = false;
+
+            foreach ($links as $stepId => $dependencyIds) {
+                if (in_array($stepId, $leftOut, true)) {
+                    continue;
+                }
+
+                $reached = [];
+
+                foreach ($dependencyIds as $dependencyId) {
+                    $reached = in_array($dependencyId, $leftOut, true)
+                        ? [...$reached, $dependencyId]
+                        : [...$reached, ...($roots[$dependencyId] ?? [])];
+                }
+
+                $reached = array_values(array_intersect($order, $reached));
+
+                if ($reached !== [] && $reached !== ($roots[$stepId] ?? [])) {
+                    $roots[$stepId] = $reached;
+                    $grew = true;
+                }
+            }
+        } while ($grew);
+
+        return $roots;
+    }
+
+    /**
+     * Batch rows that a pending step links to with `$ref:<id>#n`, by batch step id and
+     * row index. Such a row cannot be left out on its own: the link would dangle.
+     *
+     * @param  list<PendingAction>  $steps
+     * @param  list<string>  $ignoredLinkers  steps that no longer hold a row in, because they are left out
+     * @return array<string, array<int, PendingAction>>
+     */
+    public function linkedRows(array $steps, array $ignoredLinkers = []): array
+    {
+        $pending = $this->pendingAmong($steps);
+        $pendingIds = array_map(static fn (PendingAction $step): string => (string) $step->getKey(), $pending);
+        $linked = [];
+
+        foreach ($pending as $step) {
+            if (in_array((string) $step->getKey(), $ignoredLinkers, true)) {
                 continue;
             }
 
-            $position++;
+            foreach (PlanReference::targetsIn($step->action_data) as $target) {
+                $index = PlanReference::index($target);
+                $targetId = PlanReference::actionId($target);
+
+                if ($index !== null && in_array($targetId, $pendingIds, true)) {
+                    $linked[$targetId][$index] ??= $step;
+                }
+            }
+        }
+
+        return $linked;
+    }
+
+    /**
+     * Approve what is left of the plan, in order, after applying what the user left out:
+     * left-out steps are rejected (with their dependents), then left-out batch rows.
+     *
+     * @param  list<string>  $leftOutSteps
+     * @param  array<string, list<int>>  $leftOutRows
+     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}|null}
+     */
+    public function approveAll(PendingAction $action, User $user, array $leftOutSteps = [], array $leftOutRows = []): array
+    {
+        $this->applyLeftOut($this->steps($action), $user, $leftOutSteps, $leftOutRows);
+
+        $approved = [];
+
+        foreach ($this->steps($action) as $step) {
+            $step->refresh();
+
+            if ($step->status !== PendingActionStatus::Pending || $step->needsOwnApproval()) {
+                continue;
+            }
 
             try {
                 $this->approveStep($step, $user);
             } catch (QueryException $exception) {
-                // Must precede the RuntimeException arm: QueryException extends
-                // PDOException extends RuntimeException, so without this the driver
-                // message (the SQL, its bindings and the connection) is what the card
-                // renders.
                 report($exception);
 
-                return [
-                    'approved' => $approved,
-                    'failed' => ['step' => $position, 'message' => $this->databaseFailureMessage($exception)],
-                ];
-            } catch (RuntimeException $exception) {
-                return [
-                    'approved' => $approved,
-                    'failed' => ['step' => $position, 'message' => ApprovalFailureMessage::for($exception)],
-                ];
+                return $this->failure($approved, $step, $this->databaseFailureMessage($exception));
+            } catch (TransportExceptionInterface $exception) {
+                report($exception);
+
+                return $this->failure($approved, $step, ApprovalFailureMessage::forDelivery());
+            } catch (RuntimeException|ValidationException $exception) {
+                return $this->failure($approved, $step, ApprovalFailureMessage::for($exception));
             }
 
-            $approved++;
+            $approved[] = $step;
         }
 
         return ['approved' => $approved, 'failed' => null];
+    }
+
+    /**
+     * Reject the given unresolved rows of a batch step, skipping any already decided.
+     *
+     * @param  list<int>  $indexes
+     */
+    public function rejectRows(PendingAction $step, User $user, array $indexes): void
+    {
+        if ($indexes === []) {
+            return;
+        }
+
+        $rows = array_intersect($indexes, ProposalProgress::for($step->refresh())->unresolvedIndices());
+
+        foreach ($rows as $index) {
+            $this->pendingActions->rejectItem($step->refresh(), $user, $index);
+        }
+    }
+
+    /**
+     * @param  list<PendingAction>  $steps
+     * @param  list<string>  $leftOutSteps
+     * @param  array<string, list<int>>  $leftOutRows
+     */
+    private function applyLeftOut(array $steps, User $user, array $leftOutSteps, array $leftOutRows): void
+    {
+        if ($leftOutSteps === [] && array_filter($leftOutRows) === []) {
+            return;
+        }
+
+        foreach ($steps as $step) {
+            $step->refresh();
+
+            if ($step->isPending() && in_array((string) $step->getKey(), $leftOutSteps, true)) {
+                $this->reject($step, $user);
+            }
+        }
+
+        $linked = $this->linkedRows($steps);
+
+        foreach ($steps as $step) {
+            $stepId = (string) $step->getKey();
+
+            if (! $step->refresh()->isPending() || $step->needsOwnApproval() || ! ProposalPayload::from($step)->isBatch) {
+                continue;
+            }
+
+            $this->rejectRows($step, $user, array_values(array_diff($leftOutRows[$stepId] ?? [], array_keys($linked[$stepId] ?? []))));
+        }
+    }
+
+    /**
+     * @param  list<PendingAction>  $approved
+     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}}
+     */
+    private function failure(array $approved, PendingAction $step, string $message): array
+    {
+        return ['approved' => $approved, 'failed' => ['step' => $step, 'message' => $message]];
     }
 
     /**
@@ -235,7 +364,11 @@ final readonly class ProposalPlanService
             return;
         }
 
-        foreach (array_keys($payload->batchRecords()) as $index) {
+        // A batch row shows only its active record in full, so one click must
+        // never send a message nobody opened.
+        throw_if($step->isEmailSend(), RuntimeException::class, __('Each email is approved on its own.'));
+
+        foreach (ProposalProgress::for($step->refresh())->unresolvedIndices() as $index) {
             $this->pendingActions->approveItem($step->refresh(), $user, $index);
         }
     }

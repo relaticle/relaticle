@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 use App\Http\Middleware\RequireIdentityConfirmation;
 use App\Http\Middleware\RequireOperationGrant;
+use App\Providers\FortifyServiceProvider;
 use Illuminate\Routing\Router;
+use Illuminate\Support\Facades\Route;
 
 mutates(RequireOperationGrant::class);
 
@@ -38,4 +40,22 @@ test('the password.confirm alias still resolves to the application middleware', 
         ->and($aliases['password.confirm'])->toBe(RequireIdentityConfirmation::class)
         ->and($aliases)->toHaveKey('require-operation')
         ->and($aliases['require-operation'])->toBe(RequireOperationGrant::class);
+});
+
+test('attaching operation grants raises no deprecation for unnamed routes', function (): void {
+    Route::get('/unnamed-probe', fn (): string => 'ok');
+    $deprecations = [];
+    set_error_handler(function (int $level, string $message) use (&$deprecations): bool {
+        $deprecations[] = $message;
+
+        return true;
+    }, E_DEPRECATED);
+
+    try {
+        $this->app->getProvider(FortifyServiceProvider::class)->boot();
+    } finally {
+        restore_error_handler();
+    }
+
+    expect($deprecations)->toBe([]);
 });

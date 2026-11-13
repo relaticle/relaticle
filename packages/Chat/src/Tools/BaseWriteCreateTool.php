@@ -11,10 +11,12 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
 use Relaticle\Chat\Tools\Concerns\ReportsSkippedRecords;
@@ -37,6 +39,11 @@ abstract class BaseWriteCreateTool implements Tool
     abstract protected function actionClass(): string;
 
     abstract protected function entityType(): string;
+
+    protected function proposalEntity(): ProposalEntity
+    {
+        return ProposalEntity::from($this->entityType());
+    }
 
     abstract public function description(): string;
 
@@ -64,6 +71,28 @@ abstract class BaseWriteCreateTool implements Tool
     protected function validateRecord(array $record, User $user): ?string
     {
         return null;
+    }
+
+    protected function requiredCapability(): ?WorkspaceCapability
+    {
+        return WorkspaceCapability::RecordsCreate;
+    }
+
+    private function batchVerb(): string
+    {
+        return Str::ucfirst($this->proposalEntity()->verb(PendingActionOperation::Create));
+    }
+
+    private function batchNoun(): string
+    {
+        return Str::headline($this->proposalEntity()->noun());
+    }
+
+    private function missingCapabilityError(User $user): ?string
+    {
+        $capability = $this->requiredCapability();
+
+        return $capability instanceof WorkspaceCapability ? $this->capabilityError($user, $capability) : null;
     }
 
     public function schema(JsonSchema $schema): array
@@ -96,7 +125,7 @@ abstract class BaseWriteCreateTool implements Tool
         /** @var User $user */
         $user = auth()->user();
 
-        $capabilityError = $this->capabilityError($user, WorkspaceCapability::RecordsCreate);
+        $capabilityError = $this->missingCapabilityError($user);
 
         if ($capabilityError !== null) {
             return $capabilityError;
@@ -199,8 +228,8 @@ abstract class BaseWriteCreateTool implements Tool
 
         $displayData = $isBatch
             ? [
-                'title' => __('Create :entities', ['entities' => Str::plural(Str::headline($this->entityType()), count($items))]),
-                'summary' => sprintf('Create %d %s', count($items), Str::plural(Str::lower(Str::headline($this->entityType())), count($items))),
+                'title' => __(':verb :entities', ['verb' => $this->batchVerb(), 'entities' => Str::plural($this->batchNoun(), count($items))]),
+                'summary' => sprintf('%s %d %s', $this->batchVerb(), count($items), Str::plural(Str::lower($this->batchNoun()), count($items))),
                 'items' => $items,
             ]
             : $items[0];
@@ -210,23 +239,13 @@ abstract class BaseWriteCreateTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: $this->actionClass(),
             operation: PendingActionOperation::Create,
-            entityType: $this->entityType(),
+            entityType: $this->proposalEntity(),
             actionData: $actionData,
             displayData: $displayData,
             turnId: $this->resolveTurnId(),
         );
 
-        $envelope = [
-            'type' => 'pending_action',
-            'pending_action_id' => $pending->id,
-            'turn_id' => $pending->turn_id,
-            'action' => class_basename($this->actionClass()),
-            'entity_type' => $this->entityType(),
-            'operation' => 'create',
-            'data' => $pending->action_data,
-            'display' => $pending->display_data,
-            'meta' => ['agent_should_stop' => true],
-        ];
+        $envelope = PendingActionEnvelope::for($pending, class_basename($this->actionClass()), $pending->action_data);
 
         return (string) json_encode($this->withSkippedRecords($envelope, $skipped), JSON_UNESCAPED_SLASHES);
     }

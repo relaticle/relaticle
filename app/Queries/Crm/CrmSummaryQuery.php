@@ -9,6 +9,7 @@ use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Queries\Opportunities\OpportunityAggregatesQuery;
@@ -57,8 +58,8 @@ final readonly class CrmSummaryQuery
                     'date' => $today->toDateString(),
                     'timezone' => $timezone,
                 ],
-                'companies' => ['total' => Company::query()->where('workspace_id', $workspaceId)->count()],
-                'people' => ['total' => People::query()->where('workspace_id', $workspaceId)->count()],
+                'companies' => ['total' => Company::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count()],
+                'people' => ['total' => People::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count()],
                 'opportunities' => [
                     'total' => $opportunities['total_count'],
                     'by_stage' => $byStage,
@@ -66,7 +67,7 @@ final readonly class CrmSummaryQuery
                     'truncated' => $opportunities['truncated'],
                 ],
                 'tasks' => $this->taskSummary($workspaceId, $today->clone()->utc(), $today->clone()->addDays(7)->utc()),
-                'notes' => ['total' => Note::query()->where('workspace_id', $workspaceId)->count()],
+                'notes' => ['total' => Note::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count()],
             ];
         });
     }
@@ -74,7 +75,7 @@ final readonly class CrmSummaryQuery
     /** @return array{total: int, overdue: int, due_this_week: int} */
     private function taskSummary(string $workspaceId, DateTimeInterface $todayUtc, DateTimeInterface $weekEndUtc): array
     {
-        $total = Task::query()->where('workspace_id', $workspaceId)->count();
+        $total = Task::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $workspaceId)->count();
         $fields = $this->taskFieldMetadata($workspaceId);
         $dueDateFieldId = $fields['due_field_id'];
 

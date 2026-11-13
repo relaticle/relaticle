@@ -12,6 +12,29 @@ final class PestTiaRuntime
 
     private const string SHARED_ENVIRONMENT_KEY = 'RELATICLE_PEST_TIA_SHARED';
 
+    /**
+     * Coverage records no edge for a file a test reads from disk.
+     *
+     * @var array<string, string>
+     */
+    private const array FILES_ARCH_TESTS_READ = [
+        '.ai/**' => 'tests/Arch',
+        '.github/**' => 'tests/Arch',
+        '*.md' => 'tests/Arch',
+        'Dockerfile' => 'tests/Arch',
+        'bin/**' => 'tests/Arch',
+        'composer.json' => 'tests/Arch',
+        'packages/*/resources/**/dist/**' => 'tests/Arch',
+        'packages/*/resources/css/**' => 'tests/Arch',
+        'resources/**/dist/**' => 'tests/Arch',
+        'resources/css/**' => 'tests/Arch',
+        'resources/data/disposable-email-domains.json' => 'tests/Feature/Auth/RegistrationTest.php',
+        'public/site.webmanifest' => 'tests/Feature/Filament/PanelWebAppMetaTest.php',
+        'public/web-app-manifest-*.png' => 'tests/Feature/Filament/PanelWebAppMetaTest.php',
+        'phpstan*.neon' => 'tests/Arch',
+        'phpunit*.xml' => 'tests/Arch',
+    ];
+
     /** @var list<string> */
     private const array COMPLETE_RUN_FLAGS = [
         '--parallel',
@@ -74,7 +97,11 @@ final class PestTiaRuntime
             );
         }
 
-        pest()->tia()->directory($storageDirectory)->locally();
+        pest()->tia()
+            ->directory($storageDirectory)
+            ->locally()
+            ->trustDefaultBranch()
+            ->watch(self::FILES_ARCH_TESTS_READ);
     }
 
     public static function storageDirectory(string $projectRoot, bool $usesSharedState): string

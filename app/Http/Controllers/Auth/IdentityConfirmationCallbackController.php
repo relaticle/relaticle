@@ -54,7 +54,7 @@ final readonly class IdentityConfirmationCallbackController
         } catch (Throwable $e) {
             report($e);
 
-            return $this->handleConfirmError($this->parseProviderError($e->getMessage(), $provider->value));
+            return $this->handleConfirmError($this->parseProviderError($e->getMessage(), $provider));
         }
 
         $account = $user->socialAccounts()->where('provider_name', $provider->value)->first();

@@ -3,22 +3,23 @@
     $mailboxSyncing = $mailboxConnected && $this->isMailboxSyncing();
 @endphp
 
-<div class="mt-14" data-testid="meetings-home">
+<div class="mt-14 max-sm:mt-8" data-testid="meetings-home">
     <div class="mb-3 flex items-center justify-between gap-3">
-        <h2 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <x-filament::icon icon="lucide-calendar" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" />
             <span>{{ __('filament/pages/dashboard.meetings.heading') }}</span>
             @if ($mailboxConnected && ! $mailboxSyncing)
                 <span class="text-gray-400 dark:text-gray-500">{{ $this->meetings->count() }}</span>
             @endif
         </h2>
         @if (! $mailboxSyncing)
-            <div class="flex shrink-0 items-center gap-1">
+            <div class="flex shrink-0 items-center gap-1 max-sm:gap-0">
                 {{-- The prefix is server-rendered and the date comes from the picker's
                      own state, so a click anywhere on "Today, Sep 10" opens the calendar. --}}
                 <div class="fi-meetings-date flex items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
                     <span
                         aria-hidden="true"
-                        class="cursor-pointer"
+                        class="cursor-pointer max-sm:text-base"
                         x-on:click="$el.parentElement.querySelector('.fi-meetings-date-trigger')?.click()"
                     >{{ $this->datePrefix() }}</span>
                     {{ $this->getSchema('datePickerSchema') }}
@@ -27,14 +28,16 @@
                 <x-filament::icon-button
                     color="gray"
                     size="xs"
-                    :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronLeft"
+                    class="max-sm:size-8"
+                    icon="lucide-chevron-left"
                     :label="__('filament/pages/dashboard.meetings.previous_day')"
                     wire:click="previousDay"
                 />
                 <x-filament::icon-button
                     color="gray"
                     size="xs"
-                    :icon="\Filament\Support\Icons\Heroicon::OutlinedChevronRight"
+                    class="max-sm:size-8"
+                    icon="lucide-chevron-right"
                     :label="__('filament/pages/dashboard.meetings.next_day')"
                     wire:click="nextDay"
                 />
@@ -44,14 +47,14 @@
                         <x-filament::icon-button
                             color="gray"
                             size="sm"
-                            :icon="\Filament\Support\Icons\Heroicon::OutlinedEllipsisVertical"
+                            icon="lucide-ellipsis-vertical"
                             :label="__('filament/pages/dashboard.meetings.more_actions')"
                         />
                     </x-slot>
 
                     <x-filament::dropdown.list>
                         <x-filament::dropdown.list.item
-                            :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendarDays"
+                            icon="lucide-calendar-days"
                             wire:click="goToToday"
                         >
                             {{ __('filament/pages/dashboard.meetings.go_to_today') }}
@@ -59,7 +62,7 @@
 
                         <x-filament::dropdown.list.item
                             tag="a"
-                            :icon="\Filament\Support\Icons\Heroicon::OutlinedCog6Tooth"
+                            icon="lucide-settings"
                             :href="\Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage::getUrl()"
                         >
                             {{ __('filament/pages/dashboard.meetings.calendar_settings') }}
@@ -73,14 +76,14 @@
     @if ($mailboxSyncing)
         @include('email-integration::livewire.partials.mailbox-sync-status')
     @elseif (! $mailboxConnected)
-        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center" data-testid="meetings-disconnected">
+        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center max-sm:py-5" data-testid="meetings-disconnected">
             <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ __('filament/pages/dashboard.meetings.disconnected.title') }}
             </p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 {{ __('filament/pages/dashboard.meetings.disconnected.description') }}
             </p>
-            <div class="mt-4 flex flex-wrap justify-center gap-3">
+            <div class="mt-4 flex flex-wrap justify-center gap-3 max-sm:[&_.fi-btn]:w-full">
                 {{ $this->connectGmailAction }}
 
                 @if ($this->connectAzureAction->isVisible())
@@ -92,7 +95,7 @@
         @php
             $nextDayWithMeetings = $this->nextDayWithMeetings();
         @endphp
-        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center">
+        <div class="rounded-xl border border-dashed border-[var(--surface-block-border)] px-6 py-10 text-center max-sm:py-5">
             <p class="text-sm font-medium text-gray-900 dark:text-white">
                 {{ __('filament/pages/dashboard.meetings.empty.title') }}
             </p>
@@ -105,7 +108,7 @@
                         color="gray"
                         size="sm"
                         outlined
-                        :icon="\Filament\Support\Icons\Heroicon::OutlinedCalendarDays"
+                        icon="lucide-calendar-days"
                         wire:click="goToNextDayWithMeetings"
                         wire:loading.attr="disabled"
                     >
@@ -126,8 +129,8 @@
                     $meetingKey = $card['id'];
                     $openTarget = "openMeeting('{$meetingKey}')";
                     $timeIcon = $card['all_day']
-                        ? \Filament\Support\Icons\Heroicon::OutlinedCalendarDays
-                        : \Filament\Support\Icons\Heroicon::OutlinedClock;
+                        ? 'lucide-calendar-days'
+                        : 'lucide-clock';
                 @endphp
                 <li
                     wire:key="meeting-home-{{ $meetingKey }}"

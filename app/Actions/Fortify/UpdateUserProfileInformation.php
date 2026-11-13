@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use App\Support\Auth\EmailProbeLimiter;
 use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,10 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
      */
     public function update(User $user, array $input): void
     {
+        if (($input['email'] ?? null) !== $user->email) {
+            resolve(EmailProbeLimiter::class)->hit($user);
+        }
+
         Validator::make($input, [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'max:255', Rule::unique('users')->ignore($user->id)],

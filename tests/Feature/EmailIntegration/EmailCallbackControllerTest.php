@@ -2,10 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
+use App\Features\Billing;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Log;
+use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\InvalidStateException;
 use Laravel\Socialite\Two\User as SocialiteUser;
@@ -72,6 +76,21 @@ it('redirects with a generic error when Socialite throws any other exception', f
     $response->assertSessionHas('error', 'We could not connect that account. Please try again.');
 });
 
+it('tells an owner who cancels at the provider that nothing was connected', function (): void {
+    bindMailboxOAuthWorkspace($this->user);
+    session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/setup');
+    Log::spy();
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail', 'error' => 'access_denied']))
+        ->assertRedirect('https://relaticle.test/app/acme/setup');
+
+    Notification::assertNotified(
+        Notification::make()->title(__('filament/pages/email-accounts.notifications.cancelled.title'))->warning(),
+    );
+
+    Log::shouldNotHaveReceived('error');
+});
+
 it('returns to the page that started the connect with a success notification', function (): void {
     Bus::fake();
 
@@ -83,6 +102,45 @@ it('returns to the page that started the connect with a success notification', f
         ->assertRedirect('https://relaticle.test/app/acme/email');
 
     Notification::assertNotified(__('filament/pages/email-accounts.notifications.connected.title'));
+
+    expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
+});
+
+it('returns a failed connect to the page that started it', function (): void {
+    bindMailboxOAuthWorkspace($this->user);
+    session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/setup');
+
+    Socialite::shouldReceive('driver')->andReturnSelf();
+    Socialite::shouldReceive('user')->andThrow(new InvalidStateException);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect('https://relaticle.test/app/acme/setup')
+        ->assertSessionMissing('error');
+
+    Notification::assertNotified(
+        Notification::make()->title('Your sign-in session expired. Please reconnect the account.')->danger(),
+    );
+
+    expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
+});
+
+it('returns to the page that started the connect when the mail read permission was declined', function (): void {
+    Bus::fake();
+
+    $social = connectedGmailUser();
+    $social->approvedScopes = ['openid', 'https://www.googleapis.com/auth/gmail.send'];
+
+    Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($this->user);
+    session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/setup');
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect('https://relaticle.test/app/acme/setup')
+        ->assertSessionMissing('error');
+
+    Notification::assertNotified(
+        Notification::make()->title('Relaticle needs permission to read your mail. Reconnect and allow every permission.')->danger(),
+    );
 
     expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
 });
@@ -125,6 +183,85 @@ it('does not connect a gmail mailbox when the mail read permission was not grant
     ]);
 
     Bus::assertNothingDispatched();
+});
+
+it('does not connect a new mailbox when the workspace has reached its limit', function (): void {
+    withHostedBilling();
+    Bus::fake();
+
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(10)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    Socialite::fake('gmail', connectedGmailUser());
+    bindMailboxOAuthWorkspace($this->user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
+        ->assertSessionHas('error', 'Mailbox limit reached. This workspace can connect 10 mailboxes. Upgrade to connect more.');
+
+    $this->assertDatabaseMissing(ConnectedAccount::class, [
+        'email_address' => 'connected@example.com',
+    ]);
+
+    Bus::assertNothingDispatched();
+});
+
+it('connects a mailbox past every plan limit on a self-hosted install', function (): void {
+    Feature::define(Billing::class, false);
+    Bus::fake();
+
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Free])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(60)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+
+    Socialite::fake('gmail', connectedGmailUser());
+    bindMailboxOAuthWorkspace($this->user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
+        ->assertSessionMissing('error');
+
+    $this->assertDatabaseHas(ConnectedAccount::class, [
+        'workspace_id' => $workspace->getKey(),
+        'email_address' => 'connected@example.com',
+    ]);
+});
+
+it('reconnects an existing mailbox when the workspace has reached its limit', function (): void {
+    withHostedBilling();
+    Bus::fake();
+
+    $workspace = $this->user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->count(9)->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+    ]));
+    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'email_address' => 'connected@example.com',
+        'access_token' => 'stale-token',
+    ]));
+
+    Socialite::fake('gmail', connectedGmailUser());
+    bindMailboxOAuthWorkspace($this->user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
+        ->assertSessionMissing('error');
+
+    Notification::assertNotified(__('filament/pages/email-accounts.notifications.connected.title'));
+
+    expect(ConnectedAccount::query()->where('email_address', 'connected@example.com')->count())->toBe(1)
+        ->and(ConnectedAccount::query()->where('email_address', 'connected@example.com')->sole()->access_token)->toBe('access-token');
 });
 
 function connectedGmailUser(): SocialiteUser

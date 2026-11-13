@@ -26,7 +26,7 @@ final class ActivityRelationManager extends RelationManager
 
     protected static ?string $title = 'Activity';
 
-    protected static string|\BackedEnum|null $icon = 'heroicon-o-clock';
+    protected static string|\BackedEnum|null $icon = 'lucide-clock';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
@@ -79,6 +79,7 @@ final class ActivityRelationManager extends RelationManager
                     ->state(fn (Activity $record): array => ActivityResource::buildChangeSummary($record))
                     ->listWithLineBreaks()
                     ->limitList(1)
+                    ->limit(120)
                     ->placeholder('—')
                     ->wrap(),
             ])

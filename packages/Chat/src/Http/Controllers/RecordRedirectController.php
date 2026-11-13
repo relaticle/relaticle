@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -78,7 +79,7 @@ final readonly class RecordRedirectController
         /** @var User $user */
         $user = $request->user();
 
-        $record = $modelClass::query()->withTrashed()->find($id);
+        $record = $modelClass::query()->withoutGlobalScope(WorkspaceScope::class)->withTrashed()->find($id);
 
         abort_if($record === null, 404);
 

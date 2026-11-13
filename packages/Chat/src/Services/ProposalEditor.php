@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services;
 
 use App\Models\User;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
-use Relaticle\Chat\Support\ProposalCoreFields;
 use Relaticle\Chat\Support\ProposalOwnership;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
-use Relaticle\CustomFields\Services\TenantContextService;
 use RuntimeException;
 
 /**
@@ -43,43 +43,36 @@ final readonly class ProposalEditor
         // Before the pin below, not after: this method validates core fields
         // against the actor's workspace while writing custom fields under the
         // proposal's, so a cross-tenant caller would split one record in two.
-        ProposalOwnership::assert($pendingAction, $user);
+        $workspace = ProposalOwnership::assert($pendingAction, $user);
 
-        $previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($pendingAction->workspace_id);
+        return resolve(CurrentWorkspace::class)->within($workspace, fn (): PendingAction => DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
+            /** @var PendingAction $locked */
+            $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
 
-        try {
-            return DB::transaction(function () use ($pendingAction, $user, $input, $index): PendingAction {
-                /** @var PendingAction $locked */
-                $locked = PendingAction::query()->lockForUpdate()->findOrFail($pendingAction->getKey());
+            $this->assertEditable($locked);
 
-                $this->assertEditable($locked);
+            $record = $this->resolveRecord($locked, $index);
+            $entity = $locked->entity_type;
 
-                $record = $this->resolveRecord($locked, $index);
-                $entityType = $locked->entity_type;
+            [$editedCore, $editedCustomFields] = $this->splitInput($entity, $input);
 
-                [$editedCore, $editedCustomFields] = $this->splitInput($entityType, $input);
+            $this->validateCore($user, $entity, $editedCore);
 
-                $this->validateCore($user, $entityType, $editedCore);
+            $cleanFields = $this->validateCustomFields($user, $entity, $editedCustomFields);
 
-                $cleanFields = $this->validateCustomFields($user, $entityType, $editedCustomFields);
+            $rebuiltRecord = $this->rebuildRecord($user, $entity, $record, $editedCore, $editedCustomFields, $cleanFields);
 
-                $rebuiltRecord = $this->rebuildRecord($user, $entityType, $record, $editedCore, $editedCustomFields, $cleanFields);
+            $rebuiltDisplay = $this->displayBuilder->build(
+                $user,
+                $entity,
+                $rebuiltRecord,
+                $this->currentDisplayFields($locked, $index),
+            );
 
-                $rebuiltDisplay = $this->displayBuilder->build(
-                    $user,
-                    $entityType,
-                    $rebuiltRecord,
-                    $this->currentDisplayFields($locked, $index),
-                );
+            $this->persist($locked, $index, $rebuiltRecord, $rebuiltDisplay);
 
-                $this->persist($locked, $index, $rebuiltRecord, $rebuiltDisplay);
-
-                return $locked->refresh();
-            });
-        } finally {
-            TenantContextService::setTenantId($previousTenantId);
-        }
+            return $locked->refresh();
+        }));
     }
 
     /**
@@ -89,13 +82,13 @@ final readonly class ProposalEditor
      * @param  array<string, mixed>  $input
      * @return array{0: array<string, mixed>, 1: array<string, mixed>}
      */
-    private function splitInput(string $entityType, array $input): array
+    private function splitInput(ProposalEntity $entity, array $input): array
     {
         $core = [];
         $custom = [];
 
         foreach ($input as $code => $value) {
-            if (ProposalCoreFields::isCore($entityType, $code)) {
+            if ($entity->isCore($code)) {
                 $core[$code] = $value;
 
                 continue;
@@ -110,9 +103,9 @@ final readonly class ProposalEditor
     /**
      * @param  array<string, mixed>  $editedCore
      */
-    private function validateCore(User $user, string $entityType, array $editedCore): void
+    private function validateCore(User $user, ProposalEntity $entity, array $editedCore): void
     {
-        $titleKey = ProposalCoreFields::titleKey($entityType);
+        $titleKey = $entity->titleKey();
 
         if (array_key_exists($titleKey, $editedCore)) {
             $value = trim((string) $editedCore[$titleKey]);
@@ -121,7 +114,7 @@ final readonly class ProposalEditor
             throw_if($value === '', RuntimeException::class, "{$label} is required.");
         }
 
-        if ($entityType === 'company' && array_key_exists('account_owner_id', $editedCore)) {
+        if ($entity === ProposalEntity::Company && array_key_exists('account_owner_id', $editedCore)) {
             $error = WorkspaceMembersContext::memberFieldError($user, 'account_owner_id', $editedCore['account_owner_id']);
 
             throw_if($error !== null, RuntimeException::class, (string) $error);
@@ -132,13 +125,13 @@ final readonly class ProposalEditor
      * @param  array<string, mixed>  $editedCustomFields
      * @return array<string, mixed>
      */
-    private function validateCustomFields(User $user, string $entityType, array $editedCustomFields): array
+    private function validateCustomFields(User $user, ProposalEntity $entity, array $editedCustomFields): array
     {
         if ($editedCustomFields === []) {
             return [];
         }
 
-        $result = $this->customFieldsValidator->validate($user, $entityType, $editedCustomFields);
+        $result = $this->customFieldsValidator->validate($user, $entity->value, $editedCustomFields);
 
         throw_if($result->error !== null, RuntimeException::class, (string) $result->error);
 
@@ -154,19 +147,19 @@ final readonly class ProposalEditor
      */
     private function rebuildRecord(
         User $user,
-        string $entityType,
+        ProposalEntity $entity,
         array $record,
         array $editedCore,
         array $editedCustomFields,
         array $cleanFields,
     ): array {
-        $titleKey = ProposalCoreFields::titleKey($entityType);
+        $titleKey = $entity->titleKey();
 
         if (array_key_exists($titleKey, $editedCore)) {
             $record[$titleKey] = trim((string) $editedCore[$titleKey]);
         }
 
-        if ($entityType === 'company' && array_key_exists('account_owner_id', $editedCore)) {
+        if ($entity === ProposalEntity::Company && array_key_exists('account_owner_id', $editedCore)) {
             $ownerId = $editedCore['account_owner_id'];
             $record['account_owner_id'] = is_string($ownerId) && $ownerId !== '' ? $ownerId : $user->getKey();
         }

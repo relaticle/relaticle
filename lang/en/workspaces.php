@@ -25,6 +25,11 @@ return [
         'workspace_logo' => [
             'label' => 'Workspace logo',
         ],
+        'web_search' => [
+            'label' => 'Let :assistant search the web',
+            'helper_text' => 'Search queries go to the AI provider\'s web search.',
+            'unavailable' => 'No model on this install can search the web.',
+        ],
     ],
 
     'sections' => [
@@ -35,6 +40,9 @@ return [
         'update_workspace_logo' => [
             'title' => 'Workspace Logo',
             'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
+        ],
+        'assistant' => [
+            'description' => 'Choose what :assistant, the built-in AI assistant, may do for members of this workspace.',
         ],
         'invite_people' => [
             'description' => 'Each person gets an email with a link to join :workspace.',
@@ -79,6 +87,7 @@ return [
     'notifications' => [
         'workspace_invitation_sent' => [
             'success' => 'Invitation sent.',
+            'success_many' => ':count invitations sent.',
         ],
         'workspace_invitation_revoked' => [
             'success' => 'Invitation revoked.',
@@ -113,21 +122,28 @@ return [
         'resend_throttled' => 'Please wait :seconds seconds before resending.',
         'some_invites_failed' => [
             'title' => 'Some invitations could not be sent',
+            'not_sent_limit' => 'not sent, the invitation limit was reached',
         ],
         'invite_rate_limited' => [
             'title' => 'Too many invitations sent',
-            'body' => 'Please wait :seconds seconds before sending more invitations.',
+            'body' => 'Please wait :time before sending more invitations.',
         ],
     ],
 
     'validation' => [
+        'slug_too_short' => 'The :attribute must be at least 3 characters.',
+        'slug_format' => 'The :attribute may only contain lowercase letters, numbers, and hyphens.',
+        'slug_reserved' => 'The :attribute is reserved and cannot be used.',
         'email_already_invited' => 'This user has already been invited to the workspace.',
         'email_already_member' => 'This user already belongs to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Admin role.',
         'invite_link_role_cannot_be_admin' => 'The workspace link cannot grant the Admin role. Invite admins by email instead.',
         'no_valid_emails' => 'Enter at least one email address.',
         'too_many_invites' => 'You can invite up to :max people at a time.',
+        'managed_plan_before_deleting' => 'This workspace is on a plan billed by Relaticle. Talk to us to end the plan before you delete the workspace.',
+        'managed_plan_before_deleting_account' => 'These workspaces are on a plan billed by Relaticle: :workspaces. Talk to us to end the plan before you delete your account.',
         'remove_members_before_deleting' => 'Remove all members from these workspaces, or delete the workspaces, before deleting your account: :workspaces',
+        'workspace_scheduled_for_deletion' => 'This workspace is scheduled for deletion. Cancel the deletion to invite people.',
     ],
 
     'modals' => [
@@ -136,6 +152,10 @@ return [
         ],
         'leave_workspace' => [
             'notice' => 'Are you sure you would like to leave this workspace?',
+            'mailbox_notice' => 'You lose access to this workspace. Any mailbox you connected here is disconnected, and its email is hidden from your team.',
+        ],
+        'remove_workspace_member' => [
+            'mailbox_notice' => ':name loses access to this workspace. Any mailbox they connected here is disconnected, and its email is hidden from everyone.',
         ],
         'delete_workspace' => [
             'notice' => 'This will schedule the workspace for deletion. You will have 30 days to cancel before all data is permanently removed.',
@@ -155,6 +175,10 @@ return [
     ],
 
     'edit_workspace' => 'Workspace Settings',
+
+    'custom_field_types' => [
+        'domain' => 'Domain',
+    ],
 
     'tabs' => [
         'general' => 'General',
@@ -222,7 +246,14 @@ return [
         ],
         'changes_modal' => [
             'trigger' => 'View all changes',
+            'trigger_full' => 'View full change',
             'close' => 'Close',
+        ],
+        'full_change' => [
+            'show' => 'Show full text',
+            'hide' => 'Hide full text',
+            'before' => 'Before',
+            'after' => 'After',
         ],
         'no_results' => [
             'heading' => 'Nothing matches these filters',
@@ -276,9 +307,13 @@ return [
         ],
         'email' => [
             'manage' => ['label' => 'Manage workspace email settings'],
+            'agent_send' => ['label' => 'Send email through an AI assistant'],
         ],
         'activity' => [
             'view' => ['label' => 'View the activity log'],
+        ],
+        'layouts' => [
+            'manage' => ['label' => 'Edit and delete table layouts shared with the workspace'],
         ],
     ],
 
@@ -333,10 +368,14 @@ return [
             'decline' => 'Not now',
         ],
         'expired' => [
-            'heading' => 'Invite link expired',
-            'body' => 'This invite link has expired. Please ask the workspace owner to share a new link.',
+            'heading' => 'This invite link no longer works',
+            'body' => 'It expired, was turned off, or was replaced by a new one. Ask the workspace owner to share the current link.',
             'action' => 'Go to my workspace',
         ],
+    ],
+
+    'deletion_banner' => [
+        'message' => 'This workspace will be permanently deleted on :date.',
     ],
 
     'pending_for_user' => [
@@ -349,11 +388,17 @@ return [
     ],
 
     'accept' => [
-        'joined' => 'You have joined the :workspace workspace.',
+        'joined' => 'You have joined :workspace.',
         'already_member' => 'You are already a member of :workspace.',
         'no_longer_valid' => 'That invitation is no longer valid. It may have been revoked or it may have expired.',
+        'email_unverified' => 'Verify your email address before you join a workspace.',
         'account_deleting' => 'You cannot accept invitations while your account is scheduled for deletion.',
         'workspace_deleting' => 'This workspace is scheduled for deletion and is not accepting new members.',
+        'deleting' => [
+            'heading' => ':workspace is not accepting new members',
+            'body' => 'This workspace is scheduled for deletion. Ask the person who invited you to cancel the deletion, then open the invitation again.',
+            'action' => 'Go to my workspace',
+        ],
         'ready' => [
             'heading' => 'Join :workspace',
             'body_with_inviter' => ':inviter invited you to join :workspace with :role access.',
@@ -369,7 +414,7 @@ return [
         ],
         'expired' => [
             'heading' => 'Invitation no longer valid',
-            'body' => 'This invitation has expired or has already been accepted.',
+            'body' => 'This invitation has expired, was already used, or was replaced by a newer one.',
             'action' => 'Go to my workspace',
         ],
     ],

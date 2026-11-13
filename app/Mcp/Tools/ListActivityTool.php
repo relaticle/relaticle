@@ -12,6 +12,7 @@ use App\Mcp\Tools\Concerns\HasReadOnlyToolAnnotations;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Support\ActivityLog\ActivityValue;
 use App\Support\CanonicalRecordUrl;
 use Carbon\CarbonImmutable;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -338,8 +339,8 @@ final class ListActivityTool extends Tool
 
             $rows[] = [
                 'field' => $row->label,
-                'old' => $this->isUnset($row->old) ? null : $row->formattedOld(),
-                'new' => $this->isUnset($row->new) ? null : $row->formattedNew(),
+                'old' => $this->isUnset($row->old) ? null : ActivityValue::excerpt($row->formattedOld()),
+                'new' => $this->isUnset($row->new) ? null : ActivityValue::excerpt($row->formattedNew()),
             ];
         }
 
@@ -355,8 +356,8 @@ final class ListActivityTool extends Tool
             $label = $change['label'] ?? $change['code'] ?? '';
             $rows[] = [
                 'field' => is_string($label) ? $label : '',
-                'old' => $this->customFieldSide($change['old'] ?? null),
-                'new' => $this->customFieldSide($change['new'] ?? null),
+                'old' => ActivityValue::forAgent($change['old'] ?? null),
+                'new' => ActivityValue::forAgent($change['new'] ?? null),
             ];
         }
 
@@ -366,17 +367,6 @@ final class ListActivityTool extends Tool
     private function isUnset(mixed $value): bool
     {
         return $value === null || $value === '';
-    }
-
-    private function customFieldSide(mixed $side): ?string
-    {
-        if (! is_array($side) || ($side['value'] ?? null) === null) {
-            return null;
-        }
-
-        $label = $side['label'] ?? null;
-
-        return is_string($label) && $label !== '' ? $label : null;
     }
 
     private function occurredAt(User $user, Activity $activity): CarbonImmutable

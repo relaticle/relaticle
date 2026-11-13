@@ -7,6 +7,7 @@ namespace Relaticle\ImportWizard\Support;
 use Illuminate\Support\Facades\Validator;
 use Relaticle\CustomFields\Contracts\FieldTypeDefinitionInterface;
 use Relaticle\CustomFields\Enums\FieldDataType;
+use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 use Relaticle\CustomFields\FieldTypeSystem\FieldManager;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\ImportWizard\Data\InferenceResult;
@@ -19,8 +20,8 @@ use Relaticle\ImportWizard\Data\InferenceResult;
  */
 final class DataTypeInferencer
 {
-    /** @var array<string, string> Validation rule key => field type key */
-    private array $validationToFieldType = [];
+    /** @var array<string, list<string>> Validation rule key => the field type keys that share it, the detected one first */
+    private array $validationToFieldTypes = [];
 
     /** @var array<string, string> FieldDataType value => field type key */
     private array $dataTypeToFieldType = [];
@@ -48,7 +49,7 @@ final class DataTypeInferencer
         }
 
         $allTypes = array_merge(
-            array_values($this->validationToFieldType),
+            array_column($this->validationToFieldTypes, 0),
             array_values($this->dataTypeToFieldType),
             ['text']
         );
@@ -79,7 +80,7 @@ final class DataTypeInferencer
         return new InferenceResult(
             type: $topType,
             confidence: $confidence,
-            suggestedFields: $this->getSuggestedFieldsForType($topType),
+            suggestedFields: $this->getSuggestedFieldsForType($this->fieldTypesSharingKeyOf($topType), array_values($nonEmptyValues)),
         );
     }
 
@@ -107,7 +108,7 @@ final class DataTypeInferencer
                 foreach ($itemRules as $rule) {
                     $validationKey = $this->extractValidationKey($rule);
                     if ($validationKey !== null) {
-                        $this->validationToFieldType[$validationKey] = $data->key;
+                        $this->validationToFieldTypes[$validationKey][] = $data->key;
                         break;
                     }
                 }
@@ -144,9 +145,9 @@ final class DataTypeInferencer
     private function detectType(string $value): string
     {
         // Check validation-based types (email, phone, url/link)
-        foreach ($this->validationToFieldType as $validationKey => $fieldTypeKey) {
+        foreach ($this->validationToFieldTypes as $validationKey => $fieldTypeKeys) {
             if ($this->passesValidation($value, $validationKey)) {
-                return $fieldTypeKey;
+                return $fieldTypeKeys[0];
             }
         }
 
@@ -198,27 +199,70 @@ final class DataTypeInferencer
     }
 
     /**
-     * Get suggested field keys for a detected field type.
-     *
-     * Queries actual custom fields configured for the entity.
-     *
+     * @return list<string>
+     */
+    private function fieldTypesSharingKeyOf(string $fieldTypeKey): array
+    {
+        foreach ($this->validationToFieldTypes as $fieldTypeKeys) {
+            if (in_array($fieldTypeKey, $fieldTypeKeys, true)) {
+                return $fieldTypeKeys;
+            }
+        }
+
+        return [$fieldTypeKey];
+    }
+
+    /**
+     * @param  list<string>  $fieldTypeKeys
+     * @param  list<string>  $values
      * @return array<string>
      */
-    private function getSuggestedFieldsForType(string $fieldTypeKey): array
+    private function getSuggestedFieldsForType(array $fieldTypeKeys, array $values): array
     {
         if ($this->entityName === null || $this->workspaceId === null) {
             return [];
         }
 
-        // Query custom fields of this type for the entity
+        $fittingTypes = array_filter($fieldTypeKeys, fn (string $key): bool => ! $this->cutsMostValuesShort($key, $values));
+
         return CustomField::query()
             ->withoutGlobalScopes()
             ->where('entity_type', $this->entityName)
             ->where('tenant_id', $this->workspaceId)
-            ->where('type', $fieldTypeKey)
+            ->whereIn('type', $fittingTypes)
             ->active()
+            ->orderBy('id')
             ->pluck('code')
             ->map(fn (string $code): string => "custom_fields_{$code}")
             ->all();
+    }
+
+    /**
+     * @param  list<string>  $values
+     */
+    private function cutsMostValuesShort(string $fieldTypeKey, array $values): bool
+    {
+        $fieldType = resolve(FieldManager::class)->getFieldTypeInstance($fieldTypeKey);
+
+        if (! $fieldType instanceof BaseFieldType) {
+            return false;
+        }
+
+        $dropped = array_filter($values, function (string $value) use ($fieldType): bool {
+            $url = parse_url(trim($value));
+
+            if (! isset($url['host'])) {
+                return false;
+            }
+
+            $stored = strtolower($fieldType->setValue($value));
+            $path = strtolower(trim($url['path'] ?? '', '/'));
+            $query = strtolower(rtrim($url['query'] ?? '', '/'));
+
+            return ($path !== '' && ! str_contains($stored, "/{$path}"))
+                || ($query !== '' && ! str_contains($stored, "?{$query}"));
+        });
+
+        return count($dropped) * 2 > count($values);
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Console\Commands;
 
+use App\Enums\BillingStatus;
+use Closure;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -29,10 +31,24 @@ final class DispatchOutboxCommand extends Command
         $defaultDaily = Config::integer('email-integration.outbox.defaults.daily_send_limit');
 
         $this->reclaimStuckSending();
-        rescue(fn () => $this->failMailOnMailboxesThatCannotSend($markFailed));
+
+        if (BillingStatus::billingEnabled()) {
+            rescue(fn () => $this->failDueMail(
+                $markFailed,
+                fn (Builder $emails): Builder => $emails->whereDoesntHave('workspace', fn (Builder $workspace): Builder => $workspace->withHostedAccess()),
+                __('filament/notifications/email-send-failed.reasons.workspace_paused'),
+            ));
+        }
+
+        rescue(fn () => $this->failDueMail(
+            $markFailed,
+            fn (Builder $emails): Builder => $emails->whereDoesntHave('connectedAccount', fn (Builder $account): Builder => $account->sendable()),
+            __('filament/notifications/email-send-failed.reasons.mailbox_needs_reconnect'),
+        ));
 
         ConnectedAccount::query()
             ->sendable()
+            ->inWorkspaceWithHostedAccess()
             ->whereHas('outgoingEmails', fn (Builder $emailQuery): Builder => $emailQuery
                 ->where('status', EmailStatus::QUEUED)
                 ->where(fn (Builder $dueQuery): Builder => $dueQuery->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', now()))
@@ -44,18 +60,17 @@ final class DispatchOutboxCommand extends Command
         return self::SUCCESS;
     }
 
-    private function failMailOnMailboxesThatCannotSend(MarkEmailsSendFailedAction $markFailed): void
+    /**
+     * @param  Closure(Builder<Email>): Builder<Email>  $unsendable
+     */
+    private function failDueMail(MarkEmailsSendFailedAction $markFailed, Closure $unsendable, string $reason): void
     {
-        Email::query()
+        $unsendable(Email::query()
             ->withoutGlobalScope(ActiveAccountScope::class)
             ->where('status', EmailStatus::QUEUED)
-            ->where(fn (Builder $dueQuery): Builder => $dueQuery->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', now()))
-            ->whereDoesntHave('connectedAccount', fn (Builder $accountQuery): Builder => $accountQuery->sendable())
-            ->with(['user', 'workspace', 'connectedAccount'])
-            ->chunkById(100, fn (Collection $emails) => $markFailed->execute(
-                $emails->toBase(),
-                __('filament/notifications/email-send-failed.reasons.mailbox_needs_reconnect'),
-            ));
+            ->where(fn (Builder $dueQuery): Builder => $dueQuery->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', now())))
+            ->with(['user', 'workspace.subscriptions', 'connectedAccount'])
+            ->chunkById(100, fn (Collection $emails) => $markFailed->execute($emails->toBase(), $reason));
     }
 
     /**

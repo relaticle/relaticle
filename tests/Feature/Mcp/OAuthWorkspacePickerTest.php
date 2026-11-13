@@ -2,14 +2,18 @@
 
 declare(strict_types=1);
 
-use App\Features\Billing;
+use App\Features\EmailIntegration;
 use App\Http\Controllers\Mcp\ApproveAuthorizationController;
+use App\Http\Middleware\RequireConsent;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Listeners\Mcp\CopyWorkspaceIdToAccessToken;
+use App\Mcp\Servers\RelaticleServer;
+use App\Mcp\Tools\WhoAmiTool;
 use App\Models\Passport\AuthCode;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Passport\WorkspaceBearerTokenResponse;
+use Illuminate\Auth\Middleware\EnsureEmailIsVerified;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Passport\Client;
@@ -21,6 +25,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(
     ApproveAuthorizationController::class,
+    RequireConsent::class,
     AuthCode::class,
     CopyWorkspaceIdToAccessToken::class,
     SetApiWorkspaceContext::class,
@@ -65,6 +70,135 @@ function authorizeUrl(Client $client, array $overrides = []): string
     ]);
 }
 
+it('refuses an authorization request meant for another server with an oauth invalid_target error', function (): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'resource' => 'https://attacker.example/mcp']))
+        ->assertBadRequest()
+        ->assertExactJson([
+            'error' => 'invalid_target',
+            'error_description' => __('mcp.consent.invalid_resource'),
+        ]);
+});
+
+it('authorizes a request that names this MCP server as its resource', function (string $resource): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'resource' => $resource]))
+        ->assertOk();
+})->with([
+    'as published' => fn (): string => url()->getMcpUrl(),
+    'with a trailing slash' => fn (): string => url()->getMcpUrl().'/',
+    'with the scheme and host in upper case' => fn (): string => strtoupper(url('/')).'/mcp',
+    'with the default port spelled out' => fn (): string => preg_replace(
+        '#^(https?)://([^/]+)#',
+        '$1://$2:'.(str_starts_with(url('/'), 'https') ? 443 : 80),
+        url()->getMcpUrl(),
+    ),
+]);
+
+it('authorizes the resource production MCP clients send', function (): void {
+    config(['app.url' => 'https://relaticle.com', 'app.mcp_domain' => 'mcp.relaticle.com']);
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'resource' => 'https://mcp.relaticle.com']))
+        ->assertOk();
+});
+
+it('lists the email access the role allows on the consent screen', function (): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))
+        ->assertOk()
+        ->assertSee('Read the email you can see in this workspace')
+        ->assertSee('Save email drafts for you to review')
+        ->assertSee('Send email as you, after a hold you can cancel')
+        ->assertSee('data-abilities="read create update delete email:read email:draft email:send"', false);
+});
+
+it('lists no sending and no writing for a workspace where the user is a viewer', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $this->actingAs($this->user->refresh());
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))
+        ->assertOk()
+        ->assertSee('data-abilities="read email:read email:draft"', false);
+});
+
+/** @return list<string> */
+function shownConsentLines(string $content): array
+{
+    preg_match_all('/data-abilities-any="([^"]+)"(\s+hidden)?/', $content, $lines, PREG_SET_ORDER);
+
+    return array_values(array_map(
+        fn (array $line): string => $line[1],
+        array_filter($lines, fn (array $line): bool => ! isset($line[2])),
+    ));
+}
+
+it('lists every record line a viewer\'s MCP connector gets, though the request names one record scope', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+    $this->user->refresh()->switchWorkspace($this->otherWorkspace);
+
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use delete']))->assertOk()->getContent();
+
+    expect(shownConsentLines($content))->toBe(['read', 'email:read', 'email:draft']);
+});
+
+it('lists every line to an owner whose MCP connector names one record scope', function (): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use delete']))->assertOk()->getContent();
+
+    expect(shownConsentLines($content))->toBe(['read', 'create update', 'delete', 'email:read', 'email:draft', 'email:send']);
+});
+
+it('lists only the named record lines to an owner whose REST client names two record scopes', function (): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'read delete']))->assertOk()->getContent();
+
+    expect(shownConsentLines($content))->toBe(['read', 'delete']);
+});
+
+it('hides the permissions the role lacks in the preselected workspace', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+    $this->user->refresh()->switchWorkspace($this->otherWorkspace);
+
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))->assertOk()->getContent();
+
+    expect($content)
+        ->toMatch('/data-abilities-any="email:send"\s+hidden/')
+        ->toMatch('/data-abilities-any="delete"\s+hidden/')
+        ->not->toMatch('/data-abilities-any="email:read"\s+hidden/')
+        ->not->toMatch('/data-abilities-any="read"\s+hidden/');
+});
+
+it('lists no email access while the email feature is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))
+        ->assertOk()
+        ->assertDontSee('Read the email you can see in this workspace')
+        ->assertSee('data-abilities="read create update delete"', false);
+});
+
+it('lists no email access for a REST client', function (): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'read']))
+        ->assertOk()
+        ->assertSee('Read and search your records')
+        ->assertDontSee('Read the email you can see in this workspace');
+});
+
 it('renders the consent view with the user\'s workspaces', function (): void {
     $this->actingAs($this->user);
 
@@ -99,13 +233,12 @@ it('names the registered host when the client omits the redirect uri', function 
 it('spells out what the connector will be able to do, including deletion', function (): void {
     $this->actingAs($this->user);
 
-    $response = $this->get(authorizeUrl($this->client));
+    $response = $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
 
     $response->assertOk();
     $response->assertSee('Read and search your records');
     $response->assertSee('Create and update them');
-    $response->assertSee('Delete them');
-    $response->assertSee('Companies, people, opportunities, tasks and notes.');
+    $response->assertSee('Delete them. You can restore deleted records.');
 });
 
 it('lists only the permissions a REST client asks for', function (): void {
@@ -172,8 +305,40 @@ it('rejects the approve POST when the user does not belong to the workspace', fu
     $response->assertForbidden();
 });
 
+it('sends an account without a verified email to verify before it approves a connector', function (): void {
+    $this->user->forceFill(['email_verified_at' => null])->save();
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
+
+    $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->otherWorkspace->getKey(),
+    ])->assertRedirect();
+
+    expect(AuthCode::query()->where('user_id', $this->user->getKey())->exists())->toBeFalse();
+});
+
+it('refuses an account without a verified email in the approve controller itself', function (): void {
+    $this->user->forceFill(['email_verified_at' => null])->save();
+    $this->actingAs($this->user)->withoutMiddleware(EnsureEmailIsVerified::class);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
+
+    $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->otherWorkspace->getKey(),
+    ])->assertForbidden();
+
+    expect(AuthCode::query()->where('user_id', $this->user->getKey())->exists())->toBeFalse();
+});
+
 it('marks a billing-paused workspace as unselectable on the consent screen', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->actingAs($this->user);
 
@@ -184,7 +349,7 @@ it('marks a billing-paused workspace as unselectable on the consent screen', fun
 });
 
 it('refuses to approve a connector for a billing-paused workspace', function (): void {
-    Feature::define(Billing::class, true);
+    withHostedBilling();
 
     $this->actingAs($this->user);
 
@@ -207,7 +372,7 @@ it('refuses to approve a connector for a billing-paused workspace', function ():
 it('persists the chosen workspace_id onto the auth code', function (): void {
     $this->actingAs($this->user);
 
-    $this->get(authorizeUrl($this->client));
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']));
 
     $this->post('/oauth/authorize', [
         'state' => 'test-state',
@@ -354,7 +519,7 @@ it('fails closed with 403 instead of a type error when the resolved caller is no
  *
  * @return array{code: string, verifier: string}
  */
-function consentToWorkspace(User $user, Client $client, Workspace $workspace): array
+function consentToWorkspace(User $user, Client $client, Workspace $workspace, string $scope = 'mcp:use'): array
 {
     $verifier = Str::random(64);
     $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
@@ -362,7 +527,7 @@ function consentToWorkspace(User $user, Client $client, Workspace $workspace): a
     test()->actingAs($user);
 
     test()->get(authorizeUrl($client, [
-        'scope' => 'mcp:use',
+        'scope' => $scope,
         'state' => 'st',
         'code_challenge' => $challenge,
     ]))->assertOk();
@@ -413,9 +578,9 @@ function redeemAuthorizationCode(Client $client, array $consent): array
  *
  * @return array{access_token: string, refresh_token: string}
  */
-function completeOauthFlow(User $user, Client $client, Workspace $workspace): array
+function completeOauthFlow(User $user, Client $client, Workspace $workspace, string $scope = 'mcp:use'): array
 {
-    return redeemAuthorizationCode($client, consentToWorkspace($user, $client, $workspace));
+    return redeemAuthorizationCode($client, consentToWorkspace($user, $client, $workspace, $scope));
 }
 
 function whoAmI(string $accessToken): string
@@ -560,39 +725,6 @@ it('refuses an MCP call when a Passport token carries no workspace binding', fun
         ->assertForbidden();
 });
 
-it('keeps the consented workspace when the client re-authorizes and Passport skips consent', function (): void {
-    completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
-
-    // Passport short-circuits the consent screen (and so our workspace picker) when the
-    // user already holds an active token for the client, so the second grant never
-    // records a workspace of its own.
-    $verifier = Str::random(64);
-    $challenge = rtrim(strtr(base64_encode(hash('sha256', $verifier, true)), '+/', '-_'), '=');
-
-    $this->actingAs($this->user);
-
-    $location = $this->get(authorizeUrl($this->client, [
-        'scope' => 'mcp:use',
-        'state' => 'again',
-        'code_challenge' => $challenge,
-    ]))->assertRedirect()->headers->get('Location');
-
-    parse_str((string) parse_url((string) $location, PHP_URL_QUERY), $query);
-
-    $this->postJson('/oauth/token', [
-        'grant_type' => 'authorization_code',
-        'client_id' => $this->client->getKey(),
-        'redirect_uri' => 'https://example.com/callback',
-        'code_verifier' => $verifier,
-        'code' => $query['code'],
-    ])->assertOk();
-
-    $tokens = DB::table('oauth_access_tokens')->where('user_id', $this->user->getKey())->get();
-
-    expect($tokens)->toHaveCount(2);
-    expect($tokens->pluck('workspace_id')->unique()->all())->toBe([$this->otherWorkspace->getKey()]);
-});
-
 it('keeps a refreshed connector on its own workspace after the client is consented to another workspace', function (): void {
     $personalTokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
 
@@ -653,34 +785,422 @@ it('binds each code exchange to the workspace its own consent picked', function 
         ->and(whoAmI($otherTokens['access_token']))->toContain($this->otherWorkspace->getKey());
 });
 
-it('leaves no workspace from a rejected approval for a later authorization', function (): void {
+it('binds a re-authorization to the workspace picked on its own consent screen', function (): void {
     completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
 
-    $otherClient = Client::query()->forceCreate([
-        'id' => (string) Str::uuid(),
-        'name' => 'Other MCP Client',
-        'redirect_uris' => ['https://example.com/callback'],
-        'grant_types' => ['authorization_code', 'refresh_token'],
-        'revoked' => false,
-        'owner_type' => $this->user->getMorphClass(),
-        'owner_id' => $this->user->getKey(),
-    ]);
+    $tokens = completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
 
+    expect(whoAmI($tokens['access_token']))
+        ->toContain($this->otherWorkspace->getKey())
+        ->not->toContain($this->personalWorkspace->getKey());
+});
+
+it('mints no auth code when the approval carries the wrong auth token', function (): void {
     $this->actingAs($this->user);
-    $this->get(authorizeUrl($otherClient, ['scope' => 'mcp:use']))->assertOk();
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))->assertOk();
+
     $this->post('/oauth/authorize', [
         'state' => 'test-state',
-        'client_id' => $otherClient->getKey(),
+        'client_id' => $this->client->getKey(),
         'auth_token' => 'not-the-session-token',
         'workspace_id' => $this->otherWorkspace->getKey(),
-    ]);
+    ])->assertForbidden();
 
-    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))->assertRedirect();
+    expect(DB::table('oauth_auth_codes')->count())->toBe(0);
+});
 
-    $skippedConsentCode = DB::table('oauth_auth_codes')
-        ->where('client_id', $this->client->getKey())
-        ->latest('expires_at')
-        ->first();
+/**
+ * @return list<string>
+ */
+function liveTokenScopes(): array
+{
+    return Passport::token()->newQuery()->where('revoked', false)->sole()->scopes;
+}
 
-    expect($skippedConsentCode->workspace_id)->toBe($this->personalWorkspace->getKey());
+/**
+ * @return array{access_token: string, refresh_token: string}
+ */
+function refreshAccessToken(Client $client, string $refreshToken): array
+{
+    $response = test()->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $client->getKey(),
+        'refresh_token' => $refreshToken,
+    ])->assertOk();
+
+    return [
+        'access_token' => (string) $response->json('access_token'),
+        'refresh_token' => (string) $response->json('refresh_token'),
+    ];
+}
+
+it('adds the email scopes the role allows to the access token', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['mcp:use', 'email:read', 'email:draft', 'email:send']);
+});
+
+it('takes the role from the workspace the user picked, not their current one', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace);
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['mcp:use', 'email:read', 'email:draft']);
+});
+
+it('adds no email scope the role lacks when the client asks for it', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace, 'mcp:use email:send');
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['mcp:use', 'email:read', 'email:draft']);
+});
+
+it('keeps the email scopes when the client refreshes its access token', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    refreshAccessToken($this->client, $tokens['refresh_token']);
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['mcp:use', 'email:read', 'email:draft', 'email:send']);
+});
+
+it('issues only the mcp scope while the email feature is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace, 'mcp:use email:read');
+
+    expect(liveTokenScopes())->toBe(['mcp:use']);
+});
+
+it('gives a REST client no email scope', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace, 'read create');
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['read', 'create']);
+});
+
+it('gives a REST client no email scope when it asks for one', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace, 'read email:send');
+
+    expect(liveTokenScopes())->toBe(['read']);
+});
+
+it('drops a record scope the role lacks when an MCP client asks for it', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace, 'mcp:use delete');
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['mcp:use', 'email:read', 'email:draft']);
+});
+
+it('drops a record scope the role lacks when a REST client asks for it', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace, 'read delete');
+
+    expect(liveTokenScopes())->toBe(['read']);
+});
+
+it('grants a workspace owner every record scope a REST client asks for', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace, 'read delete');
+
+    expect(liveTokenScopes())->toEqualCanonicalizing(['read', 'delete']);
+});
+
+it('names the granted scope in the token response', function (): void {
+    $consent = consentToWorkspace($this->user, $this->client, $this->personalWorkspace);
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'authorization_code',
+        'client_id' => $this->client->getKey(),
+        'redirect_uri' => 'https://example.com/callback',
+        'code_verifier' => $consent['verifier'],
+        'code' => $consent['code'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('scope', 'mcp:use email:read email:draft email:send');
+});
+
+it('names the trimmed scope, not the requested one, in the token response', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $consent = consentToWorkspace($this->user->refresh(), $this->client, $this->otherWorkspace, 'read delete');
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'authorization_code',
+        'client_id' => $this->client->getKey(),
+        'redirect_uri' => 'https://example.com/callback',
+        'code_verifier' => $consent['verifier'],
+        'code' => $consent['code'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('scope', 'read');
+});
+
+it('names the granted scope when the client refreshes its access token', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $this->postJson('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $this->client->getKey(),
+        'refresh_token' => $tokens['refresh_token'],
+    ])
+        ->assertOk()
+        ->assertJsonPath('scope', 'mcp:use email:read email:draft email:send');
+});
+
+it('redirects the client with access_denied and mints nothing when the role grants nothing it asked for', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $this->actingAs($this->user->refresh());
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'delete']))->assertOk();
+
+    $location = (string) $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->otherWorkspace->getKey(),
+    ])->assertRedirect()->headers->get('Location');
+
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+
+    expect($location)->toStartWith('https://example.com/callback')
+        ->and($query['error'])->toBe('access_denied')
+        ->and($query['state'])->toBe('test-state')
+        ->and(DB::table('oauth_auth_codes')->count())->toBe(0)
+        ->and(DB::table('oauth_access_tokens')->count())->toBe(0);
+});
+
+it('swaps the list for one sentence and disables Authorize when the role grants nothing the client asked for', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+    $this->user->refresh()->switchWorkspace($this->otherWorkspace);
+
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'delete']))->assertOk()->getContent();
+
+    expect($content)
+        ->toContain('Your role in this workspace allows nothing Test MCP Client asked for.')
+        ->toMatch('/id="permissionList"\s+hidden/')
+        ->not->toMatch('/id="consentNone"\s+hidden/')
+        ->toMatch('/<button type="submit"\s+disabled\s+class=/');
+});
+
+it('shows the sentence and refuses the approval when the request names nothing an owner could grant', function (string $scope): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => $scope]))->assertOk()->getContent();
+
+    expect($content)
+        ->toContain('Your role in this workspace allows nothing Test MCP Client asked for.')
+        ->toMatch('/id="permissionList"\s+hidden/')
+        ->not->toMatch('/id="consentNone"\s+hidden/')
+        ->not->toMatch('/data-abilities-any="/')
+        ->toMatch('/<button type="submit"\s+disabled\s+class=/');
+
+    $location = (string) $this->post('/oauth/authorize', [
+        'state' => 'test-state',
+        'client_id' => $this->client->getKey(),
+        'auth_token' => session('authToken'),
+        'workspace_id' => $this->personalWorkspace->getKey(),
+    ])->assertRedirect()->headers->get('Location');
+
+    parse_str((string) parse_url($location, PHP_URL_QUERY), $query);
+
+    expect($query['error'])->toBe('access_denied')
+        ->and(DB::table('oauth_auth_codes')->count())->toBe(0);
+})->with([
+    'an email scope without mcp:use' => 'email:read',
+    'no scope at all' => '',
+]);
+
+it('keeps the list and an enabled Authorize when the role grants what the client asked for', function (): void {
+    $this->actingAs($this->user);
+
+    $content = (string) $this->get(authorizeUrl($this->client, ['scope' => 'delete']))->assertOk()->getContent();
+
+    expect($content)
+        ->not->toMatch('/id="permissionList"\s+hidden/')
+        ->toMatch('/id="consentNone"\s+hidden/')
+        ->not->toMatch('/<button type="submit"\s+disabled/')
+        ->and(shownConsentLines($content))->toBe(['delete']);
+});
+
+function reportedAbilities(string $accessToken): array
+{
+    return json_decode(whoAmI($accessToken), true)['result']['structuredContent']['token_abilities'];
+}
+
+it('reports the record abilities and the email abilities of the role to the connector', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    expect(reportedAbilities($tokens['access_token']))->toBe(['read', 'create', 'update', 'delete', 'email:read', 'email:draft', 'email:send']);
+});
+
+it('reports a viewer\'s connector the read and email abilities its role grants', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $tokens = completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace);
+
+    expect(reportedAbilities($tokens['access_token']))->toBe(['read', 'email:read', 'email:draft']);
+});
+
+it('stops reporting write and send abilities to a connector once its user is demoted to viewer', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->otherWorkspace);
+
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    expect(reportedAbilities($tokens['access_token']))->toBe(['read', 'email:read', 'email:draft']);
+});
+
+it('reports only the record abilities to a connector while the email feature is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    expect(reportedAbilities($tokens['access_token']))->toBe(['read', 'create', 'update', 'delete']);
+});
+
+it('shows consent again on a re-authorization, so the token always holds what the screen listed', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('asks the user to sign in again when a client sends prompt=login', function (): void {
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'prompt' => 'login']))
+        ->assertRedirect(route('login'));
+
+    $this->assertGuest();
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'prompt' => 'login']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('shows consent on a re-authorization that sends prompt=none', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use', 'prompt' => 'none']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('shows consent when a client names an email scope while the email feature is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use email:send']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('shows consent again on a re-authorization while the email feature is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'mcp:use']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('shows consent again for a REST client that already holds its scopes', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace, 'read');
+
+    $this->actingAs($this->user);
+
+    $this->get(authorizeUrl($this->client, ['scope' => 'read']))
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('trims the record scope a demoted member lost when the REST client re-authorizes', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->otherWorkspace, 'read delete');
+
+    $firstTokenId = Passport::token()->newQuery()->sole()->getKey();
+
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace, 'read delete');
+
+    $newestToken = Passport::token()->newQuery()->whereKeyNot($firstTokenId)->sole();
+
+    expect($newestToken->scopes)->toBe(['read']);
+});
+
+it('refuses an oauth token that lacks the mcp scope, whatever else it holds', function (): void {
+    Passport::actingAs($this->user, ['email:read']);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(WhoAmiTool::class)
+        ->assertHasErrors(['Invalid ability provided.']);
+});
+
+it('reads the requested scope from the query string, as the authorization server does', function (): void {
+    completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    $this->actingAs($this->user);
+
+    $this->json('GET', authorizeUrl($this->client, ['scope' => 'mcp:use']), ['scope' => 'read'])
+        ->assertOk()
+        ->assertSee('name="workspace_id"', false);
+});
+
+it('leaves a malformed scope parameter to the authorization server', function (): void {
+    $this->actingAs($this->user);
+
+    $response = $this->get(authorizeUrl($this->client, ['scope' => null]).'&scope[]=email:read');
+
+    expect($response->getStatusCode())->toBeLessThan(500);
+});
+
+function listedTools(string $accessToken): array
+{
+    auth()->forgetGuards();
+
+    return test()->withHeaders(['Authorization' => 'Bearer '.$accessToken])
+        ->postJson('/mcp', ['jsonrpc' => '2.0', 'id' => 1, 'method' => 'tools/list'])
+        ->assertOk()
+        ->json('result.tools.*.name');
+}
+
+it('gives the email tools to a connector whose role allows email', function (): void {
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    expect(listedTools($tokens['access_token']))->toContain('list-emails-tool', 'get-email-tool', 'send-email-tool');
+});
+
+it('keeps the send tool away from a connector whose role cannot send', function (): void {
+    $this->otherWorkspace->users()->updateExistingPivot($this->user->getKey(), ['role' => 'viewer']);
+
+    $tokens = completeOauthFlow($this->user->refresh(), $this->client, $this->otherWorkspace);
+
+    expect(listedTools($tokens['access_token']))->toContain('list-emails-tool')
+        ->not->toContain('send-email-tool');
+});
+
+it('keeps the email tools away from a connector while the email feature is off', function (): void {
+    Feature::define(EmailIntegration::class, false);
+
+    $tokens = completeOauthFlow($this->user, $this->client, $this->personalWorkspace);
+
+    expect(listedTools($tokens['access_token']))->not->toContain('list-emails-tool')
+        ->not->toContain('get-email-tool');
 });

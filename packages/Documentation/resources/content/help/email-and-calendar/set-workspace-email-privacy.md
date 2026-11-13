@@ -1,27 +1,18 @@
 ---
 title: Set workspace email privacy
-description: Owners and admins set the default sharing level, hide email from protected or blocked addresses, and decide which records sync creates.
+description: Owners and admins hide email from protected or blocked addresses and decide which records sync creates.
 order: 6
-updated: "2026-10-05"
+updated: "2026-11-08"
 related: [help/email-and-calendar/choose-who-sees-your-email, help/workspace/manage-members-and-roles, help/email-and-calendar/connect-your-google-account]
 ---
 
-Owners and admins set the email rules for the whole workspace: the default
-sharing level, the addresses whose email stays hidden, and the records that
-syncing creates. Open **Workspace Settings**, then **Email and Calendar**.
-The three tabs below appear only for those two roles.
-
-## Set the default sharing level
-
-1. Open the **Sharing** tab.
-2. Under **Workspace default sharing tier**, pick a level.
-3. Click **Save**.
-
-The default applies to every member who follows it. Saving also updates the
-email they have already synced, except email a member changed individually.
-A member can override the default for their own mailboxes. The levels are
-explained in
-[Choose who sees your email](/help/email-and-calendar/choose-who-sees-your-email).
+Owners and admins set the email rules for the whole workspace: the addresses
+whose email stays hidden, and the records that syncing creates. Open
+**Workspace Settings**, then **Email and Calendar**. The two tabs below appear
+only for those two roles. How much of each mailbox the workspace sees is set
+on the mailbox itself, as
+[Choose who sees your email](/help/email-and-calendar/choose-who-sees-your-email)
+explains.
 
 ## Hide email that involves certain addresses
 

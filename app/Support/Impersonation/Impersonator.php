@@ -12,14 +12,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Gate;
 
 final readonly class Impersonator
 {
+    public const string LOG_NAME = 'impersonation';
+
+    private const int MAX_SECONDS = 1800;
+
     private const string ADMINISTRATOR_ID = 'impersonation.administrator_id';
 
     private const string TARGET_ID = 'impersonation.target_id';
 
     private const string PREVIOUS_USER_ID = 'impersonation.previous_user_id';
+
+    private const string STARTED_AT = 'impersonation.started_at';
 
     // AuthenticateSession only writes the hash when absent, so a stale one logs the
     // assumed user straight back out.
@@ -35,6 +42,7 @@ final readonly class Impersonator
         $session->put(self::ADMINISTRATOR_ID, $administratorId);
         $session->put(self::TARGET_ID, $target->getKey());
         $session->put(self::PREVIOUS_USER_ID, $previousUserId);
+        $session->put(self::STARTED_AT, now()->getTimestamp());
     }
 
     public function stop(Request $request): void
@@ -52,7 +60,7 @@ final readonly class Impersonator
         $session = $request->session();
         $previousUser = User::query()->find($session->get(self::PREVIOUS_USER_ID));
 
-        $session->forget([self::ADMINISTRATOR_ID, self::TARGET_ID, self::PREVIOUS_USER_ID]);
+        $session->forget([self::ADMINISTRATOR_ID, self::TARGET_ID, self::PREVIOUS_USER_ID, self::STARTED_AT]);
 
         if ($previousUser instanceof User) {
             $this->assume($session, $previousUser);
@@ -75,6 +83,21 @@ final readonly class Impersonator
         $targetId = $request->session()->get(self::TARGET_ID);
 
         return $targetId !== null && Auth::guard('web')->id() === $targetId;
+    }
+
+    public function lapsed(Request $request, (Model&Authenticatable)|null $administrator): bool
+    {
+        if (! $this->active($request)) {
+            return false;
+        }
+
+        $startedAt = $request->session()->get(self::STARTED_AT);
+
+        if (! is_int($startedAt) || now()->getTimestamp() - $startedAt >= self::MAX_SECONDS) {
+            return true;
+        }
+
+        return $administrator === null || Gate::forUser($administrator)->denies('impersonate');
     }
 
     public function administratorId(Request $request): ?string
@@ -121,17 +144,19 @@ final readonly class Impersonator
     /**
      * Swapping from one customer to another stops the first, so the record has to
      * be written where the state is known rather than in the stop route.
+     *
+     * @param  array<string, mixed>  $properties
      */
-    public function record(string $event, (Model&Authenticatable)|null $administrator, ?Authenticatable $target): void
+    public function record(string $event, (Model&Authenticatable)|null $administrator, ?Authenticatable $target, array $properties = []): void
     {
         if (! $target instanceof User) {
             return;
         }
 
-        activity((string) config('activitylog.default_log_name'))
+        activity(self::LOG_NAME)
             ->causedBy($administrator)
             ->performedOn($target)
-            ->withProperties(['email' => $target->email])
+            ->withProperties(['email' => $target->email, ...$properties])
             ->event($event)
             ->log($event);
     }

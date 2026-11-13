@@ -10,7 +10,6 @@ return [
         'connect_gmail' => 'Connect Google account',
         'connect_azure' => 'Connect Microsoft account',
         'manage' => 'Manage',
-        'edit_settings' => 'Edit settings',
         'reconnect' => 'Reconnect',
         'set_default' => 'Set as default',
         'retry_sync' => 'Retry sync',
@@ -61,6 +60,14 @@ return [
             'title' => 'Account connected.',
             'body' => 'Emails and meetings will appear as the import runs.',
         ],
+        'cancelled' => [
+            'title' => 'Nothing was connected. You can connect a mailbox any time.',
+        ],
+        'limit_reached' => [
+            'title' => '{1}Mailbox limit reached. This workspace can connect 1 mailbox. Upgrade to connect more.|[2,*]Mailbox limit reached. This workspace can connect :count mailboxes. Upgrade to connect more.',
+            'trial' => 'Free trial account limit reached. Upgrade now to sync more accounts.',
+            'upgrade' => 'Upgrade',
+        ],
         'calendar_sync_queued' => [
             'title' => 'Calendar sync started.',
             'body' => 'Your meetings will update on this page as the sync finishes.',
@@ -91,17 +98,14 @@ return [
         ],
     ],
     'default_badge' => 'Default',
-    'sections' => [
-        'connected' => [
-            'heading' => 'Connected accounts',
-            'description' => 'Read how we handle your data in our <a href=":url" target="_blank" class="underline">Privacy Policy</a>.',
-        ],
-    ],
     'synced_at' => 'Synced :time',
     'in_sync' => 'In sync',
     'sync_error' => [
         'badge' => 'Sync issue',
         'heading' => 'Some items could not be synced',
+        'reasons' => [
+            'google_mail_disabled' => "Gmail isn't enabled for this Google Workspace account. Ask your Google admin to turn it on, then reconnect.",
+        ],
     ],
     'importing' => 'Syncing',
     'importing_percent' => ':percent%',

@@ -6,6 +6,7 @@ namespace App\Support\Media;
 
 use App\Exceptions\UploadException;
 use Closure;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use RuntimeException;
 
@@ -32,7 +33,7 @@ final readonly class LocalCopy
             return $callback($path);
         } finally {
             fclose($stream);
-            @unlink($path);
+            File::delete($path);
         }
     }
 }

@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Support\Facades\Route;
 use Relaticle\EmailIntegration\Controllers\CalendarPushWebhookController;
 use Relaticle\EmailIntegration\Controllers\CallbackController as EmailCallbackController;
@@ -27,7 +26,7 @@ Route::middleware(['web', 'auth', 'verified'])->group(function (): void {
         ->middleware('throttle:10,1');
 });
 
-Route::middleware(['web', 'auth', 'verified', 'no-referrer', AuthenticateSession::class])->group(function (): void {
+Route::middleware(['web', 'auth', 'verified', 'no-referrer'])->group(function (): void {
     Route::get('/email-compose-images', ComposerInlineImageController::class)
         ->name('email-compose-images.show');
 

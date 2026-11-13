@@ -4,12 +4,7 @@
 @endphp
 
 <div class="flex items-center gap-3 py-1.5">
-    @include('email-integration::filament.infolists.partials.meeting-attendee-avatar', [
-        'src' => $state['avatar'],
-        'alt' => $state['name'],
-        'hasName' => $state['has_name'],
-        'size' => 'md',
-    ])
+    <x-email-integration::person-avatar :src="$state['avatar']" :alt="$state['name']" />
 
     <div class="min-w-0 flex-1">
         <div class="flex min-w-0 items-center gap-2">

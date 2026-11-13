@@ -971,6 +971,64 @@ it('does not match hidden subject text when the viewer only has a disconnected s
         ->assertSee(__('filament/pages/email-inbox.list_empty.no_results', ['search' => 'this is mass']));
 });
 
+it('does not match hidden subject text when the viewer holds a copy with the same message id', function (): void {
+    $owner = User::factory()->withWorkspace()->create();
+    $team = $owner->currentWorkspace;
+    $viewer = User::factory()->create(['current_workspace_id' => $team->id]);
+    $team->users()->attach($viewer, ['role' => 'member']);
+
+    $ownerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $team->id,
+        'user_id' => $owner->id,
+    ]));
+
+    $viewerAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $team->id,
+        'user_id' => $viewer->id,
+    ]));
+
+    $person = People::factory()->create([
+        'workspace_id' => $team->id,
+        'creator_id' => $owner->id,
+    ]);
+
+    $rfcMessageId = '<planted-copy@example.com>';
+
+    $email = Email::factory()->inbound()->create([
+        'workspace_id' => $team->id,
+        'user_id' => $owner->id,
+        'connected_account_id' => $ownerAccount->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => $rfcMessageId,
+        'subject' => 'Acquisition final offer',
+        'snippet' => 'Walk-away price',
+        'is_internal' => false,
+    ]);
+
+    Email::factory()->inbound()->create([
+        'workspace_id' => $team->id,
+        'user_id' => $viewer->id,
+        'connected_account_id' => $viewerAccount->getKey(),
+        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        'rfc_message_id' => $rfcMessageId,
+        'subject' => 'Unrelated note',
+        'is_internal' => false,
+    ]);
+
+    $person->emails()->attach($email->getKey());
+
+    $this->actingAs($viewer);
+    Filament::setTenant($team);
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->assertSeeHtml("email-list-row-{$email->getKey()}")
+        ->set('search', 'acquisition')
+        ->assertDontSeeHtml("email-list-row-{$email->getKey()}");
+});
+
 it('shows a request access pill on record mailbox rows without body access', function (): void {
     $owner = User::factory()->withWorkspace()->create();
     $team = $owner->currentWorkspace;

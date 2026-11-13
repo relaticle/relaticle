@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Restarts PostgreSQL and Redis after the orb wakes or boots from a snapshot.
+# The app, Horizon and Reverb are supervised services in .amp/services.yaml.
+
+set -euo pipefail
+
+pg_isready -q -h 127.0.0.1 || sudo pg_ctlcluster 17 main start
+redis-cli ping >/dev/null 2>&1 || sudo redis-server --daemonize yes --save '' --appendonly no
+
+for _ in $(seq 1 25); do
+    pg_isready -q -h 127.0.0.1 && exit 0
+    sleep 0.2
+done
+
+echo "PostgreSQL did not become ready" >&2
+exit 1

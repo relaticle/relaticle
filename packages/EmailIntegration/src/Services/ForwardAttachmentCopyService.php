@@ -15,7 +15,6 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
-use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Throwable;
 
@@ -282,11 +281,14 @@ final readonly class ForwardAttachmentCopyService
             return null;
         }
 
-        $source = Email::query()
-            ->with('connectedAccount')
-            ->where('workspace_id', $user->current_workspace_id)
-            ->where('rfc_message_id', $email->in_reply_to)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
+        $source = resolve(PreferredEmailCopyService::class)
+            ->restrictToVisiblePreferredCopies(
+                Email::query()
+                    ->with('connectedAccount')
+                    ->where('workspace_id', $user->current_workspace_id)
+                    ->where('rfc_message_id', $email->in_reply_to),
+                $user,
+            )
             ->first();
 
         return $source instanceof Email && $user->can('viewBody', $source) ? $source : null;

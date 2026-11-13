@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\SystemAdmin\Filament\Resources\ImportResource\RelationManagers;
 
 use Filament\Resources\RelationManagers\RelationManager;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +13,7 @@ final class FailedRowsRelationManager extends RelationManager
 {
     protected static string $relationship = 'failedRows';
 
-    protected static string|\BackedEnum|null $icon = Heroicon::OutlinedExclamationTriangle;
+    protected static string|\BackedEnum|null $icon = 'lucide-triangle-exclamation-point';
 
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {

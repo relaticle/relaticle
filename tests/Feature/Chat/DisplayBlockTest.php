@@ -574,7 +574,7 @@ it('names record custom fields in a list table with one lookup per page, not per
     $block = displayBlockOf(app(ListTasksTool::class)->handle(new Request(['per_page' => 25])));
 
     $companyLookups = collect(DB::getQueryLog())->filter(
-        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], '"workspace_id"'),
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'where "workspace_id"'),
     );
 
     expect(collect($block['rows'])->pluck('cells.linked_company')->filter()->sort()->values()->all())

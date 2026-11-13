@@ -1,5 +1,5 @@
 {
-    "name": "laravel/laravel",
+    "name": "relaticle/relaticle",
     "type": "project",
     "description": "The Next-Generation Open-Source CRM Platform",
     "keywords": [
@@ -11,13 +11,12 @@
         "sales-pipeline",
         "workspace-collaboration"
     ],
-    "license": "AGPL-3.0",
+    "license": "AGPL-3.0-only",
     "require": {
         "php": "^8.5",
         "ext-intl": "*",
         "andreiio/blade-remix-icon": "^3.9",
         "ashallendesign/favicon-fetcher": "^3.8",
-        "asmit/resized-column": "^4.0",
         "blade-ui-kit/blade-heroicons": "^2.6",
         "blade-ui-kit/blade-icons": "^1.8",
         "doctrine/dbal": "^4.4",
@@ -40,14 +39,16 @@
         "laravel/socialite": "^5.16",
         "laravel/tinker": "^3.0",
         "league/flysystem-aws-s3-v3": "^3.0",
+        "league/html-to-markdown": "^5.2",
         "livewire/livewire": "^4.0",
+        "mallardduck/blade-lucide-icons": "^2.0",
         "manukminasyan/blade-mdi": "^1.0",
         "propaganistas/laravel-disposable-email": "^2.5",
         "ralphjsmit/laravel-filament-seo": "^2.2",
         "ralphjsmit/laravel-seo": "^1.8",
         "relaticle/activity-log": "^1.2",
-        "relaticle/custom-fields": "^3.13.1",
-        "relaticle/flowforge": "^4.0",
+        "relaticle/custom-fields": "^3.18.4",
+        "relaticle/flowforge": "^4.3.4",
         "relaticle/ink": "^2.3",
         "scalar/laravel": "^0.4.0",
         "sentry/sentry-laravel": "^4.13",
@@ -59,7 +60,6 @@
         "spatie/laravel-data": "^4.15",
         "spatie/laravel-health": "^1.37",
         "spatie/laravel-honeypot": "^4.7",
-        "spatie/laravel-login-link": "^1.3",
         "spatie/laravel-mailcoach-mailer": "^1.5",
         "spatie/laravel-mailcoach-sdk": "^1.4",
         "spatie/laravel-markdown": "^2.7",
@@ -83,8 +83,6 @@
         "driftingly/rector-laravel": "^2.0",
         "fakerphp/faker": "^1.23",
         "larastan/larastan": "^3.0",
-        "laravel-lang/lang": "^15.29",
-        "laravel-lang/publisher": "^16.8",
         "laravel/boost": "^2.0",
         "laravel/pail": "^1.2.2",
         "laravel/pao": "^1.0",
@@ -92,13 +90,15 @@
         "laravel/sail": "^1.26",
         "mockery/mockery": "^1.6",
         "nunomaduro/collision": "^8.0",
-        "pestphp/pest": "^5.0",
+        "pestphp/pest": "dev-tia-warmup-worktrees-5x as 5.3.5",
         "pestphp/pest-plugin-browser": "^5.0",
+        "pestphp/pest-plugin-evals": "^5.1",
         "pestphp/pest-plugin-laravel": "^5.0",
         "pestphp/pest-plugin-rector": "^5.0",
         "pestphp/pest-plugin-type-coverage": "^5.0",
         "rector/rector": "^2.0",
-        "spatie/guidelines-skills": "dev-main"
+        "spatie/guidelines-skills": "dev-main",
+        "spatie/laravel-login-link": "^1.3"
     },
     "autoload": {
         "psr-4": {
@@ -109,6 +109,7 @@
             "Relaticle\\OnboardSeed\\": "packages/OnboardSeed/src",
             "Relaticle\\ImportWizard\\": "packages/ImportWizard/src",
             "Relaticle\\EmailIntegration\\": "packages/EmailIntegration/src",
+            "Relaticle\\Cloud\\": "packages/Cloud/src",
             "Database\\Factories\\": "database/factories/",
             "Database\\Seeders\\": "database/seeders/"
         }
@@ -160,6 +161,10 @@
         ],
         "test:types": "phpstan analyse",
         "test:arch": "pest tests/Arch/ --no-tia",
+        "test:evals": [
+            "Composer\\Config::disableProcessTimeout",
+            "pest tests/Evals --evals --no-tia"
+        ],
         "test:type-coverage": [
             "Composer\\Config::disableProcessTimeout",
             "pest --type-coverage --min=100 --no-tia"
@@ -180,6 +185,10 @@
         "test:pest:ci": [
             "Composer\\Config::disableProcessTimeout",
             "pest --compact --parallel --configuration phpunit.ci.xml --shard=${SHARD} --ci --no-tia"
+        ],
+        "test:affected": [
+            "Composer\\Config::disableProcessTimeout",
+            "bash bin/test-affected.sh"
         ],
         "test:update-shards": [
             "Composer\\Config::disableProcessTimeout",
@@ -219,5 +228,12 @@
         }
     },
     "minimum-stability": "beta",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "repositories": [
+        {
+            "name": "pest",
+            "type": "vcs",
+            "url": "https://github.com/ManukMinasyan/pest"
+        }
+    ]
 }

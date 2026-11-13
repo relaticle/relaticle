@@ -6,6 +6,7 @@ namespace Relaticle\ImportWizard\Support;
 
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
 use Illuminate\Database\Eloquent\Builder;
@@ -144,6 +145,7 @@ final class EntityLinkResolver
         $modelClass = $link->targetModelClass;
 
         return $modelClass::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
             ->where('workspace_id', $this->workspaceId)
             ->whereIn($field, $uniqueValues)
             ->pluck('id', $field)
@@ -206,6 +208,7 @@ final class EntityLinkResolver
         $modelClass = $link->targetModelClass;
 
         return $modelClass::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
             ->select((new $modelClass)->getQualifiedKeyName())
             ->where('workspace_id', $this->workspaceId);
     }
@@ -293,6 +296,42 @@ final class EntityLinkResolver
         }
 
         return $spellingsByOriginal;
+    }
+
+    /**
+     * @param  list<string>  $values
+     * @return array<string, list<string>>
+     */
+    public function recordIdsByValue(CustomField $customField, array $values): array
+    {
+        $valueColumn = $customField->getValueColumn();
+        $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
+        $model = new CustomFieldValue;
+        $recordIdsByValue = [];
+
+        foreach (array_chunk(array_map(mb_strtolower(...), $values), 5000) as $chunk) {
+            $placeholders = implode(',', array_fill(0, count($chunk), '?'));
+
+            $sql = $valueColumn === 'json_value'
+                ? $this->jsonValueMatchSql($model->getTable(), $tenantKey, $placeholders)
+                : "SELECT cfv.entity_id, LOWER(cfv.{$valueColumn}::text) AS matched_value
+                   FROM {$model->getTable()} cfv
+                   WHERE cfv.{$tenantKey} = ?
+                     AND cfv.custom_field_id = ?
+                     AND cfv.entity_type = ?
+                     AND LOWER(cfv.{$valueColumn}::text) IN ({$placeholders})";
+
+            $rows = $model->getConnection()->select(
+                $sql,
+                [$this->workspaceId, $customField->getKey(), $customField->entity_type, ...$chunk],
+            );
+
+            foreach ($rows as $row) {
+                $recordIdsByValue[mb_strtolower((string) $row->matched_value)][] = (string) $row->entity_id;
+            }
+        }
+
+        return $recordIdsByValue;
     }
 
     /** @param  array<mixed>  $values */

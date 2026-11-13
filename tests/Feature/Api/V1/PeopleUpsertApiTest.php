@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureTokenHasAbility;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\CustomFields\EntitiesByFieldValueQuery;
@@ -419,7 +420,7 @@ it('creates a new person when only a deleted person holds the email', function (
         'name' => 'Grace Hopper',
     ])->assertCreated();
 
-    People::query()->findOrFail($deleted->json('data.id'))->delete();
+    People::query()->withoutGlobalScope(WorkspaceScope::class)->findOrFail($deleted->json('data.id'))->delete();
 
     $response = $this->postJson('/api/v1/people/upsert', [
         'match' => ['field' => 'emails', 'value' => 'grace@navy.mil'],

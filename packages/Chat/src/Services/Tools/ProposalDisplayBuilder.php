@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services\Tools;
 
 use App\Models\User;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Support\WorkspaceMembersContext;
 
 /**
@@ -16,21 +17,6 @@ use Relaticle\Chat\Support\WorkspaceMembersContext;
  */
 final readonly class ProposalDisplayBuilder
 {
-    /**
-     * Per-entity title/summary literals. Must match each Create*Tool::buildRecordDisplay()
-     * exactly so the card heading is stable across an edit.
-     *
-     * @var array<string, array{title: string, nameKey: string, label: string, summaryPrefix: string}>
-     */
-    private const array ENTITY_MAP = [
-        'company' => ['title' => 'Create Company', 'nameKey' => 'name', 'label' => 'Name', 'summaryPrefix' => 'Create company'],
-        'people' => ['title' => 'Create Person', 'nameKey' => 'name', 'label' => 'Name', 'summaryPrefix' => 'Create person'],
-        'opportunity' => ['title' => 'Create Opportunity', 'nameKey' => 'name', 'label' => 'Name', 'summaryPrefix' => 'Create opportunity'],
-        'task' => ['title' => 'Create Task', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create task'],
-        'note' => ['title' => 'Create Note', 'nameKey' => 'title', 'label' => 'Title', 'summaryPrefix' => 'Create note'],
-        'workspace_invitations' => ['title' => 'Invite Teammate', 'nameKey' => 'email', 'label' => 'Email', 'summaryPrefix' => 'Invite'],
-    ];
-
     public function __construct(
         private CustomFieldsDisplayFormatter $formatter,
     ) {}
@@ -40,25 +26,16 @@ final readonly class ProposalDisplayBuilder
      * @param  list<array<string, mixed>>  $existingFields  current display fields, to carry forward read-only core rows
      * @return array{title: string, summary: string, fields: list<array<string, mixed>>}
      */
-    public function build(User $user, string $entityType, array $record, array $existingFields): array
+    public function build(User $user, ProposalEntity $entity, array $record, array $existingFields): array
     {
-        $meta = self::ENTITY_MAP[$entityType] ?? [
-            'title' => 'Create '.ucfirst($entityType),
-            'nameKey' => 'name',
-            'label' => 'Name',
-            'summaryPrefix' => 'Create '.lcfirst($entityType),
-        ];
+        $nameValue = (string) ($record[$entity->titleKey()] ?? '');
 
-        $nameValue = (string) ($record[$meta['nameKey']] ?? '');
-        $title = $meta['title'];
-        $summary = "{$meta['summaryPrefix']} \"{$nameValue}\"";
-
-        $coreRows = $this->buildCoreRows($meta, $nameValue, $entityType, $record);
+        $coreRows = $this->buildCoreRows($entity, $nameValue, $record);
         $ownedLabels = array_map(fn (array $row): string => $row['label'], $coreRows);
 
         $customFields = is_array($record['custom_fields'] ?? null) ? $record['custom_fields'] : [];
         /** @var array<string, mixed> $customFields */
-        $customRows = $this->formatter->format($user, $entityType, $customFields, null);
+        $customRows = $this->formatter->format($user, $entity->value, $customFields, null);
         $customLabels = array_map(fn (array $row): string => (string) $row['label'], $customRows);
 
         // The builder owns core rows AND re-derives every custom-field row fresh, so a
@@ -68,24 +45,23 @@ final readonly class ProposalDisplayBuilder
         $carried = $this->carryForwardRows($existingFields, array_merge($ownedLabels, $customLabels));
 
         return [
-            'title' => $title,
-            'summary' => $summary,
+            'title' => $entity->createTitle(),
+            'summary' => $entity->createSummary($nameValue),
             'fields' => array_merge($coreRows, $carried, $customRows),
         ];
     }
 
     /**
-     * @param  array{title: string, nameKey: string, label: string, summaryPrefix: string}  $meta
      * @param  array<string, mixed>  $record
      * @return list<array{label: string, code: string, value: string}>
      */
-    private function buildCoreRows(array $meta, string $nameValue, string $entityType, array $record): array
+    private function buildCoreRows(ProposalEntity $entity, string $nameValue, array $record): array
     {
         $rows = [
-            ['label' => $meta['label'], 'code' => $meta['nameKey'], 'value' => $nameValue],
+            ['label' => $entity->titleLabel(), 'code' => $entity->titleKey(), 'value' => $nameValue],
         ];
 
-        if ($entityType === 'company') {
+        if ($entity === ProposalEntity::Company) {
             $ownerId = $record['account_owner_id'] ?? null;
 
             if (is_string($ownerId) && $ownerId !== '') {

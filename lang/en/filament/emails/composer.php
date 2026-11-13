@@ -22,8 +22,6 @@ return [
         'signature_content' => 'Signature',
         'signature_default' => 'Use as my default signature',
         'template_none' => 'No templates yet',
-        'template_name' => 'Template name',
-        'template_shared' => 'Share with my workspace',
         'subject_placeholder' => 'Add a subject',
         'body_placeholder' => 'Write your message…',
         'company_team' => 'Company team',
@@ -77,6 +75,7 @@ return [
             'body' => '{1}Sending to 1 recipient.|[2,*]Sending to :count recipients.',
         ],
         'queued' => ['title' => 'Email queued for sending'],
+        'outbox_full' => ['title' => 'Could not queue the email'],
         'signature_created' => ['title' => 'Signature created'],
         'template_created' => ['title' => 'Template saved'],
         'attachment_too_large' => [

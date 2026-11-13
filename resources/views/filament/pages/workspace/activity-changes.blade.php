@@ -1,5 +1,5 @@
 @php
-    /** @var list<array{label: string, old: string, new: string}> $rows */
+    /** @var list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}> $rows */
 @endphp
 
 <dl class="divide-y divide-gray-100 rounded-lg border border-gray-200 dark:divide-white/5 dark:border-white/10">
@@ -9,13 +9,21 @@
                 {{ $row['label'] }}
             </dt>
 
+            @if ($row['full'] !== null)
+                <dd>
+                    @include('activity-log.full-change', ['full' => $row['full']])
+                </dd>
+
+                @continue
+            @endif
+
             <dd class="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-sm">
                 <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">
                     {{ $row['old'] }}
                 </span>
 
                 <x-filament::icon
-                    icon="heroicon-m-arrow-right"
+                    icon="lucide-arrow-right"
                     class="h-3 w-3 shrink-0 self-center text-gray-300 dark:text-gray-600"
                 />
 

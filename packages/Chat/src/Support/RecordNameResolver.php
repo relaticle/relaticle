@@ -80,6 +80,54 @@ final readonly class RecordNameResolver
     }
 
     /**
+     * How a display row names a record an earlier step will create.
+     */
+    public static function planLabel(string $name, int $step): string
+    {
+        return __(':name (step :step)', ['name' => $name, 'step' => $step]);
+    }
+
+    /**
+     * Splits a display value into plain text and the linked records among it. Only the exact
+     * text of a link becomes a chip, so free text never does.
+     *
+     * @param  list<array{display: string, name: string, isNew: bool}>  $links
+     * @return list<array{text: string, isNew: bool}>
+     */
+    public static function chipParts(string $value, array $links): array
+    {
+        $parts = [['text' => $value, 'isNew' => false]];
+
+        foreach ($links as $link) {
+            $next = [];
+
+            foreach ($parts as $part) {
+                if ($part['isNew'] || $link['display'] === '' || ! str_contains($part['text'], $link['display'])) {
+                    $next[] = $part;
+
+                    continue;
+                }
+
+                foreach (explode($link['display'], $part['text']) as $position => $piece) {
+                    if ($position > 0) {
+                        $next[] = ['text' => $link['name'], 'isNew' => $link['isNew']];
+                    }
+
+                    $text = trim($piece, ', ');
+
+                    if ($text !== '') {
+                        $next[] = ['text' => $text, 'isNew' => false];
+                    }
+                }
+            }
+
+            $parts = $next;
+        }
+
+        return $parts;
+    }
+
+    /**
      * The proposed name of a record an earlier step of this turn will create,
      * labelled with that step's position so the card says where it comes from.
      */
@@ -107,7 +155,7 @@ final readonly class RecordNameResolver
             return '';
         }
 
-        $titleKey = ProposalCoreFields::titleKey($action->entity_type);
+        $titleKey = $action->entity_type->titleKey();
         // A batched proposal keeps its records under `records`, so the title lives on
         // the referenced record, not on action_data. recordAtOrEmpty() answers both
         // shapes: a single-record proposal is its own record at index 0.
@@ -120,9 +168,7 @@ final readonly class RecordNameResolver
 
         $step = $this->stepNumber($action);
 
-        return $step === null
-            ? $title
-            : __(':name (step :step)', ['name' => $title, 'step' => $step]);
+        return $step === null ? $title : self::planLabel($title, $step);
     }
 
     /**

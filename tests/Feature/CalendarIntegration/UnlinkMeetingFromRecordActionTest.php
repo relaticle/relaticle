@@ -3,8 +3,10 @@
 declare(strict_types=1);
 
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Actions\UnlinkMeetingFromRecordAction;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -20,6 +22,7 @@ it('removes a link regardless of source', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create();
     (app(LinkMeetingToRecordAction::class))->execute(mailboxOwnerInWorkspace($account), $meeting, $person);
 
@@ -34,6 +37,7 @@ it('refuses to unlink a record from another workspace', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $foreignWorkspace = Workspace::factory()->create();
     $foreignPerson = People::factory()->for($foreignWorkspace)->create();
     $meeting->people()->attach($foreignPerson->getKey(), ['link_source' => 'manual']);
@@ -43,7 +47,7 @@ it('refuses to unlink a record from another workspace', function (): void {
     expect(fn () => app(UnlinkMeetingFromRecordAction::class)->execute($owner->fresh(), $meeting, $foreignPerson))
         ->toThrow(InvalidArgumentException::class);
 
-    expect($meeting->people()->count())->toBe(1);
+    expect($meeting->people()->withoutGlobalScope(WorkspaceScope::class)->count())->toBe(1);
 });
 
 it('refuses a viewer who cannot update the record', function (): void {
@@ -52,6 +56,7 @@ it('refuses a viewer who cannot update the record', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     $person = People::factory()->for($meeting->workspace)->create();
     $meeting->people()->attach($person->getKey(), ['link_source' => 'manual']);
 
@@ -68,6 +73,7 @@ it('refuses a teammate who cannot see the meeting', function (): void {
         'workspace_id' => $account->workspace_id,
         'connected_account_id' => $account->getKey(),
     ]);
+    resolve(CurrentWorkspace::class)->set($meeting->workspace);
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->getKey(),
         'email_address' => $account->email_address,

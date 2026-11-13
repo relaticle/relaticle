@@ -85,7 +85,7 @@ final readonly class CustomFieldFilterSchema
                 ...self::buildOperators(['$has_any', '$has_none'], 'array'),
                 'domain' => ['type' => 'object', 'properties' => self::buildOperators(self::DOMAIN_OPERATORS, 'array')],
             ],
-            CustomFieldType::PHONE,
+            CustomFieldType::PHONE, CustomFieldType::DOMAIN,
             CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(['$has_any', '$has_none'], 'array'),
             CustomFieldType::CURRENCY => self::buildOperators(array_keys(self::COMPARISONS), 'number'),
             CustomFieldType::NUMBER => self::buildOperators(array_keys(self::COMPARISONS), 'integer'),

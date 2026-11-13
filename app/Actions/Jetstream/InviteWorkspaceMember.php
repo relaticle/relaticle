@@ -11,24 +11,23 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation as WorkspaceInvitationModel;
 use App\Rules\RegistrableEmail;
 use App\Support\EmailAddress;
+use App\Support\Workspaces\InvitationCeiling;
 use Closure;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 use Laravel\Jetstream\Contracts\InvitesTeamMembers;
 use Laravel\Jetstream\Events\InvitingTeamMember;
-use Laravel\Jetstream\Jetstream;
 use Laravel\Jetstream\Rules\Role;
 
 final readonly class InviteWorkspaceMember implements InvitesTeamMembers
 {
+    public function __construct(private InvitationCeiling $ceiling) {}
+
     /**
      * Invite a new workspace member to the given workspace.
      *
@@ -44,31 +43,22 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
             Gate::forUser($user)->authorize('promoteToAdmin', $workspace);
         }
 
+        $this->ensureWorkspaceIsNotClosing($workspace);
+
         $email = EmailAddress::canonicalize($email);
 
         $this->validate($workspace, $email, $role);
 
+        $this->ceiling->ensureAvailable($user, $workspace);
+
         event(new InvitingTeamMember($workspace, $email, $role));
 
-        $invitation = $workspace->workspaceInvitations()->make([
-            'email' => $email,
-            'role' => $role,
-            'inviter_id' => $user->id,
-        ]);
-
-        /** @var WorkspaceInvitationModel $invitation */
-        $rawToken = $invitation->issueToken();
-
-        // The unique rule above is a check-then-write, so a concurrent invite to
-        // the same address reaches the constraint instead of the validator. The
-        // transaction makes that a savepoint, so a caller holding one (the chat
-        // approval path) survives the rollback.
+        // The validator checked before this write, so a concurrent invite is caught here. The transaction is
+        // a savepoint for a caller that holds one (the chat approval path).
         try {
-            DB::transaction(fn () => $invitation->save());
+            [$invitation, $rawToken] = DB::transaction(fn (): array => $this->issueInvitation($user, $workspace, $email, $role));
         } catch (UniqueConstraintViolationException) {
-            throw ValidationException::withMessages([
-                'email' => __('workspaces.validation.email_already_invited'),
-            ])->errorBag('addWorkspaceMember');
+            throw $this->alreadyInvited();
         }
 
         // Queued, and deferred to after the transaction commits. The chat
@@ -80,7 +70,20 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
         // leave a real invitation email on its way.
         Mail::to($invitation->email)->queue(new WorkspaceInvitationMail($invitation, $rawToken)->afterCommit());
 
+        $this->ceiling->recordSent($user, $workspace);
+
         return $invitation;
+    }
+
+    private function ensureWorkspaceIsNotClosing(Workspace $workspace): void
+    {
+        if (! $workspace->isScheduledForDeletion()) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'email' => __('workspaces.validation.workspace_scheduled_for_deletion'),
+        ])->errorBag('addWorkspaceMember');
     }
 
     /**
@@ -91,29 +94,71 @@ final readonly class InviteWorkspaceMember implements InvitesTeamMembers
         Validator::make([
             'email' => $email,
             'role' => $role,
-        ], $this->rules($workspace), [
-            'email.unique' => __('workspaces.validation.email_already_invited'),
-        ])->after(
+        ], $this->rules())->after(
+            $this->ensureAddressIsNotAlreadyInvited($workspace, $email)
+        )->after(
             $this->ensureUserIsNotAlreadyOnWorkspace($workspace, $email)
         )->validateWithBag('addWorkspaceMember');
     }
 
     /**
+     * @return list<mixed>
+     */
+    public static function emailRules(): array
+    {
+        return ['max:255', ...RegistrableEmail::rules(checkDns: false)];
+    }
+
+    /**
      * Get the validation rules for inviting a workspace member.
      *
-     * @return array<string, list<Unique|Role|string>>
+     * @return array<string, list<Role|string>>
      */
-    private function rules(Workspace $workspace): array
+    private function rules(): array
     {
         return [
-            'email' => [
-                'required', ...RegistrableEmail::rules(checkDns: false),
-                Rule::unique(Jetstream::teamInvitationModel())->where(function (Builder $query) use ($workspace): void {
-                    $query->where('workspace_id', $workspace->id);
-                }),
-            ],
+            'email' => ['required', ...self::emailRules()],
             'role' => ['required', 'string', new Role],
         ];
+    }
+
+    /**
+     * @return array{WorkspaceInvitationModel, string}
+     */
+    private function issueInvitation(User $inviter, Workspace $workspace, string $email, ?string $role): array
+    {
+        /** @var WorkspaceInvitationModel|null $invitation */
+        $invitation = $workspace->workspaceInvitations()->where('email', $email)->lockForUpdate()->first();
+
+        if ($invitation instanceof WorkspaceInvitationModel && ! $invitation->isExpired()) {
+            throw $this->alreadyInvited();
+        }
+
+        $invitation ??= $workspace->workspaceInvitations()->make(['email' => $email]);
+        $invitation->fill(['role' => $role, 'inviter_id' => $inviter->id]);
+
+        $rawToken = $invitation->issueToken();
+        $invitation->save();
+
+        return [$invitation, $rawToken];
+    }
+
+    private function alreadyInvited(): ValidationException
+    {
+        return ValidationException::withMessages([
+            'email' => __('workspaces.validation.email_already_invited'),
+        ])->errorBag('addWorkspaceMember');
+    }
+
+    private function ensureAddressIsNotAlreadyInvited(Workspace $workspace, string $email): Closure
+    {
+        return function ($validator) use ($workspace, $email): void { // @pest-ignore-type
+            $validator->errors()->addIf(
+                $workspace->workspaceInvitations()->unexpired()->where('email', $email)->exists(),
+                'email',
+                __('workspaces.validation.email_already_invited')
+            );
+        };
     }
 
     /**

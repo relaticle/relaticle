@@ -14,6 +14,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Concerns\ListsEntity;
@@ -70,7 +71,7 @@ it('requires authentication', function (): void {
 it('can list opportunities', function (): void {
     Sanctum::actingAs($this->user);
 
-    $seeded = Opportunity::query()->where('workspace_id', $this->workspace->id)->count();
+    $seeded = Opportunity::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $this->workspace->id)->count();
     Opportunity::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $this->getJson('/api/v1/opportunities')
@@ -833,7 +834,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $opportunity = Opportunity::query()->where('name', 'Test Deal')->first();
+        $opportunity = Opportunity::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Test Deal')->first();
         expect($opportunity->workspace_id)->toBe($this->workspace->id);
     });
 
@@ -848,7 +849,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $opportunity = Opportunity::query()->where('name', 'Test Deal')->first();
+        $opportunity = Opportunity::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Test Deal')->first();
         expect($opportunity->creator_id)->toBe($this->user->id);
     });
 

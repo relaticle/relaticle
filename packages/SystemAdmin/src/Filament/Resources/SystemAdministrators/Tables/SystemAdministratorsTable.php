@@ -40,8 +40,8 @@ final class SystemAdministratorsTable
                 IconColumn::make('email_verified_at')
                     ->label('Verified')
                     ->boolean()
-                    ->trueIcon('heroicon-o-check-badge')
-                    ->falseIcon('heroicon-o-x-mark'),
+                    ->trueIcon('lucide-badge-check')
+                    ->falseIcon('lucide-x'),
 
                 TextColumn::make('created_at')
                     ->dateTime()

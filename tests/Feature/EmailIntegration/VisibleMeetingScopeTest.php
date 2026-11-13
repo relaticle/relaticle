@@ -56,6 +56,17 @@ function visibleMeetingsTo(User $viewer, bool $personalCalendarOnly = false): Co
         ->get();
 }
 
+it('treats like wildcards in an inferred workspace domain as literal characters', function (): void {
+    $this->coworker->update(['email' => 'coworker@exa_ple.com']);
+
+    $lookalike = ($this->makeCoworkerMeeting)(['client@exaxple.com']);
+    $member = ($this->makeCoworkerMeeting)(['client@exa_ple.com']);
+
+    expect(visibleMeetingsTo($this->viewer)->modelKeys())
+        ->toContain($lookalike->id)
+        ->not->toContain($member->id);
+});
+
 it('shows a coworker meeting to a workspace member listed on the guest list even when all attendees are protected', function (): void {
     $coworkerEmail = strtolower((string) $this->coworker->email);
 

@@ -15,23 +15,18 @@ namespace Relaticle\Chat\Support;
 final readonly class NextSteps
 {
     /**
+     * @param  array<mixed>  $meta
      * @return list<array{label: string, prompt: string}>
      */
-    public static function fromMeta(?string $meta): array
+    public static function fromMeta(array $meta): array
     {
-        if ($meta === null) {
-            return [];
-        }
-
-        $decoded = json_decode($meta, true);
-
-        if (! is_array($decoded) || ! is_array($decoded['next_steps'] ?? null)) {
+        if (! is_array($meta['next_steps'] ?? null)) {
             return [];
         }
 
         $steps = [];
 
-        foreach ($decoded['next_steps'] as $step) {
+        foreach ($meta['next_steps'] as $step) {
             if (! is_array($step)) {
                 continue;
             }

@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Pages;
 
+use App\Contracts\Billing;
+use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
-use Filament\Actions\Action;
+use App\Models\User;
+use App\Models\Workspace;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
-use Filament\Support\Enums\Size;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\HtmlString;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -59,18 +60,6 @@ final class EmailAccountsPage extends Page
         return $this->ownedAccountsQuery()->defaultFirst()->get();
     }
 
-    public function editSettingsAction(): Action
-    {
-        return Action::make('editSettings')
-            ->label(__('filament/pages/email-accounts.actions.edit_settings'))
-            ->icon('heroicon-o-cog-6-tooth')
-            ->color('gray')
-            ->size(Size::Small)
-            ->url(fn (array $arguments): string => EmailAccountSettingsPage::getUrl([
-                'account' => (string) $arguments['account_id'],
-            ]));
-    }
-
     public function refreshAccounts(): void
     {
         $this->connectedAccounts = $this->getAccounts();
@@ -83,11 +72,32 @@ final class EmailAccountsPage extends Page
         );
     }
 
-    public function connectedSectionDescription(): HtmlString
+    public function hasMailboxCapacity(): bool
     {
-        return new HtmlString(__('filament/pages/email-accounts.sections.connected.description', [
-            'url' => route('policy.show'),
-        ]));
+        return $this->workspace()->hasMailboxCapacity();
+    }
+
+    public function mailboxLimitMessage(): string
+    {
+        return $this->workspace()->mailboxLimitMessage();
+    }
+
+    public function upgradeUrl(): ?string
+    {
+        $workspace = $this->workspace();
+        $user = auth()->user();
+
+        if (! $user instanceof User || ! $user->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage)) {
+            return null;
+        }
+
+        return resolve(Billing::class)->url($workspace);
+    }
+
+    private function workspace(): Workspace
+    {
+        /** @var Workspace */
+        return filament()->getTenant();
     }
 
     protected function afterAccountChanged(): void

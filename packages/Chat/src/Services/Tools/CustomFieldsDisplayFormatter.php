@@ -15,6 +15,7 @@ use DateTimeInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -168,7 +169,7 @@ final readonly class CustomFieldsDisplayFormatter
      */
     private function storedValues(CustomField $field, mixed $value, ?FieldDataType $dataType): ?array
     {
-        if ($field->type === CustomFieldType::LINK->value) {
+        if (CustomFieldType::tryFrom($field->type)?->isLinkList()) {
             return is_array($value) ? $this->optionNames($field, $value) : null;
         }
 
@@ -231,6 +232,10 @@ final readonly class CustomFieldsDisplayFormatter
             return PlainText::fromHtml((string) $value);
         }
 
+        if ($field->type === CustomFieldType::CURRENCY->value && is_numeric($value)) {
+            return $this->renderCurrency($field, (float) $value);
+        }
+
         $dataType = CustomFieldsType::getFieldType($field->type)?->dataType;
 
         return match ($dataType) {
@@ -242,6 +247,22 @@ final readonly class CustomFieldsDisplayFormatter
             FieldDataType::BOOLEAN => $value ? 'Yes' : 'No',
             default => is_array($value) ? implode(', ', array_map(strval(...), $value)) : (string) $value,
         };
+    }
+
+    private function renderCurrency(CustomField $field, float $amount): string
+    {
+        $decimalPlaces = $field->getDecimalPlaces();
+        $code = $field->getCurrencyCode();
+
+        if ($field->getCurrencyDisplayType() === 'code') {
+            $number = Number::format($amount, $decimalPlaces);
+
+            return $number === false ? "{$code} {$amount}" : "{$code} {$number}";
+        }
+
+        $money = Number::currency($amount, $code, precision: $decimalPlaces);
+
+        return $money === false ? "{$code} {$amount}" : $money;
     }
 
     private function renderSingleChoice(CustomField $field, mixed $value): ?string
@@ -276,7 +297,7 @@ final readonly class CustomFieldsDisplayFormatter
 
     private function displayType(CustomField $field, ?FieldDataType $dataType): string
     {
-        if ($field->type === CustomFieldType::LINK->value) {
+        if (CustomFieldType::tryFrom($field->type)?->isLinkList()) {
             return 'link';
         }
 
@@ -309,7 +330,7 @@ final readonly class CustomFieldsDisplayFormatter
 
     private function storedForm(CustomField $field, mixed $value): mixed
     {
-        return in_array($field->type, [CustomFieldType::LINK->value, CustomFieldType::PHONE->value], true)
+        return in_array($field->type, [CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value, CustomFieldType::PHONE->value], true)
             ? $this->comparable($field, $value)
             : $value;
     }

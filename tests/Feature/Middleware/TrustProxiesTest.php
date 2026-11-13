@@ -15,7 +15,7 @@ beforeEach(function (): void {
     ]);
 });
 
-it('honours forwarded headers from a private network proxy so HTTPS is detected behind Traefik', function (): void {
+it('honours the forwarded proto and client ip from a private network proxy but never its forwarded host', function (): void {
     $this->call(
         method: 'GET',
         uri: '/_trust-proxy-probe',
@@ -28,7 +28,7 @@ it('honours forwarded headers from a private network proxy so HTTPS is detected 
     )->assertOk()->assertJson([
         'isSecure' => true,
         'scheme' => 'https',
-        'host' => 'crm.example.com',
+        'host' => 'relaticle.test',
         'clientIp' => '203.0.113.5',
     ]);
 });
@@ -111,12 +111,23 @@ it('trusts the Laravel Cloud edge, which forwards HTTPS from a public IPv6 addre
             Illuminate\Foundation\Bootstrap\LoadEnvironmentVariables::class,
             Illuminate\Foundation\Bootstrap\LoadConfiguration::class,
         ]);
-        $app->make(Illuminate\Contracts\Http\Kernel::class);
+        $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
+        $proxyMiddleware = array_values(array_filter(
+            $kernel->getGlobalMiddleware(),
+            fn (string $middleware): bool => in_array($middleware, [
+                App\Http\Middleware\ConfigureTrustedProxies::class,
+                Illuminate\Http\Middleware\TrustProxies::class,
+            ], true),
+        ));
         $request = Illuminate\Http\Request::create('http://relaticle.laravel.cloud/', server: [
             'REMOTE_ADDR' => '2600:1f18:124c:a910:b364::4',
             'HTTP_X_FORWARDED_PROTO' => 'https',
         ]);
-        echo (new Illuminate\Http\Middleware\TrustProxies)->handle($request, fn (Illuminate\Http\Request $request): string => $request->getScheme());
+        echo (new Illuminate\Pipeline\Pipeline($app))
+            ->send($request)
+            ->through($proxyMiddleware)
+            ->then(fn (Illuminate\Http\Request $request): Illuminate\Http\Response => new Illuminate\Http\Response($request->getScheme()))
+            ->getContent();
         PHP;
 
     $process = new Process([PHP_BINARY, '-r', $boot], base_path(), ['LARAVEL_CLOUD' => $laravelCloud]);

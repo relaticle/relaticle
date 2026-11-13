@@ -18,6 +18,17 @@ use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\CreateUploadUrlTool;
+use App\Mcp\Tools\Email\CancelEmailTool;
+use App\Mcp\Tools\Email\CreateEmailDraftTool;
+use App\Mcp\Tools\Email\DeleteEmailDraftTool;
+use App\Mcp\Tools\Email\GetEmailTool;
+use App\Mcp\Tools\Email\ListEmailAccountsTool;
+use App\Mcp\Tools\Email\ListEmailsTool;
+use App\Mcp\Tools\Email\RescheduleEmailTool;
+use App\Mcp\Tools\Email\RetryEmailTool;
+use App\Mcp\Tools\Email\SendEmailDraftTool;
+use App\Mcp\Tools\Email\SendEmailTool;
+use App\Mcp\Tools\Email\UpdateEmailDraftTool;
 use App\Mcp\Tools\FetchTool;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\GetCrmSummaryTool;
@@ -71,6 +82,9 @@ $updateTaskAnnotations = ['readOnlyHint' => false, 'destructiveHint' => true, 'i
 /** @var array{readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false} $deleteAnnotations */
 $deleteAnnotations = ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => false, 'openWorldHint' => false];
 
+/** @var array{readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true} $sendAnnotations */
+$sendAnnotations = ['readOnlyHint' => false, 'destructiveHint' => true, 'idempotentHint' => false, 'openWorldHint' => true];
+
 /** @var array{readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false} $attachAnnotations */
 $attachAnnotations = ['readOnlyHint' => false, 'destructiveHint' => false, 'idempotentHint' => true, 'openWorldHint' => false];
 
@@ -121,6 +135,17 @@ $toolContracts = [
     DeleteNoteTool::class => ['title' => 'Delete Note', 'name' => 'delete-note-tool', 'annotations' => $deleteAnnotations],
     AttachNoteToEntitiesTool::class => ['title' => 'Attach Note Relationships', 'name' => 'attach-note-to-entities-tool', 'annotations' => $attachAnnotations],
     DetachNoteFromEntitiesTool::class => ['title' => 'Detach Note Relationships', 'name' => 'detach-note-from-entities-tool', 'annotations' => $detachAnnotations],
+    ListEmailsTool::class => ['title' => 'List Emails', 'name' => 'list-emails-tool', 'annotations' => $readAnnotations],
+    GetEmailTool::class => ['title' => 'Get Email', 'name' => 'get-email-tool', 'annotations' => $readAnnotations],
+    ListEmailAccountsTool::class => ['title' => 'List Email Accounts', 'name' => 'list-email-accounts-tool', 'annotations' => $readAnnotations],
+    CreateEmailDraftTool::class => ['title' => 'Create Email Draft', 'name' => 'create-email-draft-tool', 'annotations' => $createAnnotations],
+    SendEmailTool::class => ['title' => 'Send Email', 'name' => 'send-email-tool', 'annotations' => $sendAnnotations],
+    UpdateEmailDraftTool::class => ['title' => 'Update Email Draft', 'name' => 'update-email-draft-tool', 'annotations' => $updateAnnotations],
+    DeleteEmailDraftTool::class => ['title' => 'Delete Email Draft', 'name' => 'delete-email-draft-tool', 'annotations' => $deleteAnnotations],
+    SendEmailDraftTool::class => ['title' => 'Send Email Draft', 'name' => 'send-email-draft-tool', 'annotations' => $sendAnnotations],
+    CancelEmailTool::class => ['title' => 'Cancel Email', 'name' => 'cancel-email-tool', 'annotations' => $deleteAnnotations],
+    RescheduleEmailTool::class => ['title' => 'Reschedule Email', 'name' => 'reschedule-email-tool', 'annotations' => $updateAnnotations],
+    RetryEmailTool::class => ['title' => 'Retry Email', 'name' => 'retry-email-tool', 'annotations' => $sendAnnotations],
 ];
 
 mutates(...array_merge(
@@ -144,7 +169,7 @@ it('publishes the exact explicit title and stable technical name for every regis
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($registeredTools)->toBeArray()->toHaveCount(39);
+    expect($registeredTools)->toBeArray()->toHaveCount(50);
     expect($registeredTools)->toEqualCanonicalizing(array_keys($toolContracts));
 
     foreach ($registeredTools as $toolClass) {
@@ -155,7 +180,10 @@ it('publishes the exact explicit title and stable technical name for every regis
         expect($definition['title'])->toBe($toolContracts[$toolClass]['title']);
         expect($definition['title'])->not->toEndWith(' Tool');
         expect($definition['name'])->toBe($toolContracts[$toolClass]['name']);
-        expect($definition['annotations'])->toBe($toolContracts[$toolClass]['annotations']);
+        expect($definition['annotations'])->toBe([
+            'title' => $toolContracts[$toolClass]['title'],
+            ...$toolContracts[$toolClass]['annotations'],
+        ]);
     }
 });
 
@@ -163,7 +191,7 @@ it('declares an output schema on every registered tool', function (): void {
     $tools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($tools)->toBeArray()->toHaveCount(39);
+    expect($tools)->toBeArray()->toHaveCount(50);
 
     foreach ($tools as $toolClass) {
         $definition = resolve($toolClass)->toArray();
@@ -171,4 +199,36 @@ it('declares an output schema on every registered tool', function (): void {
         expect($definition)->toHaveKey('outputSchema');
         expect($definition['outputSchema']['properties'] ?? [])->not->toBeEmpty();
     }
+});
+
+it('declares the item type of every array parameter', function (): void {
+    $collectMissingItems = function (mixed $schema, string $path) use (&$collectMissingItems): array {
+        if (! is_array($schema)) {
+            return [];
+        }
+
+        $types = (array) ($schema['type'] ?? []);
+        $missing = in_array('array', $types, true) && ! array_key_exists('items', $schema) ? [$path] : [];
+
+        foreach ($schema['properties'] ?? [] as $name => $property) {
+            $missing = [...$missing, ...$collectMissingItems($property, "{$path}.{$name}")];
+        }
+
+        return [...$missing, ...$collectMissingItems($schema['items'] ?? null, "{$path}[]")];
+    };
+
+    $tools = new ReflectionClass(RelaticleServer::class)
+        ->getDefaultProperties()['tools'];
+
+    $offenders = [];
+
+    foreach ($tools as $toolClass) {
+        $inputSchema = resolve($toolClass)->toArray()['inputSchema'];
+
+        foreach ($collectMissingItems($inputSchema, 'inputSchema') as $path) {
+            $offenders[] = "{$toolClass}: {$path}";
+        }
+    }
+
+    expect($offenders)->toBe([], implode("\n", $offenders));
 });

@@ -46,7 +46,7 @@ final class EmailSignaturesPage extends Page
      */
     protected ?string $heading = '';
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-pencil-square';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-square-pen';
 
     /**
      * @var Collection<int, EmailSignature>
@@ -125,7 +125,7 @@ final class EmailSignaturesPage extends Page
     {
         return Action::make('createSignature')
             ->label(__('filament/pages/email-signatures.actions.create'))
-            ->icon('heroicon-o-plus')
+            ->icon('lucide-plus')
             ->size(Size::Small)
             ->schema([
                 Select::make('connected_account_id')
@@ -174,16 +174,16 @@ final class EmailSignaturesPage extends Page
     {
         return Action::make('editSignature')
             ->label(__('filament/pages/email-signatures.actions.edit'))
-            ->icon('heroicon-o-pencil-square')
+            ->icon('lucide-square-pen')
             ->color('gray')
             ->size(Size::Small)
             ->fillForm(function (array $arguments): array {
                 $signature = $this->ownedSignatures()->whereKey($arguments['signature_id'])->first();
 
                 return [
-                    'name' => $signature === null ? '' : $signature->name,
-                    'content_html' => $signature === null ? '' : $signature->content_html,
-                    'is_default' => $signature === null ? false : $signature->is_default,
+                    'name' => $signature->name ?? '',
+                    'content_html' => $signature->content_html ?? '',
+                    'is_default' => $signature->is_default ?? false,
                 ];
             })
             ->schema([
@@ -226,7 +226,7 @@ final class EmailSignaturesPage extends Page
     {
         return Action::make('deleteSignature')
             ->label(__('filament/pages/email-signatures.actions.delete'))
-            ->icon('heroicon-o-trash')
+            ->icon('lucide-trash')
             ->color('danger')
             ->size(Size::Small)
             ->requiresConfirmation()

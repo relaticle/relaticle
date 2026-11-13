@@ -47,7 +47,7 @@ final class BlocklistDomainMatcher
         string $participantAddressColumn,
         string $includeSubdomainsColumn = 'include_subdomains',
     ): void {
-        $valueExpression = "lower({$blockedValueColumn})";
+        $valueExpression = "replace(replace(replace(lower({$blockedValueColumn}), '\\', '\\\\'), '%', '\\%'), '_', '\\_')";
         $addressExpression = "lower({$participantAddressColumn})";
 
         $query->where(function (BaseBuilder $match) use (
@@ -62,7 +62,7 @@ final class BlocklistDomainMatcher
             ): void {
                 $exactOnly
                     ->where($includeSubdomainsColumn, false)
-                    ->whereRaw("{$addressExpression} like '%@' || {$valueExpression}");
+                    ->whereRaw("{$addressExpression} like '%@' || {$valueExpression} escape '\\'");
             })->orWhere(function (BaseBuilder $withSubdomains) use (
                 $valueExpression,
                 $addressExpression,
@@ -72,11 +72,16 @@ final class BlocklistDomainMatcher
                     ->where($includeSubdomainsColumn, true)
                     ->where(function (BaseBuilder $patterns) use ($valueExpression, $addressExpression): void {
                         $patterns
-                            ->whereRaw("{$addressExpression} like '%@' || {$valueExpression}")
-                            ->orWhereRaw("{$addressExpression} like '%@%.' || {$valueExpression}");
+                            ->whereRaw("{$addressExpression} like '%@' || {$valueExpression} escape '\\'")
+                            ->orWhereRaw("{$addressExpression} like '%@%.' || {$valueExpression} escape '\\'");
                     });
             });
         });
+    }
+
+    public function escapeLike(string $value): string
+    {
+        return addcslashes($value, '\\%_');
     }
 
     private function domainFromEmail(string $email): ?string

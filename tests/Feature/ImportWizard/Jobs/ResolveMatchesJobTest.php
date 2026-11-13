@@ -7,7 +7,9 @@ use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Cache;
@@ -29,7 +31,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ResolveMatchesJob::class, MatchResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -336,7 +338,7 @@ describe('on a remote store disk', function (): void {
 
         [$job] = (new ResolveMatchesJob($this->import->id))->withFakeBatch();
 
-        Event::fake()->except([WorkspaceCreated::class, QueryExecuted::class]);
+        Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, QueryExecuted::class]);
 
         DB::listen(function (QueryExecuted $query) use ($job): void {
             if (str_contains($query->sql, 'from "imports"')) {

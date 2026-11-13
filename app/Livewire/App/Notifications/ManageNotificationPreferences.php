@@ -7,8 +7,10 @@ namespace App\Livewire\App\Notifications;
 use App\Actions\User\UpdateNotificationPreferences;
 use App\Enums\Notifications\NotificationChannel;
 use App\Enums\Notifications\NotificationType;
+use App\Features\EmailIntegration;
 use App\Livewire\BaseLivewireComponent;
 use Illuminate\Contracts\View\View;
+use Laravel\Pennant\Feature;
 
 final class ManageNotificationPreferences extends BaseLivewireComponent
 {
@@ -21,7 +23,7 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
     {
         $user = $this->authUser();
 
-        foreach (NotificationType::collaboration() as $type) {
+        foreach ($this->offeredTypes() as $type) {
             foreach ($type->channels() as $channel) {
                 $this->cells[$type->value][$channel->value] = $user->wantsNotification($type, $channel);
             }
@@ -58,9 +60,20 @@ final class ManageNotificationPreferences extends BaseLivewireComponent
     public function render(): View
     {
         return view('livewire.app.notifications.manage-notification-preferences', [
-            'types' => NotificationType::collaboration(),
+            'types' => $this->offeredTypes(),
             'channels' => NotificationChannel::cases(),
         ]);
+    }
+
+    /** @return array<int, NotificationType> */
+    private function offeredTypes(): array
+    {
+        $emailIntegrationActive = Feature::for(null)->active(EmailIntegration::class);
+
+        return array_values(array_filter(
+            NotificationType::collaboration(),
+            fn (NotificationType $type): bool => $emailIntegrationActive || ! $type->requiresEmailIntegration(),
+        ));
     }
 
     private function persist(NotificationType $type, NotificationChannel $channel, bool $enabled): void

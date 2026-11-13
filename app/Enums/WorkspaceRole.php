@@ -51,7 +51,9 @@ enum WorkspaceRole: string
                 WorkspaceCapability::MembersManage,
                 WorkspaceCapability::FieldsManage,
                 WorkspaceCapability::EmailManage,
+                WorkspaceCapability::EmailAgentSend,
                 WorkspaceCapability::ActivityView,
+                WorkspaceCapability::LayoutsManage,
             ],
             self::Member => [
                 WorkspaceCapability::RecordsView,
@@ -60,6 +62,7 @@ enum WorkspaceRole: string
                 WorkspaceCapability::RecordsDelete,
                 WorkspaceCapability::DataImport,
                 WorkspaceCapability::DataExport,
+                WorkspaceCapability::EmailAgentSend,
             ],
             self::Viewer => [WorkspaceCapability::RecordsView],
         };

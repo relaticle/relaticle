@@ -21,7 +21,7 @@ final class Appearance extends Page
 
     protected static ?int $navigationSort = 5;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-swatch';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-swatch-book';
 
     /** @var class-string<Cluster>|null */
     protected static ?string $cluster = Settings::class;

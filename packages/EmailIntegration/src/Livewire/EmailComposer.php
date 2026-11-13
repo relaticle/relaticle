@@ -46,20 +46,21 @@ use Relaticle\EmailIntegration\Actions\SendEmailBatchAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Exceptions\OutboxFull;
+use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
-use Relaticle\EmailIntegration\Services\PrivacyService;
+use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
@@ -154,8 +155,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public mixed $bodyHtml = null;
 
     public ?string $signatureId = null;
-
-    public ?string $privacyTier = null;
 
     #[Locked]
     public ?string $pageTo = null;
@@ -263,8 +262,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             : ($payload['to'] ?? ($this->pageTo !== null && $this->pageTo !== '' ? [$this->pageTo] : []));
         $this->linkRecordType = $payload['linkRecordType'] ?? ($this->isMassSend ? null : $this->pageRecordType);
         $this->linkRecordId = $payload['linkRecordId'] ?? ($this->isMassSend ? null : $this->pageRecordId);
-        $this->privacyTier = resolve(PrivacyService::class)
-            ->defaultTierForUser($this->authUser())->value;
 
         $signature = $this->defaultSignatureFor($this->accountId);
         $this->signatureId = $signature?->getKey();
@@ -311,22 +308,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $user = $this->authUser();
         $this->accountId = (string) $account->getKey();
-        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
 
         $this->replyMode = in_array($mode, ['reply', 'reply_all', 'forward'], true) ? $mode : 'reply';
 
         $this->to = match ($this->replyMode) {
             'forward' => [],
-            // Reply-all addresses the original sender PLUS the to/cc recipients
-            // (never bcc), minus the user's own account address.
             'reply_all' => $email->replyAllRecipients($account->email_address),
-            // `where()` on the loaded collection keeps the original keys, so the
-            // result has to be re-indexed to satisfy the list-typed property.
-            default => array_values($email->participants
-                ->where('role', EmailParticipantRole::FROM)
-                ->map(fn (EmailParticipant $participant): string => (string) $participant->email_address)
-                ->filter(fn (string $address): bool => $address !== '')
-                ->all()),
+            default => $email->replyRecipients(),
         };
 
         // Only prefill the original subject when the viewer is entitled to see it.
@@ -401,7 +389,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->resetComposerState();
 
         $this->accountId = (string) $account->getKey();
-        $this->privacyTier = resolve(PrivacyService::class)->defaultTierForUser($user)->value;
 
         $this->loadDraft((string) $draft->getKey());
 
@@ -467,15 +454,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $bodyHtml = $this->bodyHtmlForPersistence();
 
-        // `bodyHtml`'s raw state is never truly "empty" (an untouched RichEditor still
-        // holds a structural `<p></p>` doc), so `required` can never catch a blank
-        // message. Check the dehydrated text instead. A signature-only email (no
-        // free text, just the signature block) is legitimate and must still send.
-        if (
-            trim(strip_tags($bodyHtml)) === ''
-            && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')
-            && ! str_contains($bodyHtml, '<img')
-        ) {
+        if ($this->isBlankBody($bodyHtml)) {
             $this->addError('bodyHtml', __('filament/emails/composer.validation.body_required'));
 
             return;
@@ -494,38 +473,18 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        $renderer = resolve(EmailTemplateRenderService::class);
-
         [$pendingPaths, $pendingNames, $pendingAttributes] = $this->storeAttachments();
 
-        $attachmentPaths = [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths, ...$inlinePaths];
-        $attachmentNames = [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames];
-        $attachmentAttributes = [...$pendingAttributes, ...$copiedAttributes, ...$forwardedAttributes, ...$inlineAttributes];
-
-        $mergeTagRecord = $this->mergeTagRecord();
-        $linkRecord = $this->linkRecord();
-
-        $email = resolve(SendEmailAction::class)->execute(
-            data: [
-                'connected_account_id' => (string) $this->accountId,
-                'subject' => $renderer->renderPlainText((string) $this->subject, $mergeTagRecord),
-                'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml, $mergeTagRecord)),
-                'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
-                'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
-                'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
-                'in_reply_to_email_id' => $this->inReplyToEmailId,
-                'creation_source' => $this->creationSource(),
-                'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
-                'batch_id' => null,
-                // Interactive sends from the composer keep the undo-send window.
-                'priority' => EmailPriority::PRIORITY,
-                'attachments' => $attachmentPaths,
-                'attachment_file_names' => $attachmentNames,
-                'attachment_attributes' => $attachmentAttributes,
-            ],
-            linkToType: $linkRecord === null ? null : $linkRecord::class,
-            linkToId: $linkRecord?->getKey(),
+        $email = $this->queueEmail(
+            $bodyHtml,
+            [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths, ...$inlinePaths],
+            [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames],
+            [...$pendingAttributes, ...$copiedAttributes, ...$forwardedAttributes, ...$inlineAttributes],
         );
+
+        if (! $email instanceof Email) {
+            return;
+        }
 
         if ($this->draftId !== null) {
             // Best-effort: two tabs open on the same draft, or a retried request,
@@ -544,6 +503,61 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         // A send both removes the draft (if any) and adds an outbox row.
         $this->dispatch('drafts:changed');
         $this->dispatch('outbox:changed');
+    }
+
+    /**
+     * @param  list<string>  $attachmentPaths
+     * @param  array<string, string>  $attachmentNames
+     * @param  array<string, array{is_inline?: bool, content_id?: ?string}>  $attachmentAttributes
+     */
+    private function queueEmail(string $bodyHtml, array $attachmentPaths, array $attachmentNames, array $attachmentAttributes): ?Email
+    {
+        $renderer = resolve(EmailTemplateRenderService::class);
+        $mergeTagRecord = $this->mergeTagRecord();
+        $linkRecord = $this->linkRecord();
+
+        try {
+            return resolve(SendEmailAction::class)->execute(
+                user: $this->authUser(),
+                data: [
+                    'connected_account_id' => (string) $this->accountId,
+                    'subject' => $renderer->renderPlainText((string) $this->subject, $mergeTagRecord),
+                    'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml, $mergeTagRecord)),
+                    'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
+                    'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
+                    'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
+                    'in_reply_to_email_id' => $this->inReplyToEmailId,
+                    'creation_source' => $this->creationSource(),
+                    'batch_id' => null,
+                    // Interactive sends from the composer keep the undo-send window.
+                    'priority' => EmailPriority::PRIORITY,
+                    'attachments' => $attachmentPaths,
+                    'attachment_file_names' => $attachmentNames,
+                    'attachment_attributes' => $attachmentAttributes,
+                ],
+                linkToType: $linkRecord === null ? null : $linkRecord::class,
+                linkToId: $linkRecord?->getKey(),
+            );
+        } catch (OutboxFull $exception) {
+            $this->deleteCopiedAttachmentFiles($attachmentPaths);
+
+            Notification::make()
+                ->title(__('filament/emails/composer.notifications.outbox_full.title'))
+                ->body($exception->getMessage())
+                ->danger()
+                ->send();
+
+            return null;
+        }
+    }
+
+    // An untouched RichEditor still holds `<p></p>`, so `required` never catches a blank
+    // message. A body with only a signature block or an image is a real email.
+    private function isBlankBody(string $bodyHtml): bool
+    {
+        return trim(strip_tags($bodyHtml)) === ''
+            && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')
+            && ! str_contains($bodyHtml, '<img');
     }
 
     private function sendMass(): void
@@ -614,7 +628,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'connected_account_id' => (string) $this->accountId,
                 'subject' => (string) $this->subject,
                 'body_html' => $bodyHtml,
-                'privacy_tier' => EmailPrivacyTier::from((string) $this->privacyTier),
                 'attachments' => $attachmentPaths,
                 'attachment_file_names' => $attachmentNames,
                 'attachment_attributes' => $attachmentAttributes,
@@ -690,32 +703,19 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function withQuotedBody(string $bodyHtml): string
     {
-        $quotedBodyHtml = $this->quotedBodyHtml();
-
-        if (blank($quotedBodyHtml)) {
+        if ($this->sourceEmailId === null || $this->replyMode === null) {
             return $bodyHtml;
         }
 
-        return $bodyHtml.($this->replyMode === 'forward'
-            ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$quotedBodyHtml
-            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$quotedBodyHtml.'</blockquote>');
-    }
-
-    // Read at send time: the original can be hundreds of KB, and a public property
-    // would ship it to the browser and back on every composer request.
-    private function quotedBodyHtml(): ?string
-    {
-        if ($this->sourceEmailId === null || $this->replyMode === null) {
-            return null;
-        }
-
+        // Read at send time: the original can be hundreds of KB, and a public property
+        // would ship it to the browser and back on every composer request.
         $source = $this->replyableEmail($this->sourceEmailId);
 
         if (! $source instanceof Email || ! $this->authUser()->can('viewBody', $source)) {
-            return null;
+            return $bodyHtml;
         }
 
-        return $source->quotedBodyHtml();
+        return $source->quotedBelow($bodyHtml, asForward: $this->replyMode === 'forward');
     }
 
     public function minimize(): void
@@ -883,7 +883,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 continue;
             }
 
-            $person = $this->personForEmail($email, $workspaceId);
+            $person = resolve(PersonByEmailQuery::class)->first($email, $workspaceId);
 
             if (! $person instanceof People) {
                 continue;
@@ -904,27 +904,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $this->massRecipients = $nextRecipients;
-    }
-
-    private function personForEmail(string $emailAddress, string $workspaceId): ?People
-    {
-        $emailField = CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $workspaceId)
-            ->where('entity_type', 'people')
-            ->where('code', 'emails')
-            ->first();
-
-        if (! $emailField instanceof CustomField) {
-            return null;
-        }
-
-        return People::query()
-            ->where('workspace_id', $workspaceId)
-            ->whereHas('customFieldValues', fn (Builder $valueQuery): Builder => $valueQuery
-                ->where('custom_field_id', $emailField->getKey())
-                ->whereJsonContains('json_value', $emailAddress))
-            ->first(['id', 'name', 'company_id']);
     }
 
     private function mergeTagRecord(): Company|Opportunity|People|null
@@ -959,7 +938,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return null;
         }
 
-        $person = $this->personForEmail($email, (string) $this->authUser()->current_workspace_id);
+        $person = resolve(PersonByEmailQuery::class)->first($email, (string) $this->authUser()->current_workspace_id);
 
         if (! $person instanceof People) {
             return null;
@@ -1127,7 +1106,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     avatarUrl: string|null,
      *     iconPath: string|null,
      *     circular: bool,
-     *     avatarColor: string,
      * }>
      */
     #[Computed(persist: true, seconds: 300)]
@@ -1236,7 +1214,6 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      *     avatarUrl: string|null,
      *     iconPath: string|null,
      *     circular: bool,
-     *     avatarColor: string,
      * }>
      */
     private function companyTeamRecipientOptions(string $workspaceId): array
@@ -1277,7 +1254,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return [];
         }
 
-        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, countLabel: string, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}> */
+        /** @var list<array{type: 'company_team', id: string, label: string, description: string, count: int, countLabel: string, emails: list<string>, avatarUrl: string|null, iconPath: string|null, circular: bool}> */
         return Company::query()
             ->where('workspace_id', $workspaceId)
             ->whereKey(array_keys($companyCounts))
@@ -1303,30 +1280,17 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * @return array{avatarUrl: string|null, iconPath: string|null, circular: bool, avatarColor: string}
+     * @return array{avatarUrl: string|null, iconPath: string|null, circular: bool}
      */
     private function recipientChipAppearance(Model $record): array
     {
         $chip = RecordChip::forRecord($record);
-        $avatarUrl = $chip->imageUrl;
-
-        if (is_string($avatarUrl) && str_starts_with($avatarUrl, 'data:')) {
-            $avatarUrl = null;
-        }
 
         return [
-            'avatarUrl' => $avatarUrl,
+            'avatarUrl' => $chip->imageUrl,
             'iconPath' => $chip->iconPath,
             'circular' => $chip->circular,
-            'avatarColor' => $this->recipientAvatarColor($chip->name),
         ];
-    }
-
-    private function recipientAvatarColor(string $name): string
-    {
-        $colors = ['primary', 'success', 'warning', 'danger', 'info'];
-
-        return $colors[abs(crc32(mb_strtolower($name))) % count($colors)];
     }
 
     /**
@@ -1482,23 +1446,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 'subject' => $this->subject,
                 'body_html' => resolve(EmailTemplateRenderService::class)->stripSignatureBlock($this->bodyHtmlValue()),
             ])
-            ->schema([
-                TextInput::make('name')
-                    ->label(__('filament/emails/composer.fields.template_name'))
-                    ->required()
-                    ->maxLength(100),
-                TextInput::make('subject')
-                    ->label(__('filament/emails/composer.fields.subject'))
-                    ->required()
-                    ->maxLength(255),
-                RichEditor::make('body_html')
-                    ->label(__('filament/emails/composer.fields.message'))
-                    ->required()
-                    ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
-                    ->toolbarButtons(['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList']),
-                Toggle::make('is_shared')
-                    ->label(__('filament/emails/composer.fields.template_shared')),
-            ])
+            ->schema(fn (Schema $schema): Schema => EmailTemplateForm::configure($schema))
             ->action(function (array $data, CreateEmailTemplateAction $createEmailTemplate): void {
                 $createEmailTemplate->execute($this->authUser(), [
                     'name' => $data['name'],
@@ -2131,11 +2079,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $user = $this->authUser();
 
-        $original = Email::query()
-            ->with(['body', 'participants', 'from', 'shares'])
-            ->where('workspace_id', $user->current_workspace_id)
-            ->where('rfc_message_id', $draft->in_reply_to)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
+        $original = resolve(PreferredEmailCopyService::class)
+            ->restrictToVisiblePreferredCopies(
+                Email::query()
+                    ->with(['body', 'participants', 'from', 'shares'])
+                    ->where('workspace_id', $user->current_workspace_id)
+                    ->where('rfc_message_id', $draft->in_reply_to),
+                $user,
+            )
             ->first();
 
         if (! $original instanceof Email || $user->cannot('view', $original)) {
@@ -2227,10 +2178,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return null;
         }
 
-        return EmailSignature::query()
-            ->where('connected_account_id', $accountId)
-            ->where('is_default', true)
-            ->first();
+        return EmailSignature::query()->defaultFor($accountId)->first();
     }
 
     /**

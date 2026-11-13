@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use Relaticle\OnboardSeed\Contracts\ModelSeederInterface;
 use Relaticle\OnboardSeed\ModelSeeders\CompanySeeder;
 use Relaticle\OnboardSeed\ModelSeeders\NoteSeeder;
@@ -45,10 +46,12 @@ final class OnboardSeedManager
             FixtureLoader::setFixtureSet($fixtureSet);
             $this->initializeSeeders();
 
-            Model::withoutEvents(function () use ($user, $workspace): void {
-                foreach ($this->seeders as $seeder) {
-                    $seeder->seed($workspace, $user);
-                }
+            DB::transaction(function () use ($user, $workspace): void {
+                Model::withoutEvents(function () use ($user, $workspace): void {
+                    foreach ($this->seeders as $seeder) {
+                        $seeder->seed($workspace, $user);
+                    }
+                });
             });
 
             return true;

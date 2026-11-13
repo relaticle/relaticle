@@ -107,11 +107,12 @@ it('places the conversation title in the topbar and the toggle beside the worksp
 
     $page->click('[data-sidebar-workspace-toggle]')
         ->assertScript('(() => !document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
-        ->click('[data-sidebar-workspace-toggle]')
+        ->click('[data-sidebar-expand-toggle]')
         ->assertScript('(() => document.querySelector("#fi-main-sidebar").classList.contains("fi-sidebar-open"))()')
         ->resize(390, 844)
         ->assertVisible('[data-page-heading]')
-        ->assertScript('(() => Array.from(document.querySelectorAll("nav[aria-label=Topbar] button[aria-label^=Expand]")).filter((button) => button.getClientRects().length > 0).length === 1)()')
+        ->assertScript('(() => Array.from(document.querySelectorAll("nav[aria-label=Topbar] button[aria-label^=Expand]")).filter((button) => button.getClientRects().length > 0).length === 0)()')
+        ->assertVisible('.fi-bottom-nav button[aria-controls=fi-main-sidebar]')
         ->assertScript('(() => getComputedStyle(document.querySelector("[data-sidebar-workspace-toggle]")).display === "none")()');
 
     $page->script(<<<JS
@@ -121,6 +122,21 @@ it('places the conversation title in the topbar and the toggle beside the worksp
     JS);
 
     $page->assertSeeIn('[data-page-heading]', 'Updated pipeline review');
+});
+
+it('does not scroll sideways on a phone', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'Pipeline review');
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertVisible('[data-page-heading]');
+
+    foreach ([390, 320] as $width) {
+        $page->resize($width, 700)->wait(0.3);
+
+        expect($page->script('document.documentElement.scrollWidth - window.innerWidth'))->toBeLessThanOrEqual(0);
+    }
 });
 
 /**

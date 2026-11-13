@@ -7,12 +7,14 @@ namespace App\Console\Commands;
 use App\Enums\MediaCollection;
 use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Storage;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Throwable;
@@ -45,7 +47,7 @@ final class PurgeUnsafeImagesCommand extends Command
                 ->orWhere(fn (Builder $query): Builder => $query
                     ->whereMorphedTo('model', Workspace::class)
                     ->whereNotIn('mime_type', Workspace::LOGO_MIME_TYPES)))
-            ->with('model')
+            ->with(['model' => fn (MorphTo $owner): MorphTo => $owner->withoutGlobalScope(WorkspaceScope::class)])
             ->lazyById();
 
         foreach ($logos as $logo) {

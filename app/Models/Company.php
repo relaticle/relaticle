@@ -19,6 +19,7 @@ use App\Support\Media\UploadAllowlist;
 use Carbon\CarbonImmutable;
 use Database\Factories\CompanyFactory;
 use Filament\Models\Contracts\HasAvatar;
+use finfo;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -126,6 +127,11 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
     public function getFilamentAvatarUrl(): ?string
     {
         return $this->logo;
+    }
+
+    public static function logoExtensionFor(string $contents): ?string
+    {
+        return self::LOGO_MIME_TYPES[new finfo(FILEINFO_MIME_TYPE)->buffer($contents)] ?? null;
     }
 
     public function registerMediaCollections(): void

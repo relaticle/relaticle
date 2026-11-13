@@ -62,17 +62,15 @@ final class LogoutOtherBrowserSessions extends BaseLivewireComponent
             return;
         }
 
-        if (config('session.driver') !== 'database') {
-            return;
-        }
-
-        resolve(DestroyOtherBrowserSessions::class)->execute($user, Session::getId());
+        $endedOtherSessions = resolve(DestroyOtherBrowserSessions::class)->execute($user, Session::getId());
 
         Session::put([
             'password_hash_'.Auth::getDefaultDriver() => $user->getAuthPassword(),
         ]);
 
-        $this->sendNotification(__('profile.notifications.logged_out_other_sessions.success'));
+        $this->sendNotification($endedOtherSessions
+            ? __('profile.notifications.logged_out_other_sessions.success')
+            : __('profile.notifications.logged_out_other_sessions.remembered_only', ['minutes' => config('session.lifetime')]));
     }
 
     /**

@@ -10,7 +10,7 @@ use App\Models\Workspace;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Routing\Router;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 final readonly class LoginDestination
 {
@@ -87,7 +87,7 @@ final readonly class LoginDestination
 
         try {
             return resolve(Router::class)->getRoutes()->match($request);
-        } catch (NotFoundHttpException) {
+        } catch (HttpException) {
             return null;
         }
     }

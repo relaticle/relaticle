@@ -171,7 +171,9 @@ return [
     |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => in_array(env('SESSION_SECURE_COOKIE'), [null, ''], true)
+        ? str_starts_with((string) env('APP_URL'), 'https://')
+        : env('SESSION_SECURE_COOKIE'),
 
     /*
     |--------------------------------------------------------------------------

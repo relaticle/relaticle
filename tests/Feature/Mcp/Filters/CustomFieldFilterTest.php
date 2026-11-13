@@ -787,8 +787,8 @@ it('matches a url link typed with or without its scheme', function (string $oper
     'another path' => ['acme.com/pricing', []],
 ]);
 
-it('reads a domain link operand that stacks schemes as its host', function (): void {
-    $site = filterTestField($this->workspace, 'people', 'site', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5, additional: ['link_variant' => 'domain']));
+it('reads a domain operand that stacks schemes as its host', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'site', 'domain', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
     $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
     DB::table('custom_field_values')->insert([
         'id' => (string) Str::ulid(),
@@ -804,8 +804,8 @@ it('reads a domain link operand that stacks schemes as its host', function (): v
         ->and(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_any' => ['http://acme.com']]]]))->toBe(['Ana']);
 });
 
-it('finds a domain link stored as a bare host by its url operand', function (): void {
-    $site = filterTestField($this->workspace, 'people', 'site', 'link', new CustomFieldSettingsData(allow_multiple: true, max_values: 5, additional: ['link_variant' => 'domain']));
+it('finds a domain stored in a legacy spelling by its url operand', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'site', 'domain', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
     $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
     People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob']);
     DB::table('custom_field_values')->insert([
@@ -819,6 +819,40 @@ it('finds a domain link stored as a bare host by its url operand', function (): 
 
     expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_any' => ['https://www.acme.com']]]]))->toBe(['Ana'])
         ->and(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_none' => ['https://www.acme.com']]]]))->toBe(['Bob']);
+});
+
+it('matches a domain stored in mixed case by an operand in any case', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'site', 'domain', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob']);
+    DB::table('custom_field_values')->insert([
+        'id' => (string) Str::ulid(),
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'people',
+        'entity_id' => $ana->getKey(),
+        'custom_field_id' => $site->getKey(),
+        'json_value' => json_encode(['www.Acme.com']),
+    ]);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_any' => ['WWW.ACME.COM']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_none' => ['WWW.ACME.COM']]]]))->toBe(['Bob']);
+});
+
+it('finds a domain field value that is not a host by the way it was typed', function (): void {
+    $site = filterTestField($this->workspace, 'people', 'site', 'domain', new CustomFieldSettingsData(allow_multiple: true, max_values: 5));
+    $ana = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob']);
+    DB::table('custom_field_values')->insert([
+        'id' => (string) Str::ulid(),
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'people',
+        'entity_id' => $ana->getKey(),
+        'custom_field_id' => $site->getKey(),
+        'json_value' => json_encode(['N / A']),
+    ]);
+
+    expect(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_any' => ['N / A']]]]))->toBe(['Ana'])
+        ->and(peopleNamesMatching($this->user, ['custom_fields' => ['site' => ['$has_none' => ['N / A']]]]))->toBe(['Bob']);
 });
 
 it('publishes only $ operators and the domain sub-field', function (): void {
@@ -996,4 +1030,29 @@ it('publishes fields that share a sort order by id', function (): void {
         ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
             ->where('filterable_fields.custom_fields', fn (Illuminate\Support\Collection $fields): bool => $fields->keys()->all() === ['tied_early', 'tied_late'])
             ->etc());
+});
+
+it('offers a domain field the list operators and no domain sub-field', function (): void {
+    expect(array_keys(CustomFieldFilterSchema::operatorsForType('domain')))->toBe(['$has_any', '$has_none', '$is_empty']);
+});
+
+it('finds a company by any spelling of its domain', function (string $operand): void {
+    $domains = WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains');
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    $company->saveCustomFieldValue($domains, ['acme.com']);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Ana', 'company_id' => $company->getKey()]);
+    People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Bob']);
+
+    expect(peopleNamesMatching($this->user, ['company' => ['custom_fields' => ['domains' => ['$has_any' => [$operand]]]]]))->toBe(['Ana']);
+})->with([
+    'bare host' => 'acme.com',
+    'uppercase' => 'ACME.COM',
+    'url with a path' => 'https://www.acme.com/about?x=1',
+    'trailing slash' => 'acme.com/',
+]);
+
+it('rejects the domain sub-field on a domain field', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListPeopleTool::class, ['filter' => ['company' => ['custom_fields' => ['domains' => ['domain' => ['$in' => ['acme.com']]]]]]])
+        ->assertHasErrors(['domains does not support domain.']);
 });

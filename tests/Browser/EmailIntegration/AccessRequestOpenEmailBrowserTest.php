@@ -32,11 +32,7 @@ it('opens a requested email in the reader from the access requests table', funct
         'email_id' => $email->id,
     ]);
 
-    $page = visit('/app/login')->{$theme}()
-        ->type('[id="form.email"]', $owner->email)
-        ->click('button[type="submit"]')
-        ->type('[id="form.password"]', 'password')
-        ->click('button[type="submit"]')
+    $page = loginViaBrowser($owner, $theme)
         ->assertPathIs("/app/{$workspace->slug}")
         ->navigate("/app/{$workspace->slug}/workspace/email/access-requests")
         ->assertMissing('.fi-email-reader-panel')

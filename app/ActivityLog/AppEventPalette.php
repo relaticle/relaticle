@@ -15,8 +15,8 @@ enum AppEventPalette: string implements HasIcon, HasLabel
     public function getIcon(): string
     {
         return match ($this) {
-            self::NoteCreated => 'ri-sticky-note-line',
-            self::TaskCreated => 'ri-checkbox-circle-line',
+            self::NoteCreated => 'lucide-sticky-note',
+            self::TaskCreated => 'lucide-circle-check',
         };
     }
 

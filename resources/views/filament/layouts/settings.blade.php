@@ -19,7 +19,7 @@
                     wire:navigate
                     class="fi-settings-back-link"
                 >
-                    <x-filament::icon icon="ri-arrow-left-line" class="size-4" />
+                    <x-filament::icon icon="lucide-arrow-left" class="size-4" />
                     {{ __('filament/panel.settings_layout.back_to_app') }}
                 </a>
 

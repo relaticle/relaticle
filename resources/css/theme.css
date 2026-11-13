@@ -1,27 +1,28 @@
 /* Theme Configuration */
 @theme {
     /* Font Family */
-    --font-default: "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
-    --font-display: "Satoshi", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-default: "Inter", "Inter Fallback", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-display: "Satoshi", "Satoshi Fallback", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-sans: var(--font-default);
 
     /* Primary Color Scale */
-    --color-primary-50: oklch(0.969 0.016 293.756);
-    --color-primary-100: oklch(0.943 0.028 294.588);
-    --color-primary-200: oklch(0.894 0.055 293.283);
-    --color-primary-300: oklch(0.811 0.101 293.571);
-    --color-primary-400: oklch(0.709 0.159 293.541);
-    --color-primary-500: oklch(0.606 0.219 292.717);
-    --color-primary-600: oklch(0.541 0.247 293.009);
-    --color-primary-700: oklch(0.491 0.241 292.581);
-    --color-primary-800: oklch(0.432 0.211 292.759);
-    --color-primary-900: oklch(0.380 0.178 293.745);
-    --color-primary-950: oklch(0.283 0.135 291.089);
-    --color-primary: oklch(0.541 0.247 293.009); /* DEFAULT: primary-600 */
+    --color-primary-50: oklch(0.969 0.014 279.186);
+    --color-primary-100: oklch(0.943 0.024 279.186);
+    --color-primary-200: oklch(0.894 0.048 279.186);
+    --color-primary-300: oklch(0.812 0.088 279.186);
+    --color-primary-400: oklch(0.711 0.139 279.186);
+    --color-primary-500: oklch(0.609 0.191 279.186);
+    --color-primary-600: oklch(0.544 0.216 279.186);
+    --color-primary-700: oklch(0.494 0.210 279.186);
+    --color-primary-800: oklch(0.435 0.184 279.186);
+    --color-primary-900: oklch(0.383 0.155 279.186);
+    --color-primary-950: oklch(0.285 0.118 279.186);
+    --color-primary: oklch(0.544 0.216 279.186); /* DEFAULT: primary-600 */
 
     /* Third-party brand marks: kept out of the primary scale since they
        represent an external provider's identity, not our own UI color. */
     --color-anthropic: #D4763C;
+    --color-anthropic-strong: #AE5A27; /* 4.9:1 behind white text, where #D4763C gives 3.25:1 */
 
     /* Off-step typography for compact UI surfaces */
     --text-pico: 0.625rem;     /* 10px */
@@ -69,6 +70,9 @@
     --surface-sidebar-bg: rgb(251 251 251);               /* a step lighter than zinc-50 */
     --surface-sidebar-hover-bg: rgb(9 9 11 / 0.025);      /* zinc-950/2.5 */
     --surface-sidebar-active-bg: rgb(9 9 11 / 0.04);      /* zinc-950/4 */
+    --surface-row-hover-bg: rgb(249 250 251);             /* gray-50: a list row or a clickable item */
+    --surface-control-hover-bg: rgb(243 244 246);         /* gray-100: an icon button or a text link */
+    --surface-table-head-bg: var(--gray-50);               /* a table head, and the row tint a pinned cell repeats */
 }
 
 .dark {
@@ -84,6 +88,9 @@
     --surface-sidebar-bg: rgb(9 9 11);                     /* zinc-950 */
     --surface-sidebar-hover-bg: rgb(255 255 255 / 0.05);
     --surface-sidebar-active-bg: rgb(255 255 255 / 0.1);
+    --surface-row-hover-bg: rgb(255 255 255 / 0.05);
+    --surface-control-hover-bg: rgb(255 255 255 / 0.1);
+    --surface-table-head-bg: color-mix(in oklab, var(--gray-900), white 5%);
 }
 
 @custom-variant dark (&:where(.dark, .dark *));
@@ -94,6 +101,12 @@
    dresses the streamed reply and the reloaded one alike. Same surface tokens
    as the follow-up chips in _transcript.blade.php, at the density of an
    @mention chip: the transcript carries two chip families, not three. */
+/* Lucide draws a 2px stroke on a 24 grid; 1.75 keeps 16px icons crisp without
+   reading heavier than the label beside them. */
+.lucide {
+    stroke-width: 1.75;
+}
+
 .chat-chip {
     @apply inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--surface-card-border)] bg-[var(--surface-card-bg)] px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-700 no-underline transition;
 
@@ -138,6 +151,29 @@
 [data-proposal-record-chip] .chat-chip-label,
 [data-record-title-chip] .chat-chip-label {
     max-width: none;
+}
+
+/* A checklist item in a reply: both pipelines emit this read-only checkbox (TaskMarkerRenderer,
+   chat.js). It takes the bullet's place and is drawn like the rich editor's checkbox. */
+li:has(> .chat-md-task) {
+    @apply list-none;
+}
+
+.chat-md-task {
+    @apply -ms-5 me-1.5 inline-block size-3.5 rounded-[4px] border border-gray-300 bg-white align-[-0.15em];
+}
+
+.chat-md-task[aria-checked="true"] {
+    @apply border-primary-600 bg-primary-600 bg-contain bg-center bg-no-repeat;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+}
+
+.dark .chat-md-task {
+    @apply border-white/20 bg-white/5;
+}
+
+.dark .chat-md-task[aria-checked="true"] {
+    @apply border-primary-500 bg-primary-500;
 }
 
 /* Hero gradient text animation: slow, subtle shimmer */

@@ -4,16 +4,18 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
+use Psr\Http\Client\NetworkExceptionInterface;
 use Psr\Http\Message\ResponseInterface;
 use Throwable;
 
 /**
- * Per-mailbox cooldown for Gmail/Graph user-rate limits. One 429 on a connected
- * account must park every other fetch for that mailbox until Retry-After, or
- * workers keep calling the API and Google slides the lock forward.
+ * Per-mailbox cooldown for Gmail/Graph user-rate limits and outages. One 429 on a
+ * connected account must park every other fetch for that mailbox until Retry-After,
+ * or workers keep calling the API and Google slides the lock forward.
  */
 final readonly class ProviderRateLimit
 {
@@ -58,6 +60,31 @@ final readonly class ProviderRateLimit
         }
 
         return null;
+    }
+
+    public static function outageSeconds(Throwable $exception): ?int
+    {
+        $current = $exception;
+
+        while ($current instanceof Throwable) {
+            if (self::isUnreachable($current) || self::isTokenRefreshOutage($current) || (self::httpStatus($current) ?? 0) >= 500) {
+                return self::clamp(self::headerSeconds($current) ?? self::FALLBACK_SECONDS);
+            }
+
+            $current = $current->getPrevious();
+        }
+
+        return null;
+    }
+
+    private static function isUnreachable(Throwable $exception): bool
+    {
+        return $exception instanceof ConnectionException || $exception instanceof NetworkExceptionInterface;
+    }
+
+    private static function isTokenRefreshOutage(Throwable $exception): bool
+    {
+        return str_starts_with($exception->getMessage(), 'internal_failure');
     }
 
     private static function secondsFor(Throwable $exception): ?int

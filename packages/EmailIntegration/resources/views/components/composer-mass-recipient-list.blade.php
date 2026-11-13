@@ -3,8 +3,6 @@
 ])
 
 @php
-    use App\Services\AvatarService;
-
     $removeLabel = __('filament/emails/composer.actions.remove_recipient');
 
     $recipientTooltip = static function (string $name, string $email): string {
@@ -15,12 +13,7 @@
 <ul {{ $attributes->class(['min-h-0 flex-1 overflow-y-auto divide-y divide-gray-100 dark:divide-white/5']) }}>
     @forelse ($recipients as $recipient)
         <li wire:key="mass-recipient-{{ $recipient['personId'] }}" class="flex items-center gap-3 px-3 py-2.5">
-            <x-filament::avatar
-                :src="resolve(AvatarService::class)->generate($recipient['name'])"
-                :alt="$recipient['name']"
-                size="h-8 w-8"
-                class="shrink-0"
-            />
+            <x-email-integration::person-avatar />
             <div
                 class="min-w-0 flex-1"
                 x-tooltip="{ content: @js($recipientTooltip($recipient['name'], $recipient['email'])), theme: $store.theme }"
@@ -29,7 +22,7 @@
                 <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ $recipient['email'] }}</p>
             </div>
             <x-email-integration::composer-icon-button
-                icon="heroicon-m-x-mark"
+                icon="lucide-x"
                 :label="$removeLabel"
                 class="!p-1"
                 wire:click="removeMassRecipient('{{ $recipient['personId'] }}')"

@@ -32,7 +32,7 @@ final class OpportunityResource extends Resource
 
     protected static ?string $model = Opportunity::class;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-currency-dollar';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-circle-dollar-sign';
 
     protected static string|\UnitEnum|null $navigationGroup = 'CRM';
 

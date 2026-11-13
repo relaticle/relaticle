@@ -2,7 +2,7 @@
 title: Self-Hosting Guide
 description: Get Docker Compose, Coolify, Dokploy and Laravel Cloud deployment steps for Relaticle, with PostgreSQL, Redis and Ollama setup.
 order: 1
-updated: "2026-10-05"
+updated: "2026-10-31"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -81,6 +81,13 @@ These must be set or the containers will refuse to start.
 | `APP_DEBUG` | `false` | Set to `true` only for debugging. Never in production. |
 | `APP_TIMEZONE` | `UTC` | Application timezone. |
 | `APP_URL` | `http://localhost` | Full URL where Relaticle is accessible. Include the scheme. |
+| `TRUSTED_HOSTS` | `localhost` | Extra hostnames the app accepts, comma separated. The `APP_URL` host and any `*_DOMAIN` hosts are always accepted. Keep `localhost` in the list, because the container health check calls it. |
+| `TRUSTED_PROXIES` | (empty) | Proxy addresses whose `X-Forwarded-For`, `-Proto` and `-Port` headers the app believes, comma separated, as IPs or CIDR ranges. Empty trusts every private range (10/8, 172.16/12, 192.168/16, loopback), which Traefik, Coolify and Dokploy need. Narrow it to your proxy, for example its Docker network gateway or subnet, so no other container or host peer can forge a client IP. `*` trusts every sender and is unsafe. Never publish the app port directly to an untrusted network. |
+| `SESSION_SECURE_COOKIE` | (empty) | Sends the session cookie over HTTPS only. Empty means secure when `APP_URL` starts with `https://`, and not secure otherwise. Set `true` or `false` to override. Serve production installs over HTTPS. A Secure cookie over plain HTTP is dropped by the browser, so a plain-HTTP install must leave this empty or `false`, or nobody can sign in. An `https://` install that you also open over plain HTTP, such as by LAN IP, needs `false` for that access to work. |
+| `HSTS_MAX_AGE` | `15552000` | Seconds browsers keep forcing HTTPS for your host. The `Strict-Transport-Security` header is sent only when `APP_ENV=production` and the request is HTTPS. Set `0` to make browsers forget it. |
+| `HSTS_INCLUDE_SUBDOMAINS` | `false` | Set `true` to extend HSTS to every subdomain of the host. Leave it off if any sibling subdomain, such as an intranet host, is served over plain HTTP. |
+| `CSP_MODE` | `enforce` | Content-Security-Policy for HTML pages. `report-only` sends the full policy as a report-only header, and `off` drops it. `frame-ancestors`, `object-src` and `base-uri` stay enforced in every mode. |
+| `CSP_SCRIPT_SRC`, `CSP_STYLE_SRC`, `CSP_IMG_SRC`, `CSP_FONT_SRC`, `CSP_CONNECT_SRC`, `CSP_FRAME_SRC` | (empty) | Extra origins for that directive, comma separated. Set `CSP_IMG_SRC` when media or profile photos load from a bucket URL on another host. The websocket origin is added for you. |
 | `APP_PORT` | `80` | Host port the app container binds to. |
 | `APP_PANEL_DOMAIN` | (empty) | Set for subdomain routing (e.g., `app.example.com`). Leave empty for path mode (`/app`). |
 | `PASSKEYS_USER_HANDLE_SECRET` | `APP_KEY` | Derives the opaque WebAuthn user handle stored on each authenticator. Set it to its own random value (`openssl rand -base64 32`) before anyone registers a passkey, so rotating `APP_KEY` later does not change every user's handle. |
@@ -111,17 +118,39 @@ These are pre-configured in `compose.yml` and generally don't need changing.
 | `DB_USERNAME` | `relaticle` | PostgreSQL username. |
 | `REDIS_PASSWORD` | `null` | Redis password. Leave as `null` for no auth. |
 
+### Live updates
+
+Rela, the built-in AI assistant, streams its replies into the chat over a websocket. The `reverb` container serves it, and the app container proxies it under `/reverb` on the address you already use. No extra port, domain or certificate is needed.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `REVERB_APP_SECRET` | `APP_KEY` | Signs messages between the app and the `reverb` container. Set it to rotate it apart from `APP_KEY`. |
+| `REVERB_HOST`, `REVERB_PORT`, `REVERB_SCHEME` | (empty) | Set these only when the websocket has its own public address. Left empty, the browser connects to the `APP_URL` origin under `/reverb`. |
+
+When the websocket is unreachable, the chat still works. Each reply appears a few seconds after it is saved, without typing live. The suggested next steps under a reply show after a page reload.
+
 ### Optional
 
 | Variable | Description |
 |----------|-------------|
-| `GOOGLE_CLIENT_ID` | Google OAuth client ID for social login. |
+| `GOOGLE_CLIENT_ID` | Google OAuth client ID for social login. The Google button appears only when this is set. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret. |
 | `GOOGLE_REDIRECT_URI` | Absolute callback URL (`https://your-host/auth/callback/google`), or a relative path (`/auth/callback/google`) to derive the host from the request. |
 | `MICROSOFT_CLIENT_ID` | Microsoft Entra ID client id. The Microsoft button appears only when this is set; register `https://your-host/auth/callback/microsoft` as the redirect URI. |
 | `MICROSOFT_CLIENT_SECRET` | Microsoft Entra ID client secret. |
 | `SENTRY_LARAVEL_DSN` | Sentry DSN for error tracking. |
 | `FATHOM_ANALYTICS_SITE_ID` | Fathom Analytics site ID. |
+
+### Legal and help links
+
+A self-hosted install ships no legal pages, and relaticle.com's policies do not cover your install. Point the first three settings at your own pages. An unset setting shows no link. Only `DOCUMENTATION_PUBLIC_URL` defaults to relaticle.com.
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `RELATICLE_PRIVACY_URL` | (empty) | Your privacy policy. Linked from the footer of the sign-in pages, the onboarding screens, the scheduled-deletion page, and the email accounts page. Unset means no link. |
+| `RELATICLE_TERMS_URL` | (empty) | Your terms of service. Linked from the sign-in footer, the onboarding screens, and the scheduled-deletion page. Unset means no link. |
+| `RELATICLE_CONTACT_URL` | (empty) | Your contact or support page. Linked from the sign-in footer. Unset means no link. |
+| `DOCUMENTATION_PUBLIC_URL` | `https://relaticle.com` | The site that serves the help center and the developer guides. Rela and the panel's help links point here. Set it to your own mirror if you host one. |
 
 ### Email and calendar
 
@@ -156,7 +185,7 @@ One setting applies to both providers.
 
 ### AI Assistant
 
-Rela, the built-in AI assistant, works with cloud providers, a self-hosted server, or both. Models appear in the chat model picker only when their provider is configured. With none configured, the assistant cannot answer.
+Rela works with cloud providers, a self-hosted server, or both. Models appear in the chat model picker only when their provider is configured. With none configured, the assistant cannot answer.
 
 There are two ways to run a self-hosted model, and you can use either or both:
 
@@ -172,8 +201,9 @@ There are two ways to run a self-hosted model, and you can use either or both:
 | `SELF_HOSTED_AI_URL` | (empty) | Base URL of an OpenAI-compatible endpoint (e.g. `http://localhost:8000/v1`). |
 | `SELF_HOSTED_AI_KEY` | (empty) | API key for that endpoint, if it requires one (blank for most local servers). |
 | `SELF_HOSTED_AI_MODELS` | (empty) | Comma-separated model tags to expose (e.g. `qwen3:14b,llama3.1:70b`). Each becomes a picker entry. |
+| `CHAT_RATE_LIMIT_PER_MINUTE` | `60` | Messages a workspace may send to Rela per minute. Set `0` for no limit. |
 
-**Choosing a model.** The assistant calls over 30 CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably. `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against its endpoint (self-hosted models only; cloud models run through the vendor SDK and are declined).
+**Choosing a model.** The assistant calls CRM tools (search, create, update, delete). Only models with strong tool-calling support work reliably. `qwen3` and `llama3.1:70b`-class models are good starting points. Small models tend to claim an action succeeded without actually invoking the tool. Verify a model before trusting it with `php artisan chat:models --probe=<id>`, which lists the registry and smoke-tests tool-calling against its endpoint (self-hosted models only; cloud models run through the vendor SDK and are declined).
 
 **Known limitations with self-hosted models:**
 
@@ -188,21 +218,26 @@ Toggle features on or off. All are enabled by default unless noted. Useful for f
 |----------|---------|-------------|
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Seed demo data (sample companies, people, tasks) when a new workspace is created. Set to `false` to start with an empty workspace. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Enable Google and Microsoft social login. Set to `false` to use only email, password, and passkey sign-in. |
-| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Enable the `/developers` and `/help` documentation module. Set to `false` to remove documentation routes and navigation links. |
+| `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Serve the OpenAPI spec at `/openapi.json` and `/openapi.yaml`, and show the MCP guide link on the access tokens page. Set to `false` to remove both. The spec exists only after `php artisan scribe:generate` writes it. The Docker image and the manual steps do not run that command, and the Laravel Cloud build does. The API reference at `/developers/api` is relaticle.com's docs page and loads the same spec. |
 | `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Enable email and calendar sync for Google and Microsoft accounts, the email composer, and the Email & calendar help pages. Requires `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET`. Microsoft accounts also need `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET`. |
-| `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. |
+| `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Ask new sign-ups to pass a Cloudflare Turnstile check. Stays hidden for normal browsers and shows a checkbox only when Cloudflare needs one. Requires `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`. The flag also refuses sign-ups from Tor exit relays, which needs no keys. It checks the Tor Project's exit list, refreshed every hour. Sign-in over Tor still works. |
+
+`RELATICLE_FEATURE_BLOG` does nothing on a self-hosted install. It switches on the blog pages, which live in the cloud package. The Docker image leaves that package out, along with the marketing site and the help and developer guide pages.
+
+Leave `RELATICLE_FEATURE_BILLING` unset, because nothing in a self-hosted install can start a subscription. With it on, every workspace created after your install ran its July 2026 billing migration resolves to Free or Trial ended. On a new install, that is every workspace. Both deny access, so email sending, mailbox sync and calendar sync stop for those workspaces. Mail already queued for them is marked failed and is not resent when you turn the flag off. The access tokens page also gains a web-form help link.
 
 ---
 
 ## Architecture
 
-The Docker setup runs 5 containers:
+The Docker setup runs 6 containers:
 
 | Container | Image | Purpose |
 |-----------|-------|---------|
 | **app** | `ghcr.io/relaticle/relaticle:latest` | Web server (nginx + PHP-FPM) on port 8080. Runs migrations automatically on startup. |
 | **horizon** | `ghcr.io/relaticle/relaticle:latest` | Queue worker powered by Laravel Horizon. Processes background jobs. |
 | **scheduler** | `ghcr.io/relaticle/relaticle:latest` | Runs `schedule:work` for recurring tasks (e.g., cleanup, notifications). |
+| **reverb** | `ghcr.io/relaticle/relaticle:latest` | Websocket server (Laravel Reverb). Streams Rela's replies to the browser. |
 | **postgres** | `postgres:17-alpine` | PostgreSQL 17 database. |
 | **redis** | `redis:7-alpine` | Cache, sessions, and queue backend. Runs with append-only persistence. |
 
@@ -216,7 +251,7 @@ The Docker setup runs 5 containers:
 
 ### Networking
 
-The app container listens on port 8080 internally and maps to `APP_PORT` (default 80) on the host. All containers communicate through Docker's internal network. Only the app container exposes a port to the host.
+The app container listens on port 8080 internally and maps to `APP_PORT` (default 80) on the host. All containers communicate through Docker's internal network. Only the app container exposes a port to the host. The browser reaches the websocket through it, at `/reverb`.
 
 ---
 
@@ -240,6 +275,8 @@ The `sysadmin` panel at `{APP_URL}/sysadmin` is a separate, instance-wide admin 
 docker compose exec app php artisan sysadmin:create
 ```
 
+The panel opens on the **Instance** dashboard at `{APP_URL}/sysadmin/instance`, and `{APP_URL}/sysadmin` redirects there. It counts the users, workspaces, companies, people, and opportunities across every workspace on your installation. The revenue, subscription, and AI credit pages that relaticle.com's staff panel shows belong to the cloud package and do not exist here.
+
 ---
 
 ## Reverse Proxy and SSL
@@ -251,6 +288,11 @@ SSL is not optional if you want passkeys: browsers run WebAuthn over HTTPS only,
 ### Nginx
 
 ```nginx
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    '' close;
+}
+
 server {
     listen 443 ssl http2;
     server_name crm.example.com;
@@ -264,6 +306,9 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
     }
 }
 
@@ -282,7 +327,7 @@ crm.example.com {
 }
 ```
 
-Caddy handles SSL certificates automatically via Let's Encrypt.
+Caddy handles SSL certificates automatically via Let's Encrypt, and it forwards websockets without extra configuration. So does Traefik.
 
 ### Traefik
 
@@ -297,7 +342,11 @@ labels:
   - "traefik.http.services.relaticle.loadbalancer.server.port=8080"
 ```
 
+The `Upgrade` and `Connection` headers in the Nginx block carry the chat websocket. A proxy that drops them still serves the app, and replies then appear a few seconds late.
+
 **Note**: When using a reverse proxy, set `APP_URL` to your public HTTPS URL (e.g., `https://crm.example.com`). The app trusts `X-Forwarded-*` headers from RFC1918 private networks, loopback, and IPv6 ULA/link-local, which covers Coolify/Dokploy/Traefik on a Docker network and reverse proxies on the host. Headers from public IPs are rejected, preventing spoofing.
+
+The app only accepts requests whose `Host` header matches `APP_URL`, `www.` plus that host, a configured `*_DOMAIN`, or an entry in `TRUSTED_HOSTS`. Any other host gets a 400. Your proxy must forward the real `Host` header (Nginx `proxy_set_header Host $host;`) and must not pass a client-supplied `X-Forwarded-Host` through. The app ignores `X-Forwarded-Host` and `X-Forwarded-Prefix`. Probes that call the container by IP or an internal name need that name in `TRUSTED_HOSTS`, or they should send the configured domain as the `Host` header.
 
 ---
 
@@ -336,7 +385,7 @@ echo "base64:$(openssl rand -base64 32)"
 
 ### 4. Deploy
 
-Click **Deploy**. Dokploy will pull the images and start all 5 containers. Wait for health checks to pass.
+Click **Deploy**. Dokploy will pull the images and start all 6 containers. Wait for health checks to pass.
 
 ### 5. Configure Domain
 
@@ -469,6 +518,8 @@ Deploy command:
 php artisan migrate --force
 ```
 
+A fork contains `packages/Cloud`, relaticle.com's own code. It stays out of the app while `RELATICLE_CLOUD` is unset, so leave that variable out of the environment.
+
 Cloud restarts Horizon on every deployment, so no `horizon:terminate` step is needed.
 
 ### 4. Queue Workers and Scheduler
@@ -512,6 +563,19 @@ docker compose up -d
 ```
 
 Database migrations run automatically on startup. The app container will apply any pending migrations before serving traffic.
+
+### 4. Refresh the Compose File
+
+A `compose.yml` downloaded before October 2026 has no `reverb` container. The chat works without it, and replies appear a few seconds after they are saved. To get live streaming, download the file again and start the stack:
+
+```bash
+curl -o compose.yml https://raw.githubusercontent.com/Relaticle/relaticle/main/compose.yml
+docker compose up -d
+```
+
+Copy any edits you made to the old file first. The new file passes the AI provider variables from `.env` to the containers, so those lines no longer need adding by hand.
+
+The image now caches in Redis by default, so the web, Horizon and scheduler containers share one cache. The old file gave only the web container Redis, and the chat's Stop button never reached the worker. A stack that sets `CACHE_STORE` itself keeps its own value.
 
 **Note**: Check the [release notes](https://github.com/Relaticle/relaticle/releases) before upgrading. Breaking changes will be documented there.
 
@@ -572,11 +636,10 @@ git clone https://github.com/Relaticle/relaticle.git /var/www/relaticle
 cd /var/www/relaticle
 ```
 
-2. Install dependencies:
+2. Install PHP dependencies:
 
 ```bash
 composer install --no-dev --optimize-autoloader
-pnpm install --frozen-lockfile && pnpm run build
 ```
 
 3. Configure the environment:
@@ -586,27 +649,54 @@ cp .env.example .env
 php artisan key:generate
 ```
 
-Edit `.env` with your database credentials, mail settings, and `APP_URL`.
+Edit `.env` with your database credentials, mail settings, and `APP_URL`. Set `APP_ENV=production` and `APP_DEBUG=false`. The example file ships `local` and `true`, and debug pages in production expose your configuration.
 
-4. Set up the database:
+Leave `RELATICLE_CLOUD` unset. `packages/Cloud` is relaticle.com's own billing, marketing site, and hosted admin pages. The Docker image leaves it out, and a clone contains it. With the switch unset it stays out of the app and out of the frontend build, so your install never serves relaticle.com's marketing site at `/`. Its license allows development and testing use, so the directory stays on disk and `git pull` keeps working.
+
+4. Build the frontend:
+
+```bash
+pnpm install --frozen-lockfile && pnpm run build
+```
+
+5. Set up the database:
 
 ```bash
 php artisan migrate --force
 php artisan storage:link
 ```
 
-5. Set permissions:
+6. Set permissions:
 
 ```bash
 chown -R www-data:www-data storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 ```
 
-6. Create your admin user:
+7. Create your admin user:
 
 ```bash
 php artisan make:filament-user
 ```
+
+### Updating a Manual Install
+
+```bash
+cd /var/www/relaticle
+php artisan down
+git pull
+composer install --no-dev --optimize-autoloader
+pnpm install --frozen-lockfile && pnpm run build
+php artisan migrate --force
+php artisan optimize
+php artisan up
+php artisan horizon:terminate
+php artisan reverb:restart
+```
+
+`php artisan optimize` rebuilds the config and route caches, which still name routes the previous release served. If you cache components with `php artisan filament:optimize`, run it again after `php artisan up`. If PHP-FPM runs with `opcache.validate_timestamps=0`, reload it as well.
+
+Supervisor restarts Horizon after `horizon:terminate`. Check the [release notes](https://github.com/Relaticle/relaticle/releases) before you update.
 
 ### Nginx Configuration
 
@@ -628,11 +718,22 @@ server {
         include fastcgi_params;
     }
 
+    location /reverb/app/ {
+        rewrite ^/reverb(/.*)$ $1 break;
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $http_host;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+    }
+
     location ~ /\.(?!well-known).* {
         deny all;
     }
 }
 ```
+
+The `/reverb/app/` block carries the chat websocket to Reverb. In `.env`, set `BROADCAST_CONNECTION=reverb`, `BROADCAST_REVERB_HOST=127.0.0.1` and `BROADCAST_REVERB_PORT=8080`, and leave `REVERB_HOST` empty.
 
 ### Supervisor for Horizon
 
@@ -657,6 +758,23 @@ sudo supervisorctl reread
 sudo supervisorctl update
 sudo supervisorctl start relaticle-horizon
 ```
+
+### Supervisor for Reverb
+
+Create `/etc/supervisor/conf.d/relaticle-reverb.conf`:
+
+```ini
+[program:relaticle-reverb]
+process_name=%(program_name)s
+command=php /var/www/relaticle/artisan reverb:start --host=127.0.0.1 --port=8080
+autostart=true
+autorestart=true
+user=www-data
+redirect_stderr=true
+stdout_logfile=/var/www/relaticle/storage/logs/reverb.log
+```
+
+Start it the same way, then run `php artisan reverb:restart` after each upgrade.
 
 ### Scheduler Cron
 
@@ -710,6 +828,20 @@ Common causes:
 2. Check your SMTP credentials are correct
 3. Test with: `docker compose exec app php artisan tinker --execute "Mail::raw('Test', fn(\$m) => \$m->to('you@example.com')->subject('Test'))"`
 4. Check logs: `docker compose logs app | grep -i mail`
+
+### Chat stays on "Thinking..."
+
+Since October 2026 a reply appears a few seconds after it is saved even with no websocket. If the chat still waits, the reply is not being produced:
+
+1. Check the job ran: `docker compose logs horizon --tail 50` shows `ProcessChatMessage` as `DONE`.
+2. Check the model answers: `docker compose exec horizon php artisan chat:models --probe=<id>`.
+3. Check every container shares the cache: `docker compose exec horizon php artisan config:show cache.default` prints `redis`.
+
+To see whether replies stream live, open the browser's Network tab, filter by WS, and look for a `/reverb/app/...` request with status 101. With no such request, the `reverb` container is missing or your reverse proxy drops the `Upgrade` header.
+
+### The homepage shows the Relaticle marketing site
+
+The cloud package is loaded, because `RELATICLE_CLOUD` is set in `.env` or in the server environment. A self-hosted install redirects `/` to the app. Remove the variable, run `php artisan config:clear` (and `php artisan optimize` again if you cache configuration), then rebuild the frontend with `pnpm run build`.
 
 ### Horizon not processing jobs
 

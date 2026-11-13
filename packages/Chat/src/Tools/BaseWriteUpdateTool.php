@@ -12,10 +12,12 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\CustomFieldsSchemaDescriber;
+use Relaticle\Chat\Support\PendingActionEnvelope;
 use Relaticle\Chat\Support\ProposalPayload;
 use Relaticle\Chat\Tools\Concerns\GuardsRecordNames;
 use Relaticle\Chat\Tools\Concerns\LimitsPlanSteps;
@@ -40,6 +42,11 @@ abstract class BaseWriteUpdateTool implements Tool
     abstract protected function actionClass(): string;
 
     abstract protected function entityType(): string;
+
+    protected function proposalEntity(): ProposalEntity
+    {
+        return ProposalEntity::from($this->entityType());
+    }
 
     abstract protected function entityLabel(): string;
 
@@ -236,7 +243,7 @@ abstract class BaseWriteUpdateTool implements Tool
             conversationId: $this->resolveConversationId(),
             actionClass: $this->actionClass(),
             operation: PendingActionOperation::Update,
-            entityType: $this->entityType(),
+            entityType: $this->proposalEntity(),
             actionData: $isBatch ? ['_batch' => true, 'records' => $actionRecords] : $actionRecords[0],
             displayData: $isBatch
                 ? [
@@ -253,23 +260,12 @@ abstract class BaseWriteUpdateTool implements Tool
 
         $publicRecords = array_map(ProposalPayload::withoutMarkers(...), $actionRecords);
 
-        $response = [
-            'type' => 'pending_action',
-            'pending_action_id' => $pending->id,
-            'turn_id' => $pending->turn_id,
-            'action' => class_basename($this->actionClass()),
-            'entity_type' => $this->entityType(),
-            'operation' => 'update',
-            'data' => $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0],
-            'display' => $pending->display_data,
-            'meta' => ['agent_should_stop' => true],
-        ];
-
-        if ($skipped !== []) {
-            $response['skipped'] = $skipped;
-        }
-
-        return (string) json_encode($response, JSON_UNESCAPED_SLASHES);
+        return (string) json_encode(PendingActionEnvelope::for(
+            $pending,
+            class_basename($this->actionClass()),
+            $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0],
+            afterMeta: $skipped === [] ? [] : ['skipped' => $skipped],
+        ), JSON_UNESCAPED_SLASHES);
     }
 
     /**

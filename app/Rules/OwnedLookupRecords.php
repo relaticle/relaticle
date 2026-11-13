@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Rules;
 
 use App\Enums\CrmEntity;
+use App\Models\Scopes\WorkspaceScope;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 
@@ -50,6 +51,7 @@ final readonly class OwnedLookupRecords implements ValidationRule
 
         $model = $entity->model();
         $owned = $model::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
             ->whereIn('id', $ids->all())
             ->where('workspace_id', $this->workspaceId)
             ->pluck('id')

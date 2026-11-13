@@ -6,7 +6,6 @@ namespace App\Http\Middleware;
 
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\CurrentWorkspace;
 use Closure;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Builder;
@@ -29,8 +28,6 @@ final readonly class ApplyTenantScopes
                 ->whereHas('workspaces', fn (Builder $query) => $query->where('workspaces.id', $tenantId))
                 ->orWhereHas('ownedWorkspaces', fn (Builder $query) => $query->where('workspaces.id', $tenantId))
         );
-
-        resolve(CurrentWorkspace::class)->set($tenant);
 
         return $next($request);
     }

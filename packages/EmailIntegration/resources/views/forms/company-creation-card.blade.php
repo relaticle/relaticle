@@ -15,7 +15,7 @@
         x-on:click="if (@js($disabled)) { return } if (! $event.target.closest('.fi-toggle')) $refs.companyToggle.click()"
     >
         <span class="ei-sharing-card-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-gray-500 transition dark:bg-white/10 dark:text-gray-400">
-            <x-filament::icon icon="heroicon-o-building-office-2" class="h-5 w-5" />
+            <x-filament::icon icon="lucide-building-complex" class="h-5 w-5" />
         </span>
 
         <span class="min-w-0 flex-1">

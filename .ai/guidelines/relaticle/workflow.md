@@ -22,6 +22,11 @@
 ## Releases
 
 - Merge to main and tag only on explicit instruction, never on your own.
+- Security fixes to dependencies come from Dependabot security updates (`.github/dependabot.yml`),
+  one pull request per ecosystem group, and a person merges and releases them like any other.
+  Packagist can list a Composer advisory hours or days before GitHub's advisory database. Then
+  Oh Dear's `SecurityAdvisoriesCheck` (`HealthServiceProvider`) alerts first, and a person runs
+  `composer update <package> -W`, which skips versions with advisories, and opens the pull request.
 - Procedure: merge → `git checkout main && git pull` → confirm local and remote
   parity (`git log origin/main..main` and the reverse are both empty) → tag
   `vX.Y.Z` (minor for features, patch for fixes) → `git push origin <tag>`.

@@ -52,13 +52,16 @@
         x-transition:enter="fi-transition-enter"
         x-transition:enter-start="fi-transition-enter-start"
         x-transition:enter-end="fi-transition-enter-end"
+        x-transition:leave="fi-transition-leave"
+        x-transition:leave-start="fi-transition-leave-start"
+        x-transition:leave-end="fi-transition-leave-end"
         class="fi-sidebar-group-btn"
     >
         <span class="fi-sidebar-group-label">{{ __('Chats') }}</span>
 
         <x-filament::icon-button
             color="gray"
-            :icon="\Filament\Support\Icons\Heroicon::ChevronUp"
+            icon="lucide-chevron-up"
             label="{{ __('Chats') }}"
             x-bind:aria-expanded="! $store.sidebar.groupIsCollapsed(label)"
             x-on:click.stop="$store.sidebar.toggleCollapsedGroup(label)"
@@ -78,6 +81,12 @@
         @if($conversations->isEmpty())
             <li
                 x-show="$store.sidebar.isOpen"
+                x-transition:enter="fi-transition-enter"
+                x-transition:enter-start="fi-transition-enter-start"
+                x-transition:enter-end="fi-transition-enter-end"
+                x-transition:leave="fi-transition-leave"
+                x-transition:leave-start="fi-transition-leave-start"
+                x-transition:leave-end="fi-transition-leave-end"
                 class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400"
                 role="status"
             >
@@ -161,6 +170,12 @@
                         }
                     }"
                     x-show="$store.sidebar.isOpen"
+                    x-transition:enter="fi-transition-enter"
+                    x-transition:enter-start="fi-transition-enter-start"
+                    x-transition:enter-end="fi-transition-enter-end"
+                    x-transition:leave="fi-transition-leave"
+                    x-transition:leave-start="fi-transition-leave-start"
+                    x-transition:leave-end="fi-transition-leave-end"
                     @class([
                         'fi-sidebar-item group/chat-item relative',
                         'fi-active' => $isActive,
@@ -172,13 +187,16 @@
                             wire:navigate
                             class="fi-sidebar-item-btn pe-8 group-hover/chat-item:bg-(--surface-sidebar-hover-bg)"
                         >
-                            <x-heroicon-o-chat-bubble-left class="fi-icon fi-size-lg fi-sidebar-item-icon" />
+                            <x-lucide-message-square class="fi-icon fi-size-lg fi-sidebar-item-icon" />
                             <span
                                 data-title
                                 x-show="$store.sidebar.isOpen"
                                 x-transition:enter="fi-transition-enter"
                                 x-transition:enter-start="fi-transition-enter-start"
                                 x-transition:enter-end="fi-transition-enter-end"
+                                x-transition:leave="fi-transition-leave"
+                                x-transition:leave-start="fi-transition-leave-start"
+                                x-transition:leave-end="fi-transition-leave-end"
                                 title="{{ $rawTitle }}"
                                 class="fi-sidebar-item-label truncate"
                             >
@@ -209,7 +227,7 @@
                     <x-filament::dropdown
                         placement="bottom-end"
                         x-show="$store.sidebar.isOpen && !editing"
-                        class="absolute inset-y-0 end-1 my-auto flex h-6 items-center"
+                        class="absolute inset-y-0 end-1 my-auto flex h-6 items-center max-sm:h-11"
                     >
                         <x-slot name="trigger">
                             <button
@@ -217,15 +235,15 @@
                                 aria-label="{{ __('Chat actions') }}"
                                 title="{{ __('Chat actions') }}"
                                 x-bind:class="{ 'opacity-100': isOpen }"
-                                class="flex size-6 items-center justify-center rounded-md text-gray-500 opacity-0 transition hover:bg-gray-200/70 hover:text-gray-700 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 pointer-coarse:opacity-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                                class="flex size-6 items-center justify-center rounded-md text-gray-500 opacity-0 max-sm:size-11 transition hover:bg-gray-200/70 hover:text-gray-700 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 pointer-coarse:opacity-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
                             >
-                                <x-heroicon-o-ellipsis-horizontal class="size-4" />
+                                <x-lucide-ellipsis class="size-4" />
                             </button>
                         </x-slot>
 
                         <x-filament::dropdown.list>
                             <x-filament::dropdown.list.item
-                                :icon="\Filament\Support\Icons\Heroicon::OutlinedPencilSquare"
+                                icon="lucide-square-pen"
                                 x-on:click="close(); startEdit()"
                             >
                                 {{ __('Rename chat') }}
@@ -233,7 +251,7 @@
 
                             <x-filament::dropdown.list.item
                                 color="danger"
-                                :icon="\Filament\Support\Icons\Heroicon::OutlinedTrash"
+                                icon="lucide-trash"
                                 wire:click="deleteConversation({{ \Illuminate\Support\Js::from($conversation->id) }})"
                                 wire:confirm="{{ __('Delete this chat? Messages and any pending actions will be removed.') }}"
                             >
@@ -247,6 +265,12 @@
             @if($hasMore)
                 <li
                     x-show="$store.sidebar.isOpen"
+                    x-transition:enter="fi-transition-enter"
+                    x-transition:enter-start="fi-transition-enter-start"
+                    x-transition:enter-end="fi-transition-enter-end"
+                    x-transition:leave="fi-transition-leave"
+                    x-transition:leave-start="fi-transition-leave-start"
+                    x-transition:leave-end="fi-transition-leave-end"
                     class="fi-sidebar-item"
                 >
                     <button
@@ -255,12 +279,15 @@
                         class="fi-sidebar-item-btn w-full text-start"
                         aria-label="{{ __('Open all chats') }}"
                     >
-                        <x-heroicon-o-ellipsis-horizontal class="fi-icon fi-size-lg fi-sidebar-item-icon" />
+                        <x-lucide-ellipsis class="fi-icon fi-size-lg fi-sidebar-item-icon" />
                         <span
                             x-show="$store.sidebar.isOpen"
                             x-transition:enter="fi-transition-enter"
                             x-transition:enter-start="fi-transition-enter-start"
                             x-transition:enter-end="fi-transition-enter-end"
+                            x-transition:leave="fi-transition-leave"
+                            x-transition:leave-start="fi-transition-leave-start"
+                            x-transition:leave-end="fi-transition-leave-end"
                             class="fi-sidebar-item-label"
                         >
                             {{ __('All chats') }}

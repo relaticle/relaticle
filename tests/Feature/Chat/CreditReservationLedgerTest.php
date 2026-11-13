@@ -2,17 +2,24 @@
 
 declare(strict_types=1);
 
+use App\Features\Billing;
 use App\Models\User;
+use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Laravel\Pennant\Feature;
+use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
 
-mutates(CreditService::class);
+mutates(CreditService::class, ReleaseOrphanedReservationsCommand::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 it('reserves exactly once for the same reservation key', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -31,6 +38,8 @@ it('reserves exactly once for the same reservation key', function (): void {
 });
 
 it('writes a reservation ledger row with the key and conversation', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -60,6 +69,8 @@ it('writes a reservation ledger row with the key and conversation', function ():
 });
 
 it('refunds orphaned reservations older than the age window', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -82,7 +93,33 @@ it('refunds orphaned reservations older than the age window', function (): void 
         ->exists())->toBeTrue();
 });
 
+it('neither refunds nor reports an orphaned reservation of an unmetered workspace', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $service = app(CreditService::class);
+    $service->resetPeriod($workspace);
+
+    $service->reserveCredit($workspace, reservationKey: 'reserve-unmetered-1', conversationId: null, userId: (string) $user->getKey());
+    $afterReserve = $service->getBalance($workspace);
+
+    AiCreditTransaction::query()
+        ->where('idempotency_key', 'reserve-unmetered-1')
+        ->update(['created_at' => now()->subHour()]);
+
+    Feature::define(Billing::class, false);
+    Feature::flushCache();
+
+    Artisan::call('chat:release-orphaned-reservations', ['--age' => 30]);
+
+    expect(Artisan::output())->not->toContain('Refunding orphaned reservation')
+        ->toContain('Refunded 0 orphaned reservations.')
+        ->and($service->getBalance($workspace))->toBe($afterReserve)
+        ->and(AiCreditTransaction::query()->where('idempotency_key', 'resolve-unmetered-1')->exists())->toBeFalse();
+});
+
 it('does not refund reservations that were settled', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -115,6 +152,8 @@ it('does not refund reservations that were settled', function (): void {
 });
 
 it('makes a late settle a no-op after the sweeper refunded the turn', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -148,6 +187,8 @@ it('makes a late settle a no-op after the sweeper refunded the turn', function (
 });
 
 it('still reserves without a key (legacy path) by only decrementing the balance', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);
@@ -164,6 +205,8 @@ it('still reserves without a key (legacy path) by only decrementing the balance'
 });
 
 it('fails the reservation when the workspace has no credits left', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $service = app(CreditService::class);

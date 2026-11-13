@@ -12,6 +12,7 @@ use Filament\Auth\Notifications\ResetPassword as FilamentResetPassword;
 use Filament\Auth\Notifications\VerifyEmail as FilamentVerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange as FilamentVerifyEmailChange;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
 
 mutates(VerifyEmail::class);
@@ -38,6 +39,27 @@ it('renders the verify email mail with the branded copy', function (): void {
         ->and((string) $message->render())->toContain(__('mail.verify_email.heading'))
         ->and((string) $message->render())->toContain('https://app.relaticle.test/verify/123')
         ->and((string) $message->render())->toContain(__('mail.footer.reason.account', ['company' => config('relaticle.company.name')]));
+});
+
+it('renders the verify email mail naming the link expiry', function (): void {
+    config(['auth.verification.expire' => 45]);
+    $notification = new VerifyEmail;
+    $notification->url = 'https://app.relaticle.test/verify/123';
+
+    expect((string) $notification->toMail(User::factory()->unverified()->create())->render())
+        ->toContain(__('mail.verify_email.body', ['count' => 45]));
+});
+
+it('sends the verify mail naming the link expiry in both the html and the plain-text part', function (): void {
+    config(['auth.verification.expire' => 45]);
+
+    User::factory()->unverified()->create()->sendEmailVerificationNotification();
+
+    $sent = Mail::mailer('array')->getSymfonyTransport()->messages()->sole()->getOriginalMessage();
+    $expiry = __('mail.verify_email.body', ['count' => 45]);
+
+    expect($sent->getTextBody())->toContain($expiry)
+        ->and($sent->getHtmlBody())->toContain($expiry);
 });
 
 it('renders the verify email change mail naming the new address and the link expiry', function (): void {

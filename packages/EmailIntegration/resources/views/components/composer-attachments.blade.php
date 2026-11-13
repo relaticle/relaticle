@@ -16,7 +16,7 @@
                     aria-label="{{ __('filament/emails/composer.actions.download_attachment') }}"
                     class="shrink-0 rounded-md p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200"
                 >
-                    <x-heroicon-m-arrow-down-tray class="h-4 w-4" />
+                    <x-lucide-download class="h-4 w-4" />
                 </a>
 
                 <x-email-integration::composer-attachment-remove wire:click="removeSavedAttachment('{{ $attachment['id'] }}')" />

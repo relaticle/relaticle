@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Rector\CodingStyle\Rector\ArrowFunction\ArrowFunctionDelegatingCallToFirstClassCallableRector;
 use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPrivateMethodRector;
+use Rector\Php55\Rector\String_\StringClassNameToClassConstantRector;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
 use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
@@ -31,6 +32,7 @@ return RectorConfig::configure()
         __DIR__.'/public',
     ])
     ->withSkip([
+        __DIR__.'/packages/Cloud/tests',
         AddOverrideAttributeToOverriddenMethodsRector::class,
         // PHP 8.5 extends #[\Override] to properties. Skipped for the same reason as
         // the method rule above: it would tag every Filament $navigationIcon/$slug
@@ -64,12 +66,17 @@ return RectorConfig::configure()
         ApplyDefaultInsteadOfNullCoalesceRector::class => [
             __DIR__.'/database/migrations/2026_08_27_120000_create_settings_table.php',
         ],
+        // A migration keeps the type as a string: the stored value outlives the class.
+        StringClassNameToClassConstantRector::class => [
+            __DIR__.'/database/migrations/2026_10_22_000002_archive_email_access_request_notifications.php',
+        ],
         AddHasFactoryToModelsRector::class => [
             __DIR__.'/app/Models/PersonalAccessToken.php',
             __DIR__.'/app/Models/ActivityLog/Activity.php',
             __DIR__.'/app/Models/Passport/*',
             __DIR__.'/app/Models/Pivots/*',
             __DIR__.'/packages/ImportWizard/src/Models/*',
+            __DIR__.'/packages/Cloud/src/Analytics/Models/Acquisition.php',
         ],
     ])
     ->withSets([

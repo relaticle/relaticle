@@ -39,9 +39,9 @@ final class PublicSuffixList
     }
 
     /**
-     * The organisational domain (eTLD+1). Used only to pick a default company
-     * name: email.anthropic.com → Anthropic, mail.acme.co.uk → Acme. Company
-     * identity is the full host, not this value.
+     * The organisational domain (eTLD+1). Used to pick a default company name
+     * (email.anthropic.com → Anthropic, mail.acme.co.uk → Acme) and to compare
+     * sender organisations. Company identity is the full host, not this value.
      */
     public function registrableDomain(string $host): ?string
     {

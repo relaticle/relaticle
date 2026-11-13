@@ -16,12 +16,13 @@ use Relaticle\EmailIntegration\Filament\RelationManagers\BaseEmailsRelationManag
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
-mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class);
+mutates(BaseEmailsRelationManager::class, EmailVisibilityService::class, Email::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -69,7 +70,7 @@ describe('requestAccess action', function (): void {
             ->assertNotified('Access request sent.');
 
         expect(
-            EmailAccessRequest::where('email_id', $email->getKey())
+            EmailAccessRequest::query()->where('email_id', $email->getKey())
                 ->where('requester_id', $this->viewer->id)
                 ->where('owner_id', $this->owner->id)
                 ->where('status', 'pending')
@@ -104,10 +105,39 @@ describe('requestAccess action', function (): void {
             ->assertActionHidden('requestAccess', ['emailId' => $email->getKey()]);
 
         expect(
-            EmailAccessRequest::where('email_id', $email->getKey())
+            EmailAccessRequest::query()->where('email_id', $email->getKey())
                 ->where('requester_id', $this->viewer->id)
                 ->count()
         )->toBe(1);
+    });
+
+    it('is offered again once the previous request is overdue', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        EmailAccessRequest::factory()->overdue()->create([
+            'email_id' => $email->getKey(),
+            'requester_id' => $this->viewer->id,
+            'owner_id' => $this->owner->id,
+        ]);
+
+        $component = livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertActionVisible('requestAccess', ['emailId' => $email->getKey()]);
+
+        $row = collect($component->instance()->emails()->items())->firstWhere('id', $email->getKey());
+
+        expect($row->viewer_has_pending_access_request)->toBeFalsy();
     });
 
     it('is hidden when the authenticated user is the email owner', function (): void {
@@ -414,8 +444,6 @@ describe('access request approve and deny from the reader overlay', function ():
             'owner_id' => $this->owner->id,
         ]);
 
-        $this->owner->notify(new EmailAccessRequestedNotification($request));
-
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
@@ -429,8 +457,7 @@ describe('access request approve and deny from the reader overlay', function ():
             ->assertDispatched('databaseNotificationsSent')
             ->assertNotified(__('filament/pages/email-access-requests.notifications.approved'));
 
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED)
-            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
     });
 
     it('denies a pending request from the relation manager overlay', function (): void {
@@ -449,8 +476,6 @@ describe('access request approve and deny from the reader overlay', function ():
             'owner_id' => $this->owner->id,
         ]);
 
-        $this->owner->notify(new EmailAccessRequestedNotification($request));
-
         livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
@@ -462,8 +487,7 @@ describe('access request approve and deny from the reader overlay', function ():
             ->assertDispatched('databaseNotificationsSent')
             ->assertNotified(__('filament/pages/email-access-requests.notifications.denied'));
 
-        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED)
-            ->and($this->owner->notifications()->where('type', EmailAccessRequestedNotification::class)->count())->toBe(0);
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
     });
 });
 
@@ -506,6 +530,51 @@ describe('subject privacy enforcement', function (): void {
         ])
             ->assertSee('Real Subject')
             ->assertDontSee('(subject hidden)');
+    });
+
+    it('keeps the opening of the message out of the reader for a viewer at the subject level', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Renewal terms',
+            'snippet' => 'The discount is forty percent',
+            'privacy_tier' => EmailPrivacyTier::SUBJECT,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->call('selectEmail', $email->getKey())
+            ->assertSee('Renewal terms')
+            ->assertDontSee('The discount is forty percent');
+    });
+
+    it('shows the opening of the message in the reader to a viewer with full access', function (): void {
+        $this->actingAs($this->viewer);
+
+        $email = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'subject' => 'Renewal terms',
+            'snippet' => 'The discount is forty percent',
+            'privacy_tier' => EmailPrivacyTier::FULL,
+        ]);
+
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->call('selectEmail', $email->getKey())
+            ->assertSee('The discount is forty percent');
     });
 
     it('does not match a guessed subject when the viewer cannot view the subject', function (): void {
@@ -552,29 +621,54 @@ describe('subject privacy enforcement', function (): void {
             ->assertDontSeeHtml("email-list-row-{$private->getKey()}");
     });
 
+    it('lists a message two members synced once, as its most open copy', function (): void {
+        $this->actingAs($this->viewer);
+
+        $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+        $this->workspace->users()->attach($teammate, ['role' => 'member']);
+        $teammateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $teammate->id,
+        ]));
+
+        $open = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+            'rfc_message_id' => '<renewal-thread@example.com>',
+            'subject' => 'Renewal terms',
+            'sent_at' => CarbonImmutable::parse('2026-10-01 09:00:00'),
+            'privacy_tier' => EmailPrivacyTier::FULL,
+        ]);
+        $closed = Email::factory()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $teammate->id,
+            'connected_account_id' => $teammateAccount->getKey(),
+            'rfc_message_id' => '<renewal-thread@example.com>',
+            'subject' => 'Renewal terms',
+            'sent_at' => CarbonImmutable::parse('2026-10-02 09:00:00'),
+            'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+        ]);
+
+        $this->person->emails()->attach([$open->getKey(), $closed->getKey()]);
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSeeHtml("email-list-row-{$open->getKey()}")
+            ->assertDontSeeHtml("email-list-row-{$closed->getKey()}")
+            ->assertSee('Renewal terms')
+            ->assertDontSee('(subject hidden)');
+    });
+
     it('returns no emails when a client calls the table records method directly', function (): void {
         $this->actingAs($this->viewer);
 
-        foreach ([EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::PRIVATE] as $tier) {
-            $email = Email::factory()->create([
-                'workspace_id' => $this->workspace->id,
-                'user_id' => $this->owner->id,
-                'connected_account_id' => $this->account->getKey(),
-                'subject' => "Secret {$tier->value} subject",
-                'privacy_tier' => $tier,
-            ]);
-
-            $this->person->emails()->attach($email->getKey());
-        }
-
-        $component = livewire(EmailsRelationManager::class, [
+        livewire(EmailsRelationManager::class, [
             'ownerRecord' => $this->person,
             'pageClass' => ViewPeople::class,
-        ])->call('getTableRecords');
-
-        expect(json_encode($component->effects['returns']))
-            ->not->toContain('Secret metadata_only subject')
-            ->not->toContain('Secret private subject');
+        ])->call('getTableRecords')->assertForbidden();
     });
 
     it('matches the subject when searching as a viewer who can view it', function (): void {
@@ -642,4 +736,70 @@ it('omits the emails tab badge when the viewer cannot see the linked mail', func
     $this->actingAs($this->viewer);
 
     expect(EmailsRelationManager::getBadge($this->person, ViewPeople::class))->toBeNull();
+});
+
+describe('sender avatar', function (): void {
+    it('shows the person silhouette for an email from outside the workspace', function (): void {
+        $email = Email::factory()->inbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => 'lena@northwind.test',
+            'name' => 'Lena Ortiz',
+        ]);
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSee('person-silhouette', escape: false)
+            ->assertDontSee('member-avatar', escape: false);
+    });
+
+    it('shows the mailbox owner avatar for an email the workspace sent', function (): void {
+        $email = Email::factory()->outbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => 'sales@owner-alias.test',
+            'name' => 'Sales',
+        ]);
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSee('member-avatar', escape: false)
+            ->assertSee($this->owner->profile_photo_url, escape: false)
+            ->assertDontSee('person-silhouette', escape: false);
+    });
+
+    it('shows the member avatar for an email a workspace member sent to the mailbox', function (): void {
+        $email = Email::factory()->inbound()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $this->owner->id,
+            'connected_account_id' => $this->account->getKey(),
+        ]);
+        EmailParticipant::factory()->from()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => mb_strtoupper($this->viewer->email),
+            'name' => $this->viewer->name,
+        ]);
+        $this->person->emails()->attach($email->getKey());
+
+        livewire(EmailsRelationManager::class, [
+            'ownerRecord' => $this->person,
+            'pageClass' => ViewPeople::class,
+        ])
+            ->assertSee($this->viewer->profile_photo_url, escape: false)
+            ->assertDontSee('person-silhouette', escape: false);
+    });
 });

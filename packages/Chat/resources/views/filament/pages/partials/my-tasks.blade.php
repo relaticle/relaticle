@@ -3,11 +3,13 @@
     $myTasks = $this->myTasks;
     $count = $myTasks->count();
     $canComplete = $this->canCompleteTasks;
+    $canEdit = $this->canEditTasks;
 @endphp
 
-<div class="mt-14">
+<div class="mt-14 max-sm:mt-8">
     <div class="mb-3 flex items-center justify-between">
-        <h2 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+        <h2 class="flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            <x-filament::icon :icon="\App\Enums\CrmEntity::Task->icon()" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" />
             <span>{{ __('filament/pages/dashboard.tasks.heading') }}</span>
             <span class="text-gray-400 dark:text-gray-500">{{ $count }}</span>
         </h2>
@@ -69,7 +71,7 @@
                                 x-on:click="checked = true; setTimeout(() => $wire.completeTask(@js($task->id)).catch(() => checked = false), 450)"
                                 title="{{ __('filament/pages/dashboard.tasks.complete') }}"
                                 aria-label="{{ __('filament/pages/dashboard.tasks.complete') }}"
-                                class="flex size-4 flex-shrink-0 items-center justify-center rounded-full border transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
+                                class="relative flex size-4 flex-shrink-0 items-center justify-center rounded-full border max-sm:size-6 max-sm:after:absolute max-sm:after:-inset-2.5 transition duration-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
                                 :class="checked
                                     ? 'border-primary-600 bg-primary-600 dark:border-primary-500 dark:bg-primary-500'
                                     : 'border-gray-400 hover:border-primary-500 dark:border-gray-500 dark:hover:border-primary-400'"
@@ -78,13 +80,16 @@
                                     class="transition duration-200 motion-reduce:transition-none"
                                     :class="checked ? 'scale-100 opacity-100' : 'scale-50 opacity-0'"
                                 >
-                                    <x-heroicon-m-check class="size-3 text-white" />
+                                    <x-lucide-check class="size-3 text-white" />
                                 </span>
                             </button>
                         @endif
                         <a
                             href="{{ $task->editUrl }}"
-                            class="flex flex-1 items-center gap-3 py-3 pr-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
+                            @if($canEdit)
+                                x-on:click="if (! ($event.metaKey || $event.ctrlKey || $event.shiftKey || $event.altKey)) { $event.preventDefault(); $wire.mountAction('editTask', { task: @js($task->id) }) }"
+                            @endif
+                            class="flex min-w-0 flex-1 items-center gap-3 py-3 pr-4 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
                         >
                             <span
                                 class="flex-1 truncate text-sm transition duration-200 motion-reduce:transition-none"
@@ -92,9 +97,11 @@
                                 title="{{ $task->title }}"
                             >{{ $task->title }}</span>
                             @if($task->dueAt)
-                                <time datetime="{{ $task->dueAt->toDateString() }}" class="text-xs {{ $dateClass }}">
-                                    {{ $task->dueAt->isoFormat('MMM D, YYYY') }}
-                                </time>
+                                <time
+                                    datetime="{{ $task->dueAt->toDateString() }}"
+                                    title="{{ $task->dueAt->isoFormat('LL') }}"
+                                    class="shrink-0 whitespace-nowrap text-xs tabular-nums {{ $dateClass }}"
+                                >{{ $task->dueAt->isoFormat($task->dueAt->isSameYear(now($task->dueAt->timezone)) ? 'MMM D' : 'MMM D, YYYY') }}</time>
                             @endif
                         </a>
                     </div>

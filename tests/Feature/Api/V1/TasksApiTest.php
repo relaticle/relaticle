@@ -10,11 +10,13 @@ use App\Http\Controllers\Api\V1\TasksController;
 use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Concerns\ListsEntity;
 use App\Queries\Tasks\TasksQuery;
+use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
@@ -41,7 +43,7 @@ it('requires authentication', function (): void {
 it('can list tasks', function (): void {
     Sanctum::actingAs($this->user);
 
-    $seeded = Task::query()->where('workspace_id', $this->workspace->id)->count();
+    $seeded = Task::query()->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $this->workspace->id)->count();
     Task::factory(3)->recycle([$this->user, $this->workspace])->create();
 
     $this->getJson('/api/v1/tasks')
@@ -202,7 +204,9 @@ it('can create a task with relationship ids', function (): void {
     ])
         ->assertCreated();
 
-    $task = Task::query()->where('title', 'Linked task')->first();
+    $task = Task::query()->withoutGlobalScope(WorkspaceScope::class)->where('title', 'Linked task')->first();
+    resolve(CurrentWorkspace::class)->set($this->workspace);
+
     expect($task->companies)->toHaveCount(1)
         ->and($task->people)->toHaveCount(1)
         ->and($task->opportunities)->toHaveCount(1)
@@ -503,7 +507,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $task = Task::query()->where('title', 'Test Task')->first();
+        $task = Task::query()->withoutGlobalScope(WorkspaceScope::class)->where('title', 'Test Task')->first();
         expect($task->workspace_id)->toBe($this->workspace->id);
     });
 
@@ -518,7 +522,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $task = Task::query()->where('title', 'Test Task')->first();
+        $task = Task::query()->withoutGlobalScope(WorkspaceScope::class)->where('title', 'Test Task')->first();
         expect($task->creator_id)->toBe($this->user->id);
     });
 

@@ -6,10 +6,12 @@ namespace Relaticle\EmailIntegration\Controllers;
 
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Notifications\Notification;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Laravel\Socialite\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use RuntimeException;
 
@@ -38,7 +40,8 @@ final readonly class RedirectController
                 $user,
                 $this->driver('azure')
                     ->setScopes($this->azureScopes())
-                    ->with(['prompt' => 'consent']),
+                    // Entra rejects a forced consent prompt for non-admins once user consent is off, even after admin consent.
+                    ->with(['prompt' => 'select_account']),
             ),
 
             default => back(),
@@ -53,15 +56,31 @@ final readonly class RedirectController
             return redirect('/')->with('error', 'Select a workspace before connecting an account.');
         }
 
-        $request->session()->put(self::WORKSPACE_SESSION_KEY, $workspace->getKey());
-
         $returnUrl = $request->query('return');
+
+        if (! $workspace->hasMailboxCapacity()) {
+            return $this->redirectAtMailboxLimit($workspace, $returnUrl);
+        }
+
+        $request->session()->put(self::WORKSPACE_SESSION_KEY, $workspace->getKey());
 
         is_string($returnUrl)
             ? $request->session()->put(self::RETURN_URL_SESSION_KEY, $returnUrl)
             : $request->session()->forget(self::RETURN_URL_SESSION_KEY);
 
         return $driver->redirect();
+    }
+
+    private function redirectAtMailboxLimit(Workspace $workspace, mixed $returnUrl): RedirectResponse
+    {
+        Notification::make()
+            ->title($workspace->mailboxLimitMessage())
+            ->danger()
+            ->send();
+
+        return redirect(is_string($returnUrl) ? $returnUrl : EmailAccountsPage::getUrl([
+            'tenant' => $workspace->slug,
+        ]));
     }
 
     /** @return array<int, string> */

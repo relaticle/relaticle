@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Jobs;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Queue;
-use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Attributes\UniqueFor;
 use Illuminate\Queue\Middleware\Skip;
 use Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction;
@@ -21,6 +22,7 @@ use Relaticle\EmailIntegration\Enums\CalendarVisibility;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Exceptions\ReconcileCalendarMeetingsFailed;
 use Relaticle\EmailIntegration\Jobs\Concerns\DetectsAuthErrors;
+use Relaticle\EmailIntegration\Jobs\Middleware\HandlesProviderFailures;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
@@ -30,8 +32,8 @@ use Throwable;
 
 #[DeleteWhenMissingModels]
 #[Backoff(60, 300, 900)]
+#[MaxExceptions(3)]
 #[Queue('emails-import')]
-#[Tries(3)]
 #[UniqueFor(3600)]
 final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
 {
@@ -43,12 +45,17 @@ final class InitialCalendarSyncJob implements ShouldBeUnique, ShouldQueue
         public readonly bool $reconcileAfter = false,
     ) {}
 
+    public function retryUntil(): CarbonImmutable
+    {
+        return now()->addDay();
+    }
+
     /**
-     * @return list<Skip>
+     * @return list<Skip|HandlesProviderFailures>
      */
     public function middleware(): array
     {
-        return [Skip::when($this->connectedAccount->trashed())];
+        return [Skip::when($this->connectedAccount->trashed()), new HandlesProviderFailures];
     }
 
     public function handle(CalendarServiceFactoryInterface $serviceFactory): void

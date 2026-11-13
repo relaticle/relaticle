@@ -17,10 +17,7 @@ final class DownloadFailedRowsController
         /** @var User $user */
         $user = $request->user();
 
-        abort_unless(
-            (string) $import->workspace_id === (string) $user->currentWorkspace?->getKey(),
-            403,
-        );
+        abort_unless($user->belongsToWorkspaceId((string) $import->workspace_id), 403);
 
         $columnHeaders = $import->headers;
         $csvHeaders = [...$columnHeaders, 'Import Error'];

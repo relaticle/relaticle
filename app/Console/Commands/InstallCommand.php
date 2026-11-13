@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace App\Console\Commands;
 
+use App\Console\Concerns\ReadsStringOptions;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Throwable;
@@ -26,6 +28,8 @@ use function Laravel\Prompts\warning;
                             {--env-file= : Custom path to .env file (for testing)}')]
 final class InstallCommand extends Command
 {
+    use ReadsStringOptions;
+
     public function handle(): int
     {
         $this->displayWelcome();
@@ -447,7 +451,7 @@ final class InstallCommand extends Command
         $this->line('  • Real-time logs (Pail)');
 
         $this->newLine();
-        $this->line('  Documentation: https://relaticle.com/documentation');
+        $this->line('  Documentation: '.DocUrl::area(DocUrl::DOCS));
         $this->newLine();
 
         $this->info('Happy CRM-ing! 🚀');
@@ -455,6 +459,6 @@ final class InstallCommand extends Command
 
     private function envPath(): string
     {
-        return $this->option('env-file') ?: base_path('.env');
+        return $this->stringOption('env-file') ?? base_path('.env');
     }
 }

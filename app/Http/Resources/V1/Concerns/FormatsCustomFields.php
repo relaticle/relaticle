@@ -81,7 +81,7 @@ trait FormatsCustomFields
 
         return [
             'id' => (string) $rawValue,
-            'label' => $option !== null ? $option->name : (string) $rawValue,
+            'label' => $option->name ?? (string) $rawValue,
         ];
     }
 
@@ -100,7 +100,7 @@ trait FormatsCustomFields
 
                 return [
                     'id' => $stringId,
-                    'label' => $option !== null ? $option->name : $stringId,
+                    'label' => $option->name ?? $stringId,
                 ];
             })
             ->values()

@@ -74,12 +74,10 @@ final readonly class EmailSendingService
         $participants = $email->participants;
 
         $bodyHtml = $body instanceof EmailBody ? (string) $body->body_html : '';
-        $bodyText = $body instanceof EmailBody ? (string) $body->body_text : strip_tags($bodyHtml);
 
         $payload = [
             'subject' => (string) $email->subject,
             'body_html' => $bodyHtml,
-            'body_text' => $bodyText,
             'to' => $participants->where('role', 'to')
                 ->map(fn (EmailParticipant $participant): array => ['email' => $participant->email_address, 'name' => $participant->name])
                 ->values()

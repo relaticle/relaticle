@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Commands;
 
+use App\Contracts\Entitlements;
 use App\Models\Workspace;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
@@ -24,7 +25,7 @@ use Relaticle\Chat\Services\CreditService;
 #[Signature('chat:release-orphaned-reservations {--age=30 : Minimum reservation age in minutes before it is considered orphaned}')]
 final class ReleaseOrphanedReservationsCommand extends Command
 {
-    public function handle(CreditService $creditService): int
+    public function handle(CreditService $creditService, Entitlements $entitlements): int
     {
         $age = max(5, (int) $this->option('age'));
 
@@ -44,13 +45,17 @@ final class ReleaseOrphanedReservationsCommand extends Command
         $refunded = 0;
 
         foreach ($orphans as $orphan) {
-            $this->info("Refunding orphaned reservation `{$orphan->idempotency_key}` for workspace `{$orphan->workspace_id}`...");
-
             $workspace = Workspace::query()->find($orphan->workspace_id);
 
             if ($workspace === null) {
                 continue;
             }
+
+            if (! $entitlements->metersCredits($workspace)) {
+                continue;
+            }
+
+            $this->info("Refunding orphaned reservation `{$orphan->idempotency_key}` for workspace `{$orphan->workspace_id}`...");
 
             $creditService->refundReservation(
                 workspace: $workspace,

@@ -87,3 +87,11 @@ it('throttles dynamic client registration after the rate limit', function (): vo
 
     $this->postJson('/oauth/register', $payload)->assertStatus(429);
 });
+
+it('answers 404 when a client starts the device authorization grant', function (): void {
+    $this->postJson('/oauth/device/code', ['client_id' => 'any-client'])->assertNotFound();
+});
+
+it('answers 404 when a user opens the device code page', function (): void {
+    $this->get('/oauth/device')->assertNotFound();
+});

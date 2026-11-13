@@ -32,7 +32,7 @@ final class EmailAccessRequestsPage extends Page implements HasTable
 
     protected static bool $shouldRegisterNavigation = false;
 
-    protected static string|\BackedEnum|null $navigationIcon = 'heroicon-o-key';
+    protected static string|\BackedEnum|null $navigationIcon = 'lucide-key';
 
     protected static ?int $navigationSort = 6;
 
@@ -57,7 +57,7 @@ final class EmailAccessRequestsPage extends Page implements HasTable
             return null;
         }
 
-        $count = EmailAccessRequest::query()->pendingIncomingFor($user)->count();
+        $count = EmailAccessRequest::countPendingIncomingFor($user, $user->currentWorkspace);
 
         return $count > 0 ? (string) $count : null;
     }

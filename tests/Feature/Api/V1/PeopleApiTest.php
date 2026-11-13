@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\V1\PeopleController;
 use App\Http\Resources\V1\PeopleResource;
 use App\Models\Company;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Concerns\ListsEntity;
@@ -96,7 +97,7 @@ it('stores a phone as E.164 and refuses one without a country code', function ()
         ->assertUnprocessable()
         ->assertInvalid(['custom_fields.phone_number.0']);
 
-    expect(People::query()->findOrFail($created->json('data.id'))->name)->toBe('Ana Costa');
+    expect(People::query()->withoutGlobalScope(WorkspaceScope::class)->findOrFail($created->json('data.id'))->name)->toBe('Ana Costa');
 });
 
 it('can show a person', function (): void {
@@ -505,7 +506,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $person = People::query()->where('name', 'Test Person')->first();
+        $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Test Person')->first();
         expect($person->workspace_id)->toBe($this->workspace->id);
     });
 
@@ -520,7 +521,7 @@ describe('mass assignment protection', function (): void {
         ])
             ->assertCreated();
 
-        $person = People::query()->where('name', 'Test Person')->first();
+        $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Test Person')->first();
         expect($person->creator_id)->toBe($this->user->id);
     });
 

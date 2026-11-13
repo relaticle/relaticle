@@ -9,7 +9,12 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Str;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class UserDeletionCancelledNotification extends Notification implements ShouldQueue
 {
     use Queueable;
@@ -29,7 +34,7 @@ final class UserDeletionCancelledNotification extends Notification implements Sh
         return (new MailMessage)
             ->subject(__('mail.account_deletion_cancelled.subject'))
             ->markdown('mail.notifications.account-deletion-cancelled', [
-                'name' => explode(' ', $this->user->name)[0],
+                'name' => explode(' ', Str::squish($this->user->name))[0],
                 'appUrl' => url()->getAppUrl(),
             ]);
     }

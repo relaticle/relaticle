@@ -14,6 +14,7 @@ use App\Support\Media\TemporaryUploads;
 use App\Support\Media\UploadAllowlist;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
@@ -60,7 +61,7 @@ final readonly class StoreAgentUpload
 
             return $media;
         } finally {
-            @unlink($temp);
+            File::delete($temp);
         }
     }
 
@@ -109,6 +110,8 @@ final readonly class StoreAgentUpload
 
     private function decode(string $base64, string $filename, string $temp): string
     {
+        throw_if($this->decodedSizeCeiling($base64) > UploadAllowlist::maxBytes(), UploadException::tooLarge(UploadAllowlist::maxBytes()));
+
         $bytes = base64_decode($base64, strict: true);
 
         throw_if($bytes === false, UploadException::invalidBase64());
@@ -117,6 +120,13 @@ final readonly class StoreAgentUpload
         file_put_contents($temp, $bytes);
 
         return $filename;
+    }
+
+    private function decodedSizeCeiling(string $base64): int
+    {
+        $encodedLength = strlen($base64) - substr_count($base64, "\n") - substr_count($base64, "\r") - substr_count($base64, ' ');
+
+        return intdiv($encodedLength * 3, 4) - 2;
     }
 
     private function takeTemporary(string $upload, string $workspaceId, string $temp): string

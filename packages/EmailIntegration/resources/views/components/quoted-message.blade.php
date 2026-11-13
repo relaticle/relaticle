@@ -12,12 +12,6 @@
     $from = $record->fromParticipant();
     $senderName = $from?->name ?: $from?->email_address ?: '?';
 
-    $initials = collect(explode(' ', trim($senderName)))
-        ->filter()
-        ->take(2)
-        ->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))
-        ->implode('');
-
     $safeHtml = $authUser->can('viewBody', $record)
         ? EmailHtmlSanitizer::sanitize($record->quotedBodyHtml(), $record->attachments->where('is_inline', true))
         : null;
@@ -26,9 +20,7 @@
 <div class="flex flex-col">
 
     <div class="flex shrink-0 items-start gap-3 px-4 py-3 sm:px-6">
-        <div class="flex h-8 w-8 aspect-square shrink-0 select-none items-center justify-center rounded-full bg-gray-100 dark:bg-gray-800 text-xs font-semibold text-gray-500 dark:text-gray-400">
-            {{ $initials ?: '?' }}
-        </div>
+        <x-email-integration::person-avatar :src="$record->senderMemberAvatarUrl()" :alt="$senderName" />
 
         <div class="min-w-0 flex-1">
             @if ($authUser->can('viewSubject', $record))

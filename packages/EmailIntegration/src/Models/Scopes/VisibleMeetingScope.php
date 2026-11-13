@@ -248,8 +248,8 @@ final readonly class VisibleMeetingScope implements Scope
 
                         foreach ($protectedDomains as $domain) {
                             $notProtected->whereRaw(
-                                "lower(meeting_attendees.email_address) not like '%@' || ?",
-                                [strtolower($domain)],
+                                "lower(meeting_attendees.email_address) not like '%@' || ? escape '\\'",
+                                [resolve(BlocklistDomainMatcher::class)->escapeLike(strtolower($domain))],
                             );
                         }
 

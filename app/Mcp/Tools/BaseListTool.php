@@ -51,7 +51,7 @@ abstract class BaseListTool extends Tool
         return [
             'filter' => $schema->object()->description(EntityFilters::grammar($this->entity()).' '.CustomFieldSchema::filterGuide(resolve(GetCrmSchemaTool::class)->name()).' Example: '.CustomFieldFilterSchema::json(EntityFilters::example($this->entity())).'.'),
             'sort' => $schema->object()->description('Sort by field. Properties: field (string), direction (asc|desc).'),
-            'include' => $schema->array()->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
+            'include' => $schema->array()->items($schema->string())->description('Singular relationships or relationship counts to expand. Use a show tool for to-many records.'),
             'per_page' => $schema->integer()->description('Results per page (default 15, max 25).')->default(15),
             'page' => $schema->integer()->description('Page number (max '.number_format(ListQuery::MAX_PAGE).').')->default(1),
         ];

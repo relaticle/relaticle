@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use App\Models\User;
+use App\Models\Workspace;
 use Relaticle\Chat\Models\PendingAction;
 use RuntimeException;
 
@@ -27,12 +28,16 @@ use RuntimeException;
  */
 final readonly class ProposalOwnership
 {
-    public static function assert(PendingAction $pendingAction, User $user): void
+    public static function assert(PendingAction $pendingAction, User $user): Workspace
     {
+        $workspace = $user->currentWorkspace;
+
         throw_unless(
-            (string) ($user->currentWorkspace?->getKey() ?? '') === (string) $pendingAction->workspace_id,
+            $workspace instanceof Workspace && (string) $workspace->getKey() === (string) $pendingAction->workspace_id,
             RuntimeException::class,
             'This action belongs to another workspace.',
         );
+
+        return $workspace;
     }
 }

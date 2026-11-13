@@ -6,11 +6,14 @@ use Illuminate\Bus\PendingBatch;
 use Illuminate\Queue\Attributes\Queue;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Queue as QueueFacade;
 use Laravel\SerializableClosure\SerializableClosure;
+use Relaticle\EmailIntegration\Actions\StartMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Data\CalendarEventData;
 use Relaticle\EmailIntegration\Data\CalendarSyncResult;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
+use Relaticle\EmailIntegration\Enums\MailboxImportPass;
 use Relaticle\EmailIntegration\Jobs\EnsureCalendarPushChannelJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
@@ -79,6 +82,20 @@ it('routes mailbox history import jobs to the emails-import queue', function (st
     InitialCalendarSyncJob::class,
     RelinkMailboxHistoryJob::class,
 ]);
+
+it('pushes the recent pass of a Microsoft import to the emails-sync queue and the full pass to emails-import', function (): void {
+    QueueFacade::fake();
+
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->azure()->create());
+
+    resolve(StartMailboxHistoryImportAction::class)->execute($account);
+
+    QueueFacade::assertPushedOn('emails-sync', InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->pass === MailboxImportPass::Recent);
+
+    dispatch(new InitialEmailSyncJob($account, historyImportBatchId: 'batch-1'));
+
+    QueueFacade::assertPushedOn('emails-import', InitialEmailSyncJob::class, fn (InitialEmailSyncJob $job): bool => $job->pass === MailboxImportPass::Full);
+});
 
 it('starts the mailbox history import batch on the emails-import queue', function (): void {
     Bus::fake();

@@ -10,7 +10,6 @@ use Illuminate\Queue\Attributes\MaxExceptions;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
-use Laravel\Ai\Responses\StructuredAgentResponse;
 use Relaticle\Chat\Agents\ConversationTitler;
 use Relaticle\Chat\Events\ConversationTitleGenerated;
 use Relaticle\Chat\Services\CreditService;
@@ -132,10 +131,6 @@ final class GenerateConversationTitle implements ShouldQueue
             rescue(function () use ($response): void {
                 resolve(CreditService::class)->recordInternalUsage($this->conversationId, $this->provider, $response->usage, $response->meta->model);
             });
-
-            if (! $response instanceof StructuredAgentResponse) {
-                return null;
-            }
 
             // A greeting or a stray character has nothing to name. Inventing a
             // label for it ("Single Character Message") reads worse than the

@@ -16,7 +16,7 @@ use Illuminate\Support\Facades\Log;
 use stdClass;
 use Throwable;
 
-#[Description('Re-run every phone and link custom field value through its field type normalizer')]
+#[Description('Re-run every phone, link and domain custom field value through its field type normalizer')]
 #[Signature('custom-fields:normalize-values {--force : Write changes instead of reporting them}')]
 final class NormalizeCustomFieldValuesCommand extends Command
 {
@@ -46,7 +46,7 @@ final class NormalizeCustomFieldValuesCommand extends Command
 
         CustomField::query()
             ->withoutGlobalScopes()
-            ->whereIn('type', [CustomFieldType::PHONE->value, CustomFieldType::LINK->value])
+            ->whereIn('type', [CustomFieldType::PHONE->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value])
             ->eachById(function (CustomField $field) use ($write): void {
                 $this->info("Normalizing {$field->entity_type}.{$field->code} in workspace {$field->tenant_id}...");
                 $this->normalizeField($field, $write);
@@ -77,7 +77,7 @@ final class NormalizeCustomFieldValuesCommand extends Command
 
     private function normalizeField(CustomField $field, bool $write): void
     {
-        $isDomain = $field->type === CustomFieldType::LINK->value && $field->setting('link_variant') === 'domain';
+        $isDomain = $field->type === CustomFieldType::DOMAIN->value;
         $nationalBefore = $this->national;
         $this->domainOwners = [];
 

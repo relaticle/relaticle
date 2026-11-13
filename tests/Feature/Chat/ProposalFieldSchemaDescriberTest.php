@@ -6,6 +6,7 @@ use App\Features\OnboardSeed;
 use App\Models\CustomField;
 use App\Models\User;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\Tools\ProposalFieldSchemaDescriber;
 
 mutates(ProposalFieldSchemaDescriber::class);
@@ -39,7 +40,7 @@ function fieldByCode(array $fields, string $code): ?array
 it('describes company core name and account_owner_id select with member options', function (): void {
     $record = ['name' => 'Acme Corp', 'account_owner_id' => null];
 
-    $fields = describerFor()->describe($this->user, 'company', $record);
+    $fields = describerFor()->describe($this->user, ProposalEntity::Company, $record);
 
     $name = fieldByCode($fields, 'name');
     expect($name)->not->toBeNull()
@@ -75,7 +76,7 @@ it('describes a company custom link field with kind link and a raw array value',
         'custom_fields' => ['linkedin' => ['https://linkedin.com/company/acme']],
     ];
 
-    $fields = describerFor()->describe($this->user, 'company', $record);
+    $fields = describerFor()->describe($this->user, ProposalEntity::Company, $record);
 
     $linkedinField = fieldByCode($fields, 'linkedin');
     expect($linkedinField)->not->toBeNull()
@@ -84,6 +85,23 @@ it('describes a company custom link field with kind link and a raw array value',
         ->and($linkedinField['value'])->toBe(['https://linkedin.com/company/acme'])
         ->and($linkedinField['required'])->toBeFalse()
         ->and($linkedinField)->not->toHaveKey('options');
+});
+
+it('describes the company domains field with kind link and a raw array value', function (): void {
+    $record = [
+        'name' => 'Acme Corp',
+        'custom_fields' => ['domains' => ['acme.com']],
+    ];
+
+    $fields = describerFor()->describe($this->user, ProposalEntity::Company, $record);
+
+    $domainsField = fieldByCode($fields, 'domains');
+    expect($domainsField)->not->toBeNull()
+        ->and($domainsField['label'])->toBe('Domains')
+        ->and($domainsField['kind'])->toBe('link')
+        ->and($domainsField['value'])->toBe(['acme.com'])
+        ->and($domainsField['required'])->toBeFalse()
+        ->and($domainsField)->not->toHaveKey('options');
 });
 
 it('describes a task single-choice status field with options and the raw id value', function (): void {
@@ -104,7 +122,7 @@ it('describes a task single-choice status field with options and the raw id valu
         'custom_fields' => ['status' => (string) $inProgress->id],
     ];
 
-    $fields = describerFor()->describe($this->user, 'task', $record);
+    $fields = describerFor()->describe($this->user, ProposalEntity::Task, $record);
 
     $title = fieldByCode($fields, 'title');
     expect($title)->not->toBeNull()
@@ -138,7 +156,7 @@ it('omits deferred record-link and assignee core fields', function (): void {
         'assignee_ids' => ['10'],
     ];
 
-    $fields = describerFor()->describe($this->user, 'company', $record);
+    $fields = describerFor()->describe($this->user, ProposalEntity::Company, $record);
 
     $codes = array_map(fn (array $f): string => $f['code'], $fields);
 
@@ -161,7 +179,7 @@ it('reports a custom field the tenant marked required as required', function ():
 
     $linkedin->forceFill(['validation_rules' => ['required' => true]])->save();
 
-    $fields = describerFor()->describe($this->user, 'company', ['name' => 'Acme Corp']);
+    $fields = describerFor()->describe($this->user, ProposalEntity::Company, ['name' => 'Acme Corp']);
 
     expect(fieldByCode($fields, 'linkedin')['required'])->toBeTrue();
 });

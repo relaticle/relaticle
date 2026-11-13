@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -195,4 +197,82 @@ it('does not store refreshed tokens on a mailbox that was disconnected meanwhile
         ->toThrow(RuntimeException::class, 'invalid_grant');
 
     expect(ConnectedAccount::withTrashed()->findOrFail($account->getKey())->refresh_token)->toBeNull();
+});
+
+function graphClientForActiveMailbox(): PendingRequest
+{
+    $user = User::factory()->withWorkspace()->create();
+    $account = ConnectedAccount::factory()
+        ->azure()
+        ->for($user)
+        ->create([
+            'workspace_id' => $user->currentWorkspace->getKey(),
+            'access_token' => 'still-valid-token',
+            'refresh_token' => 'refresh-1',
+            'token_expires_at' => now()->addHour(),
+        ]);
+
+    return resolve(MicrosoftGraphClientFactory::class)->make($account);
+}
+
+it('retries a read that Graph answers with a gateway error', function (): void {
+    Http::fake([
+        'graph.microsoft.com/*' => Http::sequence()
+            ->push(['error' => ['code' => 'UnknownError']], 502)
+            ->push(['id' => 'inbox-id']),
+    ]);
+
+    $response = graphClientForActiveMailbox()->get('/me/mailFolders/inbox');
+
+    expect($response->json('id'))->toBe('inbox-id');
+    Http::assertSentCount(2);
+});
+
+it('hands back the gateway error when Graph stays down', function (): void {
+    Http::fake(['graph.microsoft.com/*' => Http::response(['error' => ['code' => 'UnknownError']], 502)]);
+
+    $response = graphClientForActiveMailbox()->get('/me/mailFolders/inbox');
+
+    expect($response->status())->toBe(502);
+    Http::assertSentCount(3);
+});
+
+it('returns a missing folder as a response without retrying', function (): void {
+    Http::fake(['graph.microsoft.com/*' => Http::response([], 404)]);
+
+    $response = graphClientForActiveMailbox()->get('/me/mailFolders/junkemail');
+
+    expect($response->status())->toBe(404);
+    Http::assertSentCount(1);
+});
+
+it('never retries a write, so a send is not repeated', function (): void {
+    Http::fake(['graph.microsoft.com/*' => Http::response([], 502)]);
+
+    $response = graphClientForActiveMailbox()->post('/me/sendMail', ['message' => []]);
+
+    expect($response->status())->toBe(502);
+    Http::assertSentCount(1);
+});
+
+it('raises an outage, not a lost grant, when the token endpoint answers a server error', function (): void {
+    Http::fake([
+        'https://login.microsoftonline.com/*' => Http::response([
+            'error' => 'temporarily_unavailable',
+            'error_description' => 'AADSTS90033: A transient error has occurred. Please try again.',
+        ], 503),
+    ]);
+
+    $user = User::factory()->withWorkspace()->create();
+    $account = ConnectedAccount::factory()
+        ->azure()
+        ->for($user)
+        ->create([
+            'workspace_id' => $user->currentWorkspace->getKey(),
+            'refresh_token' => 'refresh-1',
+            'token_expires_at' => now()->subMinute(),
+        ]);
+
+    expect(fn () => resolve(MicrosoftGraphClientFactory::class)->make($account))
+        ->toThrow(fn (RequestException $exception) => expect($exception->response->status())->toBe(503));
 });

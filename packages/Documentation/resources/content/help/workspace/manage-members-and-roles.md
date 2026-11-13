@@ -36,9 +36,16 @@ API or MCP.
 | Promote someone to Admin | Yes | No | No | No |
 | Manage custom fields | Yes | Yes | No | No |
 | Manage workspace email settings | Yes | Yes | No | No |
+| Send email through an AI assistant | Yes | Yes | Yes | No |
 | Manage billing | Yes | No | No | No |
 | Rename or delete the workspace | Yes | No | No | No |
 | View the activity log | Yes | Yes | No | No |
+| Edit and delete table layouts shared with the workspace | Yes | Yes | No | No |
+
+A shared table layout stays with the member who shared it. Admins can also
+rename it, save over its contents, stop sharing it, or delete it, and the layout's
+owner is told. A rename or a save shows for everyone on their next visit. Stopping
+the share or deleting it removes the layout, and members keep the table as it is.
 
 Admins manage members, custom fields, and workspace email settings alongside working with records. A
 few things stay with the **workspace owner** alone, whatever anyone's role:

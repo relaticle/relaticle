@@ -3,7 +3,11 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\Dashboard;
+use App\Models\CustomFieldValue;
+use App\Models\Task;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 mutates(Dashboard::class);
 
@@ -42,6 +46,29 @@ it('uses a white composer surface in light mode', function (): void {
 
     expect($colors['light'])->toBe('rgb(255, 255, 255)')
         ->and($colors['dark'])->not->toBe($colors['light']);
+});
+
+it('keeps paragraphs in the chat composer flush', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $page = loginViaBrowser($user)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->assertNoJavaScriptErrors();
+
+    $gap = $page->script(<<<'JS'
+        (() => {
+            const surface = document.querySelector('[data-chat-context=dashboard] [contenteditable="true"]');
+
+            surface.editor.commands.setContent('<p>Find my open opportunities</p><p>Sort them by close date</p>');
+
+            const [first, second] = surface.querySelectorAll(':scope > p');
+
+            return second.getBoundingClientRect().top - first.getBoundingClientRect().bottom;
+        })();
+    JS);
+
+    expect($gap)->toEqualWithDelta(0, 0.5);
 });
 
 it('shows greeting on the dashboard', function (): void {
@@ -87,4 +114,36 @@ it('seeds the chat composer from the ask_rela checklist step without sending', f
 
     expect($state['text'])->toBe(__('filament/pages/dashboard.activation.steps.ask_rela.prompt_empty'))
         ->and($state['messageCount'])->toBe(0);
+});
+
+it('keeps a task due date inside its row however long the title is', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $task = Task::factory()->for($workspace)->create([
+        'title' => str_repeat('Laravel wave: Laravel News link, emails to Eric, Povilas and PHP Weekly, directories ', 3),
+    ]);
+    $task->assignees()->attach($user);
+    CustomFieldValue::query()->create([
+        'id' => (string) Str::ulid(),
+        'entity_type' => 'task',
+        'entity_id' => $task->id,
+        'custom_field_id' => DB::table('custom_fields')->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'due_date')->value('id'),
+        'tenant_id' => $workspace->id,
+        'datetime_value' => now()->addDays(3),
+    ]);
+
+    $page = loginViaBrowser($user)->assertPathIs("/app/{$workspace->slug}");
+
+    foreach ([[1280, 800], [390, 844]] as [$width, $height]) {
+        $page->resize($width, $height);
+
+        $overflow = $page->script(<<<'JS'
+            (() => {
+                const row = document.querySelector('[data-testid=my-task-row]');
+                return row.querySelector('time').getBoundingClientRect().right - row.getBoundingClientRect().right;
+            })();
+        JS);
+
+        expect($overflow)->toBeLessThanOrEqual(0);
+    }
 });

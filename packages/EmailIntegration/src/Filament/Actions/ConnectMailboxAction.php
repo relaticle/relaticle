@@ -36,7 +36,7 @@ final class ConnectMailboxAction extends Action
             ->icon(fn (): string => $this->provider->getIcon())
             ->color('gray')
             ->outlined()
-            ->visible(fn (): bool => $this->provider === EmailProvider::GMAIL || filled(config('services.azure.client_id')))
+            ->visible(fn (): bool => $this->provider->isConfigured())
             ->url(fn (): ?string => ($workspace = $this->workspace()) instanceof Workspace
                 ? MailboxOAuthWorkspace::redirectUrl($this->provider->value, $workspace, Livewire::originalUrl())
                 : null);

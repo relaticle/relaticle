@@ -13,7 +13,10 @@ use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\AutoCreateCompanyAction;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
@@ -396,6 +399,35 @@ it('does not auto-create a company when the person already exists', function ():
 
     expect(Company::where('workspace_id', $this->workspace->id)->count())->toBe($countBefore);
 });
+
+it('does not auto-create a company for a regional consumer mail domain', function (string $address): void {
+    $this->workspace->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $countBefore = Company::where('workspace_id', $this->workspace->id)->count();
+
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => $address,
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(Company::where('workspace_id', $this->workspace->id)->count())->toBe($countBefore);
+})->with([
+    'kunde@gmx.de',
+    'kunde@web.de',
+    'kunde@t-online.de',
+    'kunde@email.de',
+    'client@yahoo.fr',
+    'client@hotmail.fr',
+    'client@orange.fr',
+    'klient@mail.ru',
+    'cliente@bol.com.br',
+]);
 
 it('does not auto-create a company for a www-prefixed public domain', function (): void {
     $this->workspace->update([
@@ -963,6 +995,57 @@ it('still auto-creates a person for a protected address', function (): void {
     expect(People::where('workspace_id', $this->workspace->id)->where('name', 'Protected Contact')->exists())->toBeTrue();
 });
 
+it('does not auto-create a person or company for a colleague on the workspace domain', function (): void {
+    $this->workspace->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+    $this->user->update(['email' => 'owner@ownco.com']);
+    $companyCountBefore = Company::where('workspace_id', $this->workspace->id)->count();
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'colleague@ownco.com',
+        'name' => 'Colleague',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect(People::where('workspace_id', $this->workspace->id)->where('name', 'Colleague')->exists())->toBeFalse()
+        ->and(Company::where('workspace_id', $this->workspace->id)->count())->toBe($companyCountBefore);
+});
+
+it('still links a colleague on the workspace domain to an existing person', function (): void {
+    $this->user->update(['email' => 'owner@ownco.com']);
+
+    $emailField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'people')
+        ->where('code', 'emails')
+        ->firstOrFail();
+
+    $person = People::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Colleague',
+        'creator_id' => $this->user->id,
+    ]);
+    $person->saveCustomFieldValue($emailField, ['colleague@ownco.com'], $this->workspace);
+
+    $email = makeLinkEmail();
+
+    EmailParticipant::factory()->from()->create([
+        'email_id' => $email->getKey(),
+        'email_address' => 'colleague@ownco.com',
+    ]);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($email->people()->whereKey($person->getKey())->exists())->toBeTrue();
+});
+
 it('does not auto-create a person for a mailbox-blocklisted address', function (): void {
     $this->workspace->update([
         'contact_creation_mode' => ContactCreationMode::All,
@@ -1464,4 +1547,69 @@ it('does not move last_email_at backwards when an older email is linked after a 
     app(LinkEmailAction::class)->execute($older);
 
     expect($company->fresh()->last_email_at->toDateTimeString())->toBe($newerSentAt->toDateTimeString());
+});
+
+it('advances the email counters of linked companies in id order whatever the participant order', function (): void {
+    $domainsField = CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+
+    $domainByCompanyId = [];
+
+    foreach (['acme.com', 'globex.com'] as $domain) {
+        $company = Company::create([
+            'workspace_id' => $this->workspace->id,
+            'name' => $domain,
+            'creator_id' => $this->user->id,
+        ]);
+        $company->saveCustomFieldValue($domainsField, "https://{$domain}", $this->workspace);
+
+        $domainByCompanyId[$company->getKey()] = $domain;
+    }
+
+    krsort($domainByCompanyId);
+
+    $email = makeLinkEmail();
+
+    foreach ($domainByCompanyId as $domain) {
+        EmailParticipant::factory()->to()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => "contact@{$domain}",
+        ]);
+    }
+
+    $advancedCompanyIds = [];
+
+    DB::listen(function (QueryExecuted $query) use (&$advancedCompanyIds): void {
+        if (str_starts_with($query->sql, 'update companies set email_count')) {
+            $advancedCompanyIds[] = Arr::last($query->bindings);
+        }
+    });
+
+    app(LinkEmailAction::class)->execute($email);
+
+    ksort($domainByCompanyId);
+
+    expect($advancedCompanyIds)->toBe(array_keys($domainByCompanyId));
+});
+
+it('counts an email toward a company and an opportunity linked before the first pass', function (): void {
+    $company = Company::create([
+        'workspace_id' => $this->workspace->id,
+        'name' => 'Linked By Hand',
+        'creator_id' => $this->user->id,
+    ]);
+    $opportunity = Opportunity::factory()->create(['workspace_id' => $this->workspace->id]);
+
+    $email = makeLinkEmail(['direction' => EmailDirection::INBOUND]);
+    $email->companies()->attach($company->getKey(), ['link_source' => 'manual']);
+    $email->opportunities()->attach($opportunity->getKey(), ['link_source' => 'manual']);
+
+    app(LinkEmailAction::class)->execute($email);
+
+    expect($company->fresh()->email_count)->toBe(1)
+        ->and($opportunity->fresh()->email_count)->toBe(1);
 });

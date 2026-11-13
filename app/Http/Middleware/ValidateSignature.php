@@ -91,7 +91,11 @@ final readonly class ValidateSignature
         $original = rtrim("{$url}?".implode('&', $normalized), '?');
 
         $keys = [config('app.key'), ...config('app.previous_keys', [])];
-        $signature = (string) $request->query('signature', '');
+        $signature = $request->query('signature', '');
+
+        if (! is_string($signature)) {
+            return false;
+        }
 
         $hasCorrectSignature = array_any(
             $keys,

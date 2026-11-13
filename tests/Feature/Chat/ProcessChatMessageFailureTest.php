@@ -5,9 +5,13 @@ declare(strict_types=1);
 use App\Actions\Onboarding\StartSetupGreeting;
 use App\Actions\Task\CreateTask;
 use App\Enums\Plan;
+use App\Features\Billing;
 use App\Features\SetupConversation;
+use App\Models\Task;
 use App\Models\User;
+use App\Services\SelfHostedEntitlements;
 use Carbon\CarbonImmutable;
+use Filament\Facades\Filament;
 use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
@@ -34,9 +38,15 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Support\StoredSteps;
+use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Cloud\Entitlements\PlanEntitlements;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 use Tests\Helpers\AnthropicSse;
 
-mutates(ProcessChatMessage::class);
+mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
 /** @param array{provider: string|null, model: string|null, id: string|null, source: string} $resolved */
 function makeFailedTurnJob(User $user, string $conversationId, array $resolved = ['provider' => 'ollama', 'model' => 'qwen3:8b', 'id' => 'ollama', 'source' => 'auto']): ProcessChatMessage
@@ -74,6 +84,8 @@ function seedFailedTurnMessage(string $conversationId, User $user, string $role,
 }
 
 it('makes a failed turn coherent: user message, failure note, superseded proposal, one credit', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
@@ -264,6 +276,8 @@ it('backfills a newly failed turn even when a prior completed turn exists', func
 });
 
 it('shows timeout-specific copy when the turn times out', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
 
@@ -370,6 +384,8 @@ function seedFailoverConversation(User $user, string $conversationId): void
 }
 
 it('redispatches once on a terminal pre-stream failure when resolution was auto', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -424,6 +440,8 @@ it('redispatches once on a terminal pre-stream failure when resolution was auto'
 });
 
 it('does not fail over for an explicit model pick', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -503,6 +521,8 @@ it('offers Retry on Auto when the provider rejects an explicit pick mid-stream',
 });
 
 it('offers no Retry on Auto when Auto has no other model to answer with', function (): void {
+    withHostedBilling();
+
     Event::fake([ChatStreamFailed::class]);
 
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -774,6 +794,8 @@ it('lets the model recover from calling a tool that does not exist instead of fa
 });
 
 it('refunds the reservation when the job dies before it ever runs', function (): void {
+    withHostedBilling();
+
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
     $workspace->forceFill(['plan' => Plan::Pro])->save();
@@ -811,6 +833,46 @@ it('refunds the reservation when the job dies before it ever runs', function ():
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
 
     expect($balance->credits_remaining)->toBe(100)
+        ->and($balance->credits_used)->toBe(0);
+});
+
+it('writes no ledger rows when a self-hosted job dies before it ever runs', function (): void {
+    Feature::define(Billing::class, false);
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())
+        ->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $turnId = (string) Str::ulid();
+    resolve(CreditService::class)->reserveCredit(
+        $workspace,
+        reservationKey: "reserve-{$turnId}",
+        conversationId: $conversationId,
+        userId: (string) $user->getKey(),
+    );
+
+    $ledgerRowsBefore = AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count();
+
+    $job = new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'hello',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'auto'],
+        turnId: $turnId,
+    );
+
+    $job->failed(new MaxAttemptsExceededException('job expired'));
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();
+
+    expect(AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->count())->toBe($ledgerRowsBefore)
+        ->and($balance->credits_remaining)->toBe(100)
         ->and($balance->credits_used)->toBe(0);
 });
 
@@ -1016,4 +1078,200 @@ it('logs the provider error type and message when the provider reports a rejecti
             && $context['model'] === 'claude-sonnet-5'
             && $context['error_type'] === 'invalid_request_error'
             && $context['error_message'] === 'bad request');
+});
+
+/**
+ * @param  array<string, mixed>  $input
+ * @return array{user: User, conversationId: string, turnId: string, job: Closure(?string): ProcessChatMessage, credits: CreditService}
+ */
+function retriedProposalTurn(string $tool, array $input, int $extraTurns = 0): array
+{
+    config()->set('relaticle.features.email_integration', true);
+    config()->set('chat.provider_starts_per_second', 1000);
+    Feature::flushCache();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 100, 'credits_used' => 0]);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $turnId = (string) Str::ulid();
+    $credits = resolve(CreditService::class);
+    $credits->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversationId, userId: (string) $user->getKey());
+
+    $input = json_decode(str_replace('{account}', (string) $account->getKey(), (string) json_encode($input)), true);
+
+    $sequence = Http::sequence()
+        ->push(AnthropicSse::toolUseStepWithInput($tool, $input), 200, ['Content-Type' => 'text/event-stream'])
+        ->push('overloaded', 529)
+        ->push(AnthropicSse::toolUseStepWithInput($tool, $input), 200, ['Content-Type' => 'text/event-stream'])
+        ->push(AnthropicSse::reply('Review the proposal below.', 'claude-sonnet-5'), 200, ['Content-Type' => 'text/event-stream']);
+
+    for ($extra = 0; $extra < $extraTurns; $extra++) {
+        $sequence->push(AnthropicSse::toolUseStepWithInput($tool, $input), 200, ['Content-Type' => 'text/event-stream'])
+            ->push(AnthropicSse::reply('Review the proposal below.', 'claude-sonnet-5'), 200, ['Content-Type' => 'text/event-stream']);
+    }
+
+    Http::fake(['api.anthropic.com/*' => $sequence]);
+    Queue::fake();
+    Event::fake([ChatStreamRetrying::class]);
+
+    $job = fn (?string $turn = null): ProcessChatMessage => new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'Do it',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: $turn ?? $turnId,
+    );
+
+    test()->actingAs($user);
+    Filament::setTenant($workspace);
+
+    return ['user' => $user, 'conversationId' => $conversationId, 'turnId' => $turnId, 'job' => $job, 'credits' => $credits];
+}
+
+/** @return list<array<string, mixed>> */
+function decideRetriedProposal(array $turn, string $decision): void
+{
+    test()->actingAs($turn['user']);
+    Filament::setTenant($turn['user']->currentWorkspace);
+
+    $pending = PendingAction::query()->where('conversation_id', $turn['conversationId'])->sole();
+
+    $decision === 'approve'
+        ? resolve(PendingActionService::class)->approve($pending, $turn['user'])
+        : resolve(PendingActionService::class)->reject($pending, $turn['user']);
+}
+
+function storedProposalEnvelopes(string $conversationId): array
+{
+    $steps = DB::table('agent_conversation_messages')->where('conversation_id', $conversationId)->where('role', 'assistant')->pluck('steps');
+
+    return collect($steps)
+        ->flatMap(fn (string $json): array => StoredSteps::toolResults($json))
+        ->map(fn (array $result): mixed => json_decode((string) $result['result'], true))
+        ->filter(fn (mixed $envelope): bool => is_array($envelope) && ($envelope['type'] ?? null) === 'pending_action')
+        ->values()
+        ->all();
+}
+
+$sendInput = ['records' => [['connected_account_id' => '{account}', 'to' => ['lena@acme.test'], 'subject' => 'Q4 lanes', 'body' => 'Confirmed.']]];
+
+describe('a turn retried after its proposal was decided', function () use ($sendInput): void {
+    it('answers an approved send with that card, decided, and queues one email', function () use ($sendInput): void {
+        $turn = retriedProposalTurn('SendEmailTool', $sendInput);
+
+        $turn['job']()->handle($turn['credits']);
+
+        $first = PendingAction::query()->where('conversation_id', $turn['conversationId'])->sole();
+        decideRetriedProposal($turn, 'approve');
+
+        $turn['job']()->handle($turn['credits']);
+
+        $envelope = storedProposalEnvelopes($turn['conversationId'])[0];
+
+        expect(PendingAction::query()->where('conversation_id', $turn['conversationId'])->get()->pluck('status')->all())->toBe([PendingActionStatus::Approved])
+            ->and(Email::query()->count())->toBe(1)
+            ->and($envelope['pending_action_id'])->toBe($first->getKey())
+            ->and($envelope['status'])->toBe('approved')
+            ->and($envelope['meta'])->toBe(['agent_should_stop' => false])
+            ->and($envelope['outcome']['id'])->toBe(Email::query()->sole()->getKey())
+            ->and($envelope['message'])->toContain('already decided')->toContain('approved');
+    });
+
+    it('marks its turn as retried when it releases for a transient error', function () use ($sendInput): void {
+        $turn = retriedProposalTurn('SendEmailTool', $sendInput);
+        TurnPresence::begin($turn['conversationId'], turnId: $turn['turnId'], message: 'Do it');
+
+        expect(TurnPresence::current($turn['conversationId'])['retried'] ?? false)->toBeFalse();
+
+        $turn['job']()->handle($turn['credits']);
+
+        expect(TurnPresence::current($turn['conversationId'])['retried'])->toBeTrue();
+    });
+
+    it('answers a rejected send with that card, decided, and sends nothing', function () use ($sendInput): void {
+        $turn = retriedProposalTurn('SendEmailTool', $sendInput);
+
+        $turn['job']()->handle($turn['credits']);
+
+        $first = PendingAction::query()->where('conversation_id', $turn['conversationId'])->sole();
+        decideRetriedProposal($turn, 'reject');
+
+        $turn['job']()->handle($turn['credits']);
+
+        $envelope = storedProposalEnvelopes($turn['conversationId'])[0];
+
+        expect(PendingAction::query()->where('conversation_id', $turn['conversationId'])->get()->pluck('status')->all())->toBe([PendingActionStatus::Rejected])
+            ->and(Email::query()->count())->toBe(0)
+            ->and($envelope['status'])->toBe('rejected')
+            ->and($envelope['meta'])->toBe(['agent_should_stop' => false])
+            ->and($envelope['message'])->toContain('rejected');
+    });
+
+    it('answers an approved task with that card, so one task exists and not two', function (): void {
+        $turn = retriedProposalTurn('CreateTaskTool', ['records' => [['title' => 'Call Lena']]]);
+
+        $turn['job']()->handle($turn['credits']);
+
+        $first = PendingAction::query()->where('conversation_id', $turn['conversationId'])->sole();
+        decideRetriedProposal($turn, 'approve');
+
+        $turn['job']()->handle($turn['credits']);
+
+        expect(PendingAction::query()->where('conversation_id', $turn['conversationId'])->count())->toBe(1)
+            ->and(storedProposalEnvelopes($turn['conversationId'])[0]['status'])->toBe('approved')
+            ->and(Task::query()->where('title', 'Call Lena')->count())->toBe(1);
+    });
+
+    it('shows one decided card after a reload, never a pending one', function () use ($sendInput): void {
+        $turn = retriedProposalTurn('SendEmailTool', $sendInput);
+
+        $turn['job']()->handle($turn['credits']);
+        decideRetriedProposal($turn, 'approve');
+        $turn['job']()->handle($turn['credits']);
+
+        $messages = resolve(ConversationMessagesQuery::class)->get($turn['user'], $turn['conversationId']);
+        $cards = collect($messages)->flatMap(fn (array $message): array => $message['pending_actions']);
+
+        expect($cards)->toHaveCount(1)
+            ->and($cards[0]['status'])->toBe('approved');
+    });
+
+    it('gives a superseded identical proposal a new pending card', function () use ($sendInput): void {
+        $turn = retriedProposalTurn('SendEmailTool', $sendInput);
+
+        $turn['job']()->handle($turn['credits']);
+        $turn['job']()->handle($turn['credits']);
+
+        $rows = PendingAction::query()->where('conversation_id', $turn['conversationId'])->orderBy('id')->get();
+
+        expect($rows->pluck('status')->all())->toBe([PendingActionStatus::Superseded, PendingActionStatus::Pending]);
+    });
+
+    it('gives the same proposal under a different turn a new pending card', function () use ($sendInput): void {
+        $turn = retriedProposalTurn('SendEmailTool', $sendInput);
+
+        $turn['job']()->handle($turn['credits']);
+        decideRetriedProposal($turn, 'approve');
+
+        $otherTurn = (string) Str::ulid();
+        $turn['credits']->reserveCredit($turn['user']->currentWorkspace, reservationKey: "reserve-{$otherTurn}", conversationId: $turn['conversationId'], userId: (string) $turn['user']->getKey());
+        $turn['job']($otherTurn)->handle($turn['credits']);
+
+        $rows = PendingAction::query()->where('conversation_id', $turn['conversationId'])->orderBy('id')->get();
+
+        expect($rows->pluck('status')->first())->toBe(PendingActionStatus::Approved)
+            ->and($rows->last()->status)->toBe(PendingActionStatus::Pending)
+            ->and($rows->last()->turn_id)->toBe($otherTurn);
+    });
 });

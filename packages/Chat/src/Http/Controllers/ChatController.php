@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Http\Controllers;
 
+use App\Contracts\Billing;
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
-use App\Features\Billing;
-use App\Filament\Pages\Billing as BillingPage;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -14,7 +14,6 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\CreditPackCatalog;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -25,7 +24,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Actions\DeleteConversation;
 use Relaticle\Chat\Actions\MarkAttachmentSent;
@@ -48,6 +46,7 @@ use Relaticle\Chat\Support\ConversationTitleGate;
 use Relaticle\Chat\Support\ModelDescriptor;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Support\TurnPresence;
+use stdClass;
 
 final readonly class ChatController
 {
@@ -66,26 +65,14 @@ final readonly class ChatController
         private MarkAttachmentSent $markAttachmentSent,
         private CreateConversation $createConversation,
         private ModelAccess $modelAccess,
+        private Entitlements $entitlements,
+        private Billing $billing,
     ) {}
 
     /** @return list<string> */
     private function modelIds(): array
     {
         return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
-    }
-
-    /**
-     * Billing page URL for the workspace, or null when billing is switched off.
-     * Resolved through the panel route so it stays correct whether the app panel
-     * is served from a path prefix or its own subdomain.
-     */
-    private function billingUrl(Workspace $workspace): ?string
-    {
-        if (! Feature::active(Billing::class)) {
-            return null;
-        }
-
-        return BillingPage::getUrl(panel: 'app', tenant: $workspace);
     }
 
     public function send(Request $request, ?string $conversation = null): JsonResponse
@@ -137,7 +124,7 @@ final readonly class ChatController
         if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
             $descriptor = $this->registry->find($validated['model']);
 
-            if ($descriptor instanceof ModelDescriptor && ! $descriptor->allowedForPlan($this->modelAccess->planFor($workspace))) {
+            if ($descriptor instanceof ModelDescriptor && ! $this->entitlements->allowsModel($workspace, $descriptor)) {
                 if ($this->modelAccess->isTrialLocked($workspace) && $descriptor->allowedForPlan($workspace->plan)) {
                     return response()->json([
                         'error' => 'model_not_allowed',
@@ -157,7 +144,7 @@ final readonly class ChatController
                     'plan' => $workspace->plan->value,
                     'requested_model' => $descriptor->id,
                     'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
+                    'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
                 ], 403);
             }
         }
@@ -189,29 +176,7 @@ final readonly class ChatController
         $turnId = (string) Str::ulid();
 
         if (! $this->creditService->reserveCredit($workspace, reservationKey: "reserve-{$turnId}", conversationId: $conversation, userId: (string) $user->getKey())) {
-            $balance = AiCreditBalance::query()
-                ->where('workspace_id', $workspace->getKey())
-                ->first();
-
-            $isFree = $workspace->plan === Plan::Free;
-            $canTopUp = ! $isFree && resolve(CreditPackCatalog::class)->hasPurchasable();
-            // Not $workspace->plan->credits(): a past-due workspace refills at the
-            // Free allowance, so the plan's figure would name credits it never got.
-            $allowance = $this->creditService->allowanceFor($workspace);
-
-            return response()->json([
-                'error' => 'credits_exhausted',
-                'message' => "You have used all {$allowance} credits for this {$workspace->plan->getLabel()} plan period.",
-                'plan' => $workspace->plan->value,
-                'allowance' => $allowance,
-                'reset_at' => $balance?->period_ends_at?->toIso8601String(),
-                'upgrade_available' => $isFree,
-                'upgrade_url' => $isFree ? $this->billingUrl($workspace) : null,
-                // A top-up is only offered when a pack can actually be bought;
-                // otherwise the CTA lands on a billing page with nothing to buy.
-                'top_up_available' => $canTopUp,
-                'top_up_url' => $canTopUp ? $this->billingUrl($workspace) : null,
-            ], 402);
+            return $this->creditsExhaustedResponse($workspace);
         }
 
         DB::transaction(function () use ($conversation, $user, $workspace): void {
@@ -279,6 +244,34 @@ final readonly class ChatController
             'status' => 'processing',
             'conversation_id' => $conversation,
         ]);
+    }
+
+    private function creditsExhaustedResponse(Workspace $workspace): JsonResponse
+    {
+        $balance = AiCreditBalance::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->first();
+
+        $isFree = $workspace->plan === Plan::Free;
+        $canTopUp = ! $isFree && $this->billing->sellsCredits($workspace);
+        $billingUrl = $this->billing->url($workspace);
+        // Not $workspace->plan->credits(): a past-due workspace refills at the
+        // Free allowance, so the plan's figure would name credits it never got.
+        $allowance = $this->creditService->allowanceFor($workspace);
+
+        return response()->json([
+            'error' => 'credits_exhausted',
+            'message' => "You have used all {$allowance} credits for this {$workspace->plan->getLabel()} plan period.",
+            'plan' => $workspace->plan->value,
+            'allowance' => $allowance,
+            'reset_on' => $balance?->period_ends_at?->toFormattedDateString(),
+            'upgrade_available' => $isFree,
+            'upgrade_url' => $isFree ? $billingUrl : null,
+            // A top-up is only offered when a pack can actually be bought;
+            // otherwise the CTA lands on a billing page with nothing to buy.
+            'top_up_available' => $canTopUp,
+            'top_up_url' => $canTopUp ? $billingUrl : null,
+        ], 402);
     }
 
     // An upload is bound to the conversation it was made in; a message in
@@ -449,6 +442,16 @@ final readonly class ChatController
         );
 
         return response()->json(['cancelled' => true]);
+    }
+
+    public function turn(Request $request, string $conversationId): JsonResponse
+    {
+        /** @var User $user */
+        $user = $request->user();
+
+        abort_unless(new ConversationsQuery()->find($user, $conversationId) instanceof stdClass, 404);
+
+        return response()->json(['in_flight' => TurnPresence::current($conversationId) !== null]);
     }
 
     /**

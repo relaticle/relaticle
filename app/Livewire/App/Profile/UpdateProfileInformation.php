@@ -11,6 +11,7 @@ use App\Filament\Actions\ConfirmIdentityAction;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\Auth\EmailProbeLimiter;
 use App\Support\EmailAddress;
 use App\Support\SameOriginUrl;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -26,6 +27,7 @@ use Filament\Schemas\Components\Section;
 use Filament\Schemas\Schema;
 use Illuminate\Contracts\View\View;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -129,6 +131,10 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             return;
         }
 
+        if ($this->probeLimitReached()) {
+            return;
+        }
+
         $data = $this->form->getState();
         $newEmail = $data['email'];
         $data['email'] = $this->authUser()->email;
@@ -153,12 +159,35 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             ]))
             ->alwaysConfirm()
             ->operation('change_email', fn (): string => EmailAddress::canonicalize((string) ($this->data['email'] ?? '')))
-            ->beforeFormFilled(function (): void {
+            ->beforeFormFilled(function (Action $action): void {
+                if ($this->probeLimitReached()) {
+                    $action->halt();
+                }
+
                 $this->form->validate();
             })
             ->confirmedUsing(function (?string $operationTarget): void {
                 $this->sendEmailChangeVerification((string) $operationTarget);
             });
+    }
+
+    private function probeLimitReached(): bool
+    {
+        $enteredEmail = EmailAddress::canonicalize((string) ($this->data['email'] ?? ''));
+
+        if ($enteredEmail === $this->authUser()->email) {
+            return false;
+        }
+
+        try {
+            resolve(EmailProbeLimiter::class)->hit($this->authUser());
+        } catch (ThrottleRequestsException $exception) {
+            $this->sendThrottledNotification((int) ($exception->getHeaders()['Retry-After'] ?? 60));
+
+            return true;
+        }
+
+        return false;
     }
 
     public function removeProfilePhoto(): void

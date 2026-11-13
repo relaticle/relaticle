@@ -218,7 +218,9 @@ it('leads each decided batch item with the record pill, beside its outcome chip'
     ]);
 
     $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
-        ->assertSee('Create 2 tasks');
+        ->assertSee('Created 1 task')
+        ->assertSee('Book onboarding session')
+        ->assertSee('left out');
 
     $page->click('[data-proposal-row]')
         ->assertVisible('[data-proposal-details]');
@@ -231,7 +233,7 @@ it('leads each decided batch item with the record pill, beside its outcome chip'
             return {
                 chipLabels: chips.map((chip) => chip.textContent.trim()),
                 chipTypes: chips.map((chip) => chip.dataset.recordType),
-                outcomes: details.textContent.includes('Created') && details.textContent.includes('Skipped'),
+                outcomes: details.textContent.includes('Created') && details.textContent.includes('left out'),
             };
         })();
     JS);
@@ -306,7 +308,7 @@ function seedResolvedBatch(User $user, int|string $workspaceId, string $conversa
     ]);
 }
 
-it('heads a part-skipped batch with per-item counts rather than its Approved status', function (): void {
+it('receipts a part-skipped batch from its per-item results rather than its Approved status', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     $task = Task::factory()->for($workspace)->create(['title' => 'Draft the renewal note']);
@@ -318,22 +320,19 @@ it('heads a part-skipped batch with per-item counts rather than its Approved sta
         ['status' => 'rejected'],
     ]);
 
-    $header = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
-        ->assertSee('Create 2 tasks')
+    $receipt = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSee('Applied 1 change')
         ->script(<<<'JS'
-            (() => {
-                const row = document.querySelector('[data-proposal-row]').parentElement;
-
-                return row.textContent.replace(/\s+/g, ' ').trim();
-            })();
+            (() => document.querySelector('[data-proposal-receipt]').textContent.replace(/\s+/g, ' ').trim())();
         JS);
 
-    expect($header)->toContain('1 created')
-        ->and($header)->toContain('1 skipped')
-        ->and($header)->not->toContain('Approved');
+    expect($receipt)->toContain('Created 1 task')
+        ->and($receipt)->toContain('Book onboarding session · left out')
+        ->and($receipt)->not->toContain('Approved')
+        ->and($receipt)->not->toContain('skipped');
 });
 
-it('heads a fully-skipped batch with Rejected, since it wrote nothing', function (): void {
+it('settles a fully-skipped batch as discarded, since it wrote nothing', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
@@ -344,16 +343,145 @@ it('heads a fully-skipped batch with Rejected, since it wrote nothing', function
         ['status' => 'rejected'],
     ]);
 
-    $header = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+    $receipt = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
         ->assertSee('Create 2 tasks')
+        ->assertVisible('[data-propose-again]')
         ->script(<<<'JS'
-            (() => {
-                const row = document.querySelector('[data-proposal-row]').parentElement;
-
-                return row.textContent.replace(/\s+/g, ' ').trim();
-            })();
+            (() => document.querySelector('[data-proposal-settled]').textContent.replace(/\s+/g, ' ').trim())();
         JS);
 
-    expect($header)->toContain('Rejected')
-        ->and($header)->not->toContain('skipped');
+    expect($receipt)->toContain('Create 2 tasks · discarded')
+        ->and($receipt)->toContain('Propose again')
+        ->and($receipt)->not->toContain('Applied');
+});
+
+it('words a decided email by what happened to it and links to no record', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'decided emails', $conversationId);
+
+    $steps = [];
+
+    foreach ([['emails', 'SendAssistantEmail', 'Q4 lanes'], ['email_drafts', 'SaveAssistantEmailDraft', 'Next steps']] as [$entityType, $action, $subject]) {
+        $pending = PendingAction::query()->create([
+            'workspace_id' => $workspace->getKey(),
+            'user_id' => $user->getKey(),
+            'conversation_id' => $conversationId,
+            'action_class' => "Relaticle\\EmailIntegration\\Actions\\{$action}",
+            'operation' => PendingActionOperation::Create,
+            'entity_type' => $entityType,
+            'action_data' => ['subject' => $subject],
+            'display_data' => [
+                'title' => $entityType === 'emails' ? 'Send Email' : 'Save Email Draft',
+                'summary' => "Email: {$subject}",
+                'fields' => [['label' => 'To', 'value' => 'Priya Nair'], ['label' => 'Subject', 'value' => $subject]],
+            ],
+            'status' => PendingActionStatus::Approved,
+            'expires_at' => now()->addMinutes(15),
+            'resolved_at' => now(),
+            'result_data' => ['id' => (string) Str::ulid(), 'type' => $entityType],
+        ]);
+
+        $steps[] = [
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'EmailTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => $action,
+                'entity_type' => $entityType,
+                'operation' => 'create',
+                'data' => ['subject' => $subject],
+                'display' => $pending->display_data,
+            ]),
+        ];
+    }
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'steps' => storedToolSteps($steps),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSee('Queued email to')
+        ->assertSee('Priya Nair')
+        ->assertSee('Q4 lanes')
+        ->assertSee('Saved')
+        ->assertDontSee('Created')
+        ->assertMissing('[data-proposal-record-link]');
+});
+
+it('words a decided invitation as invited', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'decided teammate', $conversationId);
+
+    $pending = PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'action_class' => 'App\\Actions\\Workspace\\CreateWorkspaceInvitation',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'workspace_invitations',
+        'action_data' => ['email' => 'alex@example.com', 'role' => 'member'],
+        'display_data' => [
+            'title' => 'Invite Teammate',
+            'summary' => 'Invite alex@example.com as Member',
+            'fields' => [['label' => 'Email', 'value' => 'alex@example.com'], ['label' => 'Role', 'value' => 'Member']],
+        ],
+        'status' => PendingActionStatus::Approved,
+        'expires_at' => now()->addMinutes(15),
+        'resolved_at' => now(),
+        'result_data' => ['id' => (string) Str::ulid(), 'type' => 'workspace_invitations'],
+    ]);
+
+    DB::table('agent_conversation_messages')->insert([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'agent' => 'Relaticle\\Chat\\Agents\\CrmAssistant',
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'document' => ChatDocument::emptyJson(),
+        'attachments' => '[]',
+        'steps' => storedToolSteps([[
+            'id' => 'toolu_'.Str::random(8),
+            'name' => 'InviteWorkspaceMemberTool',
+            'result' => json_encode([
+                'type' => 'pending_action',
+                'pending_action_id' => $pending->id,
+                'action' => 'CreateWorkspaceInvitation',
+                'entity_type' => 'workspace_invitations',
+                'operation' => 'create',
+                'data' => ['email' => 'alex@example.com', 'role' => 'member'],
+                'display' => $pending->display_data,
+            ]),
+        ]]),
+        'usage' => '{}',
+        'meta' => '{}',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSee('Invited')
+        ->assertSee('alex@example.com')
+        ->assertDontSee('Created');
 });

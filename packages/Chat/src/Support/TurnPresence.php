@@ -57,6 +57,17 @@ final readonly class TurnPresence
         ], self::TTL_SECONDS);
     }
 
+    public static function markRetried(string $conversationId, string $turnId): void
+    {
+        $current = self::current($conversationId);
+
+        if ($current === null || $current['turn_id'] !== $turnId) {
+            return;
+        }
+
+        Cache::put(self::key($conversationId), [...$current, 'retried' => true], self::TTL_SECONDS);
+    }
+
     /**
      * Scoped to the clearing turn: a newer send overwrites the marker before
      * the older job ends (two tabs racing), and the older job's cleanup must
@@ -74,11 +85,11 @@ final readonly class TurnPresence
     }
 
     /**
-     * @return array{turn_id: string, origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null
+     * @return array{turn_id: string, retried?: bool, origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null
      */
     public static function current(string $conversationId): ?array
     {
-        /** @var array{turn_id: string, origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null $value */
+        /** @var array{turn_id: string, retried?: bool, origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}|null $value */
         $value = Cache::get(self::key($conversationId));
 
         return is_array($value) ? $value : null;

@@ -105,12 +105,11 @@
             <span class="relaticle-nav-brand">Relaticle</span>
         </a>
         <div class="relaticle-nav-sep"></div>
-        <a href="/developers" class="relaticle-nav-title" style="text-decoration:none;">API Reference</a>
+        <a href="{{ \Relaticle\Documentation\Support\DocUrl::area(\Relaticle\Documentation\Support\DocUrl::DOCS) }}" class="relaticle-nav-title" style="text-decoration:none;">API Reference</a>
     </div>
     <div class="relaticle-nav-links">
-        <a href="/help">Help</a>
-        <a href="/developers">Developers</a>
-        <a href="/pricing">Pricing</a>
+        <a href="{{ \Relaticle\Documentation\Support\DocUrl::area(\Relaticle\Documentation\Support\DocUrl::HELP) }}">Help</a>
+        <a href="{{ \Relaticle\Documentation\Support\DocUrl::area(\Relaticle\Documentation\Support\DocUrl::DOCS) }}">Developers</a>
         <a href="https://github.com/Relaticle/relaticle" target="_blank" rel="noopener">GitHub</a>
     </div>
 </nav>

@@ -81,6 +81,23 @@ it('collapses an identical re-proposed batch (job retry idempotency)', function 
         ->count())->toBe(1);
 });
 
+it('collapses an identical re-proposed record whose keys the database stores in another order', function (): void {
+    $company = Company::factory()->for($this->user->currentWorkspace)->create();
+    $task = [
+        'title' => 'Call',
+        'assignee_ids' => [(string) $this->user->getKey()],
+        'company_ids' => [(string) $company->getKey()],
+    ];
+
+    proposeTasks($this->convId, [$task]);
+    proposeTasks($this->convId, [$task]);
+
+    expect(PendingAction::query()
+        ->where('conversation_id', $this->convId)
+        ->where('status', PendingActionStatus::Pending)
+        ->count())->toBe(1);
+});
+
 it('rejects a linked record from another workspace at proposal time', function (): void {
     $foreign = Company::factory()->for(User::factory()->withPersonalWorkspace()->create()->currentWorkspace)->create();
 

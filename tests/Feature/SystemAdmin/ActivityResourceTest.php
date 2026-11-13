@@ -2,14 +2,17 @@
 
 declare(strict_types=1);
 
+use App\Enums\CreationSource;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Filament\Facades\Filament;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ListActivities;
 use Relaticle\SystemAdmin\Filament\Resources\ActivityResource\Pages\ViewActivity;
+use Relaticle\SystemAdmin\Filament\Widgets\ActivitySourceChartWidget;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 /**
@@ -30,12 +33,13 @@ function seedActivity(Workspace $workspace, User $causer, array $attributes = []
     ], $attributes));
 }
 
-mutates(Activity::class);
+mutates(Activity::class, ActivitySourceChartWidget::class);
 
 beforeEach(function (): void {
     $this->admin = SystemAdministrator::factory()->create();
     $this->actingAs($this->admin, 'sysadmin');
     Filament::setCurrentPanel('sysadmin');
+    resolve(CurrentWorkspace::class)->readAcrossWorkspaces();
 
     $this->ownerA = User::factory()->withWorkspace()->create();
     $this->workspaceA = $this->ownerA->currentWorkspace;
@@ -70,6 +74,41 @@ it('filters activity by event', function (): void {
         ->filterTable('event', 'deleted')
         ->assertCanSeeTableRecords([$deleted])
         ->assertCanNotSeeTableRecords([$created]);
+});
+
+it('filters activity by source', function (): void {
+    $fromMcp = seedActivity($this->workspaceA, $this->ownerA, ['properties' => ['source' => 'mcp']]);
+    $fromWeb = seedActivity($this->workspaceA, $this->ownerA, ['properties' => ['source' => 'web']]);
+    $legacy = seedActivity($this->workspaceA, $this->ownerA);
+
+    livewire(ListActivities::class)
+        ->filterTable('source', CreationSource::MCP->value)
+        ->assertCanSeeTableRecords([$fromMcp])
+        ->assertCanNotSeeTableRecords([$fromWeb, $legacy]);
+});
+
+it('names the source on the list and view pages', function (): void {
+    $activity = seedActivity($this->workspaceA, $this->ownerA, ['properties' => ['source' => 'system']]);
+
+    livewire(ListActivities::class)
+        ->assertTableColumnFormattedStateSet('source', CreationSource::SYSTEM->getLabel(), $activity);
+
+    livewire(ViewActivity::class, ['record' => $activity->getKey()])
+        ->assertOk()
+        ->assertSee(CreationSource::SYSTEM->getLabel());
+});
+
+it('charts activity by source for the rows the table filters keep', function (): void {
+    seedActivity($this->workspaceA, $this->ownerA, ['properties' => ['source' => 'api']]);
+    seedActivity($this->workspaceA, $this->ownerA, ['properties' => ['source' => 'api']]);
+    seedActivity($this->workspaceA, $this->ownerA);
+    seedActivity($this->workspaceB, $this->ownerB, ['properties' => ['source' => 'mcp']]);
+
+    livewire(ActivitySourceChartWidget::class, ['tableFilters' => ['workspace_id' => ['value' => $this->workspaceA->id]]])
+        ->assertOk()
+        ->assertSee('API: 2 (67%)')
+        ->assertSee('Not recorded: 1 (33%)')
+        ->assertDontSee(CreationSource::MCP->getLabel());
 });
 
 it('filters activity by causer', function (): void {
@@ -176,6 +215,25 @@ it('renders the view page for a custom-field-changes activity', function (): voi
         ->assertSee('Priority')
         ->assertSee('Low')
         ->assertSee('High');
+});
+
+it('cuts a long change short on the view page', function (): void {
+    $activity = seedActivity($this->workspaceA, $this->ownerA, [
+        'event' => 'custom_field_changes',
+        'description' => 'custom_field_changes',
+        'properties' => ['custom_field_changes' => [[
+            'label' => 'Body',
+            'old' => 'Draft',
+            'new' => str_repeat('lorem ', 500).'closing words',
+        ]]],
+    ]);
+
+    livewire(ViewActivity::class, [
+        'record' => $activity->getKey(),
+    ])
+        ->assertOk()
+        ->assertSee('Body: Draft → lorem')
+        ->assertDontSee('closing words');
 });
 
 it('renders the view page for a deleted activity with an itemized old→new diff', function (): void {

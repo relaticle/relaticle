@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -113,4 +114,26 @@ it('does not expand a signature block from another workspace', function (): void
 
     expect($sent)->toContain('Hello')
         ->not->toContain('Other workspace signature');
+});
+
+it('resolves the signature of the signed-in user outside a panel', function (): void {
+    $this->signature->forceFill(['user_id' => $this->user->id, 'workspace_id' => $this->workspace->id])->save();
+    Filament::setTenant(null);
+
+    expect(SignatureBlock::toPreviewHtml(['signature_id' => $this->signature->getKey()]))->toBe('<p>Best, Jane</p>');
+});
+
+it('does not resolve a signature of another user outside a panel', function (): void {
+    $this->signature->forceFill(['user_id' => User::factory()->create()->id, 'workspace_id' => $this->workspace->id])->save();
+    Filament::setTenant(null);
+
+    expect(SignatureBlock::toPreviewHtml(['signature_id' => $this->signature->getKey()]))->toBeNull();
+});
+
+it('does not resolve a signature of the same user in another workspace outside a panel', function (): void {
+    $otherWorkspace = Workspace::factory()->create();
+    $this->signature->forceFill(['user_id' => $this->user->id, 'workspace_id' => $otherWorkspace->id])->save();
+    Filament::setTenant(null);
+
+    expect(SignatureBlock::toPreviewHtml(['signature_id' => $this->signature->getKey()]))->toBeNull();
 });

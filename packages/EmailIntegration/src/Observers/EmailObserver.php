@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Observers;
 
-use App\Models\User;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\PrivacyService;
 
@@ -19,12 +19,22 @@ final readonly class EmailObserver
 
     public function creating(Email $email): void
     {
-        $owner = User::query()->find($email->user_id);
+        if ($email->isDirty('privacy_tier')) {
+            if ($email->creation_source !== EmailCreationSource::SYNC) {
+                $email->privacy_tier_customized = true;
+            }
 
-        if ($owner && ! $email->isDirty('privacy_tier')) {
-            $email->privacy_tier = $this->privacyService->defaultTierForUser($owner, $email->workspace);
-        } elseif ($email->isDirty('privacy_tier') && $email->creation_source !== EmailCreationSource::SYNC) {
-            $email->privacy_tier_customized = true;
+            return;
+        }
+
+        $mailbox = $email->relationLoaded('connectedAccount')
+            ? $email->connectedAccount
+            : ConnectedAccount::withTrashed()->find($email->connected_account_id);
+
+        if ($mailbox instanceof ConnectedAccount) {
+            $email->privacy_tier = $this->privacyService->tierForMailbox($mailbox);
+            // LinkEmailAction reads the email's workspace next.
+            $email->setRelation('workspace', $mailbox->workspace);
         }
     }
 

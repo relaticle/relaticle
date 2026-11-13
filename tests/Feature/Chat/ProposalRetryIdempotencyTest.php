@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
@@ -65,13 +66,13 @@ it('returns the same proposal id on an identical re-proposal', function (): void
         user: $this->user, conversationId: $this->convId,
         actionClass: CreateTask::class,
         operation: PendingActionOperation::Create,
-        entityType: 'task', actionData: ['title' => 'Dup'], displayData: ['title' => 'Dup'],
+        entityType: ProposalEntity::Task, actionData: ['title' => 'Dup'], displayData: ['title' => 'Dup'],
     );
     $second = $service->createProposal(
         user: $this->user, conversationId: $this->convId,
         actionClass: CreateTask::class,
         operation: PendingActionOperation::Create,
-        entityType: 'task', actionData: ['title' => 'Dup'], displayData: ['title' => 'Dup'],
+        entityType: ProposalEntity::Task, actionData: ['title' => 'Dup'], displayData: ['title' => 'Dup'],
     );
 
     expect($second->getKey())->toBe($first->getKey());

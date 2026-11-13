@@ -1,5 +1,5 @@
 {{-- Type-aware proposal field row. Expects Alpine scope var `field`:
-     {label, value?|new?, old?, type?, values?} --}}
+     {label, value?|new?, old?, type?, values?, icon?} --}}
 <div class="flex items-start gap-3">
     <span class="w-32 shrink-0 truncate text-sm leading-5 text-gray-700 sm:w-36 dark:text-gray-300" x-text="field.label"></span>
 
@@ -7,7 +7,7 @@
         <template x-if="field.old">
             <span class="flex items-center gap-1.5">
                 <span class="text-gray-400 line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600" x-text="field.old"></span>
-                <x-heroicon-m-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
+                <x-lucide-arrow-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true" />
             </span>
         </template>
 
@@ -21,10 +21,7 @@
 
         <template x-if="field.type === 'boolean'">
             <span
-                class="inline-flex items-center rounded-full px-2 py-0.5 text-[length:var(--text-micro)] font-medium"
-                :class="(field.new ?? field.value) === 'Yes'
-                    ? 'bg-green-50 text-green-700 dark:bg-green-400/10 dark:text-green-400'
-                    : 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-400'"
+                class="inline-flex items-center rounded-full bg-gray-100 px-2 py-0.5 text-[length:var(--text-micro)] font-medium text-gray-600 dark:bg-white/10 dark:text-gray-400"
                 x-text="field.new ?? field.value"
             ></span>
         </template>
@@ -59,11 +56,20 @@
             ></a>
         </template>
 
+        <template x-if="field.icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
+                <path stroke-linecap="round" stroke-linejoin="round" :d="field.icon"></path>
+            </svg>
+        </template>
+
         <template x-if="!['badges', 'boolean', 'link'].includes(field.type)">
             <span
-                :class="Object.prototype.hasOwnProperty.call(field, 'new')
-                    ? 'font-medium text-gray-900 dark:text-white'
-                    : 'text-gray-700 dark:text-gray-300'"
+                :class="[
+                    Object.prototype.hasOwnProperty.call(field, 'new')
+                        ? 'font-medium text-gray-900 dark:text-white'
+                        : 'text-gray-700 dark:text-gray-300',
+                    String(field.new ?? field.value ?? '').includes('\n') ? 'whitespace-pre-wrap' : '',
+                ]"
                 x-text="field.new ?? field.value"
             ></span>
         </template>

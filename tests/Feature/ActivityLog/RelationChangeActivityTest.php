@@ -9,6 +9,7 @@ use App\Models\Concerns\LogsRelationChanges;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\ActivityValue;
@@ -163,7 +164,7 @@ it('logs a task linked from the company side on the task timeline', function ():
 it('writes a single activity row for a person created with a company', function (): void {
     $this->postJson('/api/v1/people', ['name' => 'Pat Contact', 'company_id' => $this->acme->getKey()])->assertCreated();
 
-    $person = People::query()->where('name', 'Pat Contact')->sole();
+    $person = People::query()->withoutGlobalScope(WorkspaceScope::class)->where('name', 'Pat Contact')->sole();
 
     expect(Activity::query()->where('subject_id', $person->getKey())->pluck('event')->all())->toBe(['created']);
 });

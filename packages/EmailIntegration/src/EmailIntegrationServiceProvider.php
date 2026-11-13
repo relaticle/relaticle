@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration;
 
+use App\Contracts\Inbox\RequestSource;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
 use Illuminate\Database\Eloquent\Model;
@@ -15,17 +17,24 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Jetstream\Events\TeamMemberRemoved;
 use Laravel\Pennant\Feature;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\GoogleProvider;
 use Livewire\Livewire;
+use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
+use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
+use Relaticle\EmailIntegration\Console\Commands\ExpireEmailAccessRequestsCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
+use Relaticle\EmailIntegration\Console\Commands\RemoveOwnDomainRecordsCommand;
 use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
-use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Pages\ManageEmailTemplates;
+use Relaticle\EmailIntegration\Inbox\EmailAccessRequestSource;
+use Relaticle\EmailIntegration\Listeners\CancelRemovedMemberAccessRequestsListener;
+use Relaticle\EmailIntegration\Listeners\DisconnectRemovedMemberMailboxesListener;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
@@ -34,7 +43,6 @@ use Relaticle\EmailIntegration\Livewire\EmailVisibilityTable;
 use Relaticle\EmailIntegration\Livewire\MeetingsHomeWidget;
 use Relaticle\EmailIntegration\Livewire\OutboxTable;
 use Relaticle\EmailIntegration\Livewire\TemplatesTable;
-use Relaticle\EmailIntegration\Livewire\UserEmailPrivacySettings;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
@@ -70,6 +78,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         $this->app->scoped(MailboxDisplayNameDirectory::class);
         $this->app->scoped(EmailVisibilityService::class);
         $this->app->scoped(QueueRecordHistoryRelink::class);
+        $this->app->tag([EmailAccessRequestSource::class], RequestSource::class);
 
         // Not gated by the feature flag: these are inert while the feature is off, and
         // static analysis (which runs with it off) can only resolve
@@ -88,15 +97,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             'meeting' => Meeting::class,
         ]);
 
-        // Workspace rules outlive their creator; a personal template leaves with them,
-        // even while the feature is off.
-        User::deleting(function (User $user): void {
-            EmailTemplate::query()
-                ->withoutGlobalScopes()
-                ->where('created_by', $user->getKey())
-                ->where('is_shared', false)
-                ->forceDelete();
-        });
+        $this->registerCleanupThatIgnoresTheFeatureFlag();
 
         if (! self::enabled()) {
             return;
@@ -119,20 +120,11 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // Incremental email + calendar sync are scheduled in bootstrap/app.php (all
         // scheduled work lives there); do not re-register them here.
 
-        // The templates resource has no page view of its own, so its tabs and header
-        // (see HasEmailSettingsHeader) are rendered into the content column from here.
         FilamentView::registerRenderHook(
             Dashboard::AFTER_COMPOSER_RENDER_HOOK,
             fn (): string => Feature::active(EmailIntegration::class)
                 ? Blade::render("@livewire('email-integration.meetings-home-widget')")
                 : '',
-        );
-
-        FilamentView::registerRenderHook(
-            PanelsRenderHook::PAGE_HEADER_WIDGETS_BEFORE,
-            fn (): string => view('email-integration::components.settings-tabs')->render()
-                .view('email-integration::components.settings-header')->render(),
-            scopes: ManageEmailTemplates::class,
         );
 
         $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
@@ -145,7 +137,6 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         Livewire::component('email-integration.outbox-table', OutboxTable::class);
         Livewire::component('email-integration.templates-table', TemplatesTable::class);
         Livewire::component('email-integration.meetings-home-widget', MeetingsHomeWidget::class);
-        Livewire::component('email-integration.user-email-privacy-settings', UserEmailPrivacySettings::class);
 
         // The feature flag is already checked above (config-based, stable for the
         // request), so the closure only needs to gate on per-request context: the
@@ -169,19 +160,52 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
             },
         );
 
-        if ($this->app->runningInConsole()) {
-            $this->commands([
-                BackfillEmailThreadsCommand::class,
-                DispatchOutboxCommand::class,
-                IncrementalCalendarSyncCommand::class,
-                IncrementalEmailSyncCommand::class,
-                RenewCalendarPushChannelsCommand::class,
-            ]);
-        }
+        $this->registerCommands();
     }
 
     public static function enabled(): bool
     {
         return Feature::for(null)->active(EmailIntegration::class);
+    }
+
+    private function registerCommands(): void
+    {
+        if (! $this->app->runningInConsole()) {
+            return;
+        }
+
+        $this->commands([
+            BackfillEmailThreadsCommand::class,
+            DispatchOutboxCommand::class,
+            ExpireEmailAccessRequestsCommand::class,
+            IncrementalCalendarSyncCommand::class,
+            IncrementalEmailSyncCommand::class,
+            RenewCalendarPushChannelsCommand::class,
+        ]);
+    }
+
+    private function registerCleanupThatIgnoresTheFeatureFlag(): void
+    {
+        // Workspace rules outlive their creator; a personal template leaves with them.
+        User::deleting(function (User $user): void {
+            EmailTemplate::query()
+                ->withoutGlobalScopes()
+                ->where('created_by', $user->getKey())
+                ->where('is_shared', false)
+                ->forceDelete();
+        });
+
+        User::deleting(fn (User $user) => resolve(PurgeStoredMailboxData::class)->execute($user));
+        Workspace::deleting(fn (Workspace $workspace) => resolve(PurgeStoredMailboxData::class)->execute($workspace));
+
+        Event::listen(TeamMemberRemoved::class, DisconnectRemovedMemberMailboxesListener::class);
+        Event::listen(TeamMemberRemoved::class, CancelRemovedMemberAccessRequestsListener::class);
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                DisconnectFormerMemberMailboxesCommand::class,
+                RemoveOwnDomainRecordsCommand::class,
+            ]);
+        }
     }
 }

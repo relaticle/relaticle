@@ -24,7 +24,7 @@ use Laravel\Ai\Promptable;
  * "Sure! Here's a title: ..." would otherwise become the title verbatim.
  */
 #[UseCheapestModel]
-#[MaxTokens(64)]
+#[MaxTokens(400)]
 #[Timeout(15)]
 final class ConversationTitler implements Agent, HasStructuredOutput
 {

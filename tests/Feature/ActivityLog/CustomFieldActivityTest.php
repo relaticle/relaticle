@@ -137,11 +137,11 @@ it('does not log a domain field rewrite that only normalizes the stored value', 
         'entity_type' => 'company',
         'code' => 'site_domains',
         'name' => 'Site domains',
-        'type' => 'link',
+        'type' => 'domain',
         'sort_order' => 2,
         'active' => true,
         'validation_rules' => [],
-        'settings' => new CustomFieldSettingsData(allow_multiple: true, max_values: 5, additional: ['link_variant' => 'domain']),
+        'settings' => new CustomFieldSettingsData(allow_multiple: true, max_values: 5),
     ]);
     $company = Company::factory()->for($this->workspace)->create();
 

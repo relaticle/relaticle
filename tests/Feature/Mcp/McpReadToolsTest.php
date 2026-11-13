@@ -121,6 +121,25 @@ it('aggregates opportunity counts and amount by company', function (): void {
             ->etc());
 });
 
+it('does not surface the name of another workspace company in the company aggregate', function (): void {
+    $otherUser = User::factory()->withPersonalWorkspace()->create();
+    $foreignCompany = Company::factory()
+        ->recycle([$otherUser, $otherUser->personalWorkspace()])
+        ->create(['name' => 'Foreign Holdings']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
+        'company_id' => $foreignCompany->id,
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(AggregateOpportunitiesTool::class, ['group_by' => 'company'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('rows.0.label', 'No Company')
+            ->where('rows.0.count', 1)
+            ->etc())
+        ->assertDontSee('Foreign Holdings');
+});
+
 it('marks aggregates truncated only when more than one hundred groups exist', function (): void {
     $companies = Company::factory()
         ->count(100)
@@ -320,7 +339,7 @@ it('rejects malformed list tool inputs before building the database query', func
         ->assertHasErrors([$error]);
 })->with([
     'filter date operand' => [ListCompaniesTool::class, ['filter' => ['created_at' => ['$gte' => 'yesterday']]], 'created_at $gte must be a date as YYYY-MM-DD or an ISO 8601 date-time'],
-    'filter creation source' => [ListCompaniesTool::class, ['filter' => ['creation_source' => ['$eq' => 'system']]], 'creation_source $eq: system is not one of'],
+    'filter creation source' => [ListCompaniesTool::class, ['filter' => ['creation_source' => ['$eq' => 'zapier']]], 'creation_source $eq: zapier is not one of'],
     'filter object' => [ListCompaniesTool::class, ['filter' => ['invalid']], 'filter field must be an object'],
     'filter operator object' => [ListCompaniesTool::class, ['filter' => ['name' => 'software']], 'name takes an operator object'],
     'sort object' => [ListCompaniesTool::class, ['sort' => 'name'], 'sort'],
@@ -460,4 +479,40 @@ it('names every known channel and null in its description', function (): void {
     }
 
     expect($description)->toContain('null');
+});
+
+it('returns an excerpt of a long rich text change, not the whole body', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
+    $body = '<p>'.str_repeat('a renewal note that keeps going. ', 200).'</p><p>closing words</p>';
+
+    Activity::withoutGlobalScopes()->where('subject_id', $company->getKey())->delete();
+    Activity::withoutGlobalScopes()->create([
+        'log_name' => 'crm',
+        'description' => 'custom_field_changes',
+        'event' => 'custom_field_changes',
+        'subject_type' => $company->getMorphClass(),
+        'subject_id' => $company->getKey(),
+        'causer_type' => 'user',
+        'causer_id' => $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'attribute_changes' => ['attributes' => ['name' => str_repeat('n', 600)], 'old' => ['name' => 'Acme']],
+        'properties' => ['custom_field_changes' => [[
+            'code' => 'description',
+            'label' => 'Description',
+            'type' => 'rich-editor',
+            'old' => ['value' => '<p>Draft</p>', 'label' => '<p>Draft</p>'],
+            'new' => ['value' => $body, 'label' => $body],
+        ]]],
+    ]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(ListActivityTool::class, ['record_type' => 'company', 'record_id' => $company->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('items.0.changes.0.field', 'Name')
+            ->where('items.0.changes.0.new', fn (string $new): bool => str_ends_with($new, '(shortened)'))
+            ->where('items.0.changes.1.field', 'Description')
+            ->where('items.0.changes.1.old', 'Draft')
+            ->where('items.0.changes.1.new', fn (string $new): bool => str_ends_with($new, '(shortened)') && mb_strlen($new) < 600)
+            ->etc());
 });

@@ -1,25 +1,42 @@
 @php
     $operation = $proposal?->operation->value;
-    $stepCount = count($steps);
-    // A plan's footer decides every remaining step at once, and says so with a
-    // count. A standalone card (single record, or a paginated batch showing one
-    // record at a time) decides exactly the record on screen, so its labels are
-    // singular: the card can never commit anything that is not rendered.
-    $isBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
-    $primaryLabel = $isPlan
-        ? __('Approve all :count', ['count' => $stepCount])
-        : match ($operation) {
-            'update' => __('Save changes'),
-            'delete' => __('Delete'),
-            default => __('Create'),
-        };
-    $primaryAction = $isPlan ? 'approveAll' : 'createCurrent';
-    $discardLabel = $isPlan ? __('Discard all') : __('Discard');
-    $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
-    $isDestructive = $operation === 'delete' && ! $isPlan;
-    $activePosition = $steps[0]['activeItemPosition'] ?? 1;
+    $approvableSteps = array_filter($steps, fn (array $step): bool => ! $step['needsOwnApproval']);
+    $totalRecordCount = array_sum(array_map(fn (array $step): int => $step['isBatch'] ? count($step['items']) : 1, $approvableSteps));
+    $countedSteps = array_filter($approvableSteps, fn (array $step): bool => ! in_array($step['id'], $leftOutStepIds, true) && ! isset($takenBy[$step['id']]));
+    $hasDelete = array_filter($countedSteps, fn (array $step): bool => $step['deletes']) !== [];
+    $isWebAccess = ! $isPlan && ($steps[0]['entity_type'] ?? null) === \Relaticle\Chat\Enums\ProposalEntity::WebAccess->value;
+    $holdsOwnApproval = ! $isPlan && ($steps[0]['needsOwnApproval'] ?? false);
+    $isStandaloneBatch = ! $isPlan && ($steps[0]['isBatch'] ?? false);
+    $rowsIn = $isStandaloneBatch
+        ? count($steps[0]['items']) - count(array_intersect(array_column($steps[0]['items'], 'index'), $leftOutRowIndexes[$steps[0]['id']] ?? []))
+        : 0;
+    $decisionCount = $holdsOwnApproval ? $rowsIn : $approvableRecordCount;
 
-    // Every change of an update unchecked: approving would write nothing, so
+    if ($isPlan) {
+        $loneStep = count($countedSteps) === 1 ? reset($countedSteps) : null;
+        $primaryLabel = $hasOwnApprovalSteps && $loneStep !== null && ! $loneStep['isBatch']
+            ? __('Approve :entity', ['entity' => $loneStep['entityNoun']])
+            : trans_choice('Approve :count change|Approve :count changes', $approvableRecordCount, ['count' => $approvableRecordCount]);
+        $showPrimary = $approvableRecordCount > 0;
+        $discardLabel = __('Discard all');
+    } else {
+        $isBatchApproval = $isStandaloneBatch && ! $holdsOwnApproval && ! $steps[0]['deletes'];
+        $primaryLabel = match (true) {
+            $isBatchApproval => trans_choice('Approve :count change|Approve :count changes', $approvableRecordCount, ['count' => $approvableRecordCount]),
+            $overwrites => __('Overwrite'),
+            default => $proposal?->entity_type->confirmLabel($proposal->operation, max($decisionCount, 1)) ?? __('Approve'),
+        };
+        $showPrimary = ! $isStandaloneBatch || $decisionCount > 0;
+        $discardLabel = $isBatchApproval ? __('Discard all') : ($proposal?->entity_type->declineLabel() ?? __('Discard'));
+    }
+
+    $primaryAction = $isPlan || ($isStandaloneBatch && ! $holdsOwnApproval) ? 'approveAll' : 'createCurrent';
+    $discardAction = $isPlan ? 'discardAll' : 'discardCurrent';
+    $isDestructive = $isPlan ? $hasDelete : ($steps[0]['deletes'] ?? false);
+    $primaryIsSend = $holdsOwnApproval;
+    $showsShortcut = ! $primaryIsRisky;
+
+    // Every change of an update left out: approving would write nothing, so
     // the confirm is disabled rather than minting an "Approved" no-op.
     $allChangesExcluded = ! $isPlan
         && $operation === 'update'
@@ -28,7 +45,7 @@
     $primaryBlocked = $editingFieldCode !== null || $allChangesExcluded;
     $primaryBlockedHint = $editingFieldCode !== null
         ? __('Finish editing the field first')
-        : __('Every change is unchecked; there is nothing to save');
+        : __('Every change is left out; there is nothing to approve');
 @endphp
 
 <div class="flex min-h-0 flex-col">
@@ -42,29 +59,25 @@
              position: fixed, so the steps scroller below cannot clip them. --}}
         <div class="fi-fixed-positioning-context flex min-h-0 flex-col overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10">
             @if ($isPlan)
-                {{-- Plan header: the card is one decision over several writes, so it
-                     says how many and in what order they run. --}}
                 <div class="flex shrink-0 items-center gap-2.5 border-b border-gray-100 px-4 py-2.5 dark:border-white/5">
-                    {{-- Neutral tile, matching the block headers (records_table,
-                         record_card): the soft accent belongs to the step rows,
-                         where it marks the record being written. --}}
-                    <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
-                        <x-heroicon-o-queue-list class="h-3.5 w-3.5" />
-                    </span>
-
                     <p class="min-w-0 flex-1 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white">
-                        {{ trans_choice(':count step|:count steps', $stepCount, ['count' => $stepCount]) }}
+                        {{ $approvableRecordCount === $totalRecordCount
+                            ? trans_choice(':count change|:count changes', $totalRecordCount, ['count' => $totalRecordCount])
+                            : __(':count of :total changes', ['count' => $approvableRecordCount, 'total' => $totalRecordCount]) }}
                     </p>
 
-                    {{-- Right-aligned meta, same slot the records_table header uses
-                         for its truncation count. --}}
-                    <span class="shrink-0 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500">
-                        {{ __('Approved together, in order') }}
-                    </span>
+                    @if ($approvableRecordCount === $totalRecordCount)
+                        <span class="hidden shrink-0 text-[length:var(--text-micro)] text-gray-400 sm:inline dark:text-gray-500">
+                            {{ __('Hover a line to leave it out') }}
+                        </span>
+                    @endif
                 </div>
             @endif
 
-            {{-- A plan can be taller than the dock: the steps scroll, so the
+            @if ($isWebAccess)
+                @include('chat::livewire.chat.partials._dock-web-access', ['step' => $steps[0], 'proposal' => $proposal])
+            @else
+            {{-- A plan can be taller than the dock: the lines scroll, so the
                  decision buttons never leave the viewport. --}}
             <div @class([
                 'min-h-0 flex-1 overflow-y-auto overscroll-contain',
@@ -82,51 +95,20 @@
             @enderror
 
             {{-- Footer: the decision. Separated by a hairline so it reads as one
-                 deliberate step. Styled after the Attio reference (user-directed,
-                 2026-08): pagination on the left for a batch, then a plain-text
-                 discard and a brand-colored confirm, with the genuinely
-                 destructive delete in red. Both buttons decide only the record
-                 on screen. --}}
+                 deliberate step: a plain-text discard and a brand-colored confirm,
+                 with the genuinely destructive delete in red. --}}
             <div class="flex shrink-0 items-center gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
-                @if ($isBatch && $remainingCount > 1)
-                    {{-- Attio-style pagination over the still-undecided records.
-                         Arrows clamp at the ends; deciding a record advances
-                         automatically. aria-live announces the position as it
-                         changes. --}}
-                    <div class="flex items-center gap-1 text-xs font-medium tabular-nums text-gray-500 dark:text-gray-400">
-                        <button
-                            type="button"
-                            wire:click="prevItem"
-                            wire:loading.attr="disabled"
-                            @disabled($activePosition <= 1)
-                            aria-label="{{ __('Previous record') }}"
-                            title="{{ __('Previous record') }}"
-                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 dark:disabled:hover:bg-transparent"
-                        >
-                            <x-heroicon-m-chevron-left class="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-
-                        <span aria-live="polite" class="select-none px-0.5">{{ $activePosition }}/{{ $remainingCount }}</span>
-
-                        <button
-                            type="button"
-                            wire:click="nextItem"
-                            wire:loading.attr="disabled"
-                            @disabled($activePosition >= $remainingCount)
-                            aria-label="{{ __('Next record') }}"
-                            title="{{ __('Next record') }}"
-                            class="inline-flex h-6 w-6 items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 dark:disabled:hover:bg-transparent"
-                        >
-                            <x-heroicon-m-chevron-right class="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                    </div>
-                @endif
-
                 <div class="ms-auto flex items-center gap-2">
                 <button
                     type="button"
+                    wire:key="discard-{{ $discardAction }}-{{ $steps[0]['id'] ?? '' }}"
                     wire:click="{{ $discardAction }}"
                     wire:loading.attr="disabled"
+                    @if ($primaryIsSend)
+                        x-data="{ armed: false }"
+                        x-init="setTimeout(() => armed = true, 700)"
+                        x-bind:disabled="{{ $editingFieldCode !== null ? 'true' : '! armed' }}"
+                    @endif
                     @disabled($editingFieldCode !== null)
                     @if ($editingFieldCode !== null) title="{{ __('Finish editing the field first') }}" @endif
                     @class([
@@ -137,10 +119,18 @@
                     {{ $discardLabel }}
                 </button>
 
+                @if ($showPrimary)
                 <button
                     type="button"
+                    wire:key="primary-{{ $primaryAction }}-{{ $steps[0]['id'] ?? '' }}"
                     wire:click="{{ $primaryAction }}"
                     wire:loading.attr="disabled"
+                    @if ($showsShortcut) data-proposal-shortcut @endif
+                    @if ($primaryIsSend)
+                        x-data="{ armed: false }"
+                        x-init="setTimeout(() => armed = true, 700)"
+                        x-bind:disabled="{{ $primaryBlocked ? 'true' : '! armed' }}"
+                    @endif
                     @disabled($primaryBlocked)
                     @if ($primaryBlocked) title="{{ $primaryBlockedHint }}" @endif
                     @class([
@@ -150,16 +140,20 @@
                         'opacity-50' => $primaryBlocked,
                     ])
                 >
-                    <x-heroicon-o-arrow-path class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
+                    <x-lucide-refresh-cw class="h-3 w-3 motion-safe:animate-spin" wire:loading wire:target="{{ $primaryAction }}" aria-hidden="true" />
                     <span>{{ $primaryLabel }}</span>
+                    @if ($showsShortcut)
                     <kbd
                         x-data
                         x-text="/Mac|iP/.test(navigator.platform) ? '⌘⏎' : 'Ctrl+⏎'"
                         class="hidden rounded bg-white/20 px-1 py-0.5 font-sans text-[length:var(--text-pico)] font-medium sm:inline"
                     ></kbd>
+                    @endif
                 </button>
+                @endif
                 </div>
             </div>
+            @endif
         </div>
     @endif
 

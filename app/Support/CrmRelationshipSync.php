@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use Illuminate\Database\Eloquent\Model;
+use InvalidArgumentException;
 
 /**
  * The one place the `*_ids` payload vocabulary is mapped, both to the models a
@@ -40,6 +41,15 @@ final readonly class CrmRelationshipSync
         'opportunity_ids' => 'opportunities',
         'assignee_ids' => 'assignees',
     ];
+
+    public static function payloadKeyFor(Model $model): string
+    {
+        $key = array_search($model::class, self::OWNED_MODELS, true);
+
+        throw_unless(is_string($key), InvalidArgumentException::class, $model::class.' is not a linkable CRM entity.');
+
+        return $key;
+    }
 
     /**
      * @param  array<string, mixed>  $data

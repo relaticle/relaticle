@@ -5,13 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 /**
- * The `display_block` key on a read-tool result, in one place.
- *
- * A block is presentation, not reasoning. It travels to the UI two ways
- * (`ConversationMessagesQuery` on reload, `ChatInterface::latestAssistantMessage()`
- * at stream-end reconcile) and travels back to the model zero ways: the store
- * strips it from the replayed history, because tool results are replayed on
- * every later turn and a block re-read is pure token cost forever.
+ * The model-replay view of a tool result: the `display_block` key and the write echo.
  */
 final readonly class DisplayBlocks
 {
@@ -44,27 +38,35 @@ final readonly class DisplayBlocks
     }
 
     /**
-     * The same tool result with its block removed. Anything that is not a JSON
-     * object carrying a block is returned untouched, so a plain-string result
-     * never round-trips through json_encode.
+     * The tool result as the model replays it; the original string when nothing is removed.
      */
     public static function strip(mixed $result): mixed
     {
-        if (! is_string($result) || ! str_contains($result, self::KEY)) {
+        if (! is_string($result) || ! self::mayCarryStrippable($result)) {
             return $result;
         }
 
         $decoded = json_decode($result, true);
 
-        if (! is_array($decoded) || ! array_key_exists(self::KEY, $decoded)) {
+        if (! is_array($decoded)) {
             return $result;
         }
 
-        unset($decoded[self::KEY]);
+        $dropped = ($decoded['type'] ?? null) === PendingActionEnvelope::TYPE
+            ? [self::KEY, ...PendingActionEnvelope::REPLAY_DROPPED_KEYS]
+            : [self::KEY];
+        $kept = array_diff_key($decoded, array_flip($dropped));
 
-        // Same flag the tools encode with: this re-encode is what the model
-        // actually replays for every block-carrying result, so dropping it
-        // would put escaped slashes back into the prefix the tools just cleaned.
-        return json_encode($decoded, JSON_UNESCAPED_SLASHES);
+        if (count($kept) === count($decoded)) {
+            return $result;
+        }
+
+        // The tools encode with this flag, so the replay keeps their unescaped slashes.
+        return json_encode($kept, JSON_UNESCAPED_SLASHES);
+    }
+
+    private static function mayCarryStrippable(string $result): bool
+    {
+        return str_contains($result, self::KEY) || str_contains($result, '"'.PendingActionEnvelope::TYPE.'"');
     }
 }

@@ -14,6 +14,7 @@ use Closure;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentView;
 use Filament\View\PanelsRenderHook;
+use Illuminate\Auth\Events\Logout;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
@@ -49,6 +51,10 @@ use Relaticle\Chat\Support\RecordChipRenderer;
 
 final class ChatServiceProvider extends ServiceProvider
 {
+    private const string CLEAR_DRAFTS_COOKIE = 'chat_clear_drafts';
+
+    private const int CLEAR_DRAFTS_COOKIE_MINUTES = 60 * 24;
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__.'/../config/chat.php', 'chat');
@@ -210,7 +216,25 @@ final class ChatServiceProvider extends ServiceProvider
         FilamentView::registerRenderHook(
             PanelsRenderHook::HEAD_END,
             $this->inAppPanel(fn (): string => $this->recordChipIconScript()
-                .Blade::render("@vite(['resources/js/echo.js', 'packages/Chat/resources/js/chat.js'])")),
+                .Blade::render("@vite(['packages/Chat/resources/js/chat.js'])")),
+        );
+
+        // A session that merely expired keeps its drafts: the composer restores them after sign-in.
+        Event::listen(Logout::class, static function (): void {
+            Cookie::queue(self::CLEAR_DRAFTS_COOKIE, '1', self::CLEAR_DRAFTS_COOKIE_MINUTES);
+        });
+
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::AUTH_LOGIN_FORM_BEFORE,
+            $this->inAppPanel(function (): View|Factory|string {
+                if (request()->cookie(self::CLEAR_DRAFTS_COOKIE) === null) {
+                    return '';
+                }
+
+                Cookie::queue(Cookie::forget(self::CLEAR_DRAFTS_COOKIE));
+
+                return view('chat::filament.app.clear-drafts-hook');
+            }),
         );
 
         FilamentView::registerRenderHook(

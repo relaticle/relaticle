@@ -11,7 +11,12 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Queue\Attributes\Backoff;
+use Illuminate\Queue\Attributes\Tries;
+use Illuminate\Support\Str;
 
+#[Tries(3)]
+#[Backoff(60, 300)]
 final class WorkspaceDeletionReminderNotification extends Notification implements ShouldQueue
 {
     use Queueable;
@@ -35,7 +40,7 @@ final class WorkspaceDeletionReminderNotification extends Notification implement
         return (new MailMessage)
             ->subject(trans_choice('mail.workspace_deletion_reminder.subject', $days, ['workspace' => $this->workspace->name, 'days' => $days]))
             ->markdown('mail.notifications.workspace-deletion-reminder', [
-                'workspaceName' => $this->workspace->name,
+                'workspaceName' => Str::squish($this->workspace->name),
                 'days' => $days,
                 'date' => $date,
                 'settingsUrl' => EditWorkspace::getUrl(panel: 'app', tenant: $this->workspace),

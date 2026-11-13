@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace App\Support\Mail;
 
-use App\Data\DigestPayload;
+use App\Data\DigestRecord;
 use App\Data\DigestTaskItem;
-use App\Data\DigestWorkspaceSection;
-use App\Mail\NewContactSubmissionMail;
-use App\Mail\ProEndedMail;
-use App\Mail\ProTrialEndingSoonMail;
+use App\Data\TaskDigest;
+use App\Enums\CrmEntity;
 use App\Mail\SetupNudgeMail;
 use App\Mail\TaskAssignedMail;
 use App\Mail\TaskDigestMail;
@@ -36,6 +34,18 @@ use InvalidArgumentException;
 
 final readonly class MailPreview
 {
+    /** @param array<string, Closure(User, Workspace): (Mailable|MailMessage)> $extensions */
+    public function __construct(private array $extensions = []) {}
+
+    /** @param Closure(User, Workspace): (Mailable|MailMessage) $mailable */
+    public static function register(string $key, Closure $mailable): void
+    {
+        app()->extend(
+            self::class,
+            static fn (self $preview): self => new self([...$preview->extensions, $key => $mailable]),
+        );
+    }
+
     /** @return list<string> */
     public function names(): array
     {
@@ -56,33 +66,21 @@ final readonly class MailPreview
     private function registry(): array
     {
         return [
-            'trial-ending' => function (User $owner, Workspace $workspace): Mailable {
-                $workspace->setRelation('owner', $owner);
-
-                return new ProTrialEndingSoonMail($workspace);
-            },
-            'trial-ended' => fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterTrial($workspace),
-            'subscription-ended' => fn (User $owner, Workspace $workspace): Mailable => ProEndedMail::afterSubscription($workspace),
             'setup-nudge' => fn (User $owner, Workspace $workspace): Mailable => new SetupNudgeMail($owner, $workspace, 'first_record', url()->getAppUrl('chat')),
             'task-assigned' => fn (User $owner, Workspace $workspace): Mailable => new TaskAssignedMail('Call Ana Reyes about the renewal', url()->getAppUrl('tasks'), $workspace->name),
-            'task-digest' => fn (User $owner): Mailable => new TaskDigestMail($owner, new DigestPayload([
-                new DigestWorkspaceSection('Acme Robotics', [
-                    new DigestTaskItem('Send revised proposal', now()->subDays(2), url()->getAppUrl('tasks')),
-                ], [
-                    new DigestTaskItem('Call Ana Reyes about the renewal', now(), url()->getAppUrl('tasks')),
+            'task-digest' => fn (User $owner, Workspace $workspace): Mailable => new TaskDigestMail($owner, $workspace, new TaskDigest(
+                overdue: [
+                    new DigestTaskItem('Send revised proposal', now()->subDays(2), url()->getAppUrl('tasks'), [new DigestRecord(CrmEntity::Company, 'Northwind Logistics'), new DigestRecord(CrmEntity::Opportunity, 'Q4 fleet expansion')], 'High', '#dc2626'),
+                ],
+                upcoming: [
+                    new DigestTaskItem('Call Ana Reyes about the renewal', now(), url()->getAppUrl('tasks'), [new DigestRecord(CrmEntity::Company, 'Brightline Health'), new DigestRecord(CrmEntity::People, 'Ana Reyes'), new DigestRecord(CrmEntity::Opportunity, 'Annual renewal')], 'Medium', '#d4a574'),
                     new DigestTaskItem('Prepare onboarding deck', now(), url()->getAppUrl('tasks')),
-                ]),
-            ])),
+                ],
+            )),
             'workspace-invitation' => fn (User $owner, Workspace $workspace): Mailable => new WorkspaceInvitationMail(
                 $this->invitation($owner, $workspace),
                 'preview-token',
             ),
-            'contact-submission' => fn (): Mailable => new NewContactSubmissionMail([
-                'name' => 'Ana Reyes',
-                'email' => 'ana@acme-robotics.example',
-                'company' => 'Acme Robotics',
-                'message' => 'We are evaluating CRMs for a 12-person sales workspace and need SSO. Can we talk this week?',
-            ]),
             'workspace-deletion-scheduled' => fn (User $owner, Workspace $workspace): MailMessage => new WorkspaceDeletionScheduledNotification($workspace)->toMail($owner),
             'workspace-deletion-reminder' => fn (User $owner, Workspace $workspace): MailMessage => new WorkspaceDeletionReminderNotification($workspace)->toMail($owner),
             'workspace-deletion-cancelled' => fn (User $owner, Workspace $workspace): MailMessage => new WorkspaceDeletionCancelledNotification($workspace)->toMail($owner),
@@ -109,6 +107,7 @@ final readonly class MailPreview
 
                 return $notification->toMail($owner);
             },
+            ...$this->extensions,
         ];
     }
 

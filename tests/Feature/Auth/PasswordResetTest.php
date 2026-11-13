@@ -7,6 +7,8 @@ use App\Filament\Pages\Auth\ResetPassword;
 use App\Models\User;
 use App\Notifications\Auth\ResetPassword as ResetPasswordNotification;
 use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentAsset;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -17,6 +19,23 @@ test('forgot password page can be rendered', function () {
     $response = $this->get(url()->getAppUrl('password-reset/request'));
 
     $response->assertSuccessful();
+});
+
+test('the reset page preloads the script its password fields bind with', function () {
+    $user = User::factory()->withWorkspace()->create();
+    $url = Filament::getPanel('app')->getResetPasswordUrl(Password::broker('users')->createToken($user), $user);
+    $revealScript = FilamentAsset::getAlpineComponentSrc('text-input/password-reveal', 'filament/forms');
+
+    $this->get($url)
+        ->assertSuccessful()
+        ->assertSee('<link rel="modulepreload" href="'.e($revealScript).'">', escape: false)
+        ->assertSee('x-load-src="'.e($revealScript).'"', escape: false);
+});
+
+test('the forgot password page, which has no password field, preloads nothing', function () {
+    $this->get(url()->getAppUrl('password-reset/request'))
+        ->assertSuccessful()
+        ->assertDontSee('password-reveal.js', escape: false);
 });
 
 test('reset password link can be requested', function () {
@@ -97,6 +116,34 @@ test('password can be reset with valid token', function () {
         ->assertRedirect();
 
     expect(Hash::check('new-secure-password', $user->fresh()->password))->toBeTrue();
+});
+
+test('a password reset ends the sessions of an account that had no password', function () {
+    config(['session.driver' => 'database']);
+
+    $user = User::factory()->socialOnly()->withWorkspace()->create();
+
+    DB::table('sessions')->insert([
+        'id' => 'signed-in-elsewhere',
+        'user_id' => $user->getKey(),
+        'ip_address' => '127.0.0.1',
+        'user_agent' => 'Mozilla/5.0',
+        'payload' => base64_encode('test'),
+        'last_activity' => time(),
+    ]);
+
+    livewire(ResetPassword::class, [
+        'email' => $user->email,
+        'token' => Password::broker('users')->createToken($user),
+    ])
+        ->fillForm([
+            'password' => 'new-secure-password',
+            'passwordConfirmation' => 'new-secure-password',
+        ])
+        ->call('resetPassword')
+        ->assertRedirect();
+
+    expect(DB::table('sessions')->where('id', 'signed-in-elsewhere')->exists())->toBeFalse();
 });
 
 test('password cannot be reset with invalid token', function () {

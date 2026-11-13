@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 use Spatie\LoginLink\Http\Controllers\LoginLinkController;
 
+// An Amp orb serves the app on its portal hostname, which only the thread's participants can open.
+$orbPortalDomain = env('AMP_ORB') ? env('AMP_PORTAL_DOMAIN') : null;
+
+$isDevelopmentHost = static fn (mixed $host): bool => is_string($host)
+    && (in_array($host, ['localhost', '127.0.0.1'], true)
+        || str_ends_with($host, '.test')
+        || (is_string($orbPortalDomain) && $orbPortalDomain !== '' && str_ends_with($host, ".{$orbPortalDomain}")));
+
 return [
     /*
-     * Login links will only work in these environments. In all
-     * other environments, an exception will be thrown.
+     * .env.example ships APP_ENV=local and TrustHosts is off there, so the request host is
+     * attacker-chosen: only an APP_URL on a development host enables login links.
      */
-    'allowed_environments' => ['local'],
+    'allowed_environments' => $isDevelopmentHost(parse_url((string) config('app.url'), PHP_URL_HOST)) ? ['local'] : [],
 
     /*
-     * Login links will only work in these hosts. In all
-     * other hosts, an exception will be thrown.
+     * Login links will only work in these hosts.
      */
-    'allowed_hosts' => array_filter([
+    'allowed_hosts' => array_values(array_unique(array_filter([
         'localhost',
         '127.0.0.1',
         'relaticle.test',
@@ -23,13 +30,14 @@ return [
         parse_url((string) config('app.url'), PHP_URL_HOST),
         config('app.app_panel_domain'),
         config('app.sysadmin_domain'),
-    ]),
+    ], $isDevelopmentHost))),
 
     /*
      * The package will automatically create a user model when trying
-     * to log in a user that doesn't exist.
+     * to log in a user that doesn't exist. Off: the request names the
+     * guard and user model, so creating users would let it mint accounts.
      */
-    'automatically_create_missing_users' => true,
+    'automatically_create_missing_users' => false,
 
     /*
      * The user model that should be logged in. If this is set to `null`

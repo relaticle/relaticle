@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Auth;
 
+use App\Models\User;
+use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Schemas\Components\Html;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
+use Filament\Support\Exceptions\Halt;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Contracts\Support\Htmlable;
-use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\Locked;
 
 /**
@@ -21,8 +23,6 @@ use Livewire\Attributes\Locked;
  */
 final class EmailVerificationPrompt extends \Filament\Auth\Pages\EmailVerification\EmailVerificationPrompt
 {
-    private const int RESEND_COOLDOWN_SECONDS = 60;
-
     /**
      * Seconds left before another verification email may be sent. Kept on the
      * server so the countdown survives a reload instead of restarting at zero.
@@ -52,9 +52,9 @@ final class EmailVerificationPrompt extends \Filament\Auth\Pages\EmailVerificati
 
     public function getResendCooldownSeconds(): int
     {
-        $key = $this->resendCooldownKey();
+        $user = $this->getVerifiable();
 
-        return $key === null ? 0 : RateLimiter::availableIn($key);
+        return $user instanceof User ? $user->verificationEmailCooldown() : 0;
     }
 
     public function content(Schema $schema): Schema
@@ -94,24 +94,19 @@ final class EmailVerificationPrompt extends \Filament\Auth\Pages\EmailVerificati
     protected function sendEmailVerificationNotification(MustVerifyEmail $user): void
     {
         if ($user->hasVerifiedEmail()) {
-            return;
+            $this->redirectIntended(Filament::getUrl());
+
+            throw new Halt;
         }
 
-        parent::sendEmailVerificationNotification($user);
+        $cooldown = $this->getResendCooldownSeconds();
 
-        $key = $this->resendCooldownKey();
+        if ($cooldown > 0) {
+            $this->getRateLimitedNotification(new TooManyRequestsException(self::class, 'resendNotification', request()->ip(), $cooldown))?->send();
 
-        if ($key === null) {
-            return;
+            throw new Halt;
         }
 
-        RateLimiter::hit($key, self::RESEND_COOLDOWN_SECONDS);
-    }
-
-    private function resendCooldownKey(): ?string
-    {
-        $id = Filament::auth()->id();
-
-        return $id === null ? null : 'verification-resend:'.$id;
+        $user->sendEmailVerificationNotification();
     }
 }

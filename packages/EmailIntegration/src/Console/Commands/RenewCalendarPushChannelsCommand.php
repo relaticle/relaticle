@@ -8,7 +8,6 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Eloquent\Builder;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\EnsureCalendarPushChannelJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Support\CalendarPushWebhookUrl;
@@ -24,7 +23,7 @@ final class RenewCalendarPushChannelsCommand extends Command
         }
 
         ConnectedAccount::query()
-            ->where('status', EmailAccountStatus::ACTIVE)
+            ->syncable()
             ->whereJsonContains('capabilities->calendar', true)
             ->whereNotNull('calendar_sync_cursor')
             ->where(function (Builder $query): void {

@@ -58,3 +58,61 @@ it('strips raw HTML the server strips while keeping chips and tables', function 
         ->and($result['chipRendered'])->toBeTrue()
         ->and($result['tableWrapped'])->toBeTrue();
 });
+
+it('shows an image as its alt text and paints no img element', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'images', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId);
+
+    $result = $page->script(<<<'JS'
+        (() => {
+            if (typeof window.renderMarkdown !== 'function') return { missing: true };
+
+            const parse = (html) => new DOMParser().parseFromString(html, 'text/html').body;
+            const markdownImage = window.renderMarkdown('![logo](https://example.com/a.png?d=secret)');
+            const emptyAlt = window.renderMarkdown('![](https://example.com/a.png?d=secret)');
+            const formattedAlt = window.renderMarkdown('![the **big** <b onmouseover=x> logo](https://example.com/a.png)');
+            const linkedImage = window.renderMarkdown('[![logo](https://example.com/a.png)](https://example.com)');
+            const rawImage = window.renderMarkdown('Hi <img src=x onerror="window.__xssFired = 1"> there');
+            const mixed = window.renderMarkdown('![logo](https://example.com/a.png) [site](https://example.com) [Acme](/r/company/01ABC)');
+
+            return {
+                missing: false,
+                markdownText: parse(markdownImage).textContent.trim(),
+                markdownHasImg: parse(markdownImage).querySelector('img') !== null,
+                markdownLeaksUrl: markdownImage.includes('example.com'),
+                emptyText: parse(emptyAlt).textContent.trim(),
+                emptyLeaksUrl: emptyAlt.includes('example.com'),
+                formattedText: parse(formattedAlt).textContent.trim(),
+                formattedHasMarkup: parse(formattedAlt).querySelector('strong, b') !== null,
+                linkedLinkText: parse(linkedImage).querySelector('a[href="https://example.com"]')?.textContent ?? null,
+                linkedHasImg: parse(linkedImage).querySelector('img') !== null,
+                rawHasImg: parse(rawImage).querySelector('img') !== null,
+                rawText: parse(rawImage).textContent.trim(),
+                xssFired: window.__xssFired === 1,
+                mixedHasImg: parse(mixed).querySelector('img') !== null,
+                mixedLink: parse(mixed).querySelector('a[href="https://example.com"]')?.textContent ?? null,
+                mixedChip: parse(mixed).querySelector('a.chat-chip[href="/r/company/01ABC"]') !== null,
+            };
+        })()
+    JS);
+
+    expect($result['missing'])->toBeFalse()
+        ->and($result['markdownText'])->toBe('logo')
+        ->and($result['markdownHasImg'])->toBeFalse()
+        ->and($result['markdownLeaksUrl'])->toBeFalse()
+        ->and($result['emptyText'])->toBe('')
+        ->and($result['emptyLeaksUrl'])->toBeFalse()
+        ->and($result['formattedText'])->toBe('the big <b onmouseover=x> logo')
+        ->and($result['formattedHasMarkup'])->toBeFalse()
+        ->and($result['linkedLinkText'])->toBe('logo')
+        ->and($result['linkedHasImg'])->toBeFalse()
+        ->and($result['rawHasImg'])->toBeFalse()
+        ->and($result['xssFired'])->toBeFalse()
+        ->and($result['mixedHasImg'])->toBeFalse()
+        ->and($result['mixedLink'])->toBe('site')
+        ->and($result['mixedChip'])->toBeTrue();
+});

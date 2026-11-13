@@ -23,8 +23,7 @@ it('resolves the custom fields destination to an app-panel url', function (): vo
 });
 
 it('resolves every declared destination to a non-null url', function (): void {
-    config()->set('relaticle.features.billing', true);
-    Feature::flushCache();
+    withHostedBilling();
 
     $resolver = app(DestinationResolver::class);
 
@@ -67,12 +66,12 @@ it('resolves access_tokens to the workspace access tokens page', function (): vo
         ->and($url)->toContain('access-tokens');
 });
 
-it('resolves connect_assistant to the public help page on the primary host', function (): void {
-    config()->set('app.url', 'https://marketing.test');
+it('resolves connect_assistant to the help article on the documentation public url', function (): void {
+    config()->set('documentation.public_url', 'https://docs.example.test');
 
     $url = app(DestinationResolver::class)->resolve('connect_assistant', $this->user->currentWorkspace);
 
-    expect($url)->toBe('https://marketing.test/help/ai-assistant/connect-claude-or-chatgpt');
+    expect($url)->toBe('https://docs.example.test/help/ai-assistant/connect-claude-or-chatgpt');
 });
 
 it('resolves email_accounts to the mailbox page while the email integration is on', function (): void {
@@ -87,8 +86,7 @@ it('resolves email_accounts to the mailbox page while the email integration is o
 });
 
 it('resolves billing to the billing page while billing is on', function (): void {
-    config()->set('relaticle.features.billing', true);
-    Feature::flushCache();
+    withHostedBilling();
 
     $url = app(DestinationResolver::class)->resolve('billing', $this->user->currentWorkspace);
 
@@ -110,3 +108,23 @@ it('resolves no email_accounts page while the email integration is off', functio
 
     expect(app(DestinationResolver::class)->resolve('email_accounts', $this->user->currentWorkspace))->toBeNull();
 });
+
+it('resolves the email tab destinations to the tab of the Emails page while the email integration is on', function (string $destination, string $tab): void {
+    config()->set('relaticle.features.email_integration', true);
+    Feature::flushCache();
+
+    $url = app(DestinationResolver::class)->resolve($destination, $this->user->currentWorkspace);
+
+    expect(parse_url($url, PHP_URL_PATH))->toEndWith("/{$this->user->currentWorkspace->slug}/email")
+        ->and(parse_url($url, PHP_URL_QUERY))->toBe("tab={$tab}");
+})->with([
+    'drafts' => ['email_drafts', 'drafts'],
+    'outbox' => ['email_outbox', 'outbox'],
+]);
+
+it('resolves no email tab page while the email integration is off', function (string $destination): void {
+    config()->set('relaticle.features.email_integration', false);
+    Feature::flushCache();
+
+    expect(app(DestinationResolver::class)->resolve($destination, $this->user->currentWorkspace))->toBeNull();
+})->with(['email_drafts', 'email_outbox']);

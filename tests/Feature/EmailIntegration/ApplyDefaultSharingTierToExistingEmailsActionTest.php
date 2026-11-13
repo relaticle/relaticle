@@ -5,158 +5,94 @@ declare(strict_types=1);
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Support\Arr;
 use Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction;
+use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ApplyDefaultSharingTierToExistingEmailsAction::class);
+mutates(
+    ApplyDefaultSharingTierToExistingEmailsAction::class,
+    SaveMailboxSharingTier::class,
+);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
     $this->actingAs($this->owner);
     $this->workspace = $this->owner->currentWorkspace;
     Filament::setTenant($this->workspace);
-
-    $this->account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $this->owner->id,
-    ]));
-
-    $this->action = app(ApplyDefaultSharingTierToExistingEmailsAction::class);
 });
 
-function makeRetroactiveEmail(array $overrides = []): Email
+function sharingMailbox(User $user, Workspace $workspace, array $attributes = []): ConnectedAccount
 {
-    return Email::factory()->create(array_merge([
-        'workspace_id' => test()->workspace->id,
-        'user_id' => test()->owner->id,
-        'connected_account_id' => test()->account->getKey(),
-        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
-        'privacy_tier_customized' => false,
-    ], $overrides));
+    $mailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        ...Arr::except($attributes, ['sharing_tier']),
+    ]));
+
+    $mailbox->forceFill(['sharing_tier' => $attributes['sharing_tier'] ?? null])->save();
+
+    return $mailbox;
 }
 
-it('updates non-customized emails for a user', function (): void {
-    $email = makeRetroactiveEmail();
-    $customized = makeRetroactiveEmail(['privacy_tier_customized' => true]);
-
-    $updated = $this->action->executeForUser($this->owner, EmailPrivacyTier::FULL);
-
-    expect($updated)->toBe(1)
-        ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($customized->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY);
-});
-
-it('updates team emails only for members who follow the workspace default', function (): void {
-    $member = User::factory()->create(['current_workspace_id' => $this->workspace->id, 'default_email_sharing_tier' => null]);
-    $this->workspace->users()->attach($member, ['role' => 'member']);
-
-    $memberAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $member->id,
-    ]));
-
-    $ownerEmail = makeRetroactiveEmail();
-    $memberEmail = Email::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $member->id,
-        'connected_account_id' => $memberAccount->getKey(),
-        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+function sharingEmail(ConnectedAccount $mailbox, EmailPrivacyTier $tier, array $attributes = []): Email
+{
+    return Email::factory()->create([
+        'workspace_id' => $mailbox->workspace_id,
+        'user_id' => $mailbox->user_id,
+        'connected_account_id' => $mailbox->getKey(),
+        'privacy_tier' => $tier,
         'privacy_tier_customized' => false,
+        ...$attributes,
     ]);
+}
 
-    $overrideMember = User::factory()->create([
-        'current_workspace_id' => $this->workspace->id,
-        'default_email_sharing_tier' => EmailPrivacyTier::PRIVATE,
-    ]);
-    $this->workspace->users()->attach($overrideMember, ['role' => 'member']);
+it('re-stamps only the mail of the mailbox whose level changed', function (): void {
+    $mailbox = sharingMailbox($this->owner, $this->workspace);
+    $sibling = sharingMailbox($this->owner, $this->workspace, ['email_address' => 'second@northwind.test']);
+    $mine = sharingEmail($mailbox, EmailPrivacyTier::METADATA_ONLY);
+    $other = sharingEmail($sibling, EmailPrivacyTier::METADATA_ONLY);
 
-    $overrideAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $overrideMember->id,
-    ]));
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
 
-    $overrideEmail = Email::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $overrideMember->id,
-        'connected_account_id' => $overrideAccount->getKey(),
-        'privacy_tier' => EmailPrivacyTier::PRIVATE,
-        'privacy_tier_customized' => false,
-    ]);
-
-    $updated = $this->action->executeForWorkspace($this->workspace, EmailPrivacyTier::FULL);
-
-    expect($updated)->toBe(2)
-        ->and($ownerEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($memberEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($overrideEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
+    expect($mine->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT)
+        ->and($other->fresh()->privacy_tier)->toBe(EmailPrivacyTier::METADATA_ONLY)
+        ->and($mailbox->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
-it('updates non-customized emails across every workspace for a user', function (): void {
-    $otherTeam = Workspace::factory()->create([
-        'user_id' => $this->owner->getKey(),
-        'default_email_sharing_tier' => EmailPrivacyTier::METADATA_ONLY,
-    ]);
-    $this->owner->workspaces()->attach($otherTeam, ['role' => 'admin']);
+it('brings drifted mail back to the mailbox level when the same level is saved again', function (): void {
+    $mailbox = sharingMailbox($this->owner, $this->workspace, ['sharing_tier' => EmailPrivacyTier::SUBJECT]);
+    $drifted = sharingEmail($mailbox, EmailPrivacyTier::FULL);
 
-    $otherAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
-        'workspace_id' => $otherTeam->getKey(),
-        'user_id' => $this->owner->getKey(),
-    ]));
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
 
-    $currentWorkspaceEmail = makeRetroactiveEmail();
-    $otherTeamEmail = Email::factory()->create([
-        'workspace_id' => $otherTeam->getKey(),
-        'user_id' => $this->owner->getKey(),
-        'connected_account_id' => $otherAccount->getKey(),
-        'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
-        'privacy_tier_customized' => false,
-    ]);
-
-    $updated = $this->action->executeForUser($this->owner, EmailPrivacyTier::FULL);
-
-    expect($updated)->toBe(2)
-        ->and($currentWorkspaceEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($otherTeamEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+    expect($drifted->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
 });
 
-it('resolves each workspace default when resetting a user override', function (): void {
-    $privateTeam = Workspace::factory()->create([
-        'user_id' => $this->owner->getKey(),
-        'default_email_sharing_tier' => EmailPrivacyTier::PRIVATE,
-    ]);
-    $this->owner->workspaces()->attach($privateTeam, ['role' => 'admin']);
-    $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::FULL]);
+it('leaves the same person mail in another workspace alone', function (): void {
+    $elsewhere = Workspace::factory()->create(['user_id' => $this->owner->id]);
+    $mailbox = sharingMailbox($this->owner, $this->workspace);
+    $far = sharingEmail(sharingMailbox($this->owner, $elsewhere), EmailPrivacyTier::FULL);
 
-    $privateAccount = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
-        'workspace_id' => $privateTeam->getKey(),
-        'user_id' => $this->owner->getKey(),
-    ]));
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
 
-    $fullWorkspaceEmail = makeRetroactiveEmail(['privacy_tier' => EmailPrivacyTier::SUBJECT]);
-    $privateWorkspaceEmail = Email::factory()->create([
-        'workspace_id' => $privateTeam->getKey(),
-        'user_id' => $this->owner->getKey(),
-        'connected_account_id' => $privateAccount->getKey(),
-        'privacy_tier' => EmailPrivacyTier::SUBJECT,
-        'privacy_tier_customized' => false,
-    ]);
-
-    $updated = $this->action->executeForUserUsingWorkspaceDefaults($this->owner);
-
-    expect($updated)->toBe(2)
-        ->and($fullWorkspaceEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL)
-        ->and($privateWorkspaceEmail->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
+    expect($far->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
 
-it('includes team owner emails when the owner is not on the team_user pivot', function (): void {
-    $this->workspace->users()->detach($this->owner->getKey());
+it('keeps an email the owner set by hand', function (): void {
+    $mailbox = sharingMailbox($this->owner, $this->workspace);
+    $custom = sharingEmail($mailbox, EmailPrivacyTier::FULL, ['privacy_tier_customized' => true]);
 
-    $email = makeRetroactiveEmail();
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::PRIVATE);
 
-    $updated = $this->action->executeForWorkspace($this->workspace, EmailPrivacyTier::FULL);
-
-    expect($updated)->toBe(1)
-        ->and($email->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
+    expect($custom->fresh()->privacy_tier)->toBe(EmailPrivacyTier::FULL);
 });
+
+it('refuses to set the level of a mailbox someone else owns', function (): void {
+    $mailbox = sharingMailbox(User::factory()->create(), $this->workspace);
+
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::FULL);
+})->throws(HttpException::class);

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Services\Factories;
 
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\PendingRequest;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use RuntimeException;
+use Throwable;
 
 final readonly class MicrosoftGraphClientFactory
 {
@@ -19,7 +22,19 @@ final readonly class MicrosoftGraphClientFactory
             ->withHeaders(['Prefer' => 'IdType="ImmutableId"'])
             ->acceptJson()
             ->asJson()
-            ->baseUrl('https://graph.microsoft.com/v1.0');
+            ->baseUrl('https://graph.microsoft.com/v1.0')
+            ->retry([200, 1000], when: $this->isTransientReadFailure(...), throw: false);
+    }
+
+    // Reads only: Graph can answer 5xx after accepting a sendMail, and a retry would send it twice.
+    private function isTransientReadFailure(Throwable $exception, PendingRequest $request, ?string $method): bool
+    {
+        if ($method !== 'GET') {
+            return false;
+        }
+
+        return $exception instanceof ConnectionException
+            || ($exception instanceof RequestException && $exception->response->serverError());
     }
 
     private function refreshIfExpired(ConnectedAccount $account): void
@@ -50,6 +65,9 @@ final readonly class MicrosoftGraphClientFactory
                 'scope' => 'offline_access https://graph.microsoft.com/.default',
             ]
         );
+
+        // Entra names an AADSTS code in its transient errors too, which would read as a lost grant.
+        $response->throwIfServerError();
 
         throw_unless($response->successful(), RuntimeException::class, "Microsoft token refresh failed: {$response->body()}");
 

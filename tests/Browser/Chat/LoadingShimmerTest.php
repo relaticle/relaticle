@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\EmailReach;
+use Relaticle\Chat\Enums\WebAccess;
 use Tests\Helpers\ChatBrowser;
 
 it('renders a single shimmer indicator with default label when streaming starts and no tool is running', function (): void {
@@ -158,10 +160,13 @@ it('removes the shimmer once content arrives in the latest assistant message', f
  * tool list, so registering a tool without a label fails here.
  */
 it('renders a human label for every tool the assistant can call', function (): void {
-    $toolNames = array_map(
+    $toolNames = array_values(array_unique(array_map(
         class_basename(...),
-        resolve(CrmAssistant::class)->tools(),
-    );
+        [
+            ...resolve(CrmAssistant::class)->withEmailReach(EmailReach::Ready)->withWebAccess(WebAccess::Ask)->tools(),
+            ...resolve(CrmAssistant::class)->withWebAccess(WebAccess::Allowed)->tools(),
+        ],
+    )));
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
@@ -199,7 +204,10 @@ it('renders a human label for every tool the assistant can call', function (): v
     $byName = array_combine($toolNames, $labels);
     expect($byName['ListCompaniesTool'])->toBe('Searching companies…')
         ->and($byName['SetCustomFieldOptionsTool'])->toBe('Preparing field option changes…')
-        ->and($byName['SearchDocsTool'])->toBe('Searching the documentation…');
+        ->and($byName['SearchDocsTool'])->toBe('Searching the documentation…')
+        ->and($byName['RequestWebAccessTool'])->toBe('Asking to search the web…')
+        ->and($byName['WebSearch'])->toBe('Searching the web…')
+        ->and($byName['WebFetch'])->toBe('Reading a web page…');
 });
 
 /**

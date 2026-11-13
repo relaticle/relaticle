@@ -37,9 +37,14 @@ abstract class BaseLivewireComponent extends Component implements HasActions, Ha
 
     protected function sendRateLimitedNotification(TooManyRequestsException $exception): void
     {
+        $this->sendThrottledNotification($exception->secondsUntilAvailable);
+    }
+
+    protected function sendThrottledNotification(int $secondsUntilAvailable): void
+    {
         Notification::make()
             ->title('Too Many Requests')
-            ->body("Please wait {$exception->secondsUntilAvailable} seconds before trying again.")
+            ->body("Please wait {$secondsUntilAvailable} seconds before trying again.")
             ->danger()
             ->send();
     }

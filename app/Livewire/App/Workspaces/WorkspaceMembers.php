@@ -9,6 +9,8 @@ use App\Actions\Jetstream\ResendWorkspaceInvitation;
 use App\Actions\Jetstream\RevokeWorkspaceInvitation;
 use App\Actions\Jetstream\UpdateWorkspaceMemberRole;
 use App\Enums\WorkspaceRole;
+use App\Exceptions\WorkspaceInvitationRateLimitedException;
+use App\Features\EmailIntegration;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use App\Models\Workspace;
@@ -21,7 +23,6 @@ use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -35,6 +36,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
 use stdClass;
@@ -80,7 +82,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
             ->searchPlaceholder(__('workspaces.table.search_placeholder'))
             // The roster always holds the owner, so the only way to empty it is
             // a search that matches nobody.
-            ->emptyStateIcon(Heroicon::OutlinedMagnifyingGlass)
+            ->emptyStateIcon('lucide-search')
             ->emptyStateHeading(__('workspaces.table.no_results.heading'))
             ->emptyStateDescription(__('workspaces.table.no_results.description'))
             ->columns([
@@ -370,7 +372,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('updateWorkspaceRole')
             ->label(__('workspaces.actions.update_workspace_role'))
-            ->icon('heroicon-m-user-circle')
+            ->icon('lucide-circle-user')
             ->visible(fn (?array $record): bool => $this->isMember($record)
                 && ! $record['is_owner']
                 && $this->canActOnRole($record)
@@ -430,8 +432,11 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('removeWorkspaceMember')
             ->label(__('workspaces.actions.remove_workspace_member'))
-            ->icon('heroicon-m-user-minus')
+            ->icon('lucide-user-minus')
             ->color('danger')
+            ->modalDescription(fn (array $record): string => Feature::active(EmailIntegration::class)
+                ? __('workspaces.modals.remove_workspace_member.mailbox_notice', ['name' => $record['name']])
+                : __('filament-actions::modal.confirmation'))
             ->requiresConfirmation()
             ->visible(fn (?array $record): bool => $this->isMember($record)
                 && ! $record['is_owner']
@@ -458,9 +463,11 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('leaveWorkspace')
             ->label(__('workspaces.actions.leave_workspace'))
-            ->icon('heroicon-m-arrow-right-start-on-rectangle')
+            ->icon('lucide-log-out')
             ->color('danger')
-            ->modalDescription(__('workspaces.modals.leave_workspace.notice'))
+            ->modalDescription(fn (): string => Feature::active(EmailIntegration::class)
+                ? __('workspaces.modals.leave_workspace.mailbox_notice')
+                : __('workspaces.modals.leave_workspace.notice'))
             ->requiresConfirmation()
             // Hidden on the owner row: RemoveWorkspaceMember always rejects the owner,
             // so showing it could only ever produce an error.
@@ -484,7 +491,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('resendWorkspaceInvitation')
             ->label(__('workspaces.actions.resend_workspace_invitation'))
-            ->icon('heroicon-m-paper-airplane')
+            ->icon('lucide-send')
             ->requiresConfirmation()
             ->visible(fn (?array $record): bool => $this->isInvitation($record)
                 && Gate::check('updateWorkspaceMember', $this->workspace))
@@ -505,7 +512,17 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
 
                 RateLimiter::hit($key, 60);
 
-                resolve(ResendWorkspaceInvitation::class)->resend($invitation);
+                try {
+                    resolve(ResendWorkspaceInvitation::class)->resend($this->authUser(), $invitation);
+                } catch (WorkspaceInvitationRateLimitedException $exception) {
+                    $this->sendNotification(
+                        __('workspaces.notifications.invite_rate_limited.title'),
+                        WorkspaceInvitationRateLimitedException::retryMessage($exception->retryAfterSeconds),
+                        type: 'danger',
+                    );
+
+                    return;
+                }
 
                 $this->sendNotification(__('workspaces.notifications.workspace_invitation_sent.success'));
                 $this->resetTable();
@@ -516,7 +533,7 @@ final class WorkspaceMembers extends BaseLivewireComponent implements Tables\Con
     {
         return Action::make('revokeWorkspaceInvitation')
             ->label(__('workspaces.actions.revoke_workspace_invitation'))
-            ->icon('heroicon-m-x-circle')
+            ->icon('lucide-circle-x')
             ->color('danger')
             ->requiresConfirmation()
             ->visible(fn (?array $record): bool => $this->isInvitation($record)

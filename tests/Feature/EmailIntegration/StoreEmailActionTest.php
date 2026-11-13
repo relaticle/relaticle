@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
+use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
@@ -464,12 +465,12 @@ it('marks email as internal when all participants are team members', function ()
 });
 
 it('stamps the mailbox workspace privacy default when the owner has switched current team', function (): void {
-    $this->user->update(['default_email_sharing_tier' => null]);
+    $this->account->forceFill(['sharing_tier' => null])->save();
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::PRIVATE]);
 
     $otherTeam = Workspace::factory()->create([
         'user_id' => $this->user->getKey(),
-        'default_email_sharing_tier' => EmailPrivacyTier::FULL,
+        'default_email_sharing_tier' => EmailPrivacyTier::SUBJECT,
     ]);
     $this->user->workspaces()->attach($otherTeam, ['role' => 'admin']);
     $this->user->forceFill(['current_workspace_id' => $otherTeam->getKey()])->save();
@@ -511,6 +512,24 @@ it('does not mark email as internal when at least one external participant exist
     $email = resolve(StoreEmailAction::class)->execute($this->account, $data);
 
     expect($email->is_internal)->toBeFalse();
+});
+
+it('links a form notification to the visitor named in its Reply-To', function (): void {
+    $this->workspace->update([
+        'contact_creation_mode' => ContactCreationMode::All,
+        'auto_create_companies' => true,
+    ]);
+
+    $email = resolve(StoreEmailAction::class)->execute($this->account, makeFetchedEmailData([
+        'participants' => [
+            ['email_address' => 'noreply@notifications.forms.example', 'name' => 'Forms', 'role' => 'from'],
+            ['email_address' => $this->user->email, 'name' => 'Owner', 'role' => 'to'],
+            ['email_address' => 'polly@5forests.example', 'name' => 'Polly Hammond', 'role' => 'reply_to'],
+        ],
+    ]));
+
+    expect($email->people()->pluck('name')->all())->toBe(['Polly Hammond'])
+        ->and($email->companies()->sole()->people()->pluck('name')->all())->toBe(['Polly Hammond']);
 });
 
 it('stores the email in the database', function (): void {

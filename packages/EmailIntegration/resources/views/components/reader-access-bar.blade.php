@@ -5,7 +5,7 @@
 @if ($pendingAccessRequests->isNotEmpty())
     <div class="shrink-0 border-b border-amber-200 bg-amber-50 px-4 py-3 dark:border-amber-800 dark:bg-amber-900/20">
         <div class="mb-2 flex items-center gap-2">
-            <x-heroicon-o-key class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+            <x-lucide-key class="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
             <span class="text-xs font-semibold text-amber-800 dark:text-amber-300">
                 {{ trans_choice('filament/pages/email-inbox.pending_access.heading', $pendingAccessRequests->count(), ['count' => $pendingAccessRequests->count()]) }}
             </span>
@@ -27,7 +27,7 @@
                             type="button"
                             class="inline-flex items-center gap-1 rounded-md bg-success-600 px-2.5 py-1 text-xs font-medium text-white transition-colors hover:bg-success-700"
                         >
-                            <x-heroicon-o-check class="h-3 w-3" />
+                            <x-lucide-check class="h-3 w-3" />
                             {{ __('filament/pages/email-inbox.pending_access.approve') }}
                         </button>
                         <button
@@ -35,7 +35,7 @@
                             type="button"
                             class="inline-flex items-center gap-1 rounded-md border border-gray-300 bg-white px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
                         >
-                            <x-heroicon-o-x-mark class="h-3 w-3" />
+                            <x-lucide-x class="h-3 w-3" />
                             {{ __('filament/pages/email-inbox.pending_access.deny') }}
                         </button>
                     </div>

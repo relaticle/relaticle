@@ -18,6 +18,7 @@
             <directory>tests/PHPStan</directory>
             <directory>tests/Smoke</directory>
             <directory>tests/Feature</directory>
+            <directory>packages/Cloud/tests</directory>
         </testsuite>
         <testsuite name="Arch">
             <directory>tests/Arch</directory>
@@ -32,8 +33,14 @@
         <testsuite name="Feature">
             <directory>tests/Feature</directory>
         </testsuite>
+        <testsuite name="Evals">
+            <directory>tests/Evals</directory>
+        </testsuite>
         <testsuite name="Browser">
             <directory>tests/Browser</directory>
+        </testsuite>
+        <testsuite name="Cloud">
+            <directory>packages/Cloud/tests</directory>
         </testsuite>
     </testsuites>
     <source>
@@ -71,6 +78,7 @@
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="PENNANT_STORE" value="array"/>
         <env name="HONEYPOT_ENABLED" value="false"/>
+        <env name="RELATICLE_CLOUD" value="true"/>
         <env name="RELATICLE_FEATURE_BLOG" value="true"/>
         <env name="BROADCAST_CONNECTION" value="log"/>
         <env name="PUSHER_APP_KEY" value="test-key"/>
@@ -78,5 +86,8 @@
         <env name="PUSHER_APP_ID" value="test-id"/>
         <env name="PUSHER_APP_CLUSTER" value="mt1"/>
         <env name="RELATICLE_FEATURE_EMAIL_INTEGRATION" value="true"/>
+        <env name="GMAIL_CLIENT_ID" value="gmail-client"/>
+        <env name="GOOGLE_CLIENT_ID" value="google-client"/>
+        <env name="MICROSOFT_CLIENT_ID" value="microsoft-client"/>
     </php>
 </phpunit>

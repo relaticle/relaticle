@@ -83,15 +83,20 @@ months two copies of the same field vocabulary drifted apart.
 ## Quality Checks
 
 The local loop is scoped to the change. GitHub CI (`.github/workflows/ci.yml`) is the
-only full run: it executes lint, rector, PHPStan, type coverage, five test shards and
-six Browser shards on every push to a pull request. A run takes about 4 minutes when
-runners are free, and longer when several runs queue for them.
+only full run: it executes lint, rector, PHPStan, type coverage, eight test shards and
+five Browser shards on every push to a pull request. The test and Browser shards run on arm
+runners, and each of those jobs takes under 3 minutes when runners are free. Runs queue when
+the organization's 20 concurrent jobs are taken.
 
 After each change, while iterating:
 
 1. `vendor/bin/pint --dirty --format agent`: fix code style
-2. `php artisan test --compact <paths>`: the test files you touched, plus the tests
-   that exercise the classes you changed (`grep -rl 'ClassName' tests`)
+2. `composer test:affected`: the tests the branch's changes reach, picked from the TIA
+   baseline and run on four processes. `-- --plan` lists them and runs nothing. When it
+   refuses, or names a file it cannot place, run `php artisan test --compact <paths>`
+   over the test files you touched and the tests that exercise the classes you changed
+   (`grep -rl 'ClassName' tests`). The Running the suite section of `testing.md` has
+   both forms
 
 Once, before pushing:
 
@@ -171,6 +176,9 @@ are under about 50. Each rule below names what fails when it is broken.
   property form, and `composer test:refactor` fails until the rewrite is taken. Code that needs
   the number at runtime reads a class constant the attribute also uses, as `SendEmailJob` does
   with `TIMEOUT_SECONDS`. `$this->timeout` no longer exists once the attribute replaces it.
+- A queued Mailable or Notification declares `#[Tries]` and `#[Backoff]`, or inherits them as every
+  `InboxNotification` does. The default queue tries a job once, so one mail provider 502 loses the
+  message. `tests/Arch/ConventionsTest.php` fails a queued mail class without them.
 - An accessor is `Attribute::get()` with a typed closure and a `@return Attribute<TGet, never>`
   docblock. Larastan reads the property type from that docblock, so PHPStan reports the
   attribute as an undefined property without it.
@@ -195,3 +203,4 @@ is the exception that admits the code could not.
 ## Scheduling
 
 - All scheduled commands go in `bootstrap/app.php` via `withSchedule()`, not in `routes/console.php`
+- A package the self-hosted build deletes schedules its own commands from its provider with `callAfterResolving(Schedule::class, ...)`, as `CloudServiceProvider` does. No test reads for this

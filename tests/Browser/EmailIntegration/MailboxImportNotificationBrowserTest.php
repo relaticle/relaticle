@@ -28,11 +28,7 @@ it('stays in sync on the accounts page after history import store failures', fun
         'finished_at' => now()->getTimestamp(),
     ]);
 
-    visit('/app/login')->{$theme}()
-        ->type('[id="form.email"]', $user->email)
-        ->click('button[type="submit"]')
-        ->type('[id="form.password"]', 'password')
-        ->click('button[type="submit"]')
+    loginViaBrowser($user, $theme)
         ->assertPathIs("/app/{$workspace->slug}")
         ->navigate("/app/{$workspace->slug}/workspace/email")
         ->waitForText($account->email_address)

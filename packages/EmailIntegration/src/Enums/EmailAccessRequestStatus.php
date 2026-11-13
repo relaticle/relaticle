@@ -12,13 +12,17 @@ enum EmailAccessRequestStatus: string implements HasColor, HasLabel
     case PENDING = 'pending';
     case APPROVED = 'approved';
     case DENIED = 'denied';
+    case CANCELLED = 'cancelled';
+    case EXPIRED = 'expired';
 
     public function getLabel(): string
     {
         return match ($this) {
-            self::PENDING => 'Pending',
-            self::APPROVED => 'Approved',
-            self::DENIED => 'Denied',
+            self::PENDING => __('filament/pages/email-access-requests.statuses.pending'),
+            self::APPROVED => __('filament/pages/email-access-requests.statuses.approved'),
+            self::DENIED => __('filament/pages/email-access-requests.statuses.denied'),
+            self::CANCELLED => __('filament/pages/email-access-requests.statuses.cancelled'),
+            self::EXPIRED => __('filament/pages/email-access-requests.statuses.expired'),
         };
     }
 
@@ -28,6 +32,7 @@ enum EmailAccessRequestStatus: string implements HasColor, HasLabel
             self::PENDING => 'warning',
             self::APPROVED => 'success',
             self::DENIED => 'danger',
+            self::CANCELLED, self::EXPIRED => 'gray',
         };
     }
 }

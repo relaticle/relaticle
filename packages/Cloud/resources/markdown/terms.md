@@ -1,0 +1,71 @@
+**Effective date:** August 26, 2026
+
+These Terms of Service ("Terms") govern your use of Relaticle, an open-source CRM platform provided by Relaticle ("we", "us", "our"). By accessing or using our services, you agree to these Terms.
+
+---
+
+## 1. Services
+
+Relaticle provides a customer relationship management (CRM) platform available in two forms:
+
+- **Cloud (Managed Hosting):** We host and maintain the application at app.relaticle.com. You access it through your web browser.
+- **Self-Hosted:** You download and run the open-source software on your own infrastructure under the AGPL-3.0 license.
+
+These Terms apply to the Cloud service. Self-hosted installations are governed by the [AGPL-3.0 license](https://www.gnu.org/licenses/agpl-3.0.html).
+
+## 2. Accounts
+
+You must provide accurate information when creating an account. You are responsible for maintaining the security of your account credentials. Notify us immediately if you suspect unauthorized access.
+
+You must be at least 16 years old to use our services.
+
+## 3. Your Data
+
+You own your data. We do not claim any intellectual property rights over the data you store in Relaticle.
+
+- **Cloud users:** Your data is stored on our servers. You can export it through the application or the REST API while your workspace is active. To request account deletion, email privacy@relaticle.com or contact us.
+- **Self-hosted users:** Your data never touches our servers. You have full control.
+
+Account deletion uses a 30-day grace period once scheduled. Signing in before the deletion date lets you cancel. Records in shared workspaces remain after your account is removed.
+
+A workspace whose Pro trial ended without a plan pauses. If no one in the workspace signs in and no one chooses a plan for 60 days, we delete the workspace and its records. We email the owner 14 days and 5 days before. A paused workspace cannot be exported.
+
+## 4. Acceptable Use
+
+You agree not to:
+
+- Use the service for any illegal purpose
+- Attempt to gain unauthorized access to other users' data
+- Interfere with or disrupt the service
+- Upload malicious content or code
+- Violate the intellectual property rights of others
+
+We reserve the right to suspend or terminate accounts that violate these terms.
+
+## 5. API and MCP Access
+
+Access to the REST API and MCP server is governed by API tokens scoped to specific workspaces and permissions. You are responsible for keeping your API tokens secure. Revoke any token you believe has been compromised.
+
+## 6. Pricing
+
+Self-hosted software has no license fee under AGPL-3.0. The hosted Cloud service may offer trial, free, and paid plans. Current pricing and included features appear on the pricing page or during checkout. Charges apply only after you accept the displayed paid terms. Price changes apply prospectively after notice.
+
+## 7. Availability
+
+We aim for high availability of the Cloud service but do not guarantee uninterrupted access. Scheduled maintenance will be announced in advance when possible.
+
+## 8. Limitation of Liability
+
+The service is provided "as is" without warranty of any kind, express or implied. To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, or consequential damages arising from your use of the service.
+
+## 9. Changes to Terms
+
+We may update these Terms from time to time. We will notify registered users of material changes via email or in-app notification. Continued use of the service after changes constitutes acceptance.
+
+## 10. Open Source
+
+Relaticle is open-source software licensed under AGPL-3.0. The source code is available at [github.com/Relaticle/relaticle](https://github.com/Relaticle/relaticle). Contributions are welcome under the same license.
+
+## 11. Contact
+
+Questions about these Terms? Reach us at [Contact Us](/contact).

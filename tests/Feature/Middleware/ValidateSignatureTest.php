@@ -31,3 +31,18 @@ it('runs the signed route once when it throws an invalid signature exception its
 
     expect($runs)->toBe(1);
 });
+
+it('rejects an array signature parameter with 403', function (): void {
+    Route::get('/_signed-array-probe', fn (): string => 'ok')->middleware('signed')->name('signed-array-probe');
+
+    $routes = new RouteCollection;
+
+    foreach (Route::getRoutes()->getRoutes() as $route) {
+        $routes->add($route);
+    }
+
+    Route::setRoutes($routes);
+
+    $this->get(URL::signedRoute('signed-array-probe').'&signature[]=x')->assertForbidden();
+    $this->get('/_signed-array-probe?signature[]=x')->assertForbidden();
+});

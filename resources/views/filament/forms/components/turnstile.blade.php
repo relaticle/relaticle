@@ -9,8 +9,8 @@
 
     The silent check takes a few seconds and a password manager fills the form in
     under one, so the submit is held until the token exists and replayed the moment
-    it arrives. A blocked script or a dead widget surfaces as a message instead of a
-    server error pointing at a challenge nobody can see.
+    it arrives. A blocked script or a dead widget surfaces as a message with a retry
+    instead of a server error pointing at a challenge nobody can see.
 --}}
 <x-dynamic-component
     :component="$getFieldWrapperView()"
@@ -20,6 +20,7 @@
         wire:ignore
         x-data="{
             widgetId: null,
+            queued: false,
             token: null,
             status: 'idle',
             interactive: false,
@@ -37,13 +38,21 @@
                 this.gate = (event) => this.holdSubmit(event);
                 this.form?.addEventListener('submit', this.gate, { capture: true });
 
+                this.load();
+            },
+
+            load() {
                 if (window.turnstile) {
                     this.render();
 
                     return;
                 }
 
-                (window.turnstileRenderQueue ??= []).push(() => this.render());
+                if (! this.queued) {
+                    this.queued = true;
+                    (window.turnstileRenderQueue ??= []).push(() => this.render());
+                }
+
                 window.turnstileReady ??= () => window.turnstileRenderQueue.splice(0).forEach((render) => render());
 
                 if (! window.turnstileScriptInjected) {
@@ -55,12 +64,26 @@
                     script.defer = true;
                     script.onerror = () => {
                         window.turnstileScriptInjected = false;
+                        script.remove();
                         this.fail();
                     };
                     document.head.appendChild(script);
                 }
 
                 this.armWatchdog();
+            },
+
+            retry() {
+                this.status = 'checking';
+
+                if (this.widgetId !== null && window.turnstile) {
+                    window.turnstile.reset(this.widgetId);
+                    this.armWatchdog();
+
+                    return;
+                }
+
+                this.load();
             },
 
             render() {
@@ -139,6 +162,7 @@
                 this.pendingSubmit = false;
                 this.status = 'failed';
                 this.expand(true);
+                this.$dispatch('analytics-event', { name: 'signup_refused_challenge_blocked', id: crypto.randomUUID() });
             },
 
             clearToken() {
@@ -181,13 +205,18 @@
             {{ __('auth.turnstile.checking') }}
         </p>
 
-        <p
+        <div
             x-show="status === 'failed'"
             x-cloak
-            class="fi-fo-field-wrp-error-message"
-            role="alert"
+            class="flex flex-col items-start gap-2"
         >
-            {{ __('auth.turnstile.blocked') }}
-        </p>
+            <p class="fi-fo-field-wrp-error-message" role="alert">
+                {{ $blockedMessage }}
+            </p>
+
+            <x-filament::link tag="button" type="button" x-on:click="retry()">
+                {{ __('auth.turnstile.retry') }}
+            </x-filament::link>
+        </div>
     </div>
 </x-dynamic-component>

@@ -2,8 +2,20 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.relaticle/crm",
   "title": "Relaticle",
-  "description": "Open-source CRM your AI agents can write to: companies, people, deals, tasks, notes, pipeline.",
+  "description": "Open-source CRM your AI agents can write to: companies, people, opportunities, tasks and notes.",
   "version": "${VERSION}",
+  "websiteUrl": "https://relaticle.com",
+  "repository": {
+    "url": "https://github.com/relaticle/relaticle",
+    "source": "github"
+  },
+  "icons": [
+    {
+      "src": "https://relaticle.com/web-app-manifest-512x512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
   "remotes": [
     {
       "type": "streamable-http",

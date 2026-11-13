@@ -21,7 +21,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\RateLimiter;
@@ -153,7 +152,7 @@ final class ConfirmIdentityAction extends Action
             }
 
             if ($this->confirmingUser()->hasPasskey()) {
-                $action->icon(Heroicon::FingerPrint);
+                $action->icon('lucide-fingerprint-pattern');
             }
 
             return $action;
@@ -460,15 +459,15 @@ final class ConfirmIdentityAction extends Action
             return null;
         }
 
-        $provider = $account->provider_name;
+        $provider = SocialiteProvider::from($account->provider_name);
 
         return Action::make('confirmWithProvider')
-            ->label(__('auth.confirm.continue_with_provider', ['provider' => ucfirst($provider)]))
-            ->icon(SocialiteProvider::tryFrom($provider)?->icon())
+            ->label(__('auth.confirm.continue_with_provider', ['provider' => $provider->label()]))
+            ->icon($provider->icon())
             ->action(function () use ($provider): RedirectResponse {
                 $this->rememberResumableAction();
 
-                return redirect()->to(route('auth.socialite.confirm.redirect', ['provider' => $provider]));
+                return redirect()->to(route('auth.socialite.confirm.redirect', ['provider' => $provider->value]));
             });
     }
 
@@ -524,7 +523,7 @@ final class ConfirmIdentityAction extends Action
         $user = $this->confirmingUser();
 
         if (! $user->hasPassword() && ! $user->hasPasskey()) {
-            $this->providerAccount = $user->socialAccounts()->first();
+            $this->providerAccount = $user->availableSocialAccount();
         }
 
         return $this->providerAccount;

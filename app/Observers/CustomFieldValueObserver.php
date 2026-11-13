@@ -65,7 +65,7 @@ final readonly class CustomFieldValueObserver
 
     private function log(CustomFieldValue $value, mixed $old): void
     {
-        $entity = $value->getRelationValue('entity');
+        $entity = $value->ownRecord();
 
         if (! $entity instanceof Model) {
             return;

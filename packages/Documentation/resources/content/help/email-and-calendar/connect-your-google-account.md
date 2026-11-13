@@ -2,7 +2,7 @@
 title: Connect your Google account
 description: Link a Google account so your email and calendar sync into Relaticle, then manage, reconnect, or disconnect it from workspace settings.
 order: 1
-updated: "2026-10-05"
+updated: "2026-11-08"
 related: [help/email-and-calendar/connect-your-microsoft-account, help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/choose-who-sees-your-email, help/email-and-calendar/see-meetings-and-link-them-to-records]
 ---
 
@@ -44,18 +44,18 @@ it runs. The account shows **Syncing** with a percentage during the import
 and **In sync** once it has caught up.
 
 New email and events keep arriving after that. What your workspace sees of
-each email depends on your sharing level, which starts at the workspace
-default. [Choose who sees your email](/help/email-and-calendar/choose-who-sees-your-email)
+each email depends on the mailbox's sharing level, which starts at
+**Participants only** in a new workspace. [Choose who sees your email](/help/email-and-calendar/choose-who-sees-your-email)
 before you connect a mailbox you consider sensitive.
 
 ## Manage a connected account
 
-Open the menu on the account's row. The menu is the same for a Google and a
-Microsoft account.
+Click the account's row to open its settings. **General** holds the sharing
+level, **Sync inbox**, **Sync sent**, and the hourly and daily send limits.
+**Mailbox-only blocklist** and **Signatures** have a tab each.
 
-- **Manage** opens the account's settings. **General** holds **Sync inbox**,
-  **Sync sent**, and the hourly and daily send limits. **Sharing**,
-  **Mailbox-only blocklist**, and **Signatures** have a tab each.
+The menu on the row is the same for a Google and a Microsoft account.
+
 - **Set as default** makes this the account the composer sends from when you
   have more than one.
 - **Disconnect account** stops syncing, deletes the access tokens Relaticle

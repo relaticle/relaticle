@@ -71,8 +71,8 @@ final class CreatePersonTool extends BaseWriteCreateTool
         }
 
         return [
-            'title' => 'Create Person',
-            'summary' => "Create person \"{$name}\"",
+            'title' => $this->proposalEntity()->createTitle(),
+            'summary' => $this->proposalEntity()->createSummary($name),
             'fields' => $fields,
         ];
     }

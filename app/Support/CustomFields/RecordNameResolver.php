@@ -7,6 +7,7 @@ namespace App\Support\CustomFields;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomFieldValue;
+use App\Models\Scopes\WorkspaceScope;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -96,6 +97,7 @@ final readonly class RecordNameResolver
         $model = $entity->model();
 
         $found = $model::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
             ->where('workspace_id', $workspaceId)
             ->whereIn('id', $missing)
             ->pluck($entity->titleColumn(), 'id');

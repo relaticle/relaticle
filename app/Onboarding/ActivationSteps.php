@@ -28,13 +28,14 @@ use Spatie\Onboard\OnboardingSteps;
  *
  * Registration order IS display order, and it is ordered by what production
  * data says the step is worth, not by how the feature was built. Measured on
- * the analytics clone (2026-08-23, workspaces at least 8 days old, n=3587, "returned"
- * excluding a later import so importing twice cannot count as returning):
- * a day-0 record predicts a 10.0% return against a 4.0% base, day-0 chat 11.0%,
- * while import reaches 0.5% of workspaces and invite 0.3%. Import and invite
- * stay because they are true facts about the workspace and the setup nudge
- * reads the same registry, but they sit last: a checklist that opens on two
- * rows almost nobody completes reads as unachievable.
+ * the analytics clone on 2026-10-06 (personal workspaces created since
+ * 2026-06-01 and at least 8 days old, n=666, back within 7 days): 3.9% with
+ * neither a record nor a chat on day 0, 7.4% with a chat only, 12.5% with an
+ * own record only, 20.0% with both, while import reaches 0.5% of workspaces
+ * and invite 0.3% (measured 2026-08-23). Import and invite stay because they are true facts about
+ * the workspace and the setup nudge reads the same registry, but they sit
+ * last: a checklist that opens on two rows almost nobody completes reads as
+ * unachievable.
  */
 final readonly class ActivationSteps
 {
@@ -45,7 +46,7 @@ final readonly class ActivationSteps
                 'key' => ActivationStep::FirstRecord,
                 'label_key' => 'filament/pages/dashboard.activation.steps.first_record.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.first_record.description',
-                'icon' => 'heroicon-o-user-plus',
+                'icon' => 'lucide-user-plus',
             ])
             ->completeIf(fn (Workspace $model): bool => resolve(WorkspaceActivationFacts::class)->hasOwnRecord($model));
 
@@ -55,7 +56,7 @@ final readonly class ActivationSteps
                     'key' => ActivationStep::SyncEmail,
                     'label_key' => 'filament/pages/dashboard.activation.steps.sync_email.label',
                     'description_key' => 'filament/pages/dashboard.activation.steps.sync_email.description',
-                    'icon' => 'heroicon-o-envelope',
+                    'icon' => 'lucide-mail',
                 ])
                 ->completeIf(function (Workspace $model): bool {
                     $user = auth()->user();
@@ -70,7 +71,7 @@ final readonly class ActivationSteps
                 'key' => ActivationStep::AskRela,
                 'label_key' => 'filament/pages/dashboard.activation.steps.ask_rela.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.ask_rela.description',
-                'icon' => 'heroicon-o-sparkles',
+                'icon' => 'lucide-sparkles',
             ])
             ->completeIf(fn (Workspace $model): bool => resolve(WorkspaceActivationFacts::class)->hasUserChatMessage($model));
 
@@ -79,7 +80,7 @@ final readonly class ActivationSteps
                 'key' => ActivationStep::Import,
                 'label_key' => 'filament/pages/dashboard.activation.steps.import.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.import.description',
-                'icon' => 'heroicon-o-arrow-up-tray',
+                'icon' => 'lucide-upload',
             ])
             ->completeIf(fn (Workspace $model): bool => resolve(WorkspaceActivationFacts::class)->hasImportedRecord($model));
 
@@ -88,7 +89,7 @@ final readonly class ActivationSteps
                 'key' => ActivationStep::Invite,
                 'label_key' => 'filament/pages/dashboard.activation.steps.invite.label',
                 'description_key' => 'filament/pages/dashboard.activation.steps.invite.description',
-                'icon' => 'heroicon-o-user-group',
+                'icon' => 'lucide-users',
             ])
             ->completeIf(fn (Workspace $model): bool => resolve(WorkspaceActivationFacts::class)->hasAnotherMember($model));
     }

@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 use App\Filament\Pages\Auth\Login;
 use App\Models\User;
+use App\Rules\IndisposableMailHost;
+use App\Support\Email\MailExchangers;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
 
-mutates(Login::class);
+mutates(Login::class, IndisposableMailHost::class);
 
 it('flags the session for signup analytics tracking on signup', function (): void {
     $email = 'jane-track-'.uniqid().'@gmail.com';
@@ -24,30 +26,110 @@ it('flags the session for signup analytics tracking on signup', function (): voi
     expect(session()->get('fathom.track_signup'))->toBeTrue();
 });
 
+it('names a user who signs up with a plus address without the tag', function (): void {
+    $email = 'jane.doe+trial-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate');
+
+    expect(User::query()->where('email', $email)->sole()->name)->toBe('Jane Doe');
+});
+
+it('names a user whose address starts with a plus tag after the whole local part', function (): void {
+    $email = '+trial'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(User::query()->where('email', $email)->sole()->name)->toStartWith('+Trial');
+});
+
+it('throttles repeated signup submissions on one discovery', function (): void {
+    $component = livewire(Login::class)
+        ->fillForm(['email' => 'throttle-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    foreach (range(1, 5) as $attempt) {
+        $component->fillForm(['password' => 'short'])->call('authenticate');
+    }
+
+    $component->fillForm(['password' => 'short'])
+        ->call('authenticate')
+        ->assertNotified(__('auth.login.signup_throttled_title'));
+});
+
+it('creates no account from a throttled signup submission', function (): void {
+    $email = 'throttled-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    foreach (range(1, 5) as $attempt) {
+        $component->fillForm(['password' => 'short'])->call('authenticate');
+    }
+
+    $component->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertNotified(__('auth.login.signup_throttled_title'));
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
 it('renders the signup event once and clears the flag', function (): void {
     $this->app['env'] = 'production';
     config(['services.fathom.site_id' => 'TESTSITE']);
     session()->put('fathom.track_signup', true);
 
     $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($html)->toContain("fathom.trackEvent('signup')")
-        ->and(session()->has('fathom.track_signup'))->toBeFalse();
+    expect($payload['events'])->toHaveCount(1);
+    expect($payload['events'][0]['name'])->toBe('signup');
+    expect($payload['events'][0]['id'])->toBeUuid();
+    expect(session()->has('fathom.track_signup'))->toBeFalse();
 
     $again = view('filament.app.analytics')->render();
 
-    expect($again)->not->toContain("trackEvent('signup')");
+    expect(json_decode(Str::betweenFirst($again, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR)['events'])->toBe([]);
 });
 
-it('keeps panel auth pages out of tenant-slug normalization', function (): void {
+it('provides the configured panel prefix for browser URL normalization', function (): void {
+    $this->app['env'] = 'production';
+    config(['services.fathom.site_id' => 'TESTSITE', 'app.app_panel_domain' => null, 'app.app_panel_path' => 'crm']);
+
+    $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($payload)->toMatchArray(['site' => 'TESTSITE', 'panel' => true, 'prefix' => '/crm']);
+});
+
+it('omits a panel prefix on a domain-routed panel', function (): void {
+    $this->app['env'] = 'production';
+    config(['services.fathom.site_id' => 'TESTSITE', 'app.app_panel_domain' => 'app.relaticle.test']);
+
+    $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($payload['prefix'])->toBe('');
+});
+
+it('loads Fathom on the sign-in page', function (): void {
     $this->app['env'] = 'production';
     config(['services.fathom.site_id' => 'TESTSITE']);
 
-    $html = view('filament.app.analytics')->render();
-
-    expect($html)->toContain("'/register'")
-        ->and($html)->toContain("'/login'")
-        ->and($html)->toContain("'/email-verification'");
+    $this->get(url()->getAppUrl('login'))
+        ->assertSuccessful()
+        ->assertSee('https://cdn.usefathom.com/script.js', escape: false);
 });
 
 it('rejects a signup from a disposable email domain', function (): void {
@@ -62,6 +144,66 @@ it('rejects a signup from a disposable email domain', function (): void {
         ->assertHasFormErrors(['email']);
 
     expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('reports a refused email to analytics', function (): void {
+    livewire(Login::class)
+        ->fillForm(['email' => 'burner-event-'.uniqid().'@mailinator.com'])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email'])
+        ->assertDispatched('analytics-event', name: 'signup_refused_email')
+        ->assertNotDispatched('analytics-event', name: 'signup_refused_password');
+});
+
+it('reports a refused password to analytics', function (): void {
+    livewire(Login::class)
+        ->fillForm(['email' => 'weak-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->fillForm(['password' => 'short'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['password'])
+        ->assertDispatched('analytics-event', name: 'signup_refused_password')
+        ->assertNotDispatched('analytics-event', name: 'signup_refused_email');
+});
+
+it('reports a throttled signup to analytics', function (): void {
+    $component = livewire(Login::class)
+        ->fillForm(['email' => 'throttle-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate');
+
+    foreach (range(1, 5) as $attempt) {
+        $component->fillForm(['password' => 'short'])->call('authenticate');
+    }
+
+    $component->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_throttled');
+});
+
+it('reports a signup for an existing account to analytics', function (): void {
+    $email = 'exists-event-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate');
+
+    User::factory()->create(['email' => $email]);
+
+    $component->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_existing_account');
+});
+
+it('reports no refusal for a signup that succeeds', function (): void {
+    livewire(Login::class)
+        ->fillForm(['email' => 'accepted-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors()
+        ->assertNotDispatched('analytics-event', fn (string $event, array $params): bool => str_starts_with((string) $params['name'], 'signup_refused_'));
 });
 
 it('rejects a disposable email in the active locale', function (): void {
@@ -125,6 +267,99 @@ it('never treats a whitelisted domain as disposable, even when the upstream list
     'jane-whitelisted@relaticle.com',
 ]);
 
+it('rejects a signup from a domain only the local disposable list carries', function (): void {
+    $storagePath = storage_path('framework/testing/disposable-domains-local.json');
+    $localSources = collect(config('disposable-email.sources'))
+        ->reject(fn (string $source): bool => Str::startsWith($source, 'https://'))
+        ->values()
+        ->all();
+
+    config([
+        'disposable-email.sources' => $localSources,
+        'disposable-email.storage' => $storagePath,
+        'disposable-email.cache.enabled' => false,
+    ]);
+
+    app()->forgetInstance('disposable_email.domains');
+    DisposableDomains::clearResolvedInstance('disposable_email.domains');
+
+    $email = 'setv'.Str::lower(Str::random(10)).'@mailsink.org';
+
+    try {
+        $this->artisan('disposable:update')->assertSuccessful();
+
+        livewire(Login::class)
+            ->fillForm(['email' => $email])
+            ->call('authenticate')
+            ->assertSet('authMethod', 'signup')
+            ->fillForm(['password' => 'Password123!'])
+            ->call('authenticate')
+            ->assertHasFormErrors(['email' => 'indisposable']);
+    } finally {
+        File::delete($storagePath);
+    }
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('rejects a signup whose domain receives mail on a disposable mail host', function (string $mailHost): void {
+    $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => [$mailHost]));
+
+    $email = 'setv'.Str::lower(Str::random(10)).'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('validation.indisposable')]);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+})->with([
+    'mail.neighbours.sh.',
+    'MX2.Neighbours.SH',
+    'neighbours.sh',
+]);
+
+it('creates the account when the mail host only resembles a disposable one', function (): void {
+    $this->app->instance(MailExchangers::class, new MailExchangers(fn (): array => ['mail.notneighbours.sh']));
+
+    $email = 'jane-lookalike-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('skips the mail host lookup once the domain has failed its dns check', function (): void {
+    $lookups = 0;
+    $this->app->instance(MailExchangers::class, new MailExchangers(function () use (&$lookups): array {
+        $lookups++;
+
+        return [];
+    }));
+
+    $email = 'jane-'.uniqid().'@no-mail-server.invalid';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email']);
+
+    expect($lookups)->toBe(0)
+        ->and(User::where('email', $email)->exists())->toBeFalse();
+});
+
 it('rejects a signup submitted faster than a human could type', function (): void {
     config(['honeypot.enabled' => true]);
     $this->freezeTime();
@@ -173,22 +408,38 @@ it('renders the workspace created event once and clears the flag', function (): 
     session()->put('fathom.track_workspace_created', true);
 
     $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($html)->toContain("fathom.trackEvent('workspace_created')")
-        ->and(session()->has('fathom.track_workspace_created'))->toBeFalse();
+    expect($payload['events'])->toHaveCount(1);
+    expect($payload['events'][0]['name'])->toBe('workspace_created');
+    expect($payload['events'][0]['id'])->toBeUuid();
+    expect(session()->has('fathom.track_workspace_created'))->toBeFalse();
 
     $again = view('filament.app.analytics')->render();
 
-    expect($again)->not->toContain("trackEvent('workspace_created')");
+    expect(json_decode(Str::betweenFirst($again, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR)['events'])->toBe([]);
 });
 
-it('renders each conversion event only for its own flag', function (): void {
+it('renders each conversion event only for its own flag', function (string $event): void {
     $this->app['env'] = 'production';
     config(['services.fathom.site_id' => 'TESTSITE']);
-    session()->put('fathom.track_signup', true);
+    $operation = (string) Str::uuid();
+    session()->put('fathom.track_'.$event, $operation);
+    session()->put('fathom.track_unapproved', true);
 
     $html = view('filament.app.analytics')->render();
+    $payload = json_decode(Str::betweenFirst($html, 'data-relaticle-analytics>', '</script>'), true, flags: JSON_THROW_ON_ERROR);
 
-    expect($html)->toContain("fathom.trackEvent('signup')")
-        ->and($html)->not->toContain("trackEvent('workspace_created')");
+    expect($payload['events'])->toBe([['id' => $operation, 'name' => $event]]);
+    expect(session()->has('fathom.track_'.$event))->toBeFalse();
+    expect(session()->has('fathom.track_unapproved'))->toBeTrue();
+})->with(['signup', 'workspace_created', 'signup_started', 'email_verified', 'login_completed', 'setup_completed', 'contact_submitted', 'checkout_started']);
+
+it('does not consume analytics flags when tracking is disabled', function (): void {
+    $this->app['env'] = 'production';
+    config(['services.fathom.site_id' => null]);
+    session()->put('fathom.track_signup', true);
+
+    expect(view('filament.app.analytics')->render())->toBe('');
+    expect(session()->get('fathom.track_signup'))->toBeTrue();
 });

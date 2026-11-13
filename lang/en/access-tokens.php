@@ -46,6 +46,9 @@ return [
 
     'permissions' => [
         'all' => 'All',
+        'email_read' => 'Read email',
+        'email_draft' => 'Draft email',
+        'email_send' => 'Send email',
     ],
 
     'modals' => [

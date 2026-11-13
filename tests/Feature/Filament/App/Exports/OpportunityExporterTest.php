@@ -14,7 +14,9 @@ use App\Models\Export;
 use App\Models\Opportunity;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
+use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
@@ -26,6 +28,8 @@ mutates(OpportunityExporter::class);
 beforeEach(function () {
     Event::fake()->except([
         WorkspaceCreated::class,
+        Authenticated::class,
+        TenantSet::class,
         'eloquent.creating: App\\Models\\Workspace',
     ]);
 

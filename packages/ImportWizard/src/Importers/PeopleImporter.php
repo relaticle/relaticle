@@ -48,7 +48,7 @@ final class PeopleImporter extends BaseImporter
                     'contact name', 'lead name', 'prospect name',
                 ])
                 ->example('John Doe')
-                ->icon('heroicon-o-user'),
+                ->icon('lucide-user'),
         ]);
     }
 

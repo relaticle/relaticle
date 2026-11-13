@@ -6,7 +6,9 @@ namespace App\Filament\Actions;
 
 use App\Actions\Task\NotifyTaskAssignees;
 use App\Models\Task;
+use App\Models\User;
 use Filament\Actions\CreateAction;
+use Filament\Facades\Filament;
 
 final class CreateTaskAction extends CreateAction
 {
@@ -32,7 +34,10 @@ final class CreateTaskAction extends CreateAction
         $task = $this->getRecord();
 
         if ($task instanceof Task) {
-            resolve(NotifyTaskAssignees::class)->execute($task, $this->submittedAssigneeIds);
+            /** @var ?User $actor */
+            $actor = Filament::auth()->user();
+
+            resolve(NotifyTaskAssignees::class)->execute($task, $this->submittedAssigneeIds, $actor);
         }
 
         return parent::callAfter();

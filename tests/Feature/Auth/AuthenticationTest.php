@@ -22,17 +22,20 @@ use App\Notifications\Auth\VerifyEmail;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
 use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Laravel\Passkeys\Events\PasskeyVerified;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
+use Symfony\Component\DomCrawler\Crawler;
 use Tests\Helpers\PasskeyAssertionFixture;
 
 mutates(CancelAuthentication::class, Login::class, PasswordSessionController::class, MfaChallengeController::class);
@@ -72,6 +75,34 @@ test('login screen can be rendered', function () {
     $response->assertStatus(200);
 });
 
+it('renders the sign-in footer without legal links when none are configured', function (): void {
+    config()->set('relaticle.legal', ['privacy_url' => null, 'terms_url' => null, 'contact_url' => null]);
+
+    $this->get(url()->getAppUrl('login'))
+        ->assertOk()
+        ->assertSee(__('auth.footer.copyright', ['year' => now()->year]))
+        ->assertDontSeeHtml('>'.__('auth.footer.terms_of_service').'</a>')
+        ->assertDontSeeHtml('>'.__('auth.footer.privacy_policy').'</a>')
+        ->assertDontSeeHtml('>'.__('auth.footer.support').'</a>');
+});
+
+it('renders the sign-in footer with the configured legal links', function (): void {
+    config()->set('relaticle.legal', [
+        'privacy_url' => 'https://legal.example.test/privacy',
+        'terms_url' => 'https://legal.example.test/terms',
+        'contact_url' => 'https://legal.example.test/contact',
+    ]);
+
+    $this->get(url()->getAppUrl('login'))
+        ->assertOk()
+        ->assertSee('href="https://legal.example.test/terms"', escape: false)
+        ->assertSee('href="https://legal.example.test/privacy"', escape: false)
+        ->assertSee('href="https://legal.example.test/contact"', escape: false)
+        ->assertSee(__('auth.footer.terms_of_service'))
+        ->assertSee(__('auth.footer.privacy_policy'))
+        ->assertSee(__('auth.footer.support'));
+});
+
 test('users can authenticate using the login screen', function () {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
@@ -98,6 +129,74 @@ test('password login waits for enrolled MFA before authenticating', function ():
 
     $this->assertGuest('web');
     expect(session('auth.pending.user_id'))->toBe($user->id);
+});
+
+test('password login returns an MFA user to the deep link they opened before signing in', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $deepLink = url()->getAppUrl("{$user->currentWorkspace->slug}/companies");
+
+    $this->get($deepLink)->assertRedirect();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one'])
+        ->assertRedirect($deepLink);
+});
+
+test('password login returns an MFA user to the invitation they opened before signing in', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $invitation = WorkspaceInvitation::factory()->create(['email' => $user->email]);
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+    $acceptUrl = route('workspace-invitations.token.accept', ['token' => $rawToken]);
+
+    $this->get($acceptUrl)->assertRedirect();
+
+    livewire(Login::class)
+        ->fillForm(['email' => $user->email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'password'])
+        ->call('authenticate')
+        ->assertRedirect(route('two-factor.login'));
+
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one'])
+        ->assertRedirect($acceptUrl);
+});
+
+test('a throttled MFA code returns to the challenge with the wait instead of a bare error page', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('two-factor.login.store'), ['code' => '000000']);
+    }
+
+    $this->post(route('two-factor.login.store'), ['code' => '000000'])
+        ->assertRedirect(route('two-factor.login'));
+
+    expect(session('errors')->first('code'))->toStartWith(Str::before(__('auth.throttle'), ':seconds'));
+});
+
+test('a throttled identity confirmation code returns to its form with the wait', function (): void {
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $this->actingAs($user);
+    AuthenticationSession::markComplete($user);
+    IdentityConfirmation::markMfaPending($user, null);
+
+    foreach (range(1, 5) as $attempt) {
+        $this->post(route('identity.confirm.mfa.store'), ['code' => '000000']);
+    }
+
+    $this->post(route('identity.confirm.mfa.store'), ['code' => '000000'])
+        ->assertRedirect(route('identity.confirm.mfa'));
+
+    expect(session('errors')->first('code'))->toStartWith(Str::before(__('auth.throttle'), ':seconds'));
 });
 
 test('the Fortify password route completes login without MFA', function (): void {
@@ -261,6 +360,12 @@ test('password login rejects an external destination for an account without a wo
 test('login email field has autocomplete=username webauthn for conditional mediation', function (): void {
     livewire(Login::class)
         ->assertSeeHtml('autocomplete="username webauthn"');
+});
+
+test('the sign-in page names its logo link for screen readers', function (): void {
+    $page = new Crawler($this->get(route('filament.app.auth.login'))->assertSuccessful()->getContent());
+
+    expect($page->filter('header a[href="'.url('/').'"]')->attr('aria-label'))->toBe(config('app.name'));
 });
 
 test('the passkey login endpoint is rate limited', function (): void {
@@ -875,7 +980,7 @@ test('social hint renders after discovering a social-only account', function ():
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
         ->call('authenticate')
-        ->assertSee(__('auth.login.social_hint'));
+        ->assertSee(__('auth.login.social_hint', ['provider' => 'Google']));
 });
 
 test('password fallback link renders only for passkey users with a password', function (): void {
@@ -1136,7 +1241,27 @@ test('signup rejects a duplicate email at submission', function (): void {
     $component
         ->fillForm(['password' => 'Password123!'])
         ->call('authenticate')
-        ->assertHasFormErrors(['email']);
+        ->assertHasFormErrors(['email' => __('auth.login.account_exists')])
+        ->assertSet('authMethod', 'password');
+
+    expect(User::where('email', $email)->count())->toBe(1);
+});
+
+test('signup moves to sign-in when the account appears under a different letter case', function (): void {
+    $email = 'dup-case-'.uniqid().'@gmail.com';
+
+    $component = livewire(Login::class)
+        ->fillForm(['email' => strtoupper($email)])
+        ->call('authenticate')
+        ->assertSet('authMethod', 'signup');
+
+    User::factory()->create(['email' => $email]);
+
+    $component
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.account_exists')])
+        ->assertSet('authMethod', 'password');
 
     expect(User::where('email', $email)->count())->toBe(1);
 });
@@ -1273,4 +1398,30 @@ test('expired sign-in MFA shows a way to start again', function (): void {
         ->assertSee(__('auth.mfa.expired'))
         ->assertSee(__('auth.mfa.restart'))
         ->assertDontSee('autocomplete="one-time-code"', false);
+});
+
+it('preloads the password reveal script before the identifier step reveals the field', function (): void {
+    $revealScript = FilamentAsset::getAlpineComponentSrc('text-input/password-reveal', 'filament/forms');
+
+    $this->get(url()->getAppUrl('login'))
+        ->assertSuccessful()
+        ->assertSee('<link rel="modulepreload" href="'.e($revealScript).'">', escape: false);
+});
+
+it('lists each seeded local account as a login link form on the local login page', function (): void {
+    User::factory()->create(['email' => 'owner@relaticle.test']);
+    $this->app->detectEnvironment(fn (): string => 'local');
+
+    $this->get(Filament::getPanel('app')->getLoginUrl())
+        ->assertOk()
+        ->assertSee(route('loginLinkLogin'), false)
+        ->assertSee('value="owner@relaticle.test"', false);
+});
+
+it('lists no local accounts on the login page outside the local environment', function (): void {
+    User::factory()->create(['email' => 'owner@relaticle.test']);
+
+    $this->get(Filament::getPanel('app')->getLoginUrl())
+        ->assertOk()
+        ->assertDontSee('value="owner@relaticle.test"', false);
 });

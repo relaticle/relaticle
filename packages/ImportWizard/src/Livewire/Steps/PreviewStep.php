@@ -9,7 +9,6 @@ use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
-use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Collection;
@@ -297,9 +296,9 @@ final class PreviewStep extends Component implements HasActions, HasForms
             default => __('Start Import'),
         };
         $icon = match (true) {
-            $resolvingMatches => Heroicon::OutlinedArrowPath,
-            $matchesIncomplete => Heroicon::OutlinedExclamationTriangle,
-            default => Heroicon::OutlinedPlay,
+            $resolvingMatches => 'lucide-refresh-cw',
+            $matchesIncomplete => 'lucide-triangle-exclamation-point',
+            default => 'lucide-play',
         };
 
         return Action::make('startImport')
@@ -319,7 +318,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
         return Action::make('downloadFailedRows')
             ->label('Download Failed Rows')
             ->color('danger')
-            ->icon(Heroicon::OutlinedArrowDownTray)
+            ->icon('lucide-download')
             ->visible(fn (): bool => $this->isCompleted && $this->import()->failed_rows > 0)
             ->action(fn (): StreamedResponse => $this->downloadFailedRows());
     }

@@ -2,11 +2,13 @@
 
 declare(strict_types=1);
 
+use App\Console\Commands\UpdateTorExitNodesCommand;
 use App\Features\SignupChallenge;
 use App\Filament\Pages\Auth\Login;
 use App\Models\User;
 use App\Rules\TurnstileChallenge;
 use App\Services\TurnstileClient;
+use App\Support\Http\TorExitNodes;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -15,21 +17,33 @@ use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Psr\Http\Message\RequestInterface;
 
-mutates(Login::class, TurnstileChallenge::class, TurnstileClient::class, SignupChallenge::class);
+mutates(Login::class, TurnstileChallenge::class, TurnstileClient::class, SignupChallenge::class, TorExitNodes::class, UpdateTorExitNodesCommand::class);
+
+function enableSignupChallengeWithoutTurnstile(): void
+{
+    config(['relaticle.features.signup_challenge' => true]);
+    Feature::flushCache();
+}
 
 function enableSignupChallenge(): void
 {
     config([
-        'relaticle.features.signup_challenge' => true,
         'services.turnstile.key' => 'test-site-key',
         'services.turnstile.secret' => 'test-secret-key',
     ]);
-    Feature::flushCache();
+    enableSignupChallengeWithoutTurnstile();
 }
 
 function fakeSiteverify(bool $success, array $errorCodes = []): void
 {
     Http::fake(['challenges.cloudflare.com/*' => Http::response(['success' => $success, 'error-codes' => $errorCodes])]);
+}
+
+function torExitListBody(string ...$exits): string
+{
+    $relays = collect(range(1, 600))->map(fn (int $relay): string => long2ip(ip2long('10.0.0.0') + $relay));
+
+    return implode("\n", [...$relays, ...$exits]);
 }
 
 function startSignup(string $email): Testable
@@ -38,6 +52,13 @@ function startSignup(string $email): Testable
         ->fillForm(['email' => $email])
         ->call('authenticate')
         ->assertSet('authMethod', 'signup');
+}
+
+function completeSignup(string $email): Testable
+{
+    return startSignup($email)
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate');
 }
 
 it('is off by default', function (): void {
@@ -193,6 +214,23 @@ it('reports the challenge prompt in the active locale', function (): void {
         ->assertHasFormErrors(['cf_turnstile_response' => 'Veuillez compléter la vérification de sécurité.']);
 });
 
+it('points a visitor the challenge cannot verify at the sign-in providers', function (): void {
+    enableSignupChallenge();
+
+    startSignup('jane-blocked-'.uniqid().'@gmail.com')
+        ->assertSee(__('auth.turnstile.blocked_with_providers', ['providers' => 'Google or Microsoft']))
+        ->assertSee(__('auth.turnstile.retry'));
+});
+
+it('tells a visitor the challenge cannot verify to check their connection when no provider is configured', function (): void {
+    config(['services.google.client_id' => null, 'services.microsoft.client_id' => null]);
+    enableSignupChallenge();
+
+    startSignup('jane-blocked-'.uniqid().'@gmail.com')
+        ->assertSee(__('auth.turnstile.blocked'))
+        ->assertDontSee(__('auth.turnstile.blocked_with_providers', ['providers' => 'Google or Microsoft']));
+});
+
 it('never challenges an existing user signing in with a password', function (): void {
     enableSignupChallenge();
     fakeSiteverify(true);
@@ -241,4 +279,122 @@ it('skips the challenge when keys are set but the flag is off', function (): voi
         ->assertHasNoFormErrors();
 
     expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('refuses a signup from a tor exit relay at the email step', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    Http::fake([TorExitNodes::SOURCE_URL => Http::response(torExitListBody('127.0.0.1'))]);
+    $this->artisan('tor:update-exit-nodes')->assertSuccessful();
+
+    $email = 'jane-tor-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_over_tor')])
+        ->assertSet('authMethod', null);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('reports a signup refused over tor to analytics', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    Http::fake([TorExitNodes::SOURCE_URL => Http::response(torExitListBody('127.0.0.1'))]);
+    $this->artisan('tor:update-exit-nodes')->assertSuccessful();
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'jane-tor-event-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_tor')
+        ->assertNotDispatched('analytics-event', name: 'signup_started');
+});
+
+it('reports a refused challenge to analytics', function (): void {
+    enableSignupChallenge();
+    fakeSiteverify(false, ['invalid-input-response']);
+
+    startSignup('jane-challenge-event-'.uniqid().'@gmail.com')
+        ->fillForm(['password' => 'Password123!', 'cf_turnstile_response' => 'a-bad-token'])
+        ->call('authenticate')
+        ->assertDispatched('analytics-event', name: 'signup_refused_challenge')
+        ->assertNotDispatched('analytics-event', name: 'signup_refused_password');
+});
+
+it('refuses a signup whose address joined the tor exit list after the email step', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    Http::fake([TorExitNodes::SOURCE_URL => Http::sequence()
+        ->push(torExitListBody())
+        ->push(torExitListBody('127.0.0.1'))]);
+    resolve(TorExitNodes::class)->refresh();
+
+    $email = 'jane-tor-late-'.uniqid().'@gmail.com';
+    $signup = startSignup($email);
+
+    resolve(TorExitNodes::class)->refresh();
+
+    $signup->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_over_tor')])
+        ->assertSet('authMethod', null);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('creates the account from an address the tor exit list does not carry', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    Http::fake([TorExitNodes::SOURCE_URL => Http::response(torExitListBody())]);
+    $this->artisan('tor:update-exit-nodes')->assertSuccessful();
+
+    $email = 'jane-clearnet-'.uniqid().'@gmail.com';
+
+    completeSignup($email)->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('creates the account from a tor exit relay when the flag is off', function (): void {
+    Http::fake([TorExitNodes::SOURCE_URL => Http::response(torExitListBody('127.0.0.1'))]);
+    resolve(TorExitNodes::class)->refresh();
+
+    $email = 'jane-tor-flagoff-'.uniqid().'@gmail.com';
+
+    completeSignup($email)->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('creates the account before the tor exit list has ever been fetched', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+
+    $email = 'jane-nolist-'.uniqid().'@gmail.com';
+
+    completeSignup($email)->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('keeps the previous tor exit list when a refresh fails', function (callable $failure): void {
+    enableSignupChallengeWithoutTurnstile();
+    Http::fake([TorExitNodes::SOURCE_URL => Http::sequence()
+        ->push(torExitListBody('127.0.0.1'))
+        ->whenEmpty($failure())]);
+    Log::spy();
+
+    $this->artisan('tor:update-exit-nodes')->assertSuccessful();
+    $this->artisan('tor:update-exit-nodes')->assertFailed();
+
+    expect(resolve(TorExitNodes::class)->contains('127.0.0.1'))->toBeTrue();
+    Log::shouldHaveReceived('warning')->once();
+})->with([
+    'server error' => [fn (): PromiseInterface => Http::response('', 500)],
+    'error page' => [fn (): PromiseInterface => Http::response('<html>maintenance</html>')],
+]);
+
+it('skips the tor exit list refresh when the flag is off', function (): void {
+    Http::fake();
+
+    $this->artisan('tor:update-exit-nodes')->assertSuccessful();
+
+    Http::assertNothingSent();
+    expect(resolve(TorExitNodes::class)->contains('127.0.0.1'))->toBeFalse();
 });

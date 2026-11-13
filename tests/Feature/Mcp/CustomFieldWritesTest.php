@@ -21,8 +21,10 @@ use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Rules\OwnedLookupRecords;
 use App\Rules\ValidCustomFields;
+use App\Support\ChecklistHtml;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\RecordNameResolver;
@@ -30,12 +32,13 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\LegacyCompanyDomains;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(BaseCreateTool::class, BaseUpdateTool::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
+mutates(BaseCreateTool::class, BaseUpdateTool::class, ChecklistHtml::class, CustomFieldInput::class, CustomFieldOptionMap::class, OwnedLookupRecords::class, ValidCustomFields::class, RecordNameResolver::class, FormatsCustomFields::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -60,7 +63,7 @@ function statusOptionId(CustomField $field, string $label): string
 function workspaceScopedCompanyLookups(): Collection
 {
     return collect(DB::getQueryLog())->filter(
-        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'workspace_id'),
+        fn (array $query): bool => str_contains($query['query'], 'from "companies"') && str_contains($query['query'], 'where "workspace_id"'),
     );
 }
 
@@ -238,6 +241,23 @@ it('stores markdown for a rich editor field as html', function (): void {
     $stored = Task::query()->where('title', 'Md')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($description);
 
     expect($stored)->toContain('<h2>Plan</h2>')->toContain('<strong>Ada</strong>');
+});
+
+it('stores markdown checklist items through the create task tool', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Checklist', 'custom_fields' => ['description' => '- [ ] Call Bob']])
+        ->assertOk();
+
+    $description = CustomField::query()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'task')
+        ->where('code', 'description')
+        ->firstOrFail();
+    $stored = Task::query()->where('title', 'Checklist')->with('customFieldValues.customField.options')->firstOrFail()->getCustomFieldValue($description);
+
+    expect(substr_count($stored, 'data-type="taskItem"'))->toBe(1)
+        ->and($stored)->toContain('data-checked="false"')
+        ->toContain('<div><p>Call Bob</p></div>');
 });
 
 it('passes html through untouched for a rich editor field', function (): void {
@@ -560,6 +580,7 @@ it('sets then clears a value for every writable custom field type', function (st
     'email' => ['email', ['ada@example.com'], ['ada@example.com']],
     'phone' => ['phone', ['+14155552671'], ['+14155552671']],
     'link' => ['link', ['https://Example.com/Pricing/'], ['https://example.com/Pricing']],
+    'domain' => ['domain', ['https://www.Acme.com/pricing?x=1#top'], ['acme.com']],
     'checkbox' => ['checkbox', true, true],
     'toggle' => ['toggle', true, true],
     'tags-input' => ['tags-input', ['priority', 'customer'], ['priority', 'customer']],
@@ -567,7 +588,7 @@ it('sets then clears a value for every writable custom field type', function (st
     'date' => ['date', '2026-09-10', '2026-09-10T00:00:00+00:00'],
     'date-time' => ['date-time', '2026-09-10T10:30:00Z', '2026-09-10T10:30:00+00:00'],
     'date-time with an offset' => ['date-time', '2026-09-10T10:30:00+05:00', '2026-09-10T05:30:00+00:00'],
-    'rich-editor' => ['rich-editor', '**bold**', "<p><strong>bold</strong></p>\n"],
+    'rich-editor' => ['rich-editor', '**bold**', '<p><strong>bold</strong></p>'],
     'select' => ['select', null, 'OPTION_ID'],
     'radio' => ['radio', null, 'OPTION_ID'],
     'toggle-buttons' => ['toggle-buttons', null, 'OPTION_ID'],
@@ -663,3 +684,62 @@ it('rejects a domain another company holds in a different spelling', function ()
         ->tool(UpdateCompanyTool::class, ['id' => $own->getKey(), 'custom_fields' => ['domains' => ['https://acme.com', 'www.other.com']]])
         ->assertHasErrors(['The value "www.other.com" is already assigned to another record.']);
 });
+
+function domainProbeField(Workspace $workspace): CustomField
+{
+    return CustomField::query()->create([
+        'tenant_id' => $workspace->getKey(),
+        'entity_type' => 'company',
+        'code' => 'probe_domains',
+        'name' => 'Probe domains',
+        'type' => 'domain',
+        'sort_order' => 70,
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => true,
+        'settings' => new CustomFieldSettingsData(allow_multiple: true, max_values: 5),
+    ]);
+}
+
+it('stores every spelling of a domain as its bare lowercase host', function (string $input): void {
+    $field = domainProbeField($this->workspace);
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $company->saveCustomFieldValue($field, [$input]);
+
+    expect(collect($company->refresh()->getCustomFieldValue($field))->all())->toBe(['acme.com']);
+})->with([
+    'scheme, www and path' => 'https://www.Acme.com/pricing?x=1#top',
+    'bare' => 'acme.com',
+    'userinfo and port' => 'http://user:secret@acme.com:8080/',
+    'trailing dot' => 'ACME.COM.',
+    'padded' => '  www.acme.com  ',
+    'at sign in the query' => 'acme.com?ref=a@b.com',
+    'repeated www' => 'www.www.acme.com',
+    'non-breaking space' => "\u{00A0}https://acme.com",
+    'zero-width characters' => "https://\u{200B}acme.com\u{FEFF}",
+    'stacked schemes split by whitespace' => "http:// HTTPS://\thttp://\u{00A0}acme.com",
+    'two hundred stacked schemes' => str_repeat('http://', 200).'Acme.com/x',
+]);
+
+it('keeps a domain value it cannot read as a host', function (string $input, string $stored): void {
+    $field = domainProbeField($this->workspace);
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $company->saveCustomFieldValue($field, [$input]);
+
+    expect(collect($company->refresh()->getCustomFieldValue($field))->all())->toBe([$stored]);
+})->with([
+    'not a link' => ['N/A', 'N/A'],
+    'tel uri' => ['tel:+14155550100', 'tel:+14155550100'],
+    'www host with no registrable part' => ['WWW.CO', 'www.co'],
+]);
+
+it('drops a domain value that holds no host', function (string $empty): void {
+    $field = domainProbeField($this->workspace);
+    $company = Company::factory()->for($this->workspace)->create();
+
+    $company->saveCustomFieldValue($field, [$empty, 'https://www.Acme.com/x']);
+
+    expect(collect($company->refresh()->getCustomFieldValue($field))->all())->toBe(['acme.com']);
+})->with(['scheme only' => 'https://', 'slash' => '/', 'www only' => 'www.']);

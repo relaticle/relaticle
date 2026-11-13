@@ -411,6 +411,115 @@ it('paints a cited record as the same chip on the streamed and the reloaded pipe
         ->and($chips['navigating'])->toBeFalse();
 });
 
+it('renders line breaks, strikethrough, bare links and checklists the same on the streamed and the reloaded pipeline', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $markdown = "Ship to:\nAnn Lee\n12 Main Street\n\n- [x] Confirm budget\n- [ ] Draft quote\n\n~~Old quote~~ replaced, see https://example.com/pricing";
+    $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
+    $serverHtmlJson = json_encode((new MarkdownRenderer)->render($markdown), JSON_THROW_ON_ERROR);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            const base = { role: 'assistant', rendered: true, editing: false, editText: '' };
+
+            data.messages.push({ ...base, content: {$markdownJson}, prerendered: false });
+            data.messages.push({ ...base, content: {$serverHtmlJson}, prerendered: true });
+
+            return true;
+        })();
+    JS);
+
+    $page->assertCount('[data-assistant-bubble] .chat-md-task', 4);
+
+    $bubbles = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const bubbles = Array.from(document.querySelectorAll('[data-assistant-bubble]')).slice(-2);
+
+            const textOf = (bubble) => {
+                const copy = bubble.cloneNode(true);
+                copy.querySelectorAll('br').forEach((node) => node.replaceWith(' '));
+
+                return copy.textContent.replace(/\s+/g, ' ').trim();
+            };
+
+            return JSON.stringify(bubbles.map((bubble) => ({
+                text: textOf(bubble),
+                breaks: bubble.querySelectorAll('br').length,
+                struck: Array.from(bubble.querySelectorAll('del')).map((node) => node.textContent),
+                links: Array.from(bubble.querySelectorAll('a')).map((node) => node.getAttribute('href')),
+                tasks: Array.from(bubble.querySelectorAll('.chat-md-task')).map((node) => node.getAttribute('aria-checked')),
+                taskItems: Array.from(bubble.querySelectorAll('li')).map((node) => node.innerHTML.trim()),
+                inputs: bubble.querySelectorAll('input').length,
+            })));
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($bubbles[0])->toBe($bubbles[1])
+        ->and($bubbles[0]['breaks'])->toBe(2)
+        ->and($bubbles[0]['struck'])->toBe(['Old quote'])
+        ->and($bubbles[0]['links'])->toBe(['https://example.com/pricing'])
+        ->and($bubbles[0]['tasks'])->toBe(['true', 'false'])
+        ->and($bubbles[0]['inputs'])->toBe(0)
+        ->and($bubbles[0]['text'])->not->toContain('[x]');
+});
+
+it('styles inline code and tables in a reply with the chat prose classes', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $markdownJson = json_encode("Run `php artisan migrate` first.\n\n| Stage | Count |\n| - | - |\n| Lead | 4 |\n\n```\nphp artisan migrate --force\n```", JSON_THROW_ON_ERROR);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug)
+        ->navigate("/app/{$workspace->slug}/chats")
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.messages.push({ role: 'assistant', rendered: true, editing: false, editText: '', content: {$markdownJson}, prerendered: false });
+
+            return true;
+        })();
+    JS);
+
+    $page->assertCount('[data-assistant-bubble] td', 2);
+
+    $styles = json_decode((string) $page->script(<<<'JS'
+        (() => {
+            const bubble = Array.from(document.querySelectorAll('[data-assistant-bubble]')).pop();
+            const code = bubble.querySelector('p code');
+            const blockCode = bubble.querySelector('pre code');
+            const prose = code.closest('.prose');
+
+            return JSON.stringify({
+                codeBefore: getComputedStyle(code, '::before').content,
+                codeBackground: getComputedStyle(code).backgroundColor,
+                firstChildMarginTop: getComputedStyle(prose.firstElementChild).marginTop,
+                cellPaddingLeft: getComputedStyle(bubble.querySelector('td')).paddingLeft,
+                blockCodeBackground: getComputedStyle(blockCode).backgroundColor,
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($styles['codeBefore'])->toBe('none')
+        ->and($styles['codeBackground'])->not->toBe('rgba(0, 0, 0, 0)')
+        ->and($styles['firstChildMarginTop'])->toBe('0px')
+        ->and($styles['cellPaddingLeft'])->toBe('8px')
+        ->and($styles['blockCodeBackground'])->toBe('rgba(0, 0, 0, 0)');
+});
+
 /**
  * `msg.content` is markdown for a reply rendered in this session and server
  * HTML for one rehydrated on reload, so copying it verbatim pasted raw tags
@@ -489,6 +598,12 @@ it('copies every markdown structure back as text, identically from both pipeline
         ```php
         echo 'hi';
         ```
+
+        - [x] Confirm budget
+        - [ ] Draft quote
+
+        Ship to:
+        Ann Lee, ~~old~~ new address
         MD;
 
     $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
@@ -529,6 +644,12 @@ it('copies every markdown structure back as text, identically from both pipeline
         '```php',
         "echo 'hi';",
         '```',
+        '',
+        '- [x] Confirm budget',
+        '- [ ] Draft quote',
+        '',
+        'Ship to:',
+        'Ann Lee, ~~old~~ new address',
     ]);
 
     expect($copied)->toBe([$expected, $expected]);

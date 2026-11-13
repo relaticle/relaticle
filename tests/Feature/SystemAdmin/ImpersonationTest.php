@@ -3,26 +3,33 @@
 declare(strict_types=1);
 
 use App\Http\Middleware\StopImpersonationOnLogout;
+use App\Http\Middleware\SuperviseImpersonation;
+use App\Livewire\App\Profile\LogoutOtherBrowserSessions;
 use App\Livewire\App\Profile\ScheduledDeletionInterstitial;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\Company;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\Impersonation\ImpersonationSessionHandler;
 use App\Support\Impersonation\Impersonator;
+use Filament\Facades\Filament;
 use Illuminate\Foundation\Application;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
+use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 use function Pest\Laravel\actingAs;
 
-mutates(Impersonator::class, StopImpersonationOnLogout::class, ScheduledDeletionInterstitial::class);
+mutates(Impersonator::class, ImpersonationSessionHandler::class, SuperviseImpersonation::class, StopImpersonationOnLogout::class, ScheduledDeletionInterstitial::class);
 
 function impersonationLink(User $target, array $parameters = [], ?SystemAdministrator $administrator = null): string
 {
@@ -159,6 +166,29 @@ it('leaves the customer login timestamp and remember token untouched', function 
         ->and($this->customer->remember_token)->toBe('keep-me-signed-in');
 });
 
+it('keeps the support session out of the customers browser sessions', function (): void {
+    config(['session.driver' => 'database']);
+
+    $this->get(impersonationLink($this->customer));
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug))
+        ->assertSuccessful();
+
+    expect(DB::table('sessions')->pluck('user_id')->all())->toBe([null])
+        ->and(Livewire::test(LogoutOtherBrowserSessions::class)->instance()->browserSessions())->toBeEmpty();
+});
+
+it('lists the session again for the account the administrator returns to', function (): void {
+    config(['session.driver' => 'database']);
+
+    $administratorsOwnAccount = User::factory()->withWorkspace()->create();
+
+    actingAs($administratorsOwnAccount, 'web');
+    $this->get(impersonationLink($this->customer));
+    $this->delete(route('impersonation.stop'));
+
+    expect(DB::table('sessions')->pluck('user_id')->filter()->values()->all())->toBe([$administratorsOwnAccount->getKey()]);
+});
+
 it('refuses an administrator who may not impersonate', function (): void {
     $administrator = SystemAdministrator::factory()->administrator()->create();
 
@@ -275,6 +305,213 @@ it('leaves an ordinary write untagged', function (): void {
         ->first();
 
     expect($activity->properties->get('impersonated_by'))->toBeNull();
+});
+
+it('ends the impersonation thirty minutes after it starts', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->travel(29)->minutes();
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug))->assertSuccessful();
+
+    $this->travel(1)->minutes();
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug))
+        ->assertRedirect(route('filament.sysadmin.resources.users.index'));
+
+    expect(Auth::guard('web')->check())->toBeFalse()
+        ->and(session('impersonation.target_id'))->toBeNull()
+        ->and(session('impersonation.started_at'))->toBeNull();
+});
+
+it('ends an impersonation that carries no start time', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    session()->forget('impersonation.started_at');
+    session()->save();
+
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug))
+        ->assertRedirect(route('filament.sysadmin.resources.users.index'));
+
+    expect(Auth::guard('web')->check())->toBeFalse();
+});
+
+it('ends the impersonation once the administrator may no longer impersonate', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->administrator->update(['role' => SystemAdministratorRole::Administrator]);
+
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug))
+        ->assertRedirect(route('filament.sysadmin.resources.users.index'));
+
+    expect(Auth::guard('web')->check())->toBeFalse();
+});
+
+it('ends the impersonation once the administrator is gone', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->administrator->delete();
+
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug))
+        ->assertRedirect(route('filament.sysadmin.resources.users.index'));
+
+    expect(Auth::guard('web')->check())->toBeFalse();
+});
+
+it('answers a livewire request with page expired once the impersonation has lapsed', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->travel(30)->minutes();
+
+    $this->withHeaders(['X-Livewire' => 'true'])
+        ->post(Livewire::getUpdateUri(), ['components' => []])
+        ->assertStatus(419);
+
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug))
+        ->assertRedirect(Filament::getPanel('app')->getLoginUrl());
+
+    expect(session('impersonation.target_id'))->toBeNull();
+});
+
+it('answers a script request with page expired once the impersonation has lapsed', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->travel(30)->minutes();
+
+    $this->postJson(route('filament.app.timezone.sync'), ['timezone' => 'Europe/Paris'])
+        ->assertStatus(419);
+});
+
+it('starts a new impersonation from a link opened after the last one lapsed', function (): void {
+    $anotherCustomer = User::factory()->withWorkspace()->create();
+
+    $this->get(impersonationLink($this->customer));
+    $this->travel(30)->minutes();
+
+    $this->get(impersonationLink($anotherCustomer))
+        ->assertRedirect(url()->getAppUrl());
+
+    expect(Auth::guard('web')->id())->toBe($anotherCustomer->getKey());
+});
+
+it('records a write request made during impersonation against the administrator', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->post(route('filament.app.timezone.sync'), ['timezone' => 'Europe/Paris']);
+
+    $record = Activity::withoutGlobalScope(WorkspaceScope::class)
+        ->where('event', 'impersonation_request')
+        ->sole();
+
+    expect($record->causer_id)->toBe($this->administrator->getKey())
+        ->and($record->subject_id)->toBe($this->customer->getKey())
+        ->and($record->properties->get('method'))->toBe('POST')
+        ->and($record->properties->get('route'))->toBe('filament.app.timezone.sync');
+});
+
+it('records the livewire actions a request calls during impersonation', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->withHeaders(['X-Livewire' => 'true'])->postJson(Livewire::getUpdateUri(), ['components' => [[
+        'snapshot' => json_encode(['memo' => ['name' => 'app.access-tokens.create-access-token']]),
+        'updates' => ['data.name' => 'Zapier'],
+        'calls' => [
+            ['method' => 'mountAction', 'params' => ['create']],
+            ['method' => 'callMountedAction', 'params' => []],
+        ],
+    ]]]);
+
+    $record = Activity::withoutGlobalScope(WorkspaceScope::class)
+        ->where('event', 'impersonation_request')
+        ->sole();
+
+    expect($record->properties->get('actions'))->toBe([
+        'app.access-tokens.create-access-token::$data.name',
+        'app.access-tokens.create-access-token::mountAction(create)',
+        'app.access-tokens.create-access-token::callMountedAction',
+    ]);
+});
+
+it('keeps the request record out of the customers workspace activity', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    Filament::setTenant($this->customer->currentWorkspace);
+    $this->post(route('filament.app.timezone.sync'), ['timezone' => 'Europe/Paris']);
+
+    $record = Activity::withoutGlobalScope(WorkspaceScope::class)
+        ->where('event', 'impersonation_request')
+        ->sole();
+
+    expect($record->workspace_id)->toBeNull();
+});
+
+it('records no request that only reads, refreshes a component or joins a channel', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->get(url()->getAppUrl($this->customer->currentWorkspace->slug));
+    $this->withHeaders(['X-Livewire' => 'true'])->postJson(Livewire::getUpdateUri(), ['components' => [[
+        'snapshot' => json_encode(['memo' => ['name' => 'app.profile.update-profile']]),
+        'updates' => [],
+        'calls' => [['method' => '__lazyLoad', 'params' => []]],
+    ]]]);
+    $this->post('/broadcasting/auth', ['channel_name' => 'private-App.Models.User.'.$this->customer->getKey()]);
+
+    expect(Activity::withoutGlobalScope(WorkspaceScope::class)->where('event', 'impersonation_request')->exists())->toBeFalse();
+});
+
+it('records no request that only polls or commits a component', function (string $method): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->withHeaders(['X-Livewire' => 'true'])->postJson(Livewire::getUpdateUri(), ['components' => [[
+        'snapshot' => json_encode(['memo' => ['name' => 'app.app-database-notifications']]),
+        'updates' => [],
+        'calls' => [['method' => $method, 'params' => []]],
+    ]]]);
+
+    expect(Activity::withoutGlobalScope(WorkspaceScope::class)->where('event', 'impersonation_request')->exists())->toBeFalse();
+})->with(['$refresh', '$commit']);
+
+it('records the property a live update commits', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->withHeaders(['X-Livewire' => 'true'])->postJson(Livewire::getUpdateUri(), ['components' => [[
+        'snapshot' => json_encode(['memo' => ['name' => 'app.profile.update-profile']]),
+        'updates' => ['data.name' => 'Priya'],
+        'calls' => [['method' => '$commit', 'params' => []]],
+    ]]]);
+
+    $record = Activity::withoutGlobalScope(WorkspaceScope::class)
+        ->where('event', 'impersonation_request')
+        ->sole();
+
+    expect($record->properties->get('actions'))->toBe(['app.profile.update-profile::$data.name']);
+});
+
+it('records a write that only claims to be a livewire request', function (): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->withHeaders(['X-Livewire' => 'true'])
+        ->post(route('filament.app.timezone.sync'), ['timezone' => 'Europe/Paris']);
+
+    expect(Activity::withoutGlobalScope(WorkspaceScope::class)->where('event', 'impersonation_request')->count())->toBe(1);
+});
+
+it('records no request for the stop or the sign out that ends the impersonation', function (string $method, string $routeName): void {
+    $this->get(impersonationLink($this->customer));
+
+    $this->call($method, route($routeName));
+
+    expect(Activity::withoutGlobalScope(WorkspaceScope::class)->where('log_name', Impersonator::LOG_NAME)->orderBy('id')->pluck('event')->all())
+        ->toBe(['impersonation_started', 'impersonation_stopped']);
+})->with([
+    'stop' => ['DELETE', 'impersonation.stop'],
+    'panel sign out' => ['POST', 'filament.app.auth.logout'],
+    'fortify sign out' => ['POST', 'logout'],
+]);
+
+it('records no request the customer makes on their own', function (): void {
+    actingAs($this->customer, 'web')
+        ->post(route('filament.app.timezone.sync'), ['timezone' => 'Europe/Paris']);
+
+    expect(Activity::withoutGlobalScope(WorkspaceScope::class)->where('event', 'impersonation_request')->exists())->toBeFalse();
 });
 
 it('drops the administrators identity confirmation when assuming the customer', function (): void {

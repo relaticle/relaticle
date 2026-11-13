@@ -85,7 +85,7 @@ function seedSuggestibleMessage(string $role, string $content, array $meta = [])
 function persistedNextSteps(string $messageId): array
 {
     return NextSteps::fromMeta(
-        (string) DB::table('agent_conversation_messages')->where('id', $messageId)->value('meta')
+        json_decode((string) DB::table('agent_conversation_messages')->where('id', $messageId)->value('meta'), true) ?? []
     );
 }
 

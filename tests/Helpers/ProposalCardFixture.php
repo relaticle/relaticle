@@ -8,12 +8,14 @@ use App\Models\CustomField;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
+use Relaticle\Chat\Tools\Note\CreateNoteTool;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
@@ -226,13 +228,48 @@ final class ProposalCardFixture
     }
 
     /**
-     * @param  class-string<CreateCompanyTool|CreatePersonTool|CreateTaskTool>  $class
+     * @return array{0: string, 1: string} A fresh conversation id and turn id to chain proposals in.
+     */
+    public static function startPlan(User $user): array
+    {
+        $conversationId = (string) Str::uuid();
+
+        DB::table('agent_conversations')->insert([
+            'id' => $conversationId,
+            'participant_type' => 'user',
+            'participant_id' => (string) $user->getKey(),
+            'workspace_id' => $user->currentWorkspace->getKey(),
+            'title' => '',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return [$conversationId, (string) Str::ulid()];
+    }
+
+    /**
+     * @param  class-string<CreateCompanyTool|CreatePersonTool|CreateTaskTool|CreateNoteTool>  $class
+     * @param  list<array<string, mixed>>  $records
+     */
+    public static function planProposal(string $class, string $conversationId, string $turnId, array $records): PendingAction
+    {
+        self::planTool($class, $conversationId, $turnId)->handle(new Request(['records' => $records]));
+
+        return PendingAction::query()
+            ->where('conversation_id', $conversationId)
+            ->where('turn_id', $turnId)
+            ->latest('id')
+            ->firstOrFail();
+    }
+
+    /**
+     * @param  class-string<CreateCompanyTool|CreatePersonTool|CreateTaskTool|CreateNoteTool>  $class
      */
     private static function planTool(
         string $class,
         string $conversationId,
         string $turnId,
-    ): CreateCompanyTool|CreatePersonTool|CreateTaskTool {
+    ): CreateCompanyTool|CreatePersonTool|CreateTaskTool|CreateNoteTool {
         $tool = resolve($class);
         $tool->setConversationId($conversationId);
         $tool->setTurnId($turnId);

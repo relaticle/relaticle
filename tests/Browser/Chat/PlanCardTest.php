@@ -2,8 +2,15 @@
 
 declare(strict_types=1);
 
+use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Illuminate\Support\Str;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\PendingAction;
+use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
+use Relaticle\EmailIntegration\Models\Email;
 use Tests\Helpers\ChatBrowser;
 
 /**
@@ -85,4 +92,432 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
 
     $page->assertSee('Cancelled with the step it depended on')
         ->assertDontSee('0 of 0 resolved');
+});
+
+it('does not let the second click of a double-click send the email that replaces the approve button', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'task then send', $conversationId);
+
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+    ]));
+
+    $turnId = (string) Str::ulid();
+
+    $propose = fn (string $actionClass, string $entityType, array $data, array $display): PendingAction => PendingAction::query()->create([
+        'workspace_id' => $workspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => $conversationId,
+        'turn_id' => $turnId,
+        'action_class' => $actionClass,
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => $entityType,
+        'action_data' => $data,
+        'display_data' => $display,
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+
+    $propose(CreateTask::class, 'task', ['title' => 'Call Lena'], [
+        'title' => 'Create Task',
+        'summary' => 'Create task "Call Lena"',
+        'fields' => [['label' => 'Title', 'value' => 'Call Lena']],
+    ]);
+
+    $send = $propose(SendAssistantEmail::class, 'emails', [
+        'connected_account_id' => (string) $account->getKey(),
+        'to' => ['lena@acme.test'],
+        'subject' => 'Q4 lanes',
+        'body' => 'Confirmed.',
+        'include_signature' => false,
+    ], [
+        'title' => 'Send Email',
+        'summary' => 'Send email to lena@acme.test: Q4 lanes',
+        'fields' => [['label' => 'Subject', 'value' => 'Q4 lanes']],
+    ]);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->resize(1440, 900)
+        ->assertSee('Q4 lanes');
+
+    $spot = $page->script(<<<'JS'
+        (() => {
+            const box = document.querySelector('[wire\\:click="approveAll"]').getBoundingClientRect();
+
+            return { x: box.right - 8, y: box.top + box.height / 2 };
+        })();
+    JS);
+
+    $page->click('[wire\:click="approveAll"]')
+        ->assertVisible('[wire\:click="createCurrent"]');
+
+    $clicked = $page->script(<<<JS
+        (() => {
+            const button = document.elementFromPoint({$spot['x']}, {$spot['y']}).closest('button');
+            const wasDisabled = button.disabled;
+            const discard = document.querySelector('[wire\\\\:click="discardCurrent"]');
+            const discardWasDisabled = discard.disabled;
+            button.click();
+            discard.click();
+
+            return { wasDisabled, discardWasDisabled, action: button.getAttribute('wire:click') };
+        })();
+    JS);
+
+    $page->wait(0.4);
+
+    expect($clicked)->toBe(['wasDisabled' => true, 'discardWasDisabled' => true, 'action' => 'createCurrent'])
+        ->and(Email::query()->count())->toBe(0)
+        ->and($send->fresh()->status)->toBe(PendingActionStatus::Pending);
+
+    $page->wait(1);
+
+    $armed = $page->script(<<<'JS'
+        document.querySelector('[wire\\:click="createCurrent"]').disabled === false;
+    JS);
+
+    expect($armed)->toBeTrue();
+});
+
+it('renders a streamed proposal the user already decided as a decided card and docks nothing', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'retried turn', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $result = $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.messages = [];
+            data.handleToolResult({
+                invocation_id: 'inv-1',
+                result: JSON.stringify({
+                    type: 'pending_action',
+                    pending_action_id: 'pa-decided',
+                    turn_id: 'turn-1',
+                    status: 'approved',
+                    operation: 'create',
+                    entity_type: 'task',
+                    display: { summary: 'Create task "Call Lena"', fields: [] },
+                    meta: { agent_should_stop: false },
+                }),
+            });
+            data.handleToolResult({
+                invocation_id: 'inv-1',
+                result: JSON.stringify({
+                    type: 'pending_action',
+                    pending_action_id: 'pa-open',
+                    turn_id: 'turn-1',
+                    operation: 'create',
+                    entity_type: 'task',
+                    display: { summary: 'Create task "Email Lena"', fields: [] },
+                    meta: { agent_should_stop: true },
+                }),
+            });
+
+            const actions = data.messages.flatMap((m) => m.pending_actions || []);
+
+            return {
+                statuses: actions.map((a) => a.status),
+                docked: data.visiblePendingActions().map((a) => a.pending_action_id),
+            };
+        })();
+    JS);
+
+    expect($result)->toBe(['statuses' => ['approved', 'pending'], 'docked' => ['pa-open']]);
+});
+
+function seedReceiptMessages(string $messagesJson): string
+{
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    return <<<JS
+        (() => {
+            {$resolveInterface}
+
+            const step = (id, status, entityType, operation, summary, extra = {}) => ({
+                pending_action_id: id,
+                turn_id: extra.turn ?? null,
+                status,
+                operation,
+                entity_type: entityType,
+                display: { summary, fields: extra.fields ?? [], items: extra.items },
+                itemResults: extra.itemResults ?? {},
+                record: extra.record ?? null,
+                outcome: extra.outcome ?? null,
+                excluded: extra.excluded ?? [],
+                moved_to: extra.moved_to ?? null,
+                moved_total: extra.moved_total ?? null,
+                resolved_at: extra.resolvedAt ?? null,
+            });
+
+            const message = (id, actions) => ({ id, role: 'assistant', content: 'Done.', rendered: true, html: '<p>Done.</p>', pending_actions: actions });
+
+            data.messages = {$messagesJson};
+
+            return true;
+        })();
+    JS;
+}
+
+it('receipts an applied plan as check lines under one head, with no status dots', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'applied plan', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [
+            step('pa-1', 'approved', 'company', 'create', 'Create company "Acme"', { turn: 't1', outcome: 'applied', record: { id: 'c1', type: 'company', label: 'Acme', url: '/app/x/companies/c1' }, fields: [{ label: 'Name', value: 'Acme' }] }),
+            step('pa-2', 'approved', 'task', 'create', 'Create task "Call Jane"', { turn: 't1', outcome: 'applied', record: { id: 't1', type: 'task', label: 'Call Jane', url: '/app/x/tasks/t1' } }),
+            step('pa-3', 'approved', 'opportunity', 'update', 'Update opportunity "Renewal"', { turn: 't1', outcome: 'applied', excluded: ['amount'], record: { id: 'o1', type: 'opportunity', label: 'Renewal', url: '/app/x/opportunities/o1' }, fields: [{ label: 'Stage', code: 'stage', old: 'Open', new: 'Won' }, { label: 'Amount', code: 'amount', old: '1', new: '2' }] }),
+        ])]
+    JS));
+
+    $page->assertSee('Applied 3 changes · just now')
+        ->assertSee('Created task')
+        ->assertSee('Call Jane')
+        ->assertSee('Stage (Amount left out)');
+
+    $receipt = $page->script(<<<'JS'
+        (() => {
+            const receipt = document.querySelector('[data-proposal-receipt]');
+            const transcript = document.querySelector('[x-ref="messages"]');
+            const dots = Array.from(transcript.querySelectorAll('.rounded-full'))
+                .filter((el) => /\bbg-(green|red)-|\bbg-gray-400\b/.test(el.className));
+
+            return {
+                lines: receipt.querySelectorAll('[data-proposal-line][data-outcome="applied"]').length,
+                icons: receipt.querySelectorAll('[data-proposal-line] svg[class*="size-4"]').length,
+                dots: dots.length,
+            };
+        })();
+    JS);
+
+    expect($receipt)->toBe(['lines' => 3, 'icons' => 3, 'dots' => 0]);
+});
+
+it('receipts a mixed outcome: a moved batch with a left-out row and an unsent email', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'mixed plan', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [
+            step('pa-1', 'approved', 'opportunity', 'update', 'Update 6 opportunities', {
+                turn: 't1',
+                outcome: 'applied',
+                moved_to: 'Negotiation',
+                moved_total: '$110,200',
+                items: ['Kovra renewal', 'Kovra add-on seats', 'Kovra platform expansion', 'Kovra pilot', 'Kovra support', 'Kovra training'].map((name) => ({
+                    summary: 'Update opportunity "' + name + '"',
+                    fields: [{ label: 'Stage', old: 'Open', new: 'Negotiation' }],
+                })),
+                itemResults: { 1: { status: 'skipped', outcome: 'left_out', excluded: [], record: null } },
+            }),
+            step('pa-2', 'rejected', 'emails', 'create', 'Email: Q4 lanes', { turn: 't1', outcome: 'not_sent', fields: [{ label: 'To', value: 'Priya Nair' }, { label: 'Subject', value: 'Q4 lanes' }] }),
+        ])]
+    JS));
+
+    $page->assertSee('Applied 5 changes · just now')
+        ->assertSee('Moved 5 opportunities to Negotiation · $110,200')
+        ->assertSee('Kovra add-on seats · left out')
+        ->assertSee('Not sent: Q4 lanes');
+});
+
+it('settles a discarded, expired and replaced proposal as one grey line', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'settled lines', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [
+            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"', { outcome: 'discarded' })]),
+            message('m2', [step('pa-2', 'superseded', 'task', 'create', 'Create task "Call Jane"', { outcome: 'replaced' })]),
+            message('m3', [
+                step('pa-3', 'expired', 'company', 'create', 'Create company "Globex"', { turn: 't3', outcome: 'expired' }),
+                step('pa-4', 'expired', 'task', 'create', 'Create task "Email Globex"', { turn: 't3', outcome: 'expired' }),
+            ]),
+        ]
+    JS));
+
+    $page->assertSee('Create company "Acme" · discarded')
+        ->assertSee('Create task "Call Jane" · replaced by a newer proposal')
+        ->assertSee('2 changes · expired');
+
+    $buttons = $page->script(<<<'JS'
+        (() => {
+            const settled = Array.from(document.querySelectorAll('[data-proposal-settled]'));
+
+            return settled.map((el) => el.querySelector('[data-propose-again]') !== null);
+        })();
+    JS);
+
+    expect($buttons)->toBe([false, false, true]);
+});
+
+it('offers Propose again on the latest decided proposal only, and never while one is pending', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'propose again', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [
+            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"', { outcome: 'discarded' })]),
+            message('m2', [step('pa-2', 'rejected', 'task', 'create', 'Create task "Call Jane"', { outcome: 'discarded' })]),
+        ]
+    JS));
+
+    $page->assertSee('Create task "Call Jane" · discarded');
+
+    $sent = $page->script(<<<'JS'
+        (() => {
+            const hosts = Array.from(document.querySelectorAll('[x-data^="chatInterface"]'));
+            const host = hosts.find((el) => el.offsetParent !== null) ?? hosts[0];
+            const data = Alpine.$data(host);
+            const owner = (el) => el.closest('[data-proposal-settled]').textContent;
+
+            const buttons = Array.from(document.querySelectorAll('[data-propose-again]'));
+            let prompt = null;
+            data.sendNextStep = (step) => { prompt = step.prompt; };
+            buttons[0].click();
+
+            return { count: buttons.length, owner: owner(buttons[0]).includes('Call Jane'), prompt };
+        })();
+    JS);
+
+    expect($sent['count'])->toBe(1)
+        ->and($sent['owner'])->toBeTrue()
+        ->and($sent['prompt'])->toBe('Propose again: Create task "Call Jane"');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [
+            message('m1', [step('pa-1', 'rejected', 'company', 'create', 'Create company "Acme"', { outcome: 'discarded' })]),
+            message('m2', [step('pa-2', 'rejected', 'task', 'create', 'Create task "Call Jane"', { outcome: 'discarded' })]),
+            message('m3', [step('pa-3', 'pending', 'people', 'create', 'Create person "Jane"')]),
+        ]
+    JS));
+
+    $page->assertMissing('[data-propose-again]');
+});
+
+it('words the head by when the plan was applied', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'receipt age', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [
+            message('m1', [step('pa-1', 'approved', 'company', 'create', 'Create company "Acme"', { outcome: 'applied', resolvedAt: new Date(Date.now() - 5 * 60000).toISOString(), record: { id: 'c1', type: 'company', label: 'Acme', url: '/x' } })]),
+            message('m2', [step('pa-2', 'approved', 'task', 'create', 'Create task "Call Jane"', { outcome: 'applied', resolvedAt: new Date(Date.now() - 20000).toISOString(), record: { id: 't1', type: 'task', label: 'Call Jane', url: '/y' } })]),
+        ]
+    JS));
+
+    $page->assertSee('Applied 1 change · 5 minutes ago')
+        ->assertSee('Applied 1 change · just now');
+});
+
+it('strikes a left-out field in the disclosure of an update', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'left out field', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [
+            step('pa-1', 'approved', 'opportunity', 'update', 'Update opportunity "Renewal"', {
+                outcome: 'applied',
+                excluded: ['name'],
+                record: { id: 'o1', type: 'opportunity', label: 'Renewal', url: '/z' },
+                fields: [{ label: 'Name', code: 'name', old: 'Renewal', new: 'Renewal 2027' }, { label: 'Amount', code: 'amount', old: '1', new: '2' }],
+            }),
+        ])]
+    JS));
+
+    $page->assertSee('Amount (Name left out)')
+        ->click('[data-proposal-row]')
+        ->assertVisible('[data-proposal-details]');
+
+    $rows = $page->script(<<<'JS'
+        (() => Array.from(document.querySelectorAll('[data-proposal-field-row]')).map((row) => [row.dataset.leftOut, row.textContent.includes('left out')]))();
+    JS);
+
+    expect($rows)->toBe([['true', true], ['false', false]]);
+});
+
+it('settles a proposal that lapses or is replaced while open, with the outcome the server would give', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'local settle', $conversationId);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('placeholder="Ask anything..."');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [Object.assign(step('pa-1', 'pending', 'company', 'create', 'Create company "Acme"'), { expires_at: new Date(Date.now() - 1000).toISOString() })])]
+    JS));
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.sweepLapsedProposals();
+
+            return true;
+        })();
+    JS);
+
+    $page->assertSee('Create company "Acme" · expired')
+        ->assertVisible('[data-propose-again]');
+
+    $page->script(seedReceiptMessages(<<<'JS'
+        [message('m1', [step('pa-2', 'pending', 'task', 'create', 'Create task "Call Jane"')])]
+    JS));
+
+    $page->script(<<<JS
+        (() => {
+            {$resolveInterface}
+
+            data.markPendingActionsSuperseded();
+
+            return true;
+        })();
+    JS);
+
+    $page->assertSee('Create task "Call Jane" · replaced by a newer proposal')
+        ->assertMissing('[data-propose-again]');
 });

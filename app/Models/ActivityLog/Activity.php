@@ -7,6 +7,7 @@ namespace App\Models\ActivityLog;
 use App\Enums\CreationSource;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\Workspace;
+use App\Support\Impersonation\Impersonator;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +22,8 @@ use Spatie\Activitylog\Models\Activity as SpatieActivity;
 final class Activity extends SpatieActivity
 {
     public const string SOURCE_PROPERTY = 'source';
+
+    public const string EMAIL_ACCESS_LOG = 'email_access';
 
     /** @param  array<array-key, mixed>  $properties */
     public static function sourceFrom(array $properties): ?CreationSource
@@ -64,12 +67,21 @@ final class Activity extends SpatieActivity
         $query->where('properties->'.self::SOURCE_PROPERTY, $source->value);
     }
 
+    /** @param  Builder<self>  $query */
+    #[Scope]
+    protected function inAuditTrail(Builder $query): void
+    {
+        $query->where(fn (Builder $log): Builder => $log
+            ->whereNull('activity_log.log_name')
+            ->orWhere('activity_log.log_name', '!=', self::EMAIL_ACCESS_LOG));
+    }
+
     protected static function booted(): void
     {
         self::addGlobalScope(new WorkspaceScope);
 
         self::creating(function (self $activity): void {
-            if ($activity->workspace_id !== null) {
+            if ($activity->workspace_id !== null || $activity->log_name === Impersonator::LOG_NAME) {
                 return;
             }
 

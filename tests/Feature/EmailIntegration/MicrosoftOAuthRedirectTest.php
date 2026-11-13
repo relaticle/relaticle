@@ -15,7 +15,7 @@ beforeEach(function (): void {
     config()->set('services.azure.tenant', 'common');
 });
 
-it('redirects to Microsoft with the least Graph scopes and prompt=consent', function (): void {
+it('redirects to Microsoft with the least Graph scopes and an account picker', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
@@ -26,7 +26,7 @@ it('redirects to Microsoft with the least Graph scopes and prompt=consent', func
     parse_str((string) parse_url((string) $location, PHP_URL_QUERY), $query);
 
     expect($location)->toContain('login.microsoftonline.com')
-        ->toContain('prompt=consent')
+        ->and($query['prompt'])->toBe('select_account')
         ->and(explode(' ', (string) $query['scope']))->toEqualCanonicalizing([
             'https://graph.microsoft.com/Mail.Read',
             'https://graph.microsoft.com/Mail.Send',

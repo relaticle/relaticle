@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Support\PlainText;
 use Carbon\CarbonInterface;
 use DateTimeInterface;
 use Illuminate\Support\Facades\Config;
@@ -19,8 +20,8 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -28,7 +29,6 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
-use RuntimeException;
 
 final readonly class SendEmailAction
 {
@@ -49,7 +49,6 @@ final readonly class SendEmailAction
      *     bcc?: array<array{email: string, name: ?string}>,
      *     in_reply_to_email_id?: ?string,
      *     creation_source: EmailCreationSource,
-     *     privacy_tier: EmailPrivacyTier,
      *     batch_id?: ?string,
      *     scheduled_for?: ?DateTimeInterface,
      *     priority?: EmailPriority,
@@ -59,11 +58,8 @@ final readonly class SendEmailAction
      * }  $data
      * @param  class-string|null  $linkToType
      */
-    public function execute(array $data, ?string $linkToType = null, ?string $linkToId = null): Email
+    public function execute(User $user, array $data, ?string $linkToType = null, ?string $linkToId = null): Email
     {
-        /** @var User $user */
-        $user = auth()->user();
-
         /** @var ConnectedAccount $account */
         $account = ConnectedAccount::query()
             ->ownedBy($user, $user->currentWorkspace)
@@ -127,10 +123,9 @@ final readonly class SendEmailAction
                 : null;
 
             /** @var Email $email */
-            $email = Email::query()->create([
+            $email = $account->emails()->chaperone()->create([
                 'workspace_id' => $account->workspace_id,
                 'user_id' => $account->user_id,
-                'connected_account_id' => $account->getKey(),
                 // Stamp a stable RFC Message-ID now (used as the outgoing Message-ID
                 // header) so a retry that re-enters after the provider already
                 // delivered can find the sent message and adopt it instead of
@@ -146,14 +141,13 @@ final readonly class SendEmailAction
                     : null,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
                 'subject' => $data['subject'],
-                'snippet' => mb_substr(strip_tags((string) $data['body_html']), 0, 255),
+                'snippet' => mb_substr(PlainText::fromHtml((string) $data['body_html']), 0, 255),
                 'sent_at' => null,
                 'scheduled_for' => $scheduledFor,
                 'direction' => EmailDirection::OUTBOUND,
                 'folder' => EmailFolder::Sent,
                 'status' => EmailStatus::QUEUED,
                 'priority' => $priority,
-                'privacy_tier' => $data['privacy_tier'],
                 'has_attachments' => $hasDownloadableAttachments,
                 'is_internal' => false,
                 'creation_source' => $data['creation_source'],
@@ -164,7 +158,7 @@ final readonly class SendEmailAction
             EmailBody::query()->create([
                 'email_id' => $email->getKey(),
                 'body_html' => $data['body_html'],
-                'body_text' => strip_tags((string) $data['body_html']),
+                'body_text' => PlainText::paragraphsFromHtml((string) $data['body_html']),
             ]);
 
             EmailParticipant::query()->create([
@@ -254,7 +248,7 @@ final readonly class SendEmailAction
             ->where('status', EmailStatus::QUEUED)
             ->count();
 
-        throw_if($queued >= $maxQueued, RuntimeException::class, "You have {$queued} emails queued. Clear the outbox before queuing more.");
+        throw_if($queued >= $maxQueued, OutboxFull::withQueued($queued));
     }
 
     /**

@@ -6,8 +6,11 @@ namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Notifications\EmailSharedNotification;
 use Relaticle\EmailIntegration\Services\EmailSharingService;
 
 final readonly class UpdateEmailSharingAction
@@ -22,9 +25,32 @@ final readonly class UpdateEmailSharingAction
         // Defense in depth: only the email owner may change its sharing, regardless of caller.
         abort_unless($email->user_id === $sharer->getKey(), 403);
 
-        $this->sharingService->setEmailTier($email, $tier);
+        $newlyGranted = DB::transaction(function () use ($email, $sharer, $tier, $shares): Collection {
+            Email::query()->withoutGlobalScopes()->whereKey($email->getKey())->lockForUpdate()->first(['id']);
 
-        $email->shares()->where('shared_by', $sharer->getKey())->delete();
+            $this->sharingService->setEmailTier($email, $tier);
+
+            $alreadyHadAccess = $email->shares()->pluck('shared_with')->all();
+
+            $email->shares()->where('shared_by', $sharer->getKey())->delete();
+
+            return $this->recreateShares($email, $sharer, $shares)
+                ->reject(fn (User $recipient, string $userId): bool => $userId === (string) $sharer->getKey()
+                    || in_array($userId, $alreadyHadAccess, true));
+        });
+
+        $newlyGranted->each(fn (User $recipient) => $recipient->notify(
+            new EmailSharedNotification($email, $sharer, $recipient),
+        ));
+    }
+
+    /**
+     * @param  array<int, array{shared_with: string|int|array<int, string|int>, tier: string|EmailPrivacyTier}>  $shares
+     * @return Collection<string, User>
+     */
+    private function recreateShares(Email $email, User $sharer, array $shares): Collection
+    {
+        $granted = collect();
 
         foreach ($shares as $share) {
             $tierForShare = $share['tier'] instanceof EmailPrivacyTier
@@ -40,7 +66,11 @@ final readonly class UpdateEmailSharingAction
                 abort_if($sharedWithUser === null, 403);
 
                 $this->sharingService->shareEmail($email, $sharer, $sharedWithUser, $tierForShare);
+
+                $granted->put((string) $sharedWithUser->getKey(), $sharedWithUser);
             }
         }
+
+        return $granted;
     }
 }

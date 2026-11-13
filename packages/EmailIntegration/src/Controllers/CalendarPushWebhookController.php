@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Controllers;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
@@ -56,7 +55,7 @@ final readonly class CalendarPushWebhookController
             $account = ConnectedAccount::query()
                 ->where('provider', EmailProvider::AZURE)
                 ->where('calendar_push_channel_id', $subscriptionId)
-                ->where('status', EmailAccountStatus::ACTIVE)
+                ->syncable()
                 ->first();
 
             if (! $account instanceof ConnectedAccount) {
@@ -86,7 +85,7 @@ final readonly class CalendarPushWebhookController
         $account = ConnectedAccount::query()
             ->where('provider', EmailProvider::GMAIL)
             ->where('calendar_push_channel_id', $channelId)
-            ->where('status', EmailAccountStatus::ACTIVE)
+            ->syncable()
             ->first();
 
         if (! $account instanceof ConnectedAccount) {

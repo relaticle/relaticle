@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+$commaSeparated = static fn (string $key): array => array_values(array_filter(
+    array_map(trim(...), explode(',', (string) env($key, ''))),
+));
+
 return [
 
     /*
@@ -55,6 +59,27 @@ return [
     */
 
     'url' => env('APP_URL', 'http://localhost'),
+
+    'trusted_hosts' => $commaSeparated('TRUSTED_HOSTS'),
+
+    'trusted_proxies' => $commaSeparated('TRUSTED_PROXIES'),
+
+    'hsts' => [
+        'max_age' => (int) env('HSTS_MAX_AGE', 15552000),
+        'include_subdomains' => (bool) env('HSTS_INCLUDE_SUBDOMAINS', false),
+    ],
+
+    'csp' => [
+        'mode' => env('CSP_MODE', 'enforce'),
+        'extra' => [
+            'script-src' => $commaSeparated('CSP_SCRIPT_SRC'),
+            'style-src' => $commaSeparated('CSP_STYLE_SRC'),
+            'img-src' => $commaSeparated('CSP_IMG_SRC'),
+            'font-src' => $commaSeparated('CSP_FONT_SRC'),
+            'connect-src' => $commaSeparated('CSP_CONNECT_SRC'),
+            'frame-src' => $commaSeparated('CSP_FRAME_SRC'),
+        ],
+    ],
 
     /*
     |--------------------------------------------------------------------------

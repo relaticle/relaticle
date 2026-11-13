@@ -4,25 +4,36 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Notifications;
 
+use App\Enums\Notifications\NotificationReason;
+use App\Models\Notification as NotificationRow;
 use App\Models\User;
+use App\Models\Workspace;
+use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
-use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
-use Illuminate\Notifications\Notification;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
-final class MailboxHistoryImportCompletedNotification extends Notification implements ShouldQueue
+final class MailboxHistoryImportCompletedNotification extends InboxNotification
 {
-    use Queueable;
+    private const string LANG = 'filament/notifications/mailbox-import-complete';
+
+    private const array COPY = [
+        'complete' => ['title' => 'title', 'body' => 'body', 'mail_subject' => 'mail.subject', 'mail_line' => 'mail.line'],
+        'partial' => ['title' => 'title_with_issues', 'body' => 'body_with_issues', 'mail_subject' => 'mail.subject_with_issues', 'mail_line' => 'mail.line_with_issues'],
+        'retry_success' => ['title' => 'retry_success.title', 'body' => 'retry_success.body', 'mail_subject' => 'mail.retry_subject', 'mail_line' => 'mail.retry_line'],
+    ];
 
     public readonly int $importedEmailCount;
 
     public readonly int $importedCalendarCount;
 
     public readonly bool $includesCalendar;
+
+    // Never a constructor argument: a notification queued before this existed unserializes without it and needs this default.
+    public bool $emailHistoryDidNotFinish = false;
 
     public function __construct(
         public readonly ConnectedAccount $account,
@@ -40,77 +51,86 @@ final class MailboxHistoryImportCompletedNotification extends Notification imple
         $this->includesCalendar = $includesCalendar ?? $account->hasCalendar();
     }
 
-    /**
-     * @return list<string>
-     */
-    public function via(object $notifiable): array
+    public function workspace(): Workspace
     {
-        return ['mail', 'database'];
+        return $this->account->workspace;
+    }
+
+    public function subject(): ConnectedAccount
+    {
+        return $this->account;
+    }
+
+    public function reason(): NotificationReason
+    {
+        return NotificationReason::System;
+    }
+
+    public function groupKey(): string
+    {
+        return "mailbox-history:{$this->account->getKey()}:".($this->batchId ?? 'initial');
+    }
+
+    public function collapsesReadRows(): bool
+    {
+        return true;
+    }
+
+    /** @return array<string, mixed> */
+    public function facts(): array
+    {
+        return [
+            'account_id' => (string) $this->account->getKey(),
+            'email' => $this->account->email_address,
+            'batch_id' => $this->batchId,
+            'kind' => $this->kind(),
+            'imported_emails' => $this->importedEmailCount,
+            'imported_calendar_events' => $this->importedCalendarCount,
+            'includes_calendar' => $this->includesCalendar,
+            'failed_emails' => $this->failedEmailCount,
+            'failed_calendar_events' => $this->failedCalendarCount,
+            'calendar_did_not_finish' => $this->calendarDidNotFinish,
+            'email_history_did_not_finish' => $this->emailHistoryDidNotFinish,
+        ];
     }
 
     public function toMail(object $notifiable): MailMessage
     {
+        $kind = $this->kind();
+
         return (new MailMessage)
-            ->subject($this->mailSubject())
-            ->greeting(__('filament/notifications/mailbox-import-complete.mail.greeting', [
+            ->subject(__(self::copy($kind, 'mail_subject')))
+            ->greeting(__(self::LANG.'.mail.greeting', [
                 'name' => $notifiable instanceof User ? $notifiable->name : '',
             ]))
-            ->line(__($this->mailLineKey(), [
-                'email' => $this->account->email_address,
-                'imported' => $this->importedSummary(),
-                'failures' => $this->failureSummary(),
-            ]));
+            ->line(__(self::copy($kind, 'mail_line'), self::replacements($this->facts())));
     }
 
-    /**
-     * @return array<string, mixed>
-     */
-    public function toDatabase(User $notifiable): array
+    public static function present(NotificationRow $row): FilamentNotification
     {
-        $notification = FilamentNotification::make()
-            ->viewData([
-                'batch_id' => $this->batchId,
-                'account_id' => (string) $this->account->getKey(),
-                'kind' => $this->kind(),
-            ])
-            ->title(__($this->titleKey()))
-            ->body(__($this->bodyKey(), [
-                'email' => $this->account->email_address,
-                'imported' => $this->importedSummary(),
-                'failures' => $this->failureSummary(),
-            ]))
-            ->icon($this->hasIssues() ? 'heroicon-o-exclamation-triangle' : 'heroicon-o-check-circle');
+        $kind = (string) data_get($row->data, 'kind');
 
-        if ($this->hasIssues()) {
-            $notification->warning();
-        } else {
-            $notification->success();
+        $notification = FilamentNotification::make((string) $row->getKey())
+            ->title(__(self::copy($kind, 'title')))
+            ->body(__(self::copy($kind, 'body'), self::replacements($row->data)));
+
+        if ($kind !== 'partial') {
+            return $notification
+                ->success()
+                ->icon('lucide-circle-check')
+                ->actions(self::inboxActions($row->workspace));
         }
 
-        if ($this->hasIssues() && is_string($this->batchId) && $this->batchId !== '') {
-            $notification->actions([
-                Action::make('retry')
-                    ->label(__('filament/notifications/mailbox-import-complete.actions.retry'))
-                    ->link()
-                    ->color('warning')
-                    ->dispatchTo(
-                        EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-                        'retry-mailbox-history-import',
-                    )
-                    ->eventData([
-                        'accountId' => (string) $this->account->getKey(),
-                        'batchId' => $this->batchId,
-                    ]),
-            ]);
-        }
-
-        return $notification->getDatabaseMessage();
+        return $notification
+            ->warning()
+            ->icon('lucide-triangle-exclamation-point')
+            ->actions(self::retryActions($row->data));
     }
 
     public function hasIssues(): bool
     {
         return ! $this->afterFailedImportRetry
-            && ($this->failedEmailCount > 0 || $this->failedCalendarCount > 0 || $this->calendarDidNotFinish);
+            && ($this->failedEmailCount > 0 || $this->failedCalendarCount > 0 || $this->calendarDidNotFinish || $this->emailHistoryDidNotFinish);
     }
 
     private function kind(): string
@@ -122,86 +142,105 @@ final class MailboxHistoryImportCompletedNotification extends Notification imple
         return $this->hasIssues() ? 'partial' : 'complete';
     }
 
-    private function titleKey(): string
+    private static function copy(string $kind, string $part): string
     {
-        if ($this->afterFailedImportRetry) {
-            return 'filament/notifications/mailbox-import-complete.retry_success.title';
-        }
-
-        return $this->hasIssues()
-            ? 'filament/notifications/mailbox-import-complete.title_with_issues'
-            : 'filament/notifications/mailbox-import-complete.title';
+        return self::LANG.'.'.self::COPY[$kind][$part];
     }
 
-    private function bodyKey(): string
+    /** @return list<Action> */
+    private static function inboxActions(?Workspace $workspace): array
     {
-        if ($this->afterFailedImportRetry) {
-            return 'filament/notifications/mailbox-import-complete.retry_success.body';
+        if (! $workspace instanceof Workspace) {
+            return [];
         }
 
-        return $this->hasIssues()
-            ? 'filament/notifications/mailbox-import-complete.body_with_issues'
-            : 'filament/notifications/mailbox-import-complete.body';
+        return [
+            Action::make('openInbox')
+                ->button()
+                ->label(__(self::LANG.'.actions.open_inbox'))
+                ->url(EmailInboxPage::getUrl(panel: 'app', tenant: $workspace))
+                ->markAsRead(),
+        ];
     }
 
-    private function mailSubject(): string
+    /**
+     * @param  array<string, mixed>  $facts
+     * @return list<Action>
+     */
+    private static function retryActions(array $facts): array
     {
-        if ($this->afterFailedImportRetry) {
-            return __('filament/notifications/mailbox-import-complete.mail.retry_subject');
+        $batchId = data_get($facts, 'batch_id');
+
+        if (! is_string($batchId) || $batchId === '') {
+            return [];
         }
 
-        return $this->hasIssues()
-            ? __('filament/notifications/mailbox-import-complete.mail.subject_with_issues')
-            : __('filament/notifications/mailbox-import-complete.mail.subject');
+        return [
+            Action::make('retry')
+                ->label(__(self::LANG.'.actions.retry'))
+                ->link()
+                ->color('warning')
+                ->dispatchTo(
+                    EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
+                    'retry-mailbox-history-import',
+                )
+                ->eventData([
+                    'accountId' => (string) data_get($facts, 'account_id'),
+                    'batchId' => $batchId,
+                ]),
+        ];
     }
 
-    private function mailLineKey(): string
+    /**
+     * @param  array<string, mixed>  $facts
+     * @return array{email: string, imported: string, failures: string}
+     */
+    private static function replacements(array $facts): array
     {
-        if ($this->afterFailedImportRetry) {
-            return 'filament/notifications/mailbox-import-complete.mail.retry_line';
-        }
-
-        return $this->hasIssues()
-            ? 'filament/notifications/mailbox-import-complete.mail.line_with_issues'
-            : 'filament/notifications/mailbox-import-complete.mail.line';
+        return [
+            'email' => (string) data_get($facts, 'email'),
+            'imported' => self::importedSummary($facts),
+            'failures' => self::failureSummary($facts),
+        ];
     }
 
-    private function importedSummary(): string
+    /** @param  array<string, mixed>  $facts */
+    private static function importedSummary(array $facts): string
     {
-        $emails = trans_choice('filament/notifications/mailbox-import-complete.imported_emails', $this->importedEmailCount, [
-            'count' => $this->importedEmailCount,
-        ]);
+        $emailCount = (int) data_get($facts, 'imported_emails');
+        $emails = trans_choice(self::LANG.'.imported_emails', $emailCount, ['count' => $emailCount]);
 
-        if (! $this->includesCalendar) {
-            return __('filament/notifications/mailbox-import-complete.imported_without_calendar', [
-                'emails' => $emails,
-            ]);
+        if (data_get($facts, 'includes_calendar') !== true) {
+            return __(self::LANG.'.imported_without_calendar', ['emails' => $emails]);
         }
 
-        return __('filament/notifications/mailbox-import-complete.imported_with_calendar', [
+        $eventCount = (int) data_get($facts, 'imported_calendar_events');
+
+        return __(self::LANG.'.imported_with_calendar', [
             'emails' => $emails,
-            'events' => trans_choice('filament/notifications/mailbox-import-complete.imported_calendar_events', $this->importedCalendarCount, [
-                'count' => $this->importedCalendarCount,
-            ]),
+            'events' => trans_choice(self::LANG.'.imported_calendar_events', $eventCount, ['count' => $eventCount]),
         ]);
     }
 
-    private function failureSummary(): string
+    /** @param  array<string, mixed>  $facts */
+    private static function failureSummary(array $facts): string
     {
         $parts = [];
+        $failedEmails = (int) data_get($facts, 'failed_emails');
+        $failedEvents = (int) data_get($facts, 'failed_calendar_events');
 
-        if ($this->failedEmailCount > 0) {
-            $parts[] = trans_choice('filament/notifications/mailbox-import-complete.failed_messages', $this->failedEmailCount, [
-                'count' => $this->failedEmailCount,
-            ]);
+        if (data_get($facts, 'email_history_did_not_finish') === true) {
+            $parts[] = __(self::LANG.'.email_history_did_not_finish');
         }
 
-        if ($this->failedCalendarCount > 0) {
-            $parts[] = trans_choice('filament/notifications/mailbox-import-complete.failed_calendar_events', $this->failedCalendarCount, [
-                'count' => $this->failedCalendarCount,
-            ]);
-        } elseif ($this->calendarDidNotFinish) {
-            $parts[] = __('filament/notifications/mailbox-import-complete.calendar_did_not_finish');
+        if ($failedEmails > 0) {
+            $parts[] = trans_choice(self::LANG.'.failed_messages', $failedEmails, ['count' => $failedEmails]);
+        }
+
+        if ($failedEvents > 0) {
+            $parts[] = trans_choice(self::LANG.'.failed_calendar_events', $failedEvents, ['count' => $failedEvents]);
+        } elseif (data_get($facts, 'calendar_did_not_finish') === true) {
+            $parts[] = __(self::LANG.'.calendar_did_not_finish');
         }
 
         return implode(' ', $parts);

@@ -26,7 +26,7 @@ Use the assertion in this table for each subject.
 
 Use a PHPUnit assertion only if no Pest expectation and no Laravel assertion exists for the subject.
 
-Assert each fact once. Do not assert a 200 status before `assertSee`, because `assertSee` already shows that the page rendered.
+Assert each fact once, but status and content are separate facts. `assertSee` passes on an error page that contains the text, so keep `assertOk()` alongside it when the status is part of the behavior.
 
 ## Named Response Assertions
 

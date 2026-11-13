@@ -1,6 +1,7 @@
 @use(Database\Seeders\Personas\PersonaCatalog)
+@use(Illuminate\Support\Facades\Route)
 
-@env('local')
+@if (app()->isLocal() && Route::has('loginLinkLogin'))
     @php($personas = PersonaCatalog::seeded())
 
     @if ($personas->isNotEmpty())
@@ -15,12 +16,18 @@
                         class="relative flex items-center justify-between gap-3 px-3 py-2"
                         title="{{ $persona->purpose }}"
                     >
-                        <x-login-link
-                            :email="$persona->email"
-                            :label="$persona->email"
-                            :redirect-url="url()->getAppUrl()"
-                            class="cursor-pointer font-mono text-xs text-gray-600 after:absolute after:inset-0 hover:underline dark:text-gray-300"
-                        />
+                        <form method="POST" action="{{ route('loginLinkLogin') }}">
+                            @csrf
+                            <input type="hidden" name="email" value="{{ $persona->email }}">
+                            <input type="hidden" name="redirect_url" value="{{ url()->getAppUrl() }}">
+
+                            <button
+                                type="submit"
+                                class="cursor-pointer font-mono text-xs text-gray-600 after:absolute after:inset-0 hover:underline dark:text-gray-300"
+                            >
+                                {{ $persona->email }}
+                            </button>
+                        </form>
 
                         <x-filament::badge :color="$persona->expect->getColor()">
                             {{ $persona->expect->getLabel() }}
@@ -30,4 +37,4 @@
             </div>
         </div>
     @endif
-@endenv
+@endif

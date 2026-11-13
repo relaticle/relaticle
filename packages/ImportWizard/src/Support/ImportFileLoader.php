@@ -11,6 +11,7 @@ use Relaticle\ImportWizard\Exceptions\ImportFileException;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Spatie\SimpleExcel\SimpleExcelReader;
+use SplFileObject;
 use Throwable;
 
 final readonly class ImportFileLoader
@@ -27,11 +28,20 @@ final readonly class ImportFileLoader
 
         $headers = $this->processHeaders($rawHeaders);
 
-        $rowCount = $reader
+        $rowCount = 0;
+
+        $rows = $reader
             ->getRows()
             ->reject(fn (array $row): bool => array_all($row, blank(...)))
-            ->take($this->maxRows() + 1)
-            ->count();
+            ->take($this->maxRows() + 1);
+
+        foreach ($rows as $row) {
+            if (! $this->isUtf8($row)) {
+                throw new ImportFileException(__('Row :row is not UTF-8 text. In Excel, choose File > Save As > CSV UTF-8, then upload the file again.', ['row' => $this->firstNonUtf8Line($path)]));
+            }
+
+            $rowCount++;
+        }
 
         throw_if($rowCount === 0, ImportFileException::class, 'CSV file has no data rows');
 
@@ -64,17 +74,19 @@ final readonly class ImportFileLoader
                 ->getRows()
                 ->reject(fn (array $row): bool => array_all($row, blank(...)))
                 ->take($this->maxRows())
-                ->map(function (array $row) use ($headers, &$rowCount): array {
-                    return [
-                        'row_number' => ++$rowCount + 1,
-                        'raw_data' => json_encode(
-                            array_combine($headers, $this->normalizeRow($headers, $row)),
-                            JSON_UNESCAPED_UNICODE
-                        ) ?: '{}',
-                        'validation' => null,
-                        'corrections' => null,
-                    ];
+                ->values()
+                ->tapEach(function () use (&$rowCount): void {
+                    $rowCount++;
                 })
+                ->map(fn (array $row, int $index): array => [
+                    'row_number' => $index + 2,
+                    'raw_data' => json_encode(
+                        array_combine($headers, $this->normalizeRow($headers, $row)),
+                        JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+                    ),
+                    'validation' => null,
+                    'corrections' => null,
+                ])
                 ->chunk($this->chunkSize())
                 ->each(fn (LazyCollection $chunk) => $store->query()->insert($chunk->all()));
 
@@ -95,6 +107,25 @@ final readonly class ImportFileLoader
         ]);
 
         return $import;
+    }
+
+    /**
+     * @param  array<int|string, mixed>  $row
+     */
+    private function isUtf8(array $row): bool
+    {
+        return array_all($row, fn (mixed $cell): bool => ! is_string($cell) || mb_check_encoding($cell, 'UTF-8'));
+    }
+
+    private function firstNonUtf8Line(string $path): int
+    {
+        foreach (new SplFileObject($path) as $index => $line) {
+            if (is_string($line) && ! mb_check_encoding($line, 'UTF-8')) {
+                return $index + 1;
+            }
+        }
+
+        return 0;
     }
 
     private function discard(Import $import, ImportStore $store): void

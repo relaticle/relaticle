@@ -33,7 +33,6 @@ it('shows only the gmail connect prompt when no account is connected', function 
     livewire(EmailInboxPage::class)
         ->assertDontSee(__('filament/pages/email-inbox.tabs.drafts'))
         ->assertDontSee(__('filament/pages/email-inbox.tabs.outbox'))
-        ->assertDontSee(__('filament/pages/email-inbox.tabs.failed'))
         ->assertDontSee(__('filament/pages/email-inbox.tabs.templates'))
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
         ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))

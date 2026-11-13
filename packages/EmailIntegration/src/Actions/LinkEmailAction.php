@@ -8,6 +8,7 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Workspace;
+use App\Support\CurrentWorkspace;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
@@ -63,6 +64,11 @@ final readonly class LinkEmailAction
 
     private function claimAndLink(Email $email, bool $reapply): void
     {
+        resolve(CurrentWorkspace::class)->within($email->workspace_id, fn () => $this->claimAndLinkInTransaction($email, $reapply));
+    }
+
+    private function claimAndLinkInTransaction(Email $email, bool $reapply): void
+    {
         DB::transaction(function () use ($email, $reapply): void {
             /** @var Email|null $locked */
             $locked = Email::query()
@@ -105,6 +111,7 @@ final readonly class LinkEmailAction
         $countedCompanies = [];
         $countedPeople = [];
         $countedOpportunities = [];
+        $counted = [];
 
         foreach ($participants as $participant) {
             // Machine-sent senders (no-reply@, notice@, bounce@) still link to existing
@@ -145,7 +152,7 @@ final readonly class LinkEmailAction
 
                     if ($this->autoAttach($email->companies(), $company->getKey()) && ! isset($countedCompanies[$company->getKey()])) {
                         $countedCompanies[$company->getKey()] = true;
-                        $this->metrics->incrementEmailMetrics($company, $email);
+                        $counted[] = $company;
                     }
                 }
             }
@@ -166,7 +173,7 @@ final readonly class LinkEmailAction
 
                 if ($this->autoAttach($email->people(), $person->getKey()) && ! isset($countedPeople[$person->getKey()])) {
                     $countedPeople[$person->getKey()] = true;
-                    $this->metrics->incrementEmailMetrics($person, $email);
+                    $counted[] = $person;
                 }
 
                 $personCompany = $person->company;
@@ -175,7 +182,7 @@ final readonly class LinkEmailAction
                     && $this->autoAttach($email->companies(), $personCompany->getKey())
                     && ! isset($countedCompanies[$personCompany->getKey()])) {
                     $countedCompanies[$personCompany->getKey()] = true;
-                    $this->metrics->incrementEmailMetrics($personCompany, $email);
+                    $counted[] = $personCompany;
                 }
 
                 $opportunities = Opportunity::query()->where('workspace_id', $workspaceId)
@@ -185,20 +192,17 @@ final readonly class LinkEmailAction
                 foreach ($opportunities as $opportunity) {
                     if ($this->autoAttach($email->opportunities(), $opportunity->getKey()) && ! isset($countedOpportunities[$opportunity->getKey()])) {
                         $countedOpportunities[$opportunity->getKey()] = true;
-                        $this->metrics->incrementEmailMetrics($opportunity, $email);
+                        $counted[] = $opportunity;
                     }
                 }
             }
         }
 
         if ($applyMetricsForPrelinkedRecords) {
-            $this->metrics->incrementEmailMetricsForPrelinkedRecords(
-                $email,
-                $countedCompanies,
-                $countedPeople,
-                $countedOpportunities,
-            );
+            $counted = [...$counted, ...$this->metrics->prelinkedRecords($email, $countedCompanies, $countedPeople, $countedOpportunities)];
         }
+
+        $this->metrics->incrementEmailMetricsInLockOrder($counted, $email);
     }
 
     /**

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Health\ChatTurnFailureRateCheck;
+use App\Health\TorExitListCheck;
 use App\Providers\HealthServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
 use Spatie\Health\Checks\Checks\HorizonCheck;
@@ -37,5 +38,6 @@ it('registers health checks when enabled', function () {
         ->toContain(DatabaseCheck::class)
         ->toContain(RedisCheck::class)
         ->toContain(HorizonCheck::class)
-        ->toContain(ChatTurnFailureRateCheck::class);
+        ->toContain(ChatTurnFailureRateCheck::class)
+        ->toContain(TorExitListCheck::class);
 });

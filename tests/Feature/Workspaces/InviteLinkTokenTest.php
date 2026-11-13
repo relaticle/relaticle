@@ -22,7 +22,6 @@ test('creating a workspace auto-generates a 40-char invite_link_token', function
     $workspace = resolve(CreateWorkspace::class)->create($user, [
         'name' => 'Acme',
         'slug' => 'acme',
-        'onboarding_use_case' => 'other',
     ]);
 
     expect($workspace->invite_link_token)->toBeString()->toHaveLength(40);
@@ -34,12 +33,10 @@ test('tokens are unique across workspaces', function (): void {
     $first = resolve(CreateWorkspace::class)->create($user, [
         'name' => 'Workspace A',
         'slug' => 'workspace-a',
-        'onboarding_use_case' => 'other',
     ]);
     $second = resolve(CreateWorkspace::class)->create($user, [
         'name' => 'Workspace B',
         'slug' => 'workspace-b',
-        'onboarding_use_case' => 'other',
     ]);
 
     expect($first->invite_link_token)->not->toBe($second->invite_link_token);
@@ -50,7 +47,6 @@ test('GET on a valid token renders the join confirmation page', function (): voi
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-confirm',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -69,7 +65,6 @@ test('the join page names the role the link grants', function (): void {
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-role-shown',
-        'onboarding_use_case' => 'other',
     ]);
     $workspace->update(['invite_link_default_role' => WorkspaceRole::Viewer->value]);
 
@@ -86,7 +81,6 @@ test('the join page offers a way out that does not join', function (): void {
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-not-now',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -105,7 +99,6 @@ test('the join page names the account that will join', function (): void {
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-signed-in-as',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -121,7 +114,6 @@ test('the join page counts the people already in the workspace', function (): vo
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-member-count',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -144,7 +136,6 @@ test('the join page explains what the granted role allows', function (): void {
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-role-description',
-        'onboarding_use_case' => 'other',
     ]);
     $workspace->update(['invite_link_default_role' => WorkspaceRole::Viewer->value]);
 
@@ -161,7 +152,6 @@ test('the join page does not leak its token through the Referer header', functio
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-referrer',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -177,7 +167,6 @@ test('POST on a valid token attaches the user and redirects', function (): void 
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-auth',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -195,7 +184,6 @@ test('a join request racing an identical concurrent request does not duplicate t
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-race',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -233,7 +221,6 @@ test('a disabled workspace link is unreachable via the token it used to carry', 
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-null',
-        'onboarding_use_case' => 'other',
     ]);
     $originalToken = $workspace->invite_link_token;
 
@@ -243,11 +230,29 @@ test('a disabled workspace link is unreachable via the token it used to carry', 
 
     $this->actingAs($joiner)
         ->get(route('workspaces.join', ['token' => $originalToken]))
-        ->assertNotFound();
+        ->assertNotFound()
+        ->assertSee(__('workspaces.invite_link.expired.heading'));
 
     $this->actingAs($joiner)
         ->post(route('workspaces.join.confirm', ['token' => $originalToken]))
         ->assertNotFound();
+});
+
+test('a replaced workspace link explains itself instead of a bare not found page', function (): void {
+    $owner = User::factory()->create();
+    $workspace = resolve(CreateWorkspace::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-rotated',
+    ]);
+    $originalToken = $workspace->invite_link_token;
+
+    $workspace->rotateInviteLink();
+
+    $this->actingAs(User::factory()->create(['email_verified_at' => now()]))
+        ->get(route('workspaces.join', ['token' => $originalToken]))
+        ->assertNotFound()
+        ->assertSee(__('workspaces.invite_link.expired.heading'))
+        ->assertSee(__('workspaces.invite_link.expired.action'));
 });
 
 test('guest hitting join link is redirected to login', function (): void {
@@ -255,7 +260,6 @@ test('guest hitting join link is redirected to login', function (): void {
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-guest',
-        'onboarding_use_case' => 'other',
     ]);
 
     $this->get(route('workspaces.join', ['token' => $workspace->invite_link_token]))
@@ -267,7 +271,6 @@ test('unauthenticated attempts against the join link route are rate limited', fu
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-throttle',
-        'onboarding_use_case' => 'other',
     ]);
 
     foreach (range(1, 10) as $ignored) {
@@ -278,12 +281,11 @@ test('unauthenticated attempts against the join link route are rate limited', fu
         ->assertStatus(429);
 });
 
-test('user scheduled for deletion cannot view join confirmation', function (): void {
+test('user scheduled for deletion is sent to the deletion interstitial instead of the join confirmation', function (): void {
     $owner = User::factory()->create();
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-scheduled',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create([
@@ -293,7 +295,7 @@ test('user scheduled for deletion cannot view join confirmation', function (): v
 
     $this->actingAs($joiner)
         ->get(route('workspaces.join', ['token' => $workspace->invite_link_token]))
-        ->assertForbidden();
+        ->assertRedirect(route('filament.app.scheduled-deletion'));
 
     expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });
@@ -303,7 +305,6 @@ test('user scheduled for deletion cannot POST to join', function (): void {
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-scheduled-post',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create([
@@ -313,7 +314,7 @@ test('user scheduled for deletion cannot POST to join', function (): void {
 
     $this->actingAs($joiner)
         ->post(route('workspaces.join.confirm', ['token' => $workspace->invite_link_token]))
-        ->assertForbidden();
+        ->assertRedirect(route('filament.app.scheduled-deletion'));
 
     expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
 });
@@ -323,7 +324,6 @@ test('joining a workspace scheduled for deletion is blocked', function (): void 
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-workspace-scheduled',
-        'onboarding_use_case' => 'other',
     ]);
     $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
 
@@ -331,9 +331,40 @@ test('joining a workspace scheduled for deletion is blocked', function (): void 
 
     $this->actingAs($joiner)
         ->post(route('workspaces.join.confirm', ['token' => $workspace->invite_link_token]))
-        ->assertStatus(410);
+        ->assertStatus(410)
+        ->assertSee(__('workspaces.accept.deleting.heading', ['workspace' => 'Acme']));
 
     expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeFalse();
+});
+
+test('the invite link of a workspace scheduled for deletion says so instead of offering to join', function (): void {
+    $owner = User::factory()->create();
+    $workspace = resolve(CreateWorkspace::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-workspace-closing',
+    ]);
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    $joiner = User::factory()->create(['email_verified_at' => now()]);
+
+    $this->actingAs($joiner)
+        ->get(route('workspaces.join', ['token' => $workspace->invite_link_token]))
+        ->assertStatus(410)
+        ->assertSee(__('workspaces.accept.deleting.heading', ['workspace' => 'Acme']))
+        ->assertDontSee(__('workspaces.invite_link.join.action'));
+});
+
+test('a member following the invite link of a workspace scheduled for deletion still lands in it', function (): void {
+    $owner = User::factory()->create();
+    $workspace = resolve(CreateWorkspace::class)->create($owner, [
+        'name' => 'Acme',
+        'slug' => 'acme-workspace-closing-member',
+    ]);
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    $this->actingAs($owner)
+        ->get(route('workspaces.join', ['token' => $workspace->invite_link_token]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
 });
 
 test('the join link grants the configured default role', function (): void {
@@ -371,7 +402,6 @@ test('joining via the invite link consumes a pending email invitation for the sa
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-consume',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);
@@ -395,7 +425,6 @@ test('joining a workspace leaves a pending invitation to a different workspace a
     $workspace = resolve(CreateWorkspace::class)->create($owner, [
         'name' => 'Acme',
         'slug' => 'acme-other',
-        'onboarding_use_case' => 'other',
     ]);
 
     $joiner = User::factory()->create(['email_verified_at' => now()]);

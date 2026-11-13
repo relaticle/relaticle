@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Jobs;
 
+use App\Contracts\Entitlements;
 use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Services\Billing\HostedWorkspaceAccess;
+use App\Support\CurrentWorkspace;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -40,6 +41,8 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\WebAccess;
+use Relaticle\Chat\Enums\WebTool;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
@@ -61,7 +64,6 @@ use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
 use Relaticle\Chat\Support\TurnPresence;
-use Relaticle\CustomFields\Services\TenantContextService;
 use Throwable;
 
 #[Timeout(self::TIMEOUT_SECONDS)]
@@ -139,11 +141,16 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function handle(CreditService $creditService): void
     {
+        resolve(CurrentWorkspace::class)->within($this->workspace, fn () => $this->process($creditService));
+    }
+
+    private function process(CreditService $creditService): void
+    {
         $startedAt = microtime(true);
 
         $this->workspace->refresh();
 
-        if (resolve(HostedWorkspaceAccess::class)->isPaused($this->workspace)) {
+        if (! resolve(Entitlements::class)->allowsAccess($this->workspace)) {
             $creditService->refundReservation(
                 $this->workspace,
                 resolutionKey: $this->resolutionKey(),
@@ -225,7 +232,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'capabilities' => array_column($this->user->workspaceCapabilities($this->workspace->getKey()), 'value'),
             ]);
             $agent->withModel($this->modelLabel(), $this->resolved['source'] === 'auto');
-            $agent->withEmailReach(EmailReach::for($this->user, $this->workspace));
+            $this->grantWebAccess($agent->withEmailReach(EmailReach::for($this->user, $this->workspace)));
             $agent->withMentions($this->mentions);
             $agent->withPageContext($this->pageContext);
             $agent->withContextLedger($this->contextLedger());
@@ -271,6 +278,12 @@ final class ProcessChatMessage implements ShouldQueue
             fn () => $this->streamTurn($agent, $broadcaster, $creditService, $startedAt),
             hidden: [MessageOrigin::CONTEXT_KEY => $this->origin->value],
         );
+    }
+
+    private function releaseForRetry(int $delay): void
+    {
+        TurnPresence::markRetried($this->conversationId, $this->turnId);
+        $this->release($delay);
     }
 
     private function streamTurn(CrmAssistant $agent, StreamEventBroadcaster $broadcaster, CreditService $creditService, float $startedAt): void
@@ -351,17 +364,7 @@ final class ProcessChatMessage implements ShouldQueue
                 ));
 
                 if (! $refundedBlankTurn) {
-                    $creditService->settleReservation(
-                        workspace: $this->workspace,
-                        user: $this->user,
-                        type: AiCreditType::Chat,
-                        model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
-                        inputTokens: $streamedResponse->usage->uncachedInputTokens(),
-                        outputTokens: $streamedResponse->usage->outputTokens,
-                        toolCallsCount: $streamedResponse->toolCalls->count(),
-                        conversationId: $streamedResponse->conversationId,
-                        resolutionKey: $this->resolutionKey(),
-                    );
+                    $this->settleTurn($streamedResponse, $creditService);
                 }
 
                 $this->persistMentions($streamedResponse->userMessageId);
@@ -394,7 +397,7 @@ final class ProcessChatMessage implements ShouldQueue
                     maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
                     delaySeconds: $delay,
                 ));
-                $this->release($delay);
+                $this->releaseForRetry($delay);
 
                 return;
             }
@@ -925,21 +928,37 @@ final class ProcessChatMessage implements ShouldQueue
             ]);
     }
 
+    private function settleTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): void
+    {
+        $creditService->settleReservation(
+            workspace: $this->workspace,
+            user: $this->user,
+            type: AiCreditType::Chat,
+            model: $this->resolved['model'] ?? $streamedResponse->meta->model ?? 'unknown',
+            inputTokens: $streamedResponse->usage->uncachedInputTokens(),
+            outputTokens: $streamedResponse->usage->outputTokens,
+            toolCallsCount: $streamedResponse->toolCalls->count() + WebTool::Fetch->countIn($streamedResponse->events),
+            webSearchCount: WebTool::Search->countIn($streamedResponse->events),
+            conversationId: $streamedResponse->conversationId,
+            resolutionKey: $this->resolutionKey(),
+        );
+    }
+
     private function settleBlankTurn(StreamedAgentResponse $streamedResponse, CreditService $creditService): bool
     {
-        if ($this->sawToolCall) {
+        if ($this->sawToolCall || trim(AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall)) !== '') {
             return false;
         }
 
-        if (trim(AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall)) !== '') {
-            return false;
-        }
+        $ranProviderTool = $this->ranProviderTool($streamedResponse);
 
-        $creditService->refundReservation(
-            $this->workspace,
-            resolutionKey: $this->resolutionKey(),
-            conversationId: $this->conversationId,
-        );
+        if (! $ranProviderTool) {
+            $creditService->refundReservation(
+                $this->workspace,
+                resolutionKey: $this->resolutionKey(),
+                conversationId: $this->conversationId,
+            );
+        }
 
         $note = $this->blankTurnMessage($streamedResponse);
 
@@ -949,7 +968,12 @@ final class ProcessChatMessage implements ShouldQueue
 
         ChatTelemetry::breadcrumb('stream.blank_reply', ['model' => $this->resolved['model'] ?? null]);
 
-        return true;
+        return ! $ranProviderTool;
+    }
+
+    private function ranProviderTool(StreamedAgentResponse $streamedResponse): bool
+    {
+        return WebTool::anyRanIn($streamedResponse->events);
     }
 
     private function blankTurnMessage(StreamedAgentResponse $streamedResponse): ?string
@@ -1102,12 +1126,6 @@ final class ProcessChatMessage implements ShouldQueue
         }
     }
 
-    /**
-     * The custom-fields tenant id in force before this job bound its own,
-     * restored by releaseAuth() so the override never outlives the job.
-     */
-    private null|int|string $previousTenantId = null;
-
     private function bindAuth(): void
     {
         // In memory only: the user may have switched workspace since dispatch, and the
@@ -1116,26 +1134,24 @@ final class ProcessChatMessage implements ShouldQueue
         $this->user->setRelation('currentWorkspace', $this->workspace);
 
         Auth::guard('web')->setUser($this->user);
-
-        // The job runs with no Filament panel request, so the custom-fields
-        // package has no ambient tenant. Without one its TenantScope no-ops:
-        // per-field validation rules that query other records (unique values,
-        // above all) silently pass during tool validation, which is how a
-        // duplicate unique email sailed through chat while the panel form
-        // rejected it. Same contract as SetApiWorkspaceContext on the API path.
-        $this->previousTenantId = TenantContextService::getCurrentTenantId();
-        TenantContextService::setTenantId($this->workspace->getKey());
     }
 
     private function releaseAuth(): void
     {
         Auth::guard('web')->forgetUser();
-        TenantContextService::setTenantId($this->previousTenantId);
     }
 
     private function resolutionKey(): string
     {
         return 'resolve-'.$this->turnId;
+    }
+
+    private function grantWebAccess(CrmAssistant $agent): void
+    {
+        $model = resolve(ModelRegistry::class)->find((string) ($this->resolved['id'] ?? ''));
+        $searches = resolve(CreditService::class)->affordableWebSearches($this->workspace);
+
+        $agent->withWebAccess(WebAccess::for($this->user, $this->workspace, $model, $this->resumesTurnId, $searches), $searches);
     }
 
     private function modelLabel(): ?string

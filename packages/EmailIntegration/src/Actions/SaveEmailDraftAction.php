@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
+use App\Support\PlainText;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
@@ -12,11 +13,11 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Exceptions\EmptyDraft;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use RuntimeException;
 
 final readonly class SaveEmailDraftAction
 {
@@ -77,7 +78,7 @@ final readonly class SaveEmailDraftAction
             abort_if($draftId !== null && $existing === null, 403);
 
             if ($this->isEmpty($data)) {
-                throw_if($existing === null, RuntimeException::class, 'Cannot save an empty draft.');
+                throw_if($existing === null, EmptyDraft::create());
 
                 return $existing;
             }
@@ -89,7 +90,7 @@ final readonly class SaveEmailDraftAction
                 'user_id' => $user->getKey(),
                 'connected_account_id' => $account->getKey(),
                 'subject' => $data['subject'],
-                'snippet' => mb_substr(strip_tags((string) $data['body_html']), 0, 255),
+                'snippet' => mb_substr(PlainText::fromHtml((string) $data['body_html']), 0, 255),
                 'sent_at' => null,
                 'direction' => EmailDirection::OUTBOUND,
                 'folder' => EmailFolder::Drafts,
@@ -115,7 +116,7 @@ final readonly class SaveEmailDraftAction
 
             $draft->body()->updateOrCreate([], [
                 'body_html' => $data['body_html'],
-                'body_text' => strip_tags((string) $data['body_html']),
+                'body_text' => PlainText::paragraphsFromHtml((string) $data['body_html']),
             ]);
 
             $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? [], $data['attachment_attributes'] ?? []);
