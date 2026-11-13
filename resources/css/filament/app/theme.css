@@ -2290,7 +2290,8 @@ html.fi-record-stacked .fi-record-layout {
     --ff-card-bg: var(--surface-block-bg);
     --ff-card-ring: var(--surface-block-border);
     --ff-gap: 0.75rem;
-    --ff-inset: 0.5rem;
+    --ff-inset: 0.75rem;
+    --ff-card-gap: 0.5rem;
     --ff-card-padding: 0.75rem;
 
     @media (width < 40rem) {
@@ -2305,7 +2306,7 @@ html.fi-record-stacked .fi-record-layout {
 .ff-board :is(.ff-cards, .ff-cell-cards) {
     display: flex;
     flex-direction: column;
-    gap: var(--ff-inset);
+    gap: var(--ff-card-gap);
 }
 
 .ff-board .ff-card {
