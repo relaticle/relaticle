@@ -1,12 +1,12 @@
 # Merge Duplicate Records (Phase 1) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `sdd-lean` (this user's replacement for
-> superpowers:subagent-driven-development) or superpowers:executing-plans to implement this plan
-> task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or
+> superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`)
+> syntax for tracking.
 
 **Goal:** A member merges two duplicate companies, or two duplicate people, from the record page's ⋯ menu. The kept record keeps its ID, takes the other's values and links, and the other is soft-deleted.
 
-**Architecture:** `MergeCompanies` and `MergePeople` in `app/Actions/Merge/` each compose shared steps (`CombineRecordValues`, `MoveRecordLinks`, `MoveRecordHistory`) and write their own entity links. Core dispatches `App\Events\RecordMerged` inside the merge transaction, and `packages/EmailIntegration` moves its emails, meetings, participants, attendees and counters in a listener. One Filament action, `MergeRecordAction`, sits in the record page's ⋯ menu and picks the right merge action.
+**Architecture:** `MergeCompanies` and `MergePeople` in `app/Actions/Merge/` are thin. Each calls the shared `MergeRecords` step with two closures, one that moves its own entity links and one that writes the combined values. `MergeRecords` owns the checks, the transaction, the lock and the shared steps (`CombineRecordValues`, `MoveRecordLinks`, `MoveRecordHistory`). Core dispatches `App\Events\RecordMerged` inside the merge transaction, and `packages/EmailIntegration` moves its emails, meetings, participants, attendees and counters from a listener that calls one package action. One Filament action, `MergeRecordAction`, sits first in the record page's ⋯ menu and picks the right merge action. Its dialog body is the `MergeRecordPicker` form field.
 
 **Tech Stack:** Laravel 13, Filament 5, Livewire 4, Pest 5 (+ browser plugin), PostgreSQL, relaticle/custom-fields, spatie/laravel-activitylog.
 
@@ -22,7 +22,7 @@
 - Datetimes are written from PHP `now()`, never the database clock.
 - Tests live in `tests/Feature` or `tests/Browser`, go through the record page (no unit tests of actions), declare `mutates(...)`, and carry no comments.
 - Methods stay under 60 lines (`MethodLengthRule`).
-- Run tests with: `DB_USERNAME=postgres DB_PORT=5432 php -d memory_limit=1G vendor/bin/pest --compact <files>` (see the local environment memory if the port refuses).
+- Run tests with: `DB_USERNAME=postgres DB_PORT=5432 php -d memory_limit=1G vendor/bin/pest --compact <files>`.
 - Commits use Conventional Commits with no `Co-Authored-By` trailer, and end with `Refs #885` in the body.
 
 ## Review Focus
@@ -41,36 +41,52 @@
 |---|---|
 | `app/Data/MergedValues.php` (create) | The combined values and any list over its limit |
 | `app/Actions/Merge/CombineRecordValues.php` (create) | The merge rule. Read by the merge and the dialog preview |
-| `app/Actions/Merge/MergeCompanies.php` (create) | Company merge: guards, transaction, company links |
-| `app/Actions/Merge/MergePeople.php` (create) | Person merge: guards, transaction, person links |
+| `app/Actions/Merge/MergeRecords.php` (create) | The shared merge step: authorization, lock, limits, sample data, the shared moves, the event and the delete |
+| `app/Actions/Merge/MergeCompanies.php` (create) | Company merge: its own links and its write, through `MergeRecords` |
+| `app/Actions/Merge/MergePeople.php` (create) | Person merge: its own links and its write, through `MergeRecords` |
 | `app/Actions/Merge/MoveRecordLinks.php` (create) | Notes, tasks, attachments, record-type references |
+| `app/Actions/Merge/MoveMorphPivot.php` (create) | Moves one morph pivot's rows and drops the ones the kept record already has. Shared by core and the email package |
 | `app/Actions/Merge/MoveRecordHistory.php` (create) | Activity rows and the `record_merged` event |
 | `app/Events/RecordMerged.php` (create) | Tells packages a merge is happening |
-| `packages/EmailIntegration/src/Listeners/MoveMergedRecordCommunicationListener.php` (create) | Emails, meetings, participants, attendees, counters |
+| `app/Enums/RecordIdentity.php` (create) | The identifying list of an entity (domains or emails): field code, icon, link, empty label, search placeholder |
+| `app/Enums/CrmEntity.php` (modify) | `identity()` and `mergeCountRelations()` |
+| `app/Models/People.php` (modify) | `contactOpportunities()` relation, counted on the person card |
+| `packages/EmailIntegration/src/Actions/MoveMergedRecordCommunication.php` (create) | Emails, meetings, participants, attendees, counters |
+| `packages/EmailIntegration/src/Listeners/MoveMergedRecordCommunicationListener.php` (create) | Listens for `RecordMerged` and makes one call to the action above |
+| `packages/EmailIntegration/src/Services/RecordCommunicationMetrics.php` (modify) | `combineMergedRecords()` sums the counters and takes the later dates |
 | `packages/EmailIntegration/src/EmailIntegrationServiceProvider.php` (modify) | Registers the listener |
-| `app/Filament/Actions/MergeRecordAction.php` (create) | The ⋯ menu item and the dialog |
+| `app/Filament/Actions/MergeRecordAction.php` (create) | The ⋯ menu item, the dialog heading and the submit |
+| `app/Filament/Components/Forms/MergeRecordPicker.php` (create) | The dialog's form field: search, pairing, cards and over-limit messages |
 | `resources/views/filament/app/merge-record.blade.php` (create) | The three-card dialog body |
-| `app/Filament/Concerns/HasRecordPageLayout.php:308` (modify) | Adds the action to the menu |
-| `app/ActivityLog/AppEventPalette.php` (modify) | `RecordMerged` case |
+| `resources/views/filament/app/merge-record/{card,heading,mark,picker,alert}.blade.php` (create) | The card, the dialog heading, the logo or icon mark, the search list and the alert |
+| `app/Filament/Concerns/HasRecordPageLayout.php` (modify) | Adds the action first in the ⋯ menu |
+| `app/ActivityLog/AppEventPalette.php` (modify) | `RecordMerged` case with `title()` and `description()` |
+| `app/Support/ActivityLog/MergedActivityRenderer.php` (modify) | Takes `AppEventRenderer` in its constructor and renders app events through it |
+| `resources/views/activity-log/entries/app-event.blade.php` (modify) | Shows the entry's title and description |
 | `lang/{en,fr}/filament/record-page.php`, `lang/{en,fr}/activity-log.php` (modify) | Copy |
 | `tests/Feature/Filament/App/Resources/MergeCompaniesTest.php` (create) | Company merge through `ViewCompany` |
 | `tests/Feature/Filament/App/Resources/MergePeopleTest.php` (create) | Person merge through `ViewPeople` |
+| `tests/Feature/Filament/App/Resources/MergeRecordDialogStateTest.php` (create) | The dialog's "no longer available" message |
 | `tests/Feature/EmailIntegration/MergedRecordCommunicationTest.php` (create) | Email rows and counters |
-| `tests/Browser/CRM/MergeRecordDialogTest.php` (create) | The dialog in a browser |
+| `tests/Browser/CRM/MergeRecordDialogTest.php` (create) | The main flows in a browser |
+| `tests/Browser/CRM/MergeRecordDialogKeyboardTest.php` (create) | Esc, arrows, Enter and focus |
+| `tests/Browser/CRM/MergeRecordDialogLayoutTest.php` (create) | Row and phone layout, popover placement |
+| `tests/Browser/Panel/MenusTest.php` (modify) | The picker joins the menu datasets |
 
 ---
 
 ### Task 1: Merge two companies' values from the ⋯ menu
 
 **Files:**
-- Create: `app/Data/MergedValues.php`, `app/Actions/Merge/CombineRecordValues.php`, `app/Actions/Merge/MergeCompanies.php`, `app/Filament/Actions/MergeRecordAction.php`
+- Create: `app/Data/MergedValues.php`, `app/Actions/Merge/CombineRecordValues.php`, `app/Actions/Merge/MergeRecords.php`, `app/Actions/Merge/MergeCompanies.php`, `app/Filament/Actions/MergeRecordAction.php`
 - Modify: `app/Filament/Concerns/HasRecordPageLayout.php:320-330`, `lang/en/filament/record-page.php`, `lang/fr/filament/record-page.php`
 - Test: `tests/Feature/Filament/App/Resources/MergeCompaniesTest.php`
 
 **Interfaces:**
 - Produces:
-  - `final readonly class MergedValues { public function __construct(public array $attributes, public array $customFields, public array $overLimit) }`. `$attributes`: `array<string, mixed>` native columns. `$customFields`: `array<string, mixed>` keyed by field code. `$overLimit`: `array<string, int>`, code to that field's limit.
+  - `final readonly class MergedValues { public function __construct(public array $attributes, public array $customFields, public array $overLimit) }`. `$attributes`: `array<string, mixed>` native columns. `$customFields`: `array<string, mixed>` keyed by field code. `$overLimit`: `array<string, array{label: string, limit: int}>`, field code to that field's label and limit.
   - `CombineRecordValues::execute(Company|People $kept, Company|People $duplicate): MergedValues`
+  - `MergeRecords::execute(User $user, Company|People $kept, Company|People $duplicate, Closure $moveOwnLinks, Closure $writeValues): Company|People`. `$moveOwnLinks(kept, duplicate)` moves the entity's own links. `$writeValues(kept, MergedValues)` writes the combined values and returns the record
   - `MergeCompanies::execute(User $user, Company $kept, Company $duplicate): Company`
   - `MergeRecordAction` named `mergeRecord`, form data `['duplicate_id' => string, 'keep' => 'current'|'other']`
 
@@ -136,22 +152,22 @@ else:
 
 Native columns follow the single-value rule. `account_owner_id` taken from the duplicate counts only when that user is still a member of the workspace (Review Focus 4, tested in Task 2).
 
-- [ ] **Step 4: Implement `MergeCompanies`**
+- [ ] **Step 4: Implement `MergeRecords` and `MergeCompanies`**
 
-Order:
+`MergeRecords::execute` runs, in order:
 1. `abort_unless($user->can('update', $kept) && $user->can('delete', $duplicate), 403)`.
-2. Refuse a duplicate equal to the kept record, or in another workspace: `abort(404)`.
-3. `$values = CombineRecordValues->execute(...)`. When `overLimit` is not empty, throw `ValidationException::withMessages(['duplicate_id' => __('filament/record-page.merge.over_limit', ['field' => $label, 'max' => $limit])])` before anything is written.
-4. `DB::transaction`: lock both rows with `Company::query()->whereKey([...])->lockForUpdate()->get()`, and `abort(404)` when either is missing (trashed meanwhile). Then `$duplicate->delete()`, and write the values through the injected `UpdateCompany::execute($user, $kept, [...$values->attributes, 'custom_fields' => $values->customFields])`.
-5. Return `$kept->refresh()`.
+2. Refuse a duplicate equal to the kept record, or in another workspace: `ValidationException::withMessages(['duplicate_id' => __('filament/record-page.merge.unavailable')])`.
+3. `DB::transaction`: lock both rows with one select ordered by id (`lockForUpdate`), so two opposite merges of the same pair wait instead of deadlocking. Throw the same `merge.unavailable` error when either row is missing (trashed meanwhile).
+4. `$values = CombineRecordValues->execute(...)`. When `overLimit` is not empty, throw `ValidationException::withMessages(['duplicate_id' => __('filament/record-page.merge.over_limit', ['field' => $label, 'max' => $limit])])` before anything is written.
+5. Move the links, call `$moveOwnLinks`, move the history, dispatch `RecordMerged`, then `$duplicate->delete()`, then return `$writeValues($kept, $values)`.
 
-Later tasks insert their steps before `$duplicate->delete()`.
+`MergeCompanies::execute` calls it with a closure that moves the company's own links and a closure that writes the values through the injected `UpdateCompany::execute($user, $kept, [...$values->attributes, 'custom_fields' => $values->customFields])`. Later tasks add their steps to `MergeRecords` before the delete, or to the entity's own closure.
 
 - [ ] **Step 5: Implement `MergeRecordAction` and add it to the menu**
 
-Mirror `MoveCardAction`'s class shape. Visible only when the record is `Company|People` and the user can `update` and `delete` it. The form has a searchable `Select` named `duplicate_id` and a `Hidden` field named `keep` (default `'current'`). Search inline in `getSearchResultsUsing`: the same model, excluding the current key, name `ilike`, limit 25. The workspace scope already bounds it. The action resolves `kept` and `duplicate` from `keep`, calls `MergeCompanies` (or `MergePeople` once Task 6 lands), sends a success notification, and redirects to the kept record's `view` URL. In `recordActions()`, add `MergeRecordAction::make()` to the inner group after `copyRecordId`, so it renders above `DeleteAction`.
+Mirror `MoveCardAction`'s class shape. Visible only when the record is `Company|People` and the user can `update` and `delete` it. The schema holds a `MergeRecordPicker` field named `duplicate_id` (a form field, not a searchable `Select` and not a `modalContent` view) and a `Hidden` field named `keep` (default `'current'`). The picker's `searchRecords()` is `#[Exposed]` and `#[Renderless]`: the same model, excluding the current key, name `ilike` or any domain or email, limit 25, ordered by name. The workspace scope already bounds it. The action resolves `kept` and `duplicate` from `keep`, calls `MergeCompanies` (or `MergePeople` once Task 6 lands), shows the success notification and redirects to the kept record's `view` URL. A `ValidationException` from the merge is rethrown on the picker's state path so the dialog shows it. In `recordActions()`, add `MergeRecordAction::make()` as the first item of the inner group, before `copyPageUrl`, so Merge record is the first item in the ⋯ menu.
 
-Lang (`filament/record-page.php`): `actions.merge_record` "Merge record", and a `merge` group: `heading` "Merge", `notice` "The record on the right wins where both records hold a value.", `search` "Search", `swap` "Swap records", `submit` "Merge records", `merged` "Records merged", `over_limit` ":field can hold :max values. Together these records have more. Remove some first." Add matching `lang/fr` entries.
+Lang (`filament/record-page.php`): `actions.merge_record` "Merge record", `notifications.records_merged` "Records merged", and a `merge` group: `heading` "Merge", `notice` "The record on the right wins where both records hold a value.", `search` "Search", `swap` "Swap records", `submit` "Merge records", `unavailable` "That record is no longer available to merge.", `over_limit` ":field can hold :max values. Together these records have more. Remove some first.", plus the picker's own strings (`pick`, `clear`, `search_placeholder`, `no_results`, `no_domains`, `no_emails`, `record`, `counts`). Add matching `lang/fr` entries.
 
 - [ ] **Step 6: Run the tests and see them pass**
 
@@ -168,7 +184,7 @@ git commit -m "feat(merge): merge two companies from the record menu" -m "Refs #
 ### Task 2: Guards: list limits, sample data, stale duplicates, departed owners
 
 **Files:**
-- Modify: `app/Actions/Merge/MergeCompanies.php`, `app/Actions/Merge/CombineRecordValues.php`
+- Modify: `app/Actions/Merge/MergeRecords.php`, `app/Actions/Merge/CombineRecordValues.php`
 - Test: `tests/Feature/Filament/App/Resources/MergeCompaniesTest.php`
 
 **Interfaces:**
@@ -203,7 +219,7 @@ Expected: the sample and owner cases FAIL. The limit and stale cases may already
 
 - [ ] **Step 3: Implement**
 
-In the transaction, before the delete: when `$kept->creation_source === CreationSource::SAMPLE` and the duplicate's is not, set the kept record's `creation_source` to the duplicate's. The owner rule lives in `CombineRecordValues` (Task 1, Step 3).
+In `MergeRecords`, inside the transaction and before the delete: when `$kept->creation_source === CreationSource::SAMPLE` and the duplicate's is not, set the kept record's `creation_source` to the duplicate's. The owner rule lives in `CombineRecordValues` (Task 1, Step 3).
 
 - [ ] **Step 4: Run them and see them pass**
 
@@ -212,8 +228,8 @@ In the transaction, before the delete: when `$kept->creation_source === Creation
 ### Task 3: Move notes, tasks, attachments and record references
 
 **Files:**
-- Create: `app/Actions/Merge/MoveRecordLinks.php`
-- Modify: `app/Actions/Merge/MergeCompanies.php`
+- Create: `app/Actions/Merge/MoveRecordLinks.php`, `app/Actions/Merge/MoveMorphPivot.php`
+- Modify: `app/Actions/Merge/MergeRecords.php`
 - Test: `tests/Feature/Filament/App/Resources/MergeCompaniesTest.php`
 
 **Interfaces:**
@@ -245,11 +261,11 @@ it('repoints record-type attributes on other records to the kept company', funct
 - [ ] **Step 3: Implement `MoveRecordLinks`**
 
 Use the query builder, not models. Raw writes skip `LogsLinkChanges`, so no link-change rows are written on the notes and tasks (spec: moved, not re-linked).
-- For `noteables` and `taskables`: delete the duplicate's rows whose item is already linked to the kept record, then update `*_id` on the rest.
+- For `noteables` and `taskables`: `MoveMorphPivot` deletes the duplicate's rows whose item is already linked to the kept record, then updates `*_id` on the rest. The email package reuses it for `emailables` and `meetingables`.
 - Media: `media` rows with `model_type` = morph, `model_id` = duplicate and `collection_name` = `attachments` get `model_id` = kept, scoped on `workspace_id`.
-- Record-type values: `custom_field_values` joined to `custom_fields` where `type = 'record'`, `lookup_type` = the morph, `tenant_id` = workspace, and `json_value::text like '%<duplicate id>%'`. Decode, replace the id, `array_values(array_unique(...))`, write back.
+- Record-type values: `custom_field_values` joined to `custom_fields` where `type = 'record'`, `lookup_type` = the morph, `tenant_id` = workspace, and `json_value::text like '%<duplicate id>%'`. Swap the id inside the list and drop repeats in one set-based `update`, keeping the order.
 
-Call it in `MergeCompanies` before `$duplicate->delete()`, and before the values are written, so `UploadClaims` sees the media as owned.
+Call it in `MergeRecords` before `$duplicate->delete()`, and before the values are written, so `UploadClaims` sees the media as owned.
 
 - [ ] **Step 4: Run them and see them pass**
 
@@ -285,8 +301,8 @@ it('takes the duplicate\'s logo only when the kept company has none', function (
 ### Task 5: History, the merged event, and email rows
 
 **Files:**
-- Create: `app/Actions/Merge/MoveRecordHistory.php`, `app/Events/RecordMerged.php`, `packages/EmailIntegration/src/Listeners/MoveMergedRecordCommunicationListener.php`
-- Modify: `app/Actions/Merge/MergeCompanies.php`, `app/ActivityLog/AppEventPalette.php`, `lang/{en,fr}/activity-log.php`, `packages/EmailIntegration/src/EmailIntegrationServiceProvider.php:106`
+- Create: `app/Actions/Merge/MoveRecordHistory.php`, `app/Events/RecordMerged.php`, `packages/EmailIntegration/src/Actions/MoveMergedRecordCommunication.php`, `packages/EmailIntegration/src/Listeners/MoveMergedRecordCommunicationListener.php`
+- Modify: `app/Actions/Merge/MergeRecords.php`, `app/ActivityLog/AppEventPalette.php`, `app/Support/ActivityLog/MergedActivityRenderer.php`, `resources/views/activity-log/entries/app-event.blade.php`, `lang/{en,fr}/activity-log.php`, `packages/EmailIntegration/src/Services/RecordCommunicationMetrics.php`, `packages/EmailIntegration/src/EmailIntegrationServiceProvider.php`
 - Test: `tests/Feature/Filament/App/Resources/MergeCompaniesTest.php`, `tests/Feature/EmailIntegration/MergedRecordCommunicationTest.php`
 
 **Interfaces:**
@@ -302,7 +318,7 @@ it('shows the duplicate\'s history and a merged entry on the kept company', func
     // duplicate has an 'updated' activity row; after merge:
     expect(Activity::query()->where('subject_id', $kept->id)->where('event', 'record_merged')->first()?->properties['duplicate_name'])->toBe('Brightline Health Inc.')
         ->and(Activity::query()->whereKey($duplicateUpdate->id)->value('subject_id'))->toBe($kept->id);
-    livewire(ViewCompany::class, ['record' => $kept->getKey()])->assertSee('Brightline Health Inc. merged into this record');
+    livewire(ViewCompany::class, ['record' => $kept->getKey()])->assertSee("{$this->user->name} merged Brightline Health Inc. into this record");
 });
 ```
 
@@ -320,12 +336,12 @@ it('adds up the counters without counting a shared email twice', function (): vo
 
 - [ ] **Step 3: Implement**
 - `MoveRecordHistory` updates `activity_log.subject_id` from the duplicate to the kept record for the morph type. It then logs `activity()->performedOn($kept)->causedBy($user)->event('record_merged')->withProperties(['duplicate_name' => $duplicate->name])->log('record_merged')`, using the log name `LabelledChangeLog::write` uses.
-- `AppEventPalette` gets the `RecordMerged` case. The timeline line reads `__('activity-log.events.record_merged.description', ['name' => ...])`. en: label "Merged", description ":name merged into this record". Find where `app-event.blade.php` takes `$entry->description`, and give this event its description from `duplicate_name`.
-- The listener (registered with `Event::listen` beside line 106) owns the email rows:
+- `AppEventPalette` gets the `RecordMerged` case, and `title()` and `description(TimelineEntry)` methods. The description names who merged: `activity-log.events.record_merged.description_by` ":causer merged :name into this record", with `description` ":name merged into this record" when the entry has no causer. en label: "Merged". `app-event.blade.php` takes its title and description from the palette first. `MergedActivityRenderer` takes `AppEventRenderer` in its constructor and hands app events to it.
+- The listener is registered with `Event::listen` in `EmailIntegrationServiceProvider` and makes one call to `MoveMergedRecordCommunication`, which owns the email rows:
   - `emailables` and `meetingables`: same dedupe as Task 3.
   - `email_participants` and `meeting_attendees`: `company_id` for a company, `contact_id` for a person.
-  - Counters: sum the two records. Subtract the shared emails that `EmailVisibilityService::countsTowardCommunicationIntelligence` counts, by `direction`, and the shared meetings that `meetingCountsTowardCommunicationIntelligence` counts. Take `GREATEST` of the three `last_*_at` columns.
-- `MergeCompanies` calls `MoveRecordHistory`, then `RecordMerged::dispatch($kept, $duplicate)`, both before the delete. The shared links must be read before the listener drops them.
+  - Counters: `RecordCommunicationMetrics::combineMergedRecords()` sums the two records. Subtract the shared emails that `EmailVisibilityService::countsTowardCommunicationIntelligence` counts, by `direction`, and the shared meetings that `meetingCountsTowardCommunicationIntelligence` counts. Take the later of each `last_*_at` value.
+- `MergeRecords` calls `MoveRecordHistory`, then `event(new RecordMerged($kept, $duplicate))`, both before the delete. The shared links must be read before the listener drops them.
 
 - [ ] **Step 4: Run them and see them pass**
 
@@ -341,7 +357,7 @@ Run: `... vendor/bin/pest --compact tests/Feature/Filament/App/Resources/MergeCo
 - Test: `tests/Feature/Filament/App/Resources/MergePeopleTest.php`
 
 **Interfaces:**
-- Consumes: `CombineRecordValues`, `MoveRecordLinks`, `MoveRecordHistory`, `RecordMerged` from Tasks 1, 3 and 5. `UpdatePeople::execute($user, $person, $data)`.
+- Consumes: `MergeRecords` (with `CombineRecordValues`, `MoveRecordLinks`, `MoveRecordHistory` and `RecordMerged` behind it) from Tasks 1, 3 and 5. `UpdatePeople::execute($user, $person, $data)`.
 - Produces: `MergePeople::execute(User $user, People $kept, People $duplicate): People`
 
 - [ ] **Step 1: Write the failing tests** through `livewire(ViewPeople::class, ...)`:
@@ -357,7 +373,7 @@ Run: `... vendor/bin/pest --compact tests/Feature/Filament/App/Resources/MergeCo
 
 - [ ] **Step 2: Run them and see them fail**
 
-- [ ] **Step 3: Implement `MergePeople`** with the same order as `MergeCompanies`. Its own link is `opportunities.contact_id`, and it writes values through `UpdatePeople`. If the two actions share more than the composed steps, extract the shared part into a step action, not a base class. `MergeRecordAction` picks `MergePeople` for a `People` record.
+- [ ] **Step 3: Implement `MergePeople`** as a thin action over `MergeRecords`, like `MergeCompanies`. Its own-links closure moves `opportunities.contact_id`, and its write closure goes through `UpdatePeople`. `MergeRecords` is the shared step both actions call, so there is no base class. `MergeRecordAction` picks `MergePeople` for a `People` record.
 
 - [ ] **Step 4: Run them and see them pass**
 
@@ -366,8 +382,8 @@ Run: `... vendor/bin/pest --compact tests/Feature/Filament/App/Resources/MergeCo
 ### Task 7: The merge dialog
 
 **Files:**
-- Create: `resources/views/filament/app/merge-record.blade.php`, `tests/Browser/CRM/MergeRecordDialogTest.php`
-- Modify: `app/Filament/Actions/MergeRecordAction.php`
+- Create: `app/Filament/Components/Forms/MergeRecordPicker.php`, `app/Enums/RecordIdentity.php`, `resources/views/filament/app/merge-record.blade.php`, `resources/views/filament/app/merge-record/{card,heading,mark,picker,alert}.blade.php`, `tests/Browser/CRM/MergeRecordDialogTest.php`, `tests/Browser/CRM/MergeRecordDialogKeyboardTest.php`, `tests/Browser/CRM/MergeRecordDialogLayoutTest.php`, `tests/Feature/Filament/App/Resources/MergeRecordDialogStateTest.php`
+- Modify: `app/Filament/Actions/MergeRecordAction.php`, `app/Enums/CrmEntity.php`, `tests/Browser/Panel/MenusTest.php`
 
 **Interfaces:**
 - Consumes: `CombineRecordValues::execute` for the preview card, `MergedValues::$overLimit` for the disabled state.
@@ -390,13 +406,17 @@ it('disables merging and names the list over its limit', function (): void { /* 
 
 Run: `... vendor/bin/pest --compact tests/Browser/CRM/MergeRecordDialogTest.php`
 
-- [ ] **Step 3: Build the dialog** as `modalContent(view('filament.app.merge-record', ...))`, laid out like the spec's sketch:
+- [ ] **Step 3: Build the dialog** as the `MergeRecordPicker` form field in the action's schema (Task 1, Step 5), rendered by `merge-record.blade.php` and laid out like the spec's sketch:
   - three cards: picked, swap button, current (priority), `=`, result
-  - the picked slot hosts the searchable select behind a **+**
-  - each card shows name, domains or emails, and counts of notes, tasks and (companies) people
+  - the picked slot hosts the search list behind a **+**. The list is positioned by hand and never with `x-float`, which caps it to the dialog height. It waits for the phone sheet to finish opening before it measures
+  - search by name, and by domain (companies) or email (people), through the field's `searchRecords()`
+  - Esc closes the list and not the dialog. Arrows move, Enter picks, and Enter merges when focus is not in a field. After a pick, focus moves to the clear button
+  - each card shows name, domains or emails, and counts from `CrmEntity::mergeCountRelations()`
   - the result card renders `CombineRecordValues` for the current pair and updates live when `duplicate_id` or `keep` changes
-  - the submit is disabled until a duplicate is picked and while `overLimit` is not empty
-  - menu tokens from `.ai/guidelines/relaticle/ui` (`h-menu-row`, `size-menu-icon`, `rounded-menu`) for the search list. Colours come from theme tokens only.
+  - the submit is disabled until a duplicate is picked and while `overLimit` is not empty, and an alert names the list over its limit
+  - menu tokens from `.ai/guidelines/relaticle/ui` (`h-menu-row`, `size-menu-icon`, `rounded-menu`) for the search list. Colours come from theme tokens only
+  - add the picker to the `MenusTest` datasets
+  - split the browser tests into three files: main flows, keyboard, and layout (laptop, desktop, phone, popover placement)
 
 - [ ] **Step 4: Run it and see it pass**, then in WebKit: `... vendor/bin/pest --compact tests/Browser/CRM/MergeRecordDialogTest.php --browser safari`. If WebKit fails where Chromium passes, add `pest()->group('webkit')` to the file.
 

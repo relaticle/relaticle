@@ -1,7 +1,7 @@
 # Merge duplicate companies and people
 
 **Date:** 2026-11-14
-**Status:** Design, pending approval
+**Status:** Phase 1 built (PR #1193)
 **Issue:** #885
 
 ## Summary
@@ -24,7 +24,7 @@ emails in a merge comes straight back on the next sync.
 |---|---|---|
 | 1 | Merge rule | Whole-record priority. The priority record wins where both hold a value. No per-field picking |
 | 2 | Records per merge | Two. Three duplicates take two merges |
-| 3 | Where it starts | **Merge record** in the record page's ⋯ menu, between "Copy record ID" and "Delete record". Companies and people only |
+| 3 | Where it starts | **Merge record** is the first item in the record page's ⋯ menu. Companies and people only |
 | 4 | Dialog | The current record fills the priority slot, the other slot starts empty with a **+** that opens a search, a ⇄ button swaps the two, and a third card previews the result |
 | 5 | Which record survives | The priority record keeps its ID and URL. A new ID would break every saved link, API reference and Rela mention to both records, and double the links to move |
 | 6 | Duplicate prompt | Phase 2, a separate PR: a record-page banner that opens the merge dialog with the duplicate picked. A duplicates review page is out of scope |
@@ -35,7 +35,7 @@ emails in a merge comes straight back on the next sync.
 
 ## Phases
 
-1. **Merge two records** (this design, below): the action, the dialog and the merge.
+1. **Merge two records** (built, below): the action, the dialog and the merge.
 2. **Duplicate prompt**: on a company or person page, a query in `app/Queries` finds other live records
    in the workspace sharing any domain or email, with mailbox sync's normalization. A banner names the
    shared value, and its **Merge** button opens the Phase 1 dialog with the first duplicate picked. The
@@ -43,10 +43,16 @@ emails in a merge comes straight back on the next sync.
 
 ## Approaches
 
-**A. One action per entity, sharing the common steps (chosen).** `MergeCompanies` and `MergePeople`
-in `app/Actions/Merge/`, each composing shared steps: combine values, move the shared links, move the
-history. What differs per entity is written out in its own action. A company owns people and
-opportunities. A person is only a point of contact.
+**A. One action per entity, sharing the common steps (chosen, built).** `MergeCompanies` and
+`MergePeople` in `app/Actions/Merge/` are thin. Each calls one shared step, `MergeRecords`, and passes
+it two closures: one that moves that entity's own links, and one that writes the combined values.
+`MergeRecords` owns what both entities share: the authorization checks, the transaction, the lock on
+both rows, the limit check, the sample-data rule, the shared link and history moves, the
+`RecordMerged` event and the soft delete. It composes `CombineRecordValues`, `MoveRecordLinks` and
+`MoveRecordHistory`, and the two pivot-moving steps share `MoveMorphPivot`. What differs per entity
+is written out in its own action. A company owns people and opportunities. A person is only a point
+of contact. Per-entity facts the dialog needs (the identifying list, the count chips) come from
+`CrmEntity` and `RecordIdentity`, not from a branch on the record type.
 
 **B. One generic `MergeRecords` driven by data on `CrmEntity`.** Less code, but the difference
 between the entities becomes data the reader has to follow. Adding opportunities later would be one
@@ -70,15 +76,28 @@ Merge  [Brightline Health]                                              ✕
                                             [Cancel] [Merge records]
 ```
 
+- The dialog body is one form field, `MergeRecordPicker`, which `MergeRecordAction` puts in its
+  schema as `duplicate_id` next to a hidden `keep` value (`current` or `other`). The field renders
+  the cards from `resources/views/filament/app/merge-record.blade.php` and its partials (card,
+  heading, mark, picker, alert).
 - The record the member opened from sits on the right: the priority slot.
-- The left slot's search lists live records of the same entity in the workspace, excluding the
-  current one, by name and (companies) domains or (people) emails.
+- The left slot's **+** opens a search list of live records of the same entity in the workspace,
+  excluding the current one. It matches the name, and for companies any domain, for people any email.
+  Picking a record sets `duplicate_id` and resets `keep` to `current`.
+- Keyboard: the arrow keys move through the list, Enter picks the highlighted record, and Esc closes
+  the list without closing the dialog. When focus is not in a field, Enter merges once a record is
+  picked. After a pick, focus moves to the clear button on the picked card.
+- The list is positioned by hand, not with `x-float`, because `x-float` caps the list to the dialog's
+  height and the list must float past the dialog's edge. On a phone it waits for the sheet to finish
+  rising before it measures where to sit.
 - ⇄ swaps the two. Whichever record is on the right is the one kept.
 - Each source card shows the name, the identifying list (domains or emails) and counts of linked
-  records. The result card shows the combined values and counts.
-- **Merge records** stays disabled until a second record is picked.
-- After the merge, the member lands on the kept record's page with a success notification. If the
-  kept record is the other one (after ⇄), they are redirected to it.
+  records. The result card shows the combined values and counts, and updates live as the pick or the
+  swap changes.
+- **Merge records** stays disabled until a second record is picked, and while a combined list is over
+  its limit. An alert names the list over the limit.
+- After the merge, the member lands on the kept record's page with a "Records merged" notification.
+  If the kept record is the other one (after ⇄), they are redirected to it.
 
 ## The merge rule
 
@@ -112,7 +131,7 @@ merging the same records cannot interleave.
   (item, type, id).
 - Activity history: `activity_log` rows whose subject is the duplicate move to the kept record, so its
   timeline shows the duplicate's past. Then a new `record_merged` event on the kept record names the
-  duplicate and who merged it.
+  duplicate and who merged it, so the timeline reads "<member> merged <duplicate> into this record".
 - `attachments` media, so rich-text values copied from the duplicate keep their images.
   `UploadClaims` rejects a rich-text value that references media owned by another record, so the
   media moves before the values are written.
@@ -133,9 +152,10 @@ merging the same records cannot interleave.
 - `email_participants.contact_id` and `meeting_attendees.contact_id`.
 
 Emails, meetings, their participants and attendees, and the communication counters belong to
-`packages/EmailIntegration`. Core dispatches `App\Events\RecordMerged` inside the transaction, and the
-package's listener moves its own rows, as it already reacts to core events elsewhere. (Refined while
-planning: core never names the package.)
+`packages/EmailIntegration`. Core dispatches `App\Events\RecordMerged` inside the transaction. The
+package's listener, `MoveMergedRecordCommunicationListener`, makes one call to the package action
+`MoveMergedRecordCommunication`, which moves its own rows and sums the counters through
+`RecordCommunicationMetrics`. (Refined while planning: core never names the package.)
 
 **Then** the duplicate is soft-deleted through the model, so its own `deleted` activity row is written.
 The duplicate's own custom attribute values are left on it.
@@ -171,13 +191,34 @@ Feature tests through the record page (Livewire `ViewCompany` and `ViewPeople`),
 - values: kept wins, gaps filled from the duplicate, lists combined in order, and an empty value on
   the duplicate never overwrites a filled one on the kept record
 - every link listed above moves, and a link both records share ends up once
-- history moves and a `record_merged` event is written
+- history moves and a `record_merged` event is written, and the timeline names who merged
 - record-type attributes on a third record are repointed
 - authorization: a member without `update` on the kept record or `delete` on the duplicate is
   refused, and a record from another workspace cannot be picked
 - the duplicate is soft-deleted and the kept record keeps its ID
+- the search finds a record by name, domain or email and leaves out the current, trashed and
+  other-workspace records
 
-One browser test walks the dialog: open, search, pick, swap, merge, land on the kept record.
+Communication tests (`MergedRecordCommunicationTest`) cover emails, meetings, participants and
+attendees, the summed counters with a shared email or meeting counted once, and the merge with the
+email feature off.
+
+Rollback and race tests, per entity:
+- a failed final write rolls back every moved link and the history
+- both records are locked with one select in id order, pinned with `DB::listen`, whichever one is kept
+- a duplicate or kept record that vanishes at the start of the transaction gives the "no longer
+  available" error and changes nothing
+
+`MergeRecordDialogStateTest` covers the dialog's "no longer available" message: absent before a pick, shown when the picked record is deleted while the dialog is open.
+
+Three browser test files, run in Chromium and in WebKit (`--browser safari`):
+- `MergeRecordDialogTest`: the main flows. Open, search, pick, swap, merge, land on the kept record,
+  and the over-limit block
+- `MergeRecordDialogKeyboardTest`: Esc, arrows, Enter, focus after a pick and tabbing out of the list
+- `MergeRecordDialogLayoutTest`: the row layout on laptop and desktop, the stacked phone layout, and
+  the popover's placement and height cap, including while the phone sheet is still rising
+
+The picker joins the `MenusTest` dataset, so its rows, icons and height cap follow the menu tokens.
 
 ## Non-goals
 
@@ -191,8 +232,10 @@ One browser test walks the dialog: open, search, pick, swap, merge, land on the 
 
 ## Left to the builder
 
-- How the dialog is built in Filament (a custom `Action` with a modal view, as `MoveCardAction` does,
-  or a schema with a searchable select). It must match the layout above
-- Names and placement of the shared steps inside `app/Actions/Merge/`
-- How the search ranks results
-- The `record_merged` icon and copy, following `AppEventPalette`
+- How the dialog is built in Filament. Built as a `MergeRecordPicker` form field inside the action's
+  schema, laid out as above
+- Names and placement of the shared steps inside `app/Actions/Merge/`. Built as `MergeRecords`,
+  `CombineRecordValues`, `MoveRecordLinks`, `MoveRecordHistory` and `MoveMorphPivot`
+- How the search ranks results. Built as name order, 25 results
+- The `record_merged` icon and copy, following `AppEventPalette`. Built as `lucide-merge`, with the
+  title and description in `AppEventPalette::title()` and `description()`
