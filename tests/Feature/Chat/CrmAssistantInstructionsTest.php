@@ -593,6 +593,8 @@ it('leaves the setup lines out of an ordinary conversation', function (): void {
 });
 
 it('tells rela how many records arrived today and from where', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
     People::factory()->count(12)->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
@@ -603,6 +605,8 @@ it('tells rela how many records arrived today and from where', function (): void
 });
 
 it('counts mailbox records apart from imports', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
     People::factory()->count(3)->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
@@ -756,6 +760,8 @@ it('names records an assistant created as arriving from the connected assistant'
 });
 
 it('offers the company pick only when companies arrived', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+
     $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
 
     People::factory()->count(3)->create(['workspace_id' => $workspace->getKey(), 'creation_source' => CreationSource::IMPORT]);
