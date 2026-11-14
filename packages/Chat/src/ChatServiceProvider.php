@@ -29,6 +29,7 @@ use Illuminate\Support\Js;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Events\AgentFailed;
+use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\StepFailed;
 use Laravel\Ai\Events\ToolFailed;
 use Livewire\Livewire;
@@ -47,6 +48,7 @@ use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Settings\ChatSettings;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\AgentRunTelemetry;
+use Relaticle\Chat\Support\EnsureMemberOnToolCall;
 use Relaticle\Chat\Support\RecordChipRenderer;
 
 final class ChatServiceProvider extends ServiceProvider
@@ -109,6 +111,7 @@ final class ChatServiceProvider extends ServiceProvider
             [AgentFailed::class, StepFailed::class, ToolFailed::class],
             AgentRunTelemetry::class,
         );
+        Event::listen(InvokingTool::class, EnsureMemberOnToolCall::class);
     }
 
     private function registerCommands(): void
