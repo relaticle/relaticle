@@ -224,7 +224,7 @@ it('keeps writes to one record under two channels in one request as separate sav
 it('names the channel of an api change in the record timeline', function (): void {
     CurrentSource::during(CreationSource::API, fn (): bool => $this->company->update(['name' => 'Posted']));
 
-    $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->first())->render();
+    $html = resolve(MergedActivityRenderer::class)->render($this->company->timeline()->get()->first())->render();
 
     expect($html)->toContain(__('workspaces.activity.via_source', ['source' => CreationSource::API->getLabel()]));
 });
@@ -232,11 +232,11 @@ it('names the channel of an api change in the record timeline', function (): voi
 it('leaves the channel line off web and legacy timeline entries', function (): void {
     $this->company->update(['name' => 'Typed']);
 
-    $webHtml = (new MergedActivityRenderer)->render($this->company->timeline()->get()->first())->render();
+    $webHtml = resolve(MergedActivityRenderer::class)->render($this->company->timeline()->get()->first())->render();
 
     Activity::withoutGlobalScopes()->where('subject_id', $this->company->getKey())->update(['properties' => '{}']);
 
-    $legacyHtml = (new MergedActivityRenderer)->render($this->company->timeline()->get()->first())->render();
+    $legacyHtml = resolve(MergedActivityRenderer::class)->render($this->company->timeline()->get()->first())->render();
 
     expect($webHtml)->not->toContain('Via ')
         ->and($legacyHtml)->not->toContain('Via ');

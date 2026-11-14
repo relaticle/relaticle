@@ -37,7 +37,7 @@ beforeEach(function (): void {
 
 function latestTimelineEntryHtml(Model $record): string
 {
-    return (new MergedActivityRenderer)->render($record->timeline()->get()->first())->render();
+    return resolve(MergedActivityRenderer::class)->render($record->timeline()->get()->first())->render();
 }
 
 function latestRelationChange(Model $record): array
