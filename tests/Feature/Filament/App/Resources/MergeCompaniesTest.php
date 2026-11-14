@@ -381,14 +381,6 @@ it('keeps the current company again when the member picks a different duplicate 
         ->assertSet('mountedActions.0.data.keep', 'current');
 });
 
-function mergeMedia(Company $company, string $collection): Media
-{
-    return $company->addMediaFromString(onePixelPng())
-        ->usingFileName('image.png')
-        ->withAttributes(['workspace_id' => $company->workspace_id])
-        ->toMediaCollection($collection);
-}
-
 it('moves the duplicate\'s notes and tasks and keeps a shared one once', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);

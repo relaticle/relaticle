@@ -6,6 +6,7 @@ use App\Actions\Merge\MergePeople;
 use App\Actions\Merge\MergeRecords;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\Enums\CreationSource;
+use App\Enums\MediaCollection;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Components\Forms\MergeRecordPicker;
@@ -14,6 +15,7 @@ use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -25,8 +27,11 @@ use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
 mutates(MergePeople::class, MergeRecords::class, MergeRecordAction::class, MergeRecordPicker::class);
@@ -200,7 +205,86 @@ it('moves the duplicate\'s history to the kept person and adds a merged entry', 
         ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$kept->getKey()])
         ->and($merged->properties['duplicate_name'])->toBe('Dana W')
         ->and($merged->causer_id)->toBe($this->user->getKey())
-        ->and($merged->workspace_id)->toBe($this->workspace->getKey());
+        ->and($merged->workspace_id)->toBe($this->workspace->getKey())
+        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->pluck('event')->all())->toBe(['deleted']);
+});
+
+it('repoints record-type attributes on other records to the kept person', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'opportunity',
+        'code' => 'champions',
+        'name' => 'Champions',
+        'type' => 'record',
+        'lookup_type' => 'people',
+        'settings' => new CustomFieldSettingsData(allow_multiple: true),
+    ]);
+    $kept = mergePersonRecord($this->workspace, $this->user);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
+    $other = mergePersonRecord($this->workspace, $this->user);
+    $both = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $onlyDuplicate = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $unrelated = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $both->saveCustomFieldValue($field, [$duplicate->getKey(), $kept->getKey()]);
+    $onlyDuplicate->saveCustomFieldValue($field, [$other->getKey(), $duplicate->getKey()]);
+    $unrelated->saveCustomFieldValue($field, [$other->getKey()]);
+
+    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $read = fn (Opportunity $opportunity): mixed => Opportunity::query()->with('customFieldValues.customField')->findOrFail($opportunity->getKey())->getCustomFieldValue($field);
+
+    expect($read($both))->toBe([$kept->getKey()])
+        ->and($read($onlyDuplicate))->toBe([$other->getKey(), $kept->getKey()])
+        ->and($read($unrelated))->toBe([$other->getKey()]);
+});
+
+it('points the kept person\'s own record attribute at itself instead of the duplicate', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'people',
+        'code' => 'colleagues',
+        'name' => 'Colleagues',
+        'type' => 'record',
+        'lookup_type' => 'people',
+        'settings' => new CustomFieldSettingsData(allow_multiple: true),
+    ]);
+    $partner = mergePersonRecord($this->workspace, $this->user);
+    $supplier = mergePersonRecord($this->workspace, $this->user);
+    $kept = mergePersonRecord($this->workspace, $this->user);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
+    $kept->saveCustomFieldValue($field, [$duplicate->getKey(), $partner->getKey()]);
+    $duplicate->saveCustomFieldValue($field, [$supplier->getKey()]);
+
+    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergePersonValue($kept, 'colleagues'))->toBe([$kept->getKey(), $partner->getKey(), $supplier->getKey()]);
+});
+
+it('copies a rich-text value with its image from the duplicate', function (): void {
+    Storage::fake('local');
+    Storage::fake('public');
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'people',
+        'code' => 'brief',
+        'name' => 'Brief',
+        'type' => 'rich-editor',
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $kept = mergePersonRecord($this->workspace, $this->user);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
+    $image = mergeMedia($duplicate, MediaCollection::Attachments->value);
+    $duplicate->saveCustomFieldValue($field, "<p>Notes</p><p><img data-id=\"{$image->uuid}\" src=\"stale\"></p>");
+
+    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $image = Media::query()->where('uuid', $image->uuid)->firstOrFail();
+
+    expect(mergePersonValue($kept, 'brief'))->toContain($image->uuid)
+        ->and($image->model_id)->toBe($kept->getKey())
+        ->and($image->collection_name)->toBe(MediaCollection::Attachments->value);
 });
 
 it('shows who merged the duplicate on the kept person\'s timeline', function (): void {

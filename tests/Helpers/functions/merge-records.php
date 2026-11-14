@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
 function mergeRecordAction(): TestAction
@@ -73,4 +74,12 @@ function mergeLinkedIds(string $table, string $itemColumn, Model $record): array
         ->sort()
         ->values()
         ->all();
+}
+
+function mergeMedia(Company|People $record, string $collection): Media
+{
+    return $record->addMediaFromString(onePixelPng())
+        ->usingFileName('image.png')
+        ->withAttributes(['workspace_id' => $record->workspace_id])
+        ->toMediaCollection($collection);
 }
