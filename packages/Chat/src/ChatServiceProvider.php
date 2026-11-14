@@ -38,6 +38,7 @@ use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
 use Relaticle\Chat\Commands\PurgeUnsentAttachmentsCommand;
 use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
+use Relaticle\Chat\Listeners\EnsureMemberOnToolCallListener;
 use Relaticle\Chat\Livewire\App\Chat\ChatAllChatsPanel;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidebarNav;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
@@ -48,7 +49,6 @@ use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Settings\ChatSettings;
 use Relaticle\Chat\Storage\SupersededAwareConversationStore;
 use Relaticle\Chat\Support\AgentRunTelemetry;
-use Relaticle\Chat\Support\EnsureMemberOnToolCall;
 use Relaticle\Chat\Support\RecordChipRenderer;
 
 final class ChatServiceProvider extends ServiceProvider
@@ -111,7 +111,7 @@ final class ChatServiceProvider extends ServiceProvider
             [AgentFailed::class, StepFailed::class, ToolFailed::class],
             AgentRunTelemetry::class,
         );
-        Event::listen(InvokingTool::class, EnsureMemberOnToolCall::class);
+        Event::listen(InvokingTool::class, EnsureMemberOnToolCallListener::class);
     }
 
     private function registerCommands(): void

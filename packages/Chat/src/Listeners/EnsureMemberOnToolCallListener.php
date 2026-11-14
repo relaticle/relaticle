@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Relaticle\Chat\Support;
+namespace Relaticle\Chat\Listeners;
 
 use App\Models\Workspace;
 use Laravel\Ai\Events\InvokingTool;
@@ -13,7 +13,7 @@ use Relaticle\Chat\Exceptions\MembershipRevokedException;
  * laravel/ai dispatches InvokingTool outside the tool's own try/catch, so a throw
  * here ends the run instead of reaching the model as a tool failure.
  */
-final readonly class EnsureMemberOnToolCall
+final readonly class EnsureMemberOnToolCallListener
 {
     public function handle(InvokingTool $event): void
     {
