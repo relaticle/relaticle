@@ -68,7 +68,7 @@ it('moves the highlighted result with the arrow keys before Enter picks it', fun
         ->type('.fi-merge-pop input', 'Globex')
         ->wait(1.2)
         ->keys('.fi-merge-pop input', 'ArrowDown')
-        ->assertAttribute('.fi-merge-pop li:nth-child(2)', 'aria-selected', 'true')
+        ->assertAttribute('.fi-merge-pop li:nth-of-type(2)', 'aria-selected', 'true')
         ->keys('.fi-merge-pop input', 'Enter')
         ->wait(1.2)
         ->assertSeeIn('[data-merge-left]', 'Globex Europe')

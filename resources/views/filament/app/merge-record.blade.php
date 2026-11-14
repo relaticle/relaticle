@@ -1,3 +1,8 @@
+@php
+    $left = $getLeftCard();
+    $keepsOther = $keepsOther();
+@endphp
+
 <div
     class="@container grid gap-4"
     data-merge-dialog
@@ -36,7 +41,7 @@
                 <button
                     type="button"
                     @disabled(! $left)
-                    x-on:click="$wire.set(@js($statePath.'.keep'), @js($keepsOther ? 'current' : 'other'))"
+                    x-on:click="$set('keep', @js($keepsOther ? 'current' : 'other'), false, true)"
                     aria-label="{{ __('filament/record-page.merge.swap') }}"
                     title="{{ __('filament/record-page.merge.swap') }}"
                     class="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-gray-600 shadow-xs ring-1 ring-gray-950/10 outline-none transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-gray-700"
@@ -49,7 +54,7 @@
             </div>
 
             <div class="min-w-0" data-merge-right>
-                @include('filament.app.merge-record.card', ['card' => $right, 'isClearable' => $keepsOther])
+                @include('filament.app.merge-record.card', ['card' => $getRightCard(), 'isClearable' => $keepsOther])
             </div>
         </div>
 
@@ -64,18 +69,18 @@
         </div>
 
         <div class="min-w-0 px-3 @3xl:px-0 @3xl:py-3">
-            @include('filament.app.merge-record.card', ['card' => $result, 'isClearable' => false, 'isResult' => true])
+            @include('filament.app.merge-record.card', ['card' => $getResultCard(), 'isClearable' => false, 'isResult' => true])
         </div>
     </div>
 
-    @error($statePath.'.duplicate_id')
+    @error($getStatePath())
         <p role="alert" class="flex items-start gap-2 rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-700 ring-1 ring-danger-600/20 dark:bg-danger-400/10 dark:text-danger-400 dark:ring-danger-400/30" data-merge-error>
             <x-filament::icon icon="lucide-circle-alert" class="mt-0.5 size-4 shrink-0" />
             {{ $message }}
         </p>
     @enderror
 
-    @foreach ($overLimit as $message)
+    @foreach ($getOverLimitMessages() as $message)
         <p role="alert" class="flex items-start gap-2 rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-700 ring-1 ring-danger-600/20 dark:bg-danger-400/10 dark:text-danger-400 dark:ring-danger-400/30" data-merge-over-limit>
             <x-filament::icon icon="lucide-circle-alert" class="mt-0.5 size-4 shrink-0" />
             {{ $message }}

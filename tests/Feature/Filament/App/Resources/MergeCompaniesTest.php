@@ -13,6 +13,7 @@ use App\Enums\MediaCollection;
 use App\Enums\WorkspaceRole;
 use App\Events\RecordMerged;
 use App\Filament\Actions\MergeRecordAction;
+use App\Filament\Components\Forms\MergeRecordPicker;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Models\ActivityLog\Activity;
@@ -27,7 +28,6 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\TransactionBeginning;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -38,7 +38,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergeCompanies::class, MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, MoveRecordHistory::class, MergeRecordAction::class);
+mutates(MergeCompanies::class, MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, MoveRecordHistory::class, MergeRecordAction::class, MergeRecordPicker::class);
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -294,25 +294,12 @@ it('shows an error on the duplicate when the merge fails validation on another f
     expect(Company::query()->find($duplicate->getKey()))->not->toBeNull();
 });
 
-function mergeCompanyDialog(Company $kept, string $search): string
-{
-    $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
-        ->mountAction(mergeRecordAction())
-        ->setActionData(['search' => $search]);
-
-    return implode('', Arr::where($page->effects['partials'], fn (string $html, string $key): bool => str_starts_with($key, 'action-modals')));
-}
-
 it('finds a company by name or by any of its domains', function (string $term, array $found): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept']);
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health'], ['domains' => ['brightline.health', 'brightlinehealth.com']]);
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind'], ['domains' => ['northwind.com']]);
 
-    $dialog = mergeCompanyDialog($kept, $term);
-
-    foreach (['Brightline Health', 'Northwind'] as $name) {
-        in_array($name, $found, true) ? expect($dialog)->toContain($name) : expect($dialog)->not->toContain($name);
-    }
+    expect(mergeSearchNames(ViewCompany::class, $kept, $term))->toBe($found);
 })->with([
     'name' => ['Bright', ['Brightline Health']],
     'second domain' => ['brightlinehealth', ['Brightline Health']],
@@ -329,7 +316,29 @@ it('finds a company by domain while the domains column is hidden from the list',
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept']);
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health'], ['domains' => ['brightline.health']]);
 
-    expect(mergeCompanyDialog($kept, 'brightline.health'))->toContain('Brightline Health');
+    expect(mergeSearchNames(ViewCompany::class, $kept, 'brightline.health'))->toBe(['Brightline Health']);
+});
+
+it('searches for a duplicate without rendering the dialog again', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind']);
+
+    $effects = mergeSearch(ViewCompany::class, $kept, 'North')->effects;
+
+    expect($effects)->not->toHaveKey('html')
+        ->and($effects['partials'] ?? [])->toBe([]);
+});
+
+it('keeps the current company again when the member picks a different duplicate after a swap', function (): void {
+    $current = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    $first = mergeCompanyRecord($this->workspace, $this->user);
+    $second = mergeCompanyRecord($this->workspace, $this->user);
+
+    livewire(ViewCompany::class, ['record' => $current->getKey()])
+        ->mountAction(mergeRecordAction())
+        ->setActionData(['duplicate_id' => $first->getKey(), 'keep' => 'other'])
+        ->set('mountedActions.0.data.duplicate_id', $second->getKey())
+        ->assertSet('mountedActions.0.data.keep', 'current');
 });
 
 function mergeMedia(Company $company, string $collection): Media
