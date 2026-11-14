@@ -65,6 +65,7 @@ final class MergeRecordAction extends Action
                 && Gate::allows('delete', $record))
             ->modalHeading(fn (): Htmlable => $this->heading())
             ->modalWidth(Width::FourExtraLarge)
+            ->stickyModalFooter()
             ->modalFooterActionsAlignment(Alignment::End)
             ->modalSubmitAction(fn (Action $action): Action => $this->submitButton($action))
             ->modalCancelAction(fn (Action $action): Action => $action->label($this->buttonLabel($this->getModalCancelActionLabel(), __('filament/record-page.merge.keys.escape'))))

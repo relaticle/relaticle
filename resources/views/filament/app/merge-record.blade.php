@@ -1,5 +1,5 @@
 <div
-    class="grid gap-4"
+    class="@container grid gap-4"
     data-merge-dialog
     x-on:keydown.enter.window="
         const openModals = document.querySelectorAll('.fi-modal-open')
@@ -20,41 +20,51 @@
         {{ __('filament/record-page.merge.notice') }}
     </p>
 
-    <div class="grid items-stretch gap-3 sm:grid-cols-[minmax(0,2fr)_auto_minmax(0,1fr)] sm:items-center">
-        <div class="relative grid gap-9 rounded-2xl sm:gap-5 bg-gray-50 p-3 ring-1 ring-gray-950/5 sm:grid-cols-2 dark:bg-white/5 dark:ring-white/10">
+    <div class="grid items-stretch @3xl:grid-cols-[minmax(0,calc((100%-8rem)*2/3+5rem))_3rem_minmax(0,1fr)]">
+        <div class="relative grid gap-12 rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-950/5 @3xl:grid-cols-2 @3xl:gap-14 dark:bg-white/5 dark:ring-white/10">
             <div class="min-w-0" data-merge-left>
                 @if ($left)
-                    @include('filament.app.merge-record.card', ['card' => $left, 'isResult' => false, 'isClearable' => ! $keepsOther])
+                    @include('filament.app.merge-record.card', ['card' => $left, 'isClearable' => ! $keepsOther])
                 @else
                     @include('filament.app.merge-record.picker')
                 @endif
             </div>
 
-            <button
-                type="button"
-                @disabled(! $left)
-                x-on:click="$wire.set(@js($statePath.'.keep'), @js($keepsOther ? 'current' : 'other'))"
-                aria-label="{{ __('filament/record-page.merge.swap') }}"
-                title="{{ __('filament/record-page.merge.swap') }}"
-                class="absolute start-1/2 top-1/2 z-10 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full bg-white text-gray-600 shadow-xs ring-1 ring-gray-950/10 outline-none transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-gray-700"
-                data-merge-swap
-            >
-                <x-filament::icon icon="lucide-arrow-left-right" class="size-menu-icon max-sm:rotate-90" />
-            </button>
+            <div class="absolute start-1/2 top-1/2 flex h-12 -translate-x-1/2 -translate-y-1/2 flex-col items-center @3xl:h-auto @3xl:w-14 @3xl:flex-row">
+                <span aria-hidden="true" class="w-px flex-1 bg-gray-950/10 @3xl:h-px @3xl:w-auto dark:bg-white/15"></span>
+
+                <button
+                    type="button"
+                    @disabled(! $left)
+                    x-on:click="$wire.set(@js($statePath.'.keep'), @js($keepsOther ? 'current' : 'other'))"
+                    aria-label="{{ __('filament/record-page.merge.swap') }}"
+                    title="{{ __('filament/record-page.merge.swap') }}"
+                    class="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-gray-600 shadow-xs ring-1 ring-gray-950/10 outline-none transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-gray-700"
+                    data-merge-swap
+                >
+                    <x-filament::icon icon="lucide-arrow-left-right" class="size-menu-icon rotate-90 @3xl:rotate-0" />
+                </button>
+
+                <span aria-hidden="true" class="w-px flex-1 bg-gray-950/10 @3xl:h-px @3xl:w-auto dark:bg-white/15"></span>
+            </div>
 
             <div class="min-w-0" data-merge-right>
-                @include('filament.app.merge-record.card', ['card' => $right, 'isResult' => false, 'isClearable' => $keepsOther])
+                @include('filament.app.merge-record.card', ['card' => $right, 'isClearable' => $keepsOther])
             </div>
         </div>
 
-        <div class="flex items-center justify-center" aria-hidden="true">
-            <span class="flex size-7 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-gray-950/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-white/15">
+        <div class="flex h-12 flex-col items-center @3xl:h-auto @3xl:flex-row" aria-hidden="true">
+            <span class="w-px flex-1 bg-gray-950/10 @3xl:h-px @3xl:w-auto dark:bg-white/15"></span>
+
+            <span class="flex size-7 shrink-0 items-center justify-center rounded-full bg-white text-gray-500 ring-1 ring-gray-950/10 dark:bg-gray-800 dark:text-gray-400 dark:ring-white/15">
                 <x-filament::icon icon="lucide-equal" class="size-4" />
             </span>
+
+            <span class="w-px flex-1 bg-gray-950/10 @3xl:h-px @3xl:w-auto dark:bg-white/15"></span>
         </div>
 
-        <div class="min-w-0">
-            @include('filament.app.merge-record.card', ['card' => $result, 'isResult' => true, 'isClearable' => false])
+        <div class="min-w-0 px-3 @3xl:px-0 @3xl:py-3">
+            @include('filament.app.merge-record.card', ['card' => $result, 'isClearable' => false, 'isResult' => true])
         </div>
     </div>
 
