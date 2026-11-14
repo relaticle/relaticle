@@ -6,12 +6,12 @@ namespace App\Actions\Merge;
 
 use App\Data\MergedValues;
 use App\Enums\CustomFieldType;
-use App\Filament\CustomFields\DomainFieldType;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
+use App\Support\CustomFields\CanonicalValue;
 use App\Support\EmailAddress;
 
 final readonly class CombineRecordValues
@@ -24,7 +24,7 @@ final readonly class CombineRecordValues
 
     public function execute(Company|People $kept, Company|People $duplicate): MergedValues
     {
-        $kept->loadMissing(['workspace', 'customFieldValues.customField']);
+        $kept->loadMissing('customFieldValues.customField');
         $duplicate->loadMissing('customFieldValues.customField');
 
         $customFields = [];
@@ -73,7 +73,7 @@ final readonly class CombineRecordValues
             return null;
         }
 
-        $isMember = User::query()->memberOf($kept->workspace)->whereKey($userId)->exists();
+        $isMember = User::query()->memberOf($kept->loadMissing('workspace')->workspace)->whereKey($userId)->exists();
 
         return $isMember ? $userId : null;
     }
@@ -152,7 +152,7 @@ final readonly class CombineRecordValues
         }
 
         return match ($field->type) {
-            CustomFieldType::DOMAIN->value => (new DomainFieldType)->setValue($value),
+            CustomFieldType::DOMAIN->value => CanonicalValue::of($field, $value),
             CustomFieldType::EMAIL->value => EmailAddress::canonicalize($value),
             default => $value,
         };
