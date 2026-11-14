@@ -29,13 +29,6 @@ final class ImportHistory extends Page implements HasTable
 
     protected string $view = 'import-wizard-new::filament.pages.import-history';
 
-    /**
-     * How long an import may sit untouched before the recovery action appears. Comfortably
-     * longer than the job's own timeout plus its retries, so a run that is merely slow is
-     * never offered up as stalled.
-     */
-    private const int STALLED_AFTER_MINUTES = 30;
-
     protected static string|null|BackedEnum $navigationIcon = 'lucide-clock';
 
     protected static ?string $navigationLabel = 'Import History';
@@ -160,8 +153,7 @@ final class ImportHistory extends Page implements HasTable
                     ->requiresConfirmation()
                     ->modalDescription('This import stopped responding. Marking it failed lets you start a new one from the same file.')
                     ->action(fn (Import $record): Import => resolve(MarkImportFailed::class)->execute($this->actingUser(), $record))
-                    ->visible(fn (Import $record): bool => $record->status === ImportStatus::Importing
-                        && $record->updated_at?->lt(now()->subMinutes(self::STALLED_AFTER_MINUTES)) === true),
+                    ->visible(fn (Import $record): bool => $record->isStalled()),
             ])
             ->defaultSort('created_at', 'desc')
             ->poll('10s');

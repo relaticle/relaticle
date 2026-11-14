@@ -7,6 +7,7 @@ use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\URL;
 use Livewire\Livewire;
+use Relaticle\ImportWizard\Actions\MarkImportFailed;
 use Relaticle\ImportWizard\Enums\ImportOutcome;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
@@ -14,6 +15,7 @@ use Relaticle\ImportWizard\Http\Controllers\DownloadFailedRowsController;
 use Relaticle\ImportWizard\Models\FailedImportRow;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Notifications\ImportFinishedNotification;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(DownloadFailedRowsController::class);
 
@@ -136,3 +138,18 @@ it('marks a stalled import failed for a member who can import', function (): voi
 
     expect($stalled->fresh()->status)->toBe(ImportStatus::Failed);
 });
+
+it('refuses marking an import failed unless it is importing and stalled', function (ImportStatus $status, bool $stalled): void {
+    $import = Import::factory()->create([
+        'workspace_id' => $this->workspaceA->id,
+        'user_id' => $this->user->id,
+        'status' => $status,
+        'updated_at' => $stalled ? now()->subMinutes(31) : now(),
+    ]);
+
+    expect(fn () => resolve(MarkImportFailed::class)->execute($this->user, $import))->toThrow(HttpException::class);
+    expect($import->fresh()->status)->toBe($status);
+})->with([
+    'completed' => [ImportStatus::Completed, true],
+    'importing but recent' => [ImportStatus::Importing, false],
+]);

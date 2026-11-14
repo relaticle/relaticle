@@ -14,6 +14,7 @@ final readonly class MarkImportFailed
     public function execute(User $user, Import $import): Import
     {
         abort_unless($user->hasWorkspaceCapability((string) $import->workspace_id, WorkspaceCapability::DataImport), 403);
+        abort_unless($import->isStalled(), 422);
 
         $import->update(['status' => ImportStatus::Failed]);
 
