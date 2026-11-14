@@ -31,6 +31,12 @@
 
             document.querySelector('[data-merge-dialog] [data-merge-clear]')?.focus()
         },
+        show() {
+            this.active = 0
+            this.place()
+            this.open = true
+            this.$nextTick(() => this.$refs.search.focus({ preventScroll: true }))
+        },
         place() {
             const gap = 8
             const edge = 16
@@ -40,8 +46,6 @@
             const width = document.documentElement.clientWidth
 
             popover.style.setProperty('--menu-room', '100dvh')
-            // WebKit runs $nextTick before x-show unhides the popover, and a hidden box measures 0.
-            popover.style.display = 'flex'
 
             const below = height - anchor.bottom - gap - edge
             const above = anchor.top - gap - edge
@@ -62,7 +66,7 @@
     <button
         type="button"
         x-ref="trigger"
-        x-on:click="open = ! open; if (open) { active = 0; $nextTick(() => { place(); $refs.search.focus({ preventScroll: true }) }) }"
+        x-on:click="open ? open = false : show()"
         aria-haspopup="listbox"
         x-bind:aria-expanded="open"
         aria-label="{{ __('filament/record-page.merge.pick') }}"
@@ -75,8 +79,8 @@
 
     <div
         x-ref="popover"
-        x-show="open"
-        x-cloak
+        style="visibility: hidden"
+        x-bind:style="{ visibility: open ? 'visible' : 'hidden' }"
         class="fixed z-50 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-menu bg-white shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10"
         data-merge-popover
     >
