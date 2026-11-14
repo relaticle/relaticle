@@ -423,6 +423,32 @@ it('repoints record-type attributes on other records to the kept company', funct
         ->and($read($unrelated))->toBe([$other->getKey()]);
 });
 
+it('points the kept company\'s own record attributes at itself instead of the duplicate', function (): void {
+    foreach (['related_companies' => true, 'parent_company' => false] as $code => $allowMultiple) {
+        CustomField::factory()->create([
+            'tenant_id' => $this->workspace->getKey(),
+            'entity_type' => 'company',
+            'code' => $code,
+            'name' => str($code)->headline()->toString(),
+            'type' => 'record',
+            'lookup_type' => 'company',
+            'settings' => new CustomFieldSettingsData(allow_multiple: $allowMultiple),
+        ]);
+    }
+    $partner = mergeCompany($this->workspace, $this->user);
+    $supplier = mergeCompany($this->workspace, $this->user);
+    $kept = mergeCompany($this->workspace, $this->user);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+    $kept->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'related_companies'), [$duplicate->getKey(), $partner->getKey()]);
+    $kept->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'parent_company'), [$duplicate->getKey()]);
+    $duplicate->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'related_companies'), [$supplier->getKey()]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergeCompanyValue($kept, 'related_companies'))->toBe([$kept->getKey(), $partner->getKey(), $supplier->getKey()])
+        ->and(mergeCompanyValue($kept, 'parent_company'))->toBe([$kept->getKey()]);
+});
+
 it('moves the duplicate\'s people and opportunities to the kept company', function (): void {
     $kept = mergeCompany($this->workspace, $this->user);
     $duplicate = mergeCompany($this->workspace, $this->user);
