@@ -5,8 +5,11 @@ declare(strict_types=1);
 use App\Actions\Merge\MergePeople;
 use App\Actions\Merge\MergeRecords;
 use App\Actions\Onboarding\RemoveSampleData;
+use App\ActivityLog\AppEventPalette;
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Enums\MediaCollection;
+use App\Enums\RecordIdentity;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Components\Forms\MergeRecordPicker;
@@ -21,6 +24,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\ActivityLog\MergedActivityRenderer;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Events\TransactionBeginning;
@@ -34,7 +38,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergePeople::class, MergeRecords::class, MergeRecordAction::class, MergeRecordPicker::class);
+mutates(MergePeople::class, MergeRecords::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
 
 beforeEach(function (): void {
     Queue::fake();

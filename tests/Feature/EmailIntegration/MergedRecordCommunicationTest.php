@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Relaticle\EmailIntegration\Actions\MoveMergedRecordCommunication;
 use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Listeners\MoveMergedRecordCommunicationListener;
@@ -22,8 +23,9 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
+use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 
-mutates(MoveMergedRecordCommunicationListener::class);
+mutates(MoveMergedRecordCommunicationListener::class, MoveMergedRecordCommunication::class, RecordCommunicationMetrics::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
