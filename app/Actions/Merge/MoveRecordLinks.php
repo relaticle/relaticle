@@ -18,21 +18,24 @@ final readonly class MoveRecordLinks
     {
         $morph = $kept->getMorphClass();
 
-        $this->movePivot('noteables', 'note_id', 'noteable_type', 'noteable_id', $morph, $kept, $duplicate);
-        $this->movePivot('taskables', 'task_id', 'taskable_type', 'taskable_id', $morph, $kept, $duplicate);
+        $this->movePivot('noteables', 'note_id', 'noteable', $morph, $kept, $duplicate);
+        $this->movePivot('taskables', 'task_id', 'taskable', $morph, $kept, $duplicate);
         $this->moveAttachments($morph, $kept, $duplicate);
         $this->repointRecordAttributes($morph, $kept, $duplicate);
     }
 
-    private function movePivot(string $table, string $itemColumn, string $typeColumn, string $idColumn, string $morph, Company|People $kept, Company|People $duplicate): void
+    private function movePivot(string $table, string $itemColumn, string $prefix, string $morph, Company|People $kept, Company|People $duplicate): void
     {
-        $linkedTo = fn (Company|People $record): Builder => DB::table($table)->where($typeColumn, $morph)->where($idColumn, $record->getKey());
-
-        $linkedTo($duplicate)
-            ->whereIn($itemColumn, $linkedTo($kept)->select($itemColumn))
+        $this->linkedTo($table, $prefix, $morph, $duplicate)
+            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $kept)->select($itemColumn))
             ->delete();
 
-        $linkedTo($duplicate)->update([$idColumn => $kept->getKey()]);
+        $this->linkedTo($table, $prefix, $morph, $duplicate)->update([$prefix.'_id' => $kept->getKey()]);
+    }
+
+    private function linkedTo(string $table, string $prefix, string $morph, Company|People $record): Builder
+    {
+        return DB::table($table)->where($prefix.'_type', $morph)->where($prefix.'_id', $record->getKey());
     }
 
     private function moveAttachments(string $morph, Company|People $kept, Company|People $duplicate): void
