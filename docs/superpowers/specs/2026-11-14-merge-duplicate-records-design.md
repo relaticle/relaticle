@@ -1,7 +1,7 @@
 # Merge duplicate companies and people
 
 **Date:** 2026-11-14
-**Status:** Phase 1 built (PR #1193)
+**Status:** Phase 1 built (PR #1193), Phase 2 built
 **Issue:** #885
 
 ## Summary
@@ -40,6 +40,12 @@ emails in a merge comes straight back on the next sync.
    in the workspace sharing any domain or email, with mailbox sync's normalization. A banner names the
    shared value, and its **Merge** button opens the Phase 1 dialog with the first duplicate picked. The
    banner is hidden from members who cannot merge, and gone once no duplicate is left.
+   Built as `App\Queries\Crm\DuplicateRecordQuery`. It reads each of the record's domains or emails
+   through `EntitiesByFieldValueQuery` with `CanonicalValue::spellings()`, the match the upsert API and
+   the restore conflict already use: case-insensitive, with `www.` and a scheme folded into one domain.
+   The oldest live record holding the first shared value is the duplicate. The banner is a `Callout`
+   in the record rail under the quick actions. Its **Merge** is a second `MergeRecordAction`, named
+   `mergeDuplicate`, that fills the dialog with the duplicate. Both read `MergeRecordAction::canMerge()`.
 
 ## Approaches
 
@@ -222,11 +228,15 @@ Rollback and race tests, per entity:
 - a duplicate or kept record that vanishes at the start of the transaction gives the "no longer
   available" error and changes nothing
 
+`MergeDuplicatePromptTest` covers the duplicate prompt: a shared domain and a shared email in another
+case, the dialog opened with the duplicate picked, no prompt for an unshared value, a trashed record,
+another workspace or a member who cannot merge, and the prompt moving to the duplicate left after a merge.
+
 `MergeRecordDialogStateTest` covers the dialog's "no longer available" message: absent before a pick, shown when the picked record is deleted while the dialog is open.
 
 Three browser test files, run in Chromium and in WebKit (`--browser safari`):
 - `MergeRecordDialogTest`: the main flows. Open, search, pick, swap, merge, land on the kept record,
-  and the over-limit block
+  the over-limit block, and the merge opened from the duplicate prompt
 - `MergeRecordDialogKeyboardTest`: Esc, arrows, Enter, focus after a pick and tabbing out of the list
 - `MergeRecordDialogLayoutTest`: the row layout on laptop and desktop, the stacked phone layout, and
   the popover's placement and height cap, including while the phone sheet is still rising
