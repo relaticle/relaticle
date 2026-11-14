@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\SentryEventScrubber;
 use GuzzleHttp\Psr7\ServerRequest;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Events\Dispatcher;
@@ -23,6 +24,8 @@ use Sentry\State\HubInterface;
 use Sentry\Transport\Result;
 use Sentry\Transport\ResultStatus;
 use Sentry\Transport\TransportInterface;
+
+mutates(SentryEventScrubber::class);
 
 final class SentryTransportSpy implements TransportInterface
 {
