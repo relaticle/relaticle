@@ -79,6 +79,7 @@
 
     <div
         x-ref="popover"
+        wire:ignore.self
         style="visibility: hidden"
         x-bind:style="{ visibility: open ? 'visible' : 'hidden' }"
         class="fixed z-50 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-menu bg-white shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10"

@@ -151,3 +151,42 @@ it('caps the open search list inside the window and scrolls it to the last row',
     'short window' => [1440, 560],
     'phone' => [390, 844],
 ]);
+
+it('keeps the open picker anchored under its button while the member types', function (int $width, int $height): void {
+    $current = dialogCompany($this->workspace, $this->user, 'Harborline');
+
+    foreach (range(1, 30) as $index) {
+        dialogCompany($this->workspace, $this->user, sprintf('Branch %02d', $index));
+    }
+
+    foreach (['Beehive Foods', 'Beeline Freight', 'Beechwood Labs'] as $name) {
+        dialogCompany($this->workspace, $this->user, $name);
+    }
+
+    $page = openMergeDialog($this->user, $this->workspace, $current, $width, $height);
+
+    $page->click('[data-merge-picker]')
+        ->assertVisible('[data-merge-popover]')
+        ->wait(1.2);
+
+    $opened = $page->script(MERGE_POPOVER_RECT);
+
+    foreach (['bee', '', 'bee', ''] as $term) {
+        $typed = searchMergePicker($page, $term);
+
+        expect($typed['rows'])->toBe($term === '' ? $opened['rows'] : 3)
+            ->and($typed['above'])->toBe($opened['above'])
+            ->and(abs($typed['left'] - $opened['left']))->toBeLessThan(1)
+            ->and(abs($typed[$opened['above'] ? 'bottom' : 'top'] - $opened[$opened['above'] ? 'bottom' : 'top']))->toBeLessThan(1)
+            ->and($typed['left'])->toBeGreaterThanOrEqual($typed['modalLeft'])
+            ->and($typed['right'])->toBeLessThanOrEqual($typed['modalRight'])
+            ->and($typed['top'])->toBeGreaterThanOrEqual(0)
+            ->and($typed['bottom'])->toBeLessThanOrEqual($typed['windowHeight']);
+    }
+
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'desktop' => [1440, 900],
+    'short window' => [1440, 560],
+    'phone' => [390, 844],
+]);
