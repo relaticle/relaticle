@@ -2225,9 +2225,9 @@ it('words the add input placeholder by the grouped attribute', function (): void
     $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
     $component = livewire(OpportunitiesBoard::class);
 
-    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('Stage name');
+    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('New stage name');
 
     $component->call('setBoardColumnField', $tier->code);
 
-    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('Option name');
+    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('New option name');
 });
