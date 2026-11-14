@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\OptionColor;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
@@ -764,6 +765,48 @@ it('collapses a stage from its header menu and expands it by clicking its rail, 
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
 ]);
 
+it('collapses a stage on a double-click in its empty space, flat and with lanes', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    [$first, $second] = $field->options->take(2)->map(fn (CustomFieldOption $option): string => (string) $option->getKey())->all();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+    $record = $model::factory()->recycle([$user, $workspace])->create($model === Opportunity::class ? ['company_id' => $company->getKey()] : []);
+    $record->saveCustomFieldValue($field, $first);
+
+    if ($record instanceof Task) {
+        $record->assignees()->attach($user);
+    }
+
+    TenantContextService::setTenantId(null);
+
+    $page = openBoard($user, $path);
+
+    $page->page()->locator("[data-column-root=\"{$second}\"] .ff-cards")->dblclick();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$second]);
+    expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([$second]);
+
+    $page->page()->locator("[data-column-root=\"{$second}\"][data-collapsed]")->click();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === []);
+
+    openViewSettingsPanel($page, '[data-board-lanes-trigger]');
+    $page->click("[data-board-grouping=\"{$groupBy}\"]")->assertVisible('.ff-lanes-heads');
+    closeViewSettings($page);
+
+    $page->page()->locator(".ff-cell-cards[data-column-id=\"{$second}\"]")->first()->dblclick();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$second]);
+    expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([$second]);
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
+]);
+
 it('lets a phone expand the columns that collapse all folded', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
     $this->withVite();
 
@@ -933,10 +976,11 @@ it('opens the stage menu on a header click, renames on Enter and recolors from t
 
     $page->page()->locator("{$menu} [data-stage-color-trigger]")->click();
     $page->assertVisible("{$menu} [data-stage-swatches]");
-    $page->page()->locator("{$menu} [data-stage-swatch=\"#ec4899\"]")->click();
-    waitForPage($page, fn (): bool => $option()->settings->color === '#ec4899');
+    $pink = OptionColor::Pink->value;
+    $page->page()->locator("{$menu} [data-stage-swatch=\"{$pink}\"]")->click();
+    waitForPage($page, fn (): bool => $option()->settings->color === $pink);
 
-    expect($option()->settings->color)->toBe('#ec4899');
+    expect($option()->settings->color)->toBe($pink);
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
 

@@ -6,18 +6,18 @@ namespace App\Enums;
 
 enum OptionColor: string
 {
-    case Red = '#ef4444';
-    case Orange = '#f97316';
-    case Amber = '#f59e0b';
-    case Lime = '#84cc16';
-    case Green = '#22c55e';
-    case Cyan = '#06b6d4';
-    case Blue = '#3b82f6';
-    case Magenta = '#d946ef';
-    case Purple = '#a855f7';
-    case Pink = '#ec4899';
-    case Olive = '#c9b100';
-    case Gray = '#6b7280';
+    case Red = '#ff5454';
+    case Orange = '#f87614';
+    case Amber = '#f5a300';
+    case Lime = '#aabf29';
+    case Green = '#05d17e';
+    case Cyan = '#02b9eb';
+    case Blue = '#266df0';
+    case Magenta = '#db4beb';
+    case Purple = '#9b69ff';
+    case Pink = '#fa4b94';
+    case Olive = '#cfb701';
+    case Gray = '#a2a4a7';
 
     public function label(): string
     {

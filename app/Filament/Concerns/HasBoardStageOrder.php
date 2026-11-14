@@ -45,8 +45,6 @@ use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
 use Relaticle\Flowforge\Support\ColorResolver;
 
-use function Filament\Support\get_color_css_variables;
-
 trait HasBoardStageOrder
 {
     /** @var Collection<string, CustomField>|null */
@@ -260,23 +258,16 @@ trait HasBoardStageOrder
             'id' => $id,
             'name' => (string) $column['label'],
             'noun' => $this->boardStageNoun(),
-            'dot' => $this->colorStyle($column['color'] ?? null),
+            'dot' => ColorResolver::dotStyle($column['color'] ?? null),
             'swatches' => array_map(fn (OptionColor $color): array => [
                 'value' => $color->value,
                 'label' => $color->label(),
-                'style' => $this->colorStyle($color->value),
+                'style' => ColorResolver::dotStyle($color->value),
                 'current' => $stored !== null && strtolower($stored) === $color->value,
             ], OptionColor::cases()),
             'editable' => $id !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages(),
             'error' => $this->getErrorBag()->first("boardStageMenu.{$id}"),
         ])->render());
-    }
-
-    private function colorStyle(mixed $color): ?string
-    {
-        $resolved = ColorResolver::resolve($color);
-
-        return $resolved === null ? null : get_color_css_variables($resolved, [500]);
     }
 
     /**

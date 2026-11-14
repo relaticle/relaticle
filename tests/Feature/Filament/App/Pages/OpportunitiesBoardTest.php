@@ -1734,7 +1734,9 @@ it('rings the current stage color in the swatch grid', function (): void {
 
     $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnColor', $id, OptionColor::Pink->value);
 
-    expect(stageMenuOf($component, $id))->toMatch('/data-stage-swatch="#ec4899"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-stage-swatch="#ec4899"/');
+    $pink = OptionColor::Pink->value;
+
+    expect(stageMenuOf($component, $id))->toMatch("/data-stage-swatch=\"{$pink}\"[^>]*aria-pressed=\"true\"|aria-pressed=\"true\"[^>]*data-stage-swatch=\"{$pink}\"/");
 });
 
 it('refuses a color outside the palette and changes nothing', function (): void {
@@ -1867,7 +1869,7 @@ it('rings only the stored color of a stage, never the gray display fallback', fu
 
     $menu = stageMenuOf(livewire(OpportunitiesBoard::class), $id);
 
-    expect($menu)->toContain('data-stage-swatch="#6b7280"');
+    expect($menu)->toContain('data-stage-swatch="'.OptionColor::Gray->value.'"');
 
     $ringed = substr_count($menu, 'aria-pressed="true"');
 
