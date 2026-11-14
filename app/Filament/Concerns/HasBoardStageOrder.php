@@ -183,11 +183,11 @@ trait HasBoardStageOrder
             : $this->boardColumnOptions()->contains('id', $optionId);
     }
 
-    public function renameBoardColumn(mixed $optionId = null, mixed $name = null): void
+    public function renameBoardColumn(mixed $optionId = null, mixed $name = null, mixed $was = null): void
     {
         $name = is_string($name) ? trim($name) : '';
 
-        $this->writeStageOption($optionId, ['name' => $name], fn (array $option): bool => $option['name'] === $name);
+        $this->writeStageOption($optionId, ['name' => $name, ...(is_string($was) ? ['was' => $was] : [])], fn (array $option): bool => $option['name'] === $name);
     }
 
     public function setBoardColumnColor(mixed $optionId = null, mixed $color = null): void
@@ -202,7 +202,7 @@ trait HasBoardStageOrder
     }
 
     /**
-     * @param  array{name?: string, color?: string}  $change
+     * @param  array{name?: string, was?: string, color?: string}  $change
      * @param  Closure(array{id: string, name: string, color: string, stored: ?string}): bool  $unchanged
      */
     private function writeStageOption(mixed $optionId, array $change, Closure $unchanged): void
@@ -236,7 +236,7 @@ trait HasBoardStageOrder
     }
 
     /**
-     * @param  array{name?: string, color?: string}  $change
+     * @param  array{name?: string, was?: string, color?: string}  $change
      * @return list<array{id: string, name: string, was: string, color?: string}>
      */
     private function stageOptionEntries(CustomField $field, string $changedId, array $change): array

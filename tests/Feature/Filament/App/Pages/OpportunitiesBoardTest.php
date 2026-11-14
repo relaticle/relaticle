@@ -2158,6 +2158,18 @@ it('tells the board user to reload when the options change under a delete, renam
     expect(stageOption($ids[1])->name)->not->toBe('Discovery')->and(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->not->toBeNull();
 })->with(['delete', 'rename', 'color']);
 
+it('refuses a rename made from a name another admin has since changed', function (): void {
+    $id = stageIds($this->stageField)[1];
+    $seen = stageOption($id)->name;
+    CustomFieldOption::query()->withoutGlobalScopes()->whereKey($id)->update(['name' => 'Renamed elsewhere']);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('renameBoardColumn', $id, 'Discovery', $seen)
+        ->assertHasErrors(['boardStageMenu.'.$id => __('filament/pages/boards.stage_menu.changed', ['noun' => 'stage'])]);
+
+    expect(stageOption($id)->name)->toBe('Renamed elsewhere');
+});
+
 it('adds a gray stage after the last one from the add tile', function (): void {
     $before = stageIds($this->stageField);
 
