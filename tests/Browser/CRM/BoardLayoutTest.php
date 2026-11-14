@@ -1140,3 +1140,26 @@ it('adds a stage from the tile after the last column and shows a taken name unde
     expect(CustomFieldOption::query()->withoutGlobalScopes()->where('name', 'Escalated')->count())->toBe(1);
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
+
+it('adds a stage in the color picked in its form, focused on open', function (string $model, string $fieldCode, string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $blue = OptionColor::Blue->value;
+
+    $page = openBoard($user, $path)->assertVisible('.ff-add-column-button');
+
+    $page->page()->locator('.ff-add-column-button')->click();
+    $page->assertScript(boardWaitFor("document.activeElement === document.querySelector('.ff-add-column-input')"), true);
+
+    $page->page()->locator('.ff-add-column-dot')->click();
+    $page->page()->locator('.ff-add-column-swatch[aria-label="'.OptionColor::Blue->label().'"]')->click();
+    $page->assertScript("document.querySelector('.ff-add-column-dot').style.getPropertyValue('--color-500')", $blue);
+
+    $page->page()->locator('.ff-add-column-input')->fill('Escalated');
+    $page->page()->locator('.ff-add-column-input')->press('Enter');
+    $page->assertScript(boardWaitFor("[...document.querySelectorAll('.ff-column')].at(-1)?.textContent.includes('Escalated') === true"), true);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->where('name', 'Escalated')->sole()->settings->color)->toBe($blue);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');

@@ -91,6 +91,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->columnActions($this->boardStageActions())
             ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->addColumnUsing($this->addBoardStageUsing())
+            ->addColumnColors(fn (): array => $this->boardStageColors())
             ->addColumnLabel(fn (): string => __('filament/pages/boards.stage_menu.add', ['noun' => $this->boardStageNoun()]))
             ->addColumnPlaceholder(fn (): string => __('filament/pages/boards.stage_menu.add_placeholder', ['noun' => $this->boardStageNoun()]))
             ->cardSchema(fn (Schema $schema): Schema => $schema->gap(false)->components($card))

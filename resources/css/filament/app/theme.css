@@ -2452,7 +2452,7 @@ html.fi-record-stacked .fi-record-layout {
     @apply border border-dashed border-gray-300 bg-transparent hover:bg-gray-100 focus-visible:bg-gray-100 dark:border-white/15 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
 }
 
-.ff-board .ff-add-column-form {
+.ff-board :is(.ff-add-column-form, .ff-add-column-swatches) {
     @apply rounded-menu;
 }
 

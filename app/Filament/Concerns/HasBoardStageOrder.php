@@ -375,14 +375,14 @@ trait HasBoardStageOrder
         $this->rebuildBoard();
     }
 
-    protected function addBoardStage(string $name): void
+    protected function addBoardStage(string $name, ?string $color = null): void
     {
         $name = trim($name);
         $field = $this->boardColumnField();
-        $options = [...$this->stageOptionEntries($field, '', []), ['name' => $name, 'color' => OptionColor::Gray->value]];
+        $options = [...$this->stageOptionEntries($field, '', []), ['name' => $name, 'color' => $color ?? OptionColor::Gray->value]];
 
         try {
-            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []], keepsColors: true);
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []], keepsColors: $color === null);
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages(['name' => $this->stageWriteFailure($exception, $name)]);
         }
@@ -394,7 +394,15 @@ trait HasBoardStageOrder
 
     protected function addBoardStageUsing(): ?Closure
     {
-        return $this->canEditStages() ? fn (string $name) => $this->addBoardStage($name) : null;
+        return $this->canEditStages() ? fn (string $name, ?string $color) => $this->addBoardStage($name, $color) : null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function boardStageColors(): array
+    {
+        return collect(OptionColor::cases())->mapWithKeys(fn (OptionColor $color): array => [$color->value => $color->label()])->all();
     }
 
     private function hideStageFromMenu(mixed $optionId): void
