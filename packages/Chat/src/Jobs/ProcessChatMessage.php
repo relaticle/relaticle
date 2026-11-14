@@ -69,6 +69,7 @@ use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
+use Relaticle\Chat\Support\TurnNotes;
 use Relaticle\Chat\Support\TurnPresence;
 use Throwable;
 
@@ -678,9 +679,7 @@ final class ProcessChatMessage implements ShouldQueue
         }
 
         if ($exception instanceof TimeoutExceededException) {
-            return __('This reply hit the :seconds-second limit before it finished. Ask for a shorter answer, or for it in parts.', [
-                'seconds' => self::TIMEOUT_SECONDS,
-            ]);
+            return TurnNotes::timeout(self::TIMEOUT_SECONDS);
         }
 
         if ($this->isRateLimited($exception)) {
@@ -1059,19 +1058,21 @@ final class ProcessChatMessage implements ShouldQueue
     {
         $reason = $streamedResponse->events->whereInstanceOf(StreamEnd::class)->last()?->reason;
 
+        $notes = TurnNotes::blankReply();
+
         if ($reason === FinishReason::Length->value) {
-            return __('This reply ran out of room before it said anything. Ask again, or ask for a shorter answer.');
+            return $notes['length'];
         }
 
         if ($reason === FinishReason::ContentFilter->value) {
-            return __('The model declined to answer this. Try rephrasing your request.');
+            return $notes['content_filter'];
         }
 
         if (! $this->origin->isTyped()) {
             return null;
         }
 
-        return __('Noted. Go on, or ask me a question.');
+        return $notes['noted'];
     }
 
     private function acknowledgeBlankTurn(?string $assistantMessageId, string $acknowledgement): void
