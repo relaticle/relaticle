@@ -89,6 +89,25 @@ test('invitation expires_at is set based on config', function () {
     expect((int) round($invitation->expires_at->diffInDays(now(), absolute: true)))->toBe(14);
 });
 
+test('an invitation expires 48 hours after it is sent', function () {
+    $this->travelTo(now()->startOfSecond());
+
+    livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
+        ->callAction('invitePeople', [
+            'emails' => 'test@example.com',
+            'role' => 'member',
+        ]);
+
+    $invitation = $this->workspace->fresh()->workspaceInvitations->sole();
+    expect($invitation->expires_at->equalTo(now()->addHours(48)))->toBeTrue();
+
+    $this->travelTo(now()->addHours(47));
+    expect($invitation->fresh()->isExpired())->toBeFalse();
+
+    $this->travelTo(now()->addHours(2));
+    expect($invitation->fresh()->isExpired())->toBeTrue();
+});
+
 test('inviting several people at once confirms how many were sent', function () {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
         ->callAction('invitePeople', [

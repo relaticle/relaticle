@@ -30,6 +30,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\Rules\Password;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\CreateUser;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
@@ -90,6 +91,7 @@ final class UserResource extends Resource
                 TextInput::make('password')
                     ->disabled(fn (string $operation): bool => $operation === 'edit' && ! auth('sysadmin')->user()?->role->canManageCustomerAccess())
                     ->password()
+                    ->rule(Password::default())
                     ->maxLength(255)
                     ->dehydrated(fn (?string $state): bool => filled($state))
                     ->required(fn (string $operation): bool => $operation === 'create'),

@@ -49,6 +49,8 @@ final readonly class SyncWorkspacePlanFromSubscription
         if ($workspace->plan === $target) {
             if ($this->holdsExtensionCredits($workspace)) {
                 $this->settleExtensionCredits($workspace, $subscription);
+            } elseif ($this->holdsTrialCredits($workspace, $subscription)) {
+                $this->credits->resetPeriod($workspace);
             }
 
             return;
@@ -181,6 +183,17 @@ final readonly class SyncWorkspacePlanFromSubscription
         AiCreditBalance::query()
             ->where('workspace_id', $workspace->getKey())
             ->update(['period_ends_at' => $subscription->trial_ends_at]);
+    }
+
+    // Cashier clears the workspace trial once a subscription exists, so the balance period is what still marks it.
+    private function holdsTrialCredits(Workspace $workspace, Subscription $subscription): bool
+    {
+        return $subscription->onTrial()
+            && $workspace->trial_extended_at === null
+            && AiCreditBalance::query()
+                ->where('workspace_id', $workspace->getKey())
+                ->where('period_ends_at', $subscription->trial_ends_at)
+                ->exists();
     }
 
     private function holdsExtensionCredits(Workspace $workspace): bool

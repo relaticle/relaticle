@@ -52,10 +52,11 @@ return [
         'heading' => [
             'trial_ended' => 'Your Pro trial has ended',
             'subscription_ended' => 'Your Cloud subscription has ended',
-            'free' => ':workspace is paused',
+            'free' => 'Choose a plan for :workspace',
             'managed_ended' => 'Your :plan plan has ended',
         ],
         'owner_body' => 'Subscribe to reopen :workspace. Your records are safe, and nothing has been deleted.',
+        'owner_body_free' => 'The free trial covers your first workspace only. Subscribe to open :workspace.',
         'member_body' => ':owner owns :workspace and can reopen it by subscribing. Your records are safe.',
         'owner_body_trial' => 'Subscribe to reopen :workspace. Your records are safe for now. If no one signs in for 60 days, we delete the workspace.',
         'member_body_trial' => ':owner owns :workspace and can reopen it by subscribing. If no one signs in for 60 days, we delete it.',

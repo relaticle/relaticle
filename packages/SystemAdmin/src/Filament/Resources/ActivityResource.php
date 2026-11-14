@@ -132,6 +132,7 @@ final class ActivityResource extends Resource
                     'created' => 'Created',
                     'updated' => 'Updated',
                     'deleted' => 'Deleted',
+                    'registered' => 'Registered',
                 ]),
             SelectFilter::make('source')
                 ->options(CreationSource::class)

@@ -2,13 +2,18 @@
 
 declare(strict_types=1);
 
+use App\Actions\Auth\RecordSignup;
 use App\Console\Commands\UpdateTorExitNodesCommand;
 use App\Features\SignupChallenge;
 use App\Filament\Pages\Auth\Login;
+use App\Models\ActivityLog\Activity;
 use App\Models\User;
+use App\Models\Workspace;
 use App\Rules\TurnstileChallenge;
 use App\Services\TurnstileClient;
+use App\Support\Auth\SignupCeiling;
 use App\Support\Http\TorExitNodes;
+use Filament\Facades\Filament;
 use GuzzleHttp\Promise\PromiseInterface;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
@@ -17,7 +22,7 @@ use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Psr\Http\Message\RequestInterface;
 
-mutates(Login::class, TurnstileChallenge::class, TurnstileClient::class, SignupChallenge::class, TorExitNodes::class, UpdateTorExitNodesCommand::class);
+mutates(Login::class, TurnstileChallenge::class, TurnstileClient::class, SignupChallenge::class, SignupCeiling::class, RecordSignup::class, TorExitNodes::class, UpdateTorExitNodesCommand::class);
 
 function enableSignupChallengeWithoutTurnstile(): void
 {
@@ -59,6 +64,14 @@ function completeSignup(string $email): Testable
     return startSignup($email)
         ->fillForm(['password' => 'Password123!'])
         ->call('authenticate');
+}
+
+function signUpAccounts(int $count): void
+{
+    foreach (range(1, $count) as $number) {
+        completeSignup("jane-ceiling-{$number}-".uniqid().'@gmail.com')->assertHasNoFormErrors();
+        Filament::auth()->logout();
+    }
 }
 
 it('is off by default', function (): void {
@@ -361,6 +374,165 @@ it('creates the account from a tor exit relay when the flag is off', function ()
     completeSignup($email)->assertHasNoFormErrors();
 
     expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('refuses a signup at the email step once its address created three accounts in a day', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    signUpAccounts(3);
+
+    $email = 'jane-fourth-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_paused_with_providers', ['providers' => 'Google or Microsoft'])])
+        ->assertSet('authMethod', null)
+        ->assertDispatched('analytics-event', name: 'signup_refused_ceiling')
+        ->assertNotDispatched('analytics-event', name: 'signup_started');
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('refuses a signup whose address reached its daily cap after the email step', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    signUpAccounts(2);
+
+    $email = 'jane-late-'.uniqid().'@gmail.com';
+    $signup = startSignup($email);
+
+    signUpAccounts(1);
+
+    $signup->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_paused_with_providers', ['providers' => 'Google or Microsoft'])])
+        ->assertSet('authMethod', null);
+
+    expect(User::where('email', $email)->exists())->toBeFalse();
+});
+
+it('accepts a signup from the same address a day later', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    signUpAccounts(3);
+
+    $this->travel(25)->hours();
+
+    $email = 'jane-next-day-'.uniqid().'@gmail.com';
+
+    completeSignup($email)->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('refuses a signup once the site-wide hourly ceiling is reached, and accepts one an hour later', function (): void {
+    config(['relaticle.signup.max_per_ip_per_day' => 0, 'relaticle.signup.max_per_hour' => 2]);
+    enableSignupChallengeWithoutTurnstile();
+    signUpAccounts(2);
+
+    $email = 'jane-busy-hour-'.uniqid().'@gmail.com';
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_paused_with_providers', ['providers' => 'Google or Microsoft'])]);
+
+    $this->travel(61)->minutes();
+
+    completeSignup($email)->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('counts only the accounts a signup created toward the ceilings', function (): void {
+    config(['relaticle.signup.max_per_ip_per_day' => 1]);
+    enableSignupChallengeWithoutTurnstile();
+
+    startSignup('jane-weak-'.uniqid().'@gmail.com')
+        ->fillForm(['password' => 'short'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['password']);
+
+    $email = 'jane-first-'.uniqid().'@gmail.com';
+
+    completeSignup($email)->assertHasNoFormErrors();
+
+    expect(User::where('email', $email)->exists())->toBeTrue();
+});
+
+it('tells a visitor to try again later when the ceiling is reached and no provider is configured', function (): void {
+    config(['services.google.client_id' => null, 'services.microsoft.client_id' => null]);
+    enableSignupChallengeWithoutTurnstile();
+    signUpAccounts(3);
+
+    livewire(Login::class)
+        ->fillForm(['email' => 'jane-no-provider-'.uniqid().'@gmail.com'])
+        ->call('authenticate')
+        ->assertHasFormErrors(['email' => __('auth.login.signup_paused')]);
+});
+
+it('leaves the signup ceilings off when the flag is off', function (): void {
+    signUpAccounts(4);
+
+    expect(User::where('email', 'like', 'jane-ceiling-%')->count())->toBe(4);
+});
+
+it('records where a password signup came from', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+
+    $email = 'jane-recorded-'.uniqid().'@gmail.com';
+
+    completeSignup($email)->assertHasNoFormErrors();
+
+    $record = Activity::query()->withoutGlobalScopes()->where('log_name', Activity::SIGNUP_LOG)->sole();
+
+    expect($record->subject?->is(User::where('email', $email)->sole()))->toBeTrue()
+        ->and($record->event)->toBe('registered')
+        ->and($record->properties?->all())->toMatchArray(['method' => 'password', 'ip' => '127.0.0.1', 'challenged' => false])
+        ->and($record->properties?->get('user_agent'))->toBeString();
+});
+
+it('keeps the signup record out of every workspace activity log', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    Filament::setTenant(Workspace::factory()->create(), isQuiet: true);
+
+    completeSignup('jane-hidden-'.uniqid().'@gmail.com')->assertHasNoFormErrors();
+
+    expect(Activity::query()->withoutGlobalScopes()->where('log_name', Activity::SIGNUP_LOG)->sole()->workspace_id)->toBeNull()
+        ->and(Activity::query()->where('log_name', Activity::SIGNUP_LOG)->exists())->toBeFalse();
+});
+
+it('says a signup was challenged when the challenge is on', function (): void {
+    enableSignupChallenge();
+    fakeSiteverify(true);
+
+    startSignup('jane-challenged-'.uniqid().'@gmail.com')
+        ->fillForm(['password' => 'Password123!', 'cf_turnstile_response' => 'a-good-token'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(Activity::query()->withoutGlobalScopes()->where('log_name', Activity::SIGNUP_LOG)->sole()->properties?->get('challenged'))->toBeTrue();
+});
+
+it('records no signup when the flag is off', function (): void {
+    completeSignup('jane-unrecorded-'.uniqid().'@gmail.com')->assertHasNoFormErrors();
+
+    expect(Activity::query()->withoutGlobalScopes()->where('log_name', Activity::SIGNUP_LOG)->exists())->toBeFalse();
+});
+
+it('removes a signup record after 90 days and keeps the rest of the activity log', function (): void {
+    enableSignupChallengeWithoutTurnstile();
+    completeSignup('jane-aged-'.uniqid().'@gmail.com')->assertHasNoFormErrors();
+    $kept = activity('crm')->log('kept');
+
+    $this->travel(89)->days();
+    $this->artisan('activitylog:clean', ['log' => Activity::SIGNUP_LOG, '--days' => 90, '--force' => true])->assertSuccessful();
+
+    expect(Activity::query()->withoutGlobalScopes()->where('log_name', Activity::SIGNUP_LOG)->exists())->toBeTrue();
+
+    $this->travel(2)->days();
+    $this->artisan('activitylog:clean', ['log' => Activity::SIGNUP_LOG, '--days' => 90, '--force' => true])->assertSuccessful();
+
+    expect(Activity::query()->withoutGlobalScopes()->where('log_name', Activity::SIGNUP_LOG)->exists())->toBeFalse()
+        ->and(Activity::query()->withoutGlobalScopes()->whereKey($kept?->getKey())->exists())->toBeTrue();
 });
 
 it('creates the account before the tor exit list has ever been fetched', function (): void {

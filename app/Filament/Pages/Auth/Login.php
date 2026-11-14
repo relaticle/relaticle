@@ -5,8 +5,10 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Auth;
 
 use App\Actions\Auth\AuthenticatePassword;
+use App\Actions\Auth\RecordSignup;
 use App\Actions\Fortify\CreateNewUser;
 use App\Concerns\DetectsWorkspaceInvitation;
+use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Features\SignupChallenge;
 use App\Models\User;
@@ -14,6 +16,7 @@ use App\Models\WorkspaceInvitation;
 use App\Rules\RegistrableEmail;
 use App\Rules\TurnstileChallenge;
 use App\Support\Auth\AuthenticationSession;
+use App\Support\Auth\SignupCeiling;
 use App\Support\EmailAddress;
 use App\Support\Http\TorExitNodes;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
@@ -208,6 +211,7 @@ final class Login extends \Filament\Auth\Pages\Login
         }
 
         $this->assertNotSigningUpOverTor();
+        $this->assertSignupCeilingNotReached();
 
         if (User::query()->where('email', $submittedEmail)->exists()) {
             $this->switchToSignInForExistingAccount();
@@ -224,6 +228,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
         $email = EmailAddress::canonicalize((string) $data['email']);
         $user = $this->createAccount($email, (string) $data['password']);
+        $this->recordSignup($user);
 
         $invitation = $this->getWorkspaceInvitationFromSession();
 
@@ -281,6 +286,37 @@ final class Login extends \Filament\Auth\Pages\Login
         throw ValidationException::withMessages([
             'data.email' => __('auth.login.signup_over_tor'),
         ]);
+    }
+
+    private function assertSignupCeilingNotReached(): void
+    {
+        if (! Feature::active(SignupChallenge::class)) {
+            return;
+        }
+
+        if (! resolve(SignupCeiling::class)->isReached((string) request()->ip())) {
+            return;
+        }
+
+        $this->forgetDiscovery();
+        $this->trackSignupRefusal('ceiling');
+
+        $providers = $this->getAvailableProviderLabels();
+
+        throw ValidationException::withMessages([
+            'data.email' => $providers === null
+                ? __('auth.login.signup_paused')
+                : __('auth.login.signup_paused_with_providers', ['providers' => $providers]),
+        ]);
+    }
+
+    private function recordSignup(User $user): void
+    {
+        if (Feature::active(SignupChallenge::class)) {
+            resolve(SignupCeiling::class)->recordSignup((string) request()->ip());
+        }
+
+        resolve(RecordSignup::class)->execute($user, AuthMethod::PASSWORD, request()->ip(), request()->userAgent(), TurnstileChallenge::isEnabled());
     }
 
     private function createAccount(string $email, #[SensitiveParameter] string $hashedPassword): User
@@ -403,6 +439,7 @@ final class Login extends \Filament\Auth\Pages\Login
 
         if ($this->authMethod === 'signup') {
             $this->assertNotSigningUpOverTor();
+            $this->assertSignupCeilingNotReached();
             $this->dispatch('analytics-event', name: 'signup_started', id: (string) Str::uuid());
         }
     }
@@ -535,15 +572,20 @@ final class Login extends \Filament\Auth\Pages\Login
 
     private function getTurnstileBlockedMessage(): string
     {
-        $providers = array_map(fn (SocialiteProvider $provider): string => $provider->label(), SocialiteProvider::available());
+        $providers = $this->getAvailableProviderLabels();
 
-        if ($providers === []) {
+        if ($providers === null) {
             return __('auth.turnstile.blocked');
         }
 
-        return __('auth.turnstile.blocked_with_providers', [
-            'providers' => Arr::join($providers, ', ', ' '.__('auth.turnstile.or').' '),
-        ]);
+        return __('auth.turnstile.blocked_with_providers', ['providers' => $providers]);
+    }
+
+    private function getAvailableProviderLabels(): ?string
+    {
+        $providers = array_map(fn (SocialiteProvider $provider): string => $provider->label(), SocialiteProvider::available());
+
+        return $providers === [] ? null : Arr::join($providers, ', ', ' '.__('auth.turnstile.or').' ');
     }
 
     /**
