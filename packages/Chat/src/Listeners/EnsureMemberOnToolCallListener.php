@@ -23,7 +23,7 @@ final readonly class EnsureMemberOnToolCallListener
             return;
         }
 
-        if (! $agent->workspace->hasMember($agent->currentUser['id'])) {
+        if (! $agent->workspace->hasMemberNow($agent->currentUser['id'])) {
             throw MembershipRevokedException::forWorkspace((string) $agent->workspace->getKey());
         }
     }

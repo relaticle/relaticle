@@ -164,7 +164,7 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
-        if (! $this->workspace->hasMember((string) $this->user->getKey())) {
+        if (! $this->workspace->hasMemberNow((string) $this->user->getKey())) {
             $this->refuseTurn($creditService, $this->membershipRevokedMessage());
 
             return;
