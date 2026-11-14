@@ -11,6 +11,7 @@ use App\Actions\Onboarding\RemoveSampleData;
 use App\Enums\CreationSource;
 use App\Enums\MediaCollection;
 use App\Enums\WorkspaceRole;
+use App\Events\RecordMerged;
 use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
@@ -27,6 +28,7 @@ use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\TransactionBeginning;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -285,6 +287,55 @@ it('takes the duplicate\'s owner when the kept company has none and the owner is
 
     expect($kept->refresh()->account_owner_id)->toBe($this->user->getKey());
 });
+
+it('drops the kept company\'s owner who left the workspace and takes the duplicate\'s member owner', function (bool $duplicateHasOwner): void {
+    $departed = User::factory()->create();
+    $kept = mergeCompany($this->workspace, $this->user, ['account_owner_id' => $departed->getKey()]);
+    $duplicate = mergeCompany($this->workspace, $this->user, ['account_owner_id' => $duplicateHasOwner ? $this->user->getKey() : null]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect($kept->refresh()->account_owner_id)->toBe($duplicateHasOwner ? $this->user->getKey() : null)
+        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+})->with([true, false]);
+
+it('shows an error on the duplicate when the merge fails validation on another field', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $kept = mergeCompany($this->workspace, $this->user, ['account_owner_id' => $member->getKey()]);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+
+    Event::listen(RecordMerged::class, fn (): int => $this->workspace->users()->detach($member));
+    mergeWith($kept, $duplicate)->assertHasActionErrors(['duplicate_id']);
+
+    expect(Company::query()->find($duplicate->getKey()))->not->toBeNull();
+});
+
+function mergeCompanyDialog(Company $kept, string $search): string
+{
+    $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
+        ->mountAction(mergeAction())
+        ->setActionData(['search' => $search]);
+
+    return implode('', Arr::where($page->effects['partials'], fn (string $html, string $key): bool => str_starts_with($key, 'action-modals')));
+}
+
+it('finds a company by name or by any of its domains', function (string $term, array $found): void {
+    $kept = mergeCompany($this->workspace, $this->user, ['name' => 'Kept']);
+    mergeCompany($this->workspace, $this->user, ['name' => 'Brightline Health'], ['domains' => ['brightline.health', 'brightlinehealth.com']]);
+    mergeCompany($this->workspace, $this->user, ['name' => 'Northwind'], ['domains' => ['northwind.com']]);
+
+    $dialog = mergeCompanyDialog($kept, $term);
+
+    foreach (['Brightline Health', 'Northwind'] as $name) {
+        in_array($name, $found, true) ? expect($dialog)->toContain($name) : expect($dialog)->not->toContain($name);
+    }
+})->with([
+    'name' => ['Bright', ['Brightline Health']],
+    'second domain' => ['brightlinehealth', ['Brightline Health']],
+    'domain fragment' => ['northwind.c', ['Northwind']],
+    'nothing' => ['zzz', []],
+]);
 
 function mergeMedia(Company $company, string $collection): Media
 {

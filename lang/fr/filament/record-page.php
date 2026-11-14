@@ -56,7 +56,10 @@ return [
         'over_limit' => ":field peut contenir :max valeurs. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.",
         'pick' => 'Choisir une fiche',
         'clear' => 'Choisir une autre fiche',
-        'search_placeholder' => 'Rechercher par nom',
+        'search_placeholder' => [
+            'company' => 'Rechercher par nom ou domaine',
+            'people' => 'Rechercher par nom ou e-mail',
+        ],
         'no_results' => 'Aucune fiche trouvée',
         'no_domains' => 'Aucun domaine',
         'no_emails' => 'Aucun e-mail',

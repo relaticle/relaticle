@@ -82,7 +82,16 @@ it('merges a duplicate picked from the dialog into the current company', functio
         ->assertScript(MERGE_SUBMIT_DISABLED, true)
         ->assertScript('document.querySelector("[data-merge-swap]").disabled', true);
 
-    pickInMergeDialog($page, 'Inc', 'Brightline Health Inc.')
+    $page->click('[data-merge-picker]')
+        ->assertAttribute('[data-merge-popover] input', 'placeholder', 'Search by name or domain')
+        ->assertAttribute('[data-merge-popover] input', 'aria-activedescendant', 'merge-option-0')
+        ->type('[data-merge-popover] input', 'zzzz')
+        ->wait(1.2)
+        ->assertAttributeMissing('[data-merge-popover] input', 'aria-activedescendant')
+        ->assertAttributeMissing('[data-merge-popover] input', 'aria-controls')
+        ->keys('[data-merge-popover] input', 'Escape');
+
+    pickInMergeDialog($page, 'brightline.health', 'Brightline Health Inc.')
         ->assertSeeIn('[data-merge-left]', 'Brightline Health Inc.')
         ->assertSeeIn('[data-merge-result]', 'brightlinehealth.com')
         ->assertSeeIn('[data-merge-result]', 'brightline.health')
@@ -310,9 +319,12 @@ it('merges a duplicate person picked from the dialog and shows emails and contac
     Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
 
     $page = openMergeDialog($this->user, $this->workspace, $kept)
-        ->assertSeeIn('[data-merge-right]', 'dana@brightline.com');
+        ->assertSeeIn('[data-merge-right]', 'dana@brightline.com')
+        ->click('[data-merge-picker]')
+        ->assertAttribute('[data-merge-popover] input', 'placeholder', 'Search by name or email')
+        ->keys('[data-merge-popover] input', 'Escape');
 
-    pickInMergeDialog($page, 'Dana W', 'Dana W.')
+    pickInMergeDialog($page, 'dana@gmail', 'Dana W.')
         ->assertSeeIn('[data-merge-left]', 'dana@gmail.com')
         ->assertSeeIn('[data-merge-result]', 'dana@brightline.com')
         ->assertSeeIn('[data-merge-result]', 'dana@gmail.com')

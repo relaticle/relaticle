@@ -16,6 +16,7 @@ use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Support\LikePattern;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
 use Filament\Notifications\Notification;
@@ -27,6 +28,7 @@ use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
@@ -79,7 +81,7 @@ final class MergeRecordAction extends Action
                     $index = array_key_last($livewire->mountedActions);
 
                     throw ValidationException::withMessages([
-                        "mountedActions.{$index}.data.duplicate_id" => $exception->errors()['duplicate_id'],
+                        "mountedActions.{$index}.data.duplicate_id" => $exception->errors()['duplicate_id'] ?? Arr::flatten($exception->errors()),
                     ]);
                 }
 
@@ -123,7 +125,8 @@ final class MergeRecordAction extends Action
     private function merge(array $data): Company|People
     {
         $current = $this->subject();
-        $other = $this->entities()->whereKey($data['duplicate_id'])->first();
+        $id = $data['duplicate_id'] ?? null;
+        $other = is_string($id) ? $this->entities()->whereKey($id)->first() : null;
 
         if ($other === null || $current->is($other)) {
             throw ValidationException::withMessages(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
@@ -168,6 +171,9 @@ final class MergeRecordAction extends Action
         return [
             'statePath' => $this->statePath(),
             'search' => (string) $this->formState('search'),
+            'searchPlaceholder' => $this->subject() instanceof People
+                ? __('filament/record-page.merge.search_placeholder.people')
+                : __('filament/record-page.merge.search_placeholder.company'),
             'results' => $pairing === null ? $this->searchResults() : [],
             'left' => $keepsOther ? $current : $other,
             'right' => $keepsOther ? $other : $current,
@@ -377,7 +383,7 @@ final class MergeRecordAction extends Action
 
         $records = $this->searchQuery()
             ->whereKeyNot($this->subject()->getKey())
-            ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'ilike', '%'.addcslashes($search, '%_\\').'%'))
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $match): Builder => $this->matching($match, '%'.LikePattern::escape($search).'%')))
             ->orderBy('name')
             ->limit(25)
             ->get();
@@ -389,6 +395,19 @@ final class MergeRecordAction extends Action
             'logo' => $this->logo($record),
             'icon' => $this->entity()->icon(),
         ])->all());
+    }
+
+    /**
+     * @param  Builder<Company>|Builder<People>  $query
+     * @return Builder<Company>|Builder<People>
+     */
+    private function matching(Builder $query, string $pattern): Builder
+    {
+        return $query
+            ->where('name', 'ilike', $pattern)
+            ->orWhereHas('customFieldValues', fn (Builder $values): Builder => $values
+                ->whereRelation('customField', 'code', $this->detailCode())
+                ->whereRaw('exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element ilike ?)', [$pattern]));
     }
 
     /**
