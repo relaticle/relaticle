@@ -143,7 +143,8 @@ it('drops an unfinished chip when another view with the same rules is opened', f
 
     $page = ($this->open)()
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Oldest first');
+        ->click('Oldest first')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Oldest first');
     expect(companyRows($page, 3))->toBeTrue();
 
     addChip($page, 'name', 'contains')
@@ -390,7 +391,8 @@ it('keeps a date in the next 30 days with a saved view and reads the same after 
 
     $page = ($this->open)()
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Renewals');
+        ->click('Renewals')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Renewals');
     expect(companyRows($page, 5))->toBeTrue();
 
     addChip($page, 'custom_fields.renewal', 'in_the_next');

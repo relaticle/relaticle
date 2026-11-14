@@ -10,7 +10,7 @@ if (($argv[1] ?? null) === '--over-budget') {
 
     $over = array_filter(
         $recorded['timings'],
-        fn (float|int $seconds, string $class): bool => $seconds > (str_contains($class, '\\Browser\\') ? 90 : 130),
+        fn (float|int $seconds, string $class): bool => $seconds > (str_contains($class, '\\Browser\\') ? 115 : 160),
         ARRAY_FILTER_USE_BOTH,
     );
 

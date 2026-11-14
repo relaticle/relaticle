@@ -54,6 +54,21 @@ it('creates an administrator who can authenticate with the given password', func
         ]))->toBeTrue();
 });
 
+it('rejects an administrator password shorter than the app minimum', function (): void {
+    livewire(CreateSystemAdministrator::class)
+        ->fillForm([
+            'name' => 'Weak Admin',
+            'email' => 'weak-admin@example.test',
+            'role' => SystemAdministratorRole::SuperAdministrator->value,
+            'password' => 'abc',
+            'password_confirmation' => 'abc',
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['password']);
+
+    expect(SystemAdministrator::query()->where('email', 'weak-admin@example.test')->exists())->toBeFalse();
+});
+
 it('changes an administrator password', function (): void {
     $target = SystemAdministrator::factory()->create();
 

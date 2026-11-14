@@ -13,8 +13,8 @@
 
     $costAnswer = $billingActive
         ? __(
-            'Relaticle Cloud meters AI by credits, never by seat. New workspaces get a :days-day Cloud Pro trial with a :credits-credit monthly allowance, and the paid plan keeps that allowance for unlimited users. A self-hosted install brings its own provider key or a local model and pays that provider directly.',
-            ['days' => $trialDays, 'credits' => $proCredits]
+            'Relaticle Cloud meters AI by credits, never by seat. New workspaces get a :days-day Cloud Pro trial with :trialCredits credits. The paid plan includes a :credits-credit monthly allowance for unlimited users. A self-hosted install brings its own provider key or a local model and pays that provider directly.',
+            ['days' => $trialDays, 'trialCredits' => number_format(\App\Enums\Plan::trialCredits()), 'credits' => $proCredits]
         )
         : __(
             'Relaticle Cloud meters AI by credits, never by seat: every workspace gets a :credits-credit monthly allowance. A self-hosted install brings its own provider key or a local model and pays that provider directly.',

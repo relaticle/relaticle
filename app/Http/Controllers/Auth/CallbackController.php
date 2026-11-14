@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Actions\Auth\BeginAuthentication;
 use App\Actions\Auth\DeleteUnclaimedAccount;
+use App\Actions\Auth\RecordSignup;
 use App\Contracts\User\CreatesNewSocialUsers;
 use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
@@ -31,6 +32,7 @@ final readonly class CallbackController
     public function __construct(
         private BeginAuthentication $beginAuthentication,
         private DeleteUnclaimedAccount $deleteUnclaimedAccount,
+        private RecordSignup $recordSignup,
     ) {}
 
     public function __invoke(
@@ -113,6 +115,7 @@ final readonly class CallbackController
             }
 
             $user = $this->createUser($socialUser, $creator);
+            $this->recordSignup->execute($user, AuthMethod::from($provider->value), request()->ip(), request()->userAgent(), challenged: false);
 
             if ($matchedUser instanceof User) {
                 $this->logReplacement($matchedUser, $user, $provider);

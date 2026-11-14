@@ -119,7 +119,8 @@ it('leaves the list and the view alone while a chip is unfinished', function ():
 
     $page = ($this->open)()
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads');
+        ->click('Hot leads')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads');
     expect(companyRows($page, 3))->toBeTrue();
 
     addChip($page, 'name', 'contains')
@@ -137,7 +138,8 @@ it('saves a complete chip on a saved view as it completes and keeps the chip aft
 
     $page = ($this->open)()
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click('Hot leads');
+        ->click('Hot leads')
+        ->assertSeeIn('.fi-view-switcher-trigger', 'Hot leads');
 
     addChip($page, 'name', 'contains')->type(valueInput(), 'glo');
     $page->assertScript(filterRowSaveControlCount(), 0);

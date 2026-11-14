@@ -41,6 +41,8 @@
                                 : __('cloud::billing.paused.member_body_ownerless', ['workspace' => $workspace->name]) }}
                         @elseif($lapsedPlan)
                             {{ __('cloud::billing.paused.owner_body_managed', ['plan' => $lapsedPlan->marketingLabel(), 'workspace' => $workspace->name]) }}
+                        @elseif($billingStatus === \App\Enums\BillingStatus::Free)
+                            {{ __('cloud::billing.paused.owner_body_free', ['workspace' => $workspace->name]) }}
                         @else
                             {{ __($deletesWhenInactive ? 'cloud::billing.paused.owner_body_trial' : 'cloud::billing.paused.owner_body', ['workspace' => $workspace->name]) }}
                         @endif

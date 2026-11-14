@@ -75,6 +75,8 @@ We protect your data with:
 - **Active accounts:** Data is retained as long as your account is active, except paused trial workspaces (below)
 - **Acquisition attribution:** Session data follows your session lifetime. Attribution saved at signup and associated milestones remain until the account is deleted
 - **Scheduled account deletions:** Accounts and their personal data are removed after a 30-day grace period. Records in shared workspaces remain.
+- **Unverified accounts:** An account whose email address is never verified, and that holds no workspace, is deleted after 30 days
+- **Sign-up security records:** The IP address and browser used to create an account are kept for 90 days to prevent abuse. Only our administrators can see them
 - **Paused trial workspaces:** Deleted with their records after 60 days without a sign-in or a plan. We email the owner 14 days and 5 days before.
 - **Contact form submissions:** Retained for up to 12 months
 - **Server logs:** Retained for up to 90 days
