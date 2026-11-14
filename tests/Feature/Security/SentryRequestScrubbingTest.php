@@ -9,10 +9,13 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Route;
+use Livewire\Component;
+use Livewire\Livewire;
 use Sentry\Breadcrumb;
 use Sentry\ClientBuilder;
 use Sentry\Event;
 use Sentry\Laravel\EventHandler;
+use Sentry\Laravel\Features\LivewirePackageIntegration;
 use Sentry\Laravel\Http\LaravelRequestFetcher;
 use Sentry\SentrySdk;
 use Sentry\State\HubInterface;
@@ -35,6 +38,21 @@ final class SentryTransportSpy implements TransportInterface
     public function close(?int $timeout = null): Result
     {
         return new Result(ResultStatus::success());
+    }
+}
+
+final class SentryBreadcrumbProbe extends Component
+{
+    public string $note = 'initial-state-secret';
+
+    public function save(string $value): void
+    {
+        $this->note = $value;
+    }
+
+    public function render(): string
+    {
+        return '<div></div>';
     }
 }
 
@@ -215,6 +233,26 @@ it('keeps sql bindings out of query breadcrumbs', function (): void {
 
     expect($breadcrumbs)->not->toBeEmpty()
         ->and(json_encode($breadcrumbs))->not->toContain('binding-secret');
+});
+
+it('keeps component state and call arguments out of livewire breadcrumbs', function (): void {
+    $transport = new SentryTransportSpy;
+    $hub = sentryHubSending($transport, sentryRequest('GET', '/app'));
+
+    $integration = new LivewirePackageIntegration(app());
+
+    if ($integration->isApplicable()) {
+        $integration->onBoot(resolve('livewire'));
+    }
+
+    Livewire::test(SentryBreadcrumbProbe::class)->call('save', 'argument-secret');
+    $hub->captureException(new RuntimeException('boom'));
+
+    $breadcrumbs = array_map(fn (Breadcrumb $breadcrumb): array => [$breadcrumb->getCategory(), $breadcrumb->getMessage(), $breadcrumb->getMetadata()], $transport->events[0]->getBreadcrumbs());
+
+    expect(json_encode($breadcrumbs))->not->toContain('initial-state-secret')
+        ->and(json_encode($breadcrumbs))->not->toContain('argument-secret')
+        ->and(array_column($breadcrumbs, 0))->not->toContain('livewire');
 });
 
 it('opts into data collection with no bodies, no identity and no payloads', function (): void {

@@ -78,8 +78,8 @@ return [
         // Capture Laravel cache events (hits, writes etc.) as breadcrumbs
         'cache' => env('SENTRY_BREADCRUMBS_CACHE_ENABLED', true),
 
-        // Capture Livewire components like routes as breadcrumbs
-        'livewire' => env('SENTRY_BREADCRUMBS_LIVEWIRE_ENABLED', true),
+        // Off by default: the breadcrumbs carry component state, mount data and call arguments.
+        'livewire' => env('SENTRY_BREADCRUMBS_LIVEWIRE_ENABLED', false),
 
         // Capture SQL queries as breadcrumbs
         'sql_queries' => env('SENTRY_BREADCRUMBS_SQL_QUERIES_ENABLED', true),
