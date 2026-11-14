@@ -282,6 +282,23 @@ it('shows the unavailable error when the duplicate disappears while the merge st
         ->and(Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->exists())->toBeFalse();
 });
 
+it('shows the unavailable error when the kept person disappears while the merge starts', function (): void {
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $duplicate->notes()->attach($note->getKey());
+
+    $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
+        ->mountAction(mergeRecordAction())
+        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+    Event::listen(TransactionBeginning::class, fn (): int => DB::table('people')->where('id', $kept->getKey())->update(['deleted_at' => now()]));
+    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+
+    expect(People::query()->find($duplicate->getKey()))->not->toBeNull()
+        ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
+        ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
+});
+
 it('counts emails case-insensitively before applying the limit', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['A1@X.com', ' a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com']]);

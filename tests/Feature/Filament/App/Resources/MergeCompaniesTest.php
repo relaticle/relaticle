@@ -252,6 +252,23 @@ it('shows the unavailable error when the duplicate disappears while the merge st
         ->and(Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->exists())->toBeFalse();
 });
 
+it('shows the unavailable error when the kept company disappears while the merge starts', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $duplicate->notes()->attach($note->getKey());
+
+    $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
+        ->mountAction(mergeRecordAction())
+        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+    Event::listen(TransactionBeginning::class, fn (): int => DB::table('companies')->where('id', $kept->getKey())->update(['deleted_at' => now()]));
+    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+
+    expect(Company::query()->find($duplicate->getKey()))->not->toBeNull()
+        ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
+        ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
+});
+
 it('leaves the owner empty when the duplicate\'s owner is not a workspace member', function (): void {
     $stranger = User::factory()->create();
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['account_owner_id' => null]);
