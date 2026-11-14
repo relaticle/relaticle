@@ -43,7 +43,7 @@ return [
         'user_info' => (bool) env('SENTRY_SEND_DEFAULT_PII', false),
         'http_bodies' => [],
         'http_headers' => [
-            'request' => ['terms' => ['forwarded', 'real-ip', 'connecting-ip']],
+            'request' => ['terms' => ['forwarded', 'real-ip', 'connecting-ip', 'client-ip']],
             'response' => ['mode' => 'off'],
         ],
         'url_query_params' => ['terms' => ['email']],

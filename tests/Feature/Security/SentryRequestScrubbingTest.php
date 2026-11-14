@@ -144,13 +144,17 @@ it('filters session, csrf and remember cookies', function (): void {
 it('sends no user address or identity', function (): void {
     $event = sentryReport('GET', '/app', tweak: fn (ServerRequest $request): ServerRequest => $request
         ->withHeader('X-Forwarded-For', '198.51.100.7')
-        ->withHeader('X-Real-IP', '198.51.100.7'));
+        ->withHeader('X-Real-IP', '198.51.100.7')
+        ->withHeader('True-Client-IP', '198.51.100.8')
+        ->withHeader('X-Client-IP', '198.51.100.9'));
 
     $json = json_encode([$event->getRequest(), $event->getUser()]);
 
     expect($event->getUser())->toBeNull()
         ->and($json)->not->toContain('203.0.113.9')
-        ->and($json)->not->toContain('198.51.100.7');
+        ->and($json)->not->toContain('198.51.100.7')
+        ->and($json)->not->toContain('198.51.100.8')
+        ->and($json)->not->toContain('198.51.100.9');
 });
 
 it('masks secret path parameters in the url and keeps other parameters', function (string $method, string $path, string $expected, string $secret): void {
