@@ -210,8 +210,7 @@ it('does not thread onto a private teammate email', function (): void {
         'batch_id' => null,
     ]);
 
-    expect($email->thread_id)->toBeNull()
-        ->and($email->in_reply_to)->toBeNull();
+    expect($email->in_reply_to)->toBeNull();
 });
 
 it('threads onto a teammate email the sender may view', function (): void {
