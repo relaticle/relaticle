@@ -547,7 +547,7 @@ PROMPT;
         return "\n\n## Current Date\n"
             ."Today is {$today->toDateString()} ({$today->englishDayOfWeek}), timezone {$timezone}. "
             .'Resolve relative dates ("tomorrow", "next week", "in 3 days") against this date instead of asking the user. '
-            ."A date alone needs no offset. A date with a time always carries its UTC offset, such as {$today->format('Y-m-d\TH:i:sP')}.";
+            ."A date alone needs no offset. A date with a time always carries its UTC offset, such as {$today->toDateString()}T15:00:00{$today->format('P')}.";
     }
 
     private function currentUserBlock(): string
