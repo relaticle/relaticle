@@ -80,3 +80,39 @@ const MERGE_LAYOUT = <<<'JS'
         };
     })();
 JS;
+
+const MERGE_POPOVER_RECT = <<<'JS'
+    (() => {
+        const box = document.querySelector('[data-merge-popover]').getBoundingClientRect();
+        const anchor = document.querySelector('[data-merge-picker]').getBoundingClientRect();
+        const modal = document.querySelector('.fi-modal-window').getBoundingClientRect();
+
+        return {
+            left: box.left,
+            top: box.top,
+            bottom: box.bottom,
+            right: box.right,
+            height: box.height,
+            above: box.bottom <= anchor.top,
+            anchorLeft: anchor.left,
+            modalLeft: modal.left,
+            modalRight: modal.right,
+            windowWidth: window.innerWidth,
+            windowHeight: window.innerHeight,
+            rows: document.querySelectorAll('[data-merge-popover] li').length,
+        };
+    })()
+JS;
+
+function searchMergePicker(AwaitableWebpage $page, string $term): array
+{
+    $page->script(<<<JS
+        (() => {
+            const input = document.querySelector('[data-merge-popover] input');
+            input.value = '{$term}';
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+        })()
+        JS);
+
+    return $page->wait(1.2)->script(MERGE_POPOVER_RECT);
+}
