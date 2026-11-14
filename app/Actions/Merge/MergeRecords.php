@@ -11,7 +11,9 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use Closure;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -72,18 +74,20 @@ final readonly class MergeRecords
      */
     private function lock(Company|People $kept, Company|People $duplicate): array
     {
-        $lockedKeys = $kept->newQueryWithoutRelationships()
+        /** @var Collection<string, TRecord> $locked */
+        $locked = $kept->newQueryWithoutRelationships()
             ->whereKey([$kept->getKey(), $duplicate->getKey()])
             // One lock order for every merge, so two opposite merges of the same pair wait instead of deadlocking.
             ->orderBy($kept->getKeyName())
             ->lockForUpdate()
-            ->pluck($kept->getKeyName());
+            ->get()
+            ->keyBy(fn (Model $record): string => (string) $record->getKey());
 
-        if ($lockedKeys->count() !== 2) {
+        if ($locked->count() !== 2) {
             throw $this->unavailable();
         }
 
-        return [$kept->fresh() ?? throw $this->unavailable(), $duplicate->fresh() ?? throw $this->unavailable()];
+        return [$locked[(string) $kept->getKey()], $locked[(string) $duplicate->getKey()]];
     }
 
     private function assertWithinLimits(MergedValues $values): void

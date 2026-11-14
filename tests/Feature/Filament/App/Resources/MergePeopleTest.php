@@ -422,7 +422,7 @@ it('locks both people with one select in id order, whichever one is kept', funct
         mergePeopleWith($current, $other, $keep)->assertHasNoActionErrors();
 
         expect($locks)->toHaveCount(1, $keep)
-            ->and($locks[0]->sql)->toContain('from "people"')
+            ->and($locks[0]->sql)->toStartWith('select * from "people"')
             ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
             ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());
     }

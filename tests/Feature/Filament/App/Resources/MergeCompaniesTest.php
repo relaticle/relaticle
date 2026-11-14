@@ -637,7 +637,7 @@ it('locks both companies with one select in id order, whichever one is kept', fu
         mergeWith($current, $other, $keep)->assertHasNoActionErrors();
 
         expect($locks)->toHaveCount(1, $keep)
-            ->and($locks[0]->sql)->toContain('from "companies"')
+            ->and($locks[0]->sql)->toStartWith('select * from "companies"')
             ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
             ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());
     }
