@@ -213,14 +213,15 @@ it('masks the url and referer carried in the trace context', function (): void {
         ->and($data['http.request.header.referer'])->toBe('https://relaticle.test/invitations/{token}');
 });
 
-it('leaves reports outside an http request untouched', function (): void {
+it('leaves the url of a request with no matched route as the sdk captured it', function (): void {
     $transport = new SentryTransportSpy;
     $hub = sentryHubSending($transport, sentryRequest('GET', '/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj'));
     app()->instance('request', Request::create('/'));
 
     $hub->captureException(new RuntimeException('boom'));
 
-    expect($transport->events)->toHaveCount(1);
+    expect($transport->events)->toHaveCount(1)
+        ->and($transport->events[0]->getRequest()['url'])->toBe('https://relaticle.test/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj');
 });
 
 it('keeps sql bindings out of query breadcrumbs', function (): void {
