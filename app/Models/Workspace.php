@@ -747,6 +747,12 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         return $this->users->merge([$this->owner]);
     }
 
+    public function hasMember(string $userId): bool
+    {
+        return (string) $this->user_id === $userId
+            || $this->users()->whereKey($userId)->exists();
+    }
+
     public function hasUser(User $user): bool
     {
         return $user->belongsToWorkspace($this);
