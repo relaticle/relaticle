@@ -283,16 +283,28 @@ it('drops the kept company\'s owner who left the workspace and takes the duplica
         ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
 })->with([true, false]);
 
-it('shows an error on the duplicate when the merge fails validation on another field', function (): void {
+it('rolls back every moved link and the history when the final write fails validation', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['account_owner_id' => $member->getKey()]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $duplicate->notes()->attach($note->getKey());
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
+    $logo = mergeMedia($duplicate, Company::LOGO_MEDIA_COLLECTION);
+    $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->pluck('id');
 
     Event::listen(RecordMerged::class, fn (): int => $this->workspace->users()->detach($member));
     mergeWith($kept, $duplicate)->assertHasActionErrors(['duplicate_id']);
 
-    expect(Company::query()->find($duplicate->getKey()))->not->toBeNull();
+    expect($duplicateRows)->not->toBeEmpty()
+        ->and(Company::query()->find($duplicate->getKey()))->not->toBeNull()
+        ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
+        ->and(mergeLinkedIds('noteables', 'note_id', $kept))->toBe([])
+        ->and($person->refresh()->company_id)->toBe($duplicate->getKey())
+        ->and($logo->refresh()->model_id)->toBe($duplicate->getKey())
+        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$duplicate->getKey()])
+        ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
 });
 
 it('finds a company by name or by any of its domains', function (string $term, array $found): void {
