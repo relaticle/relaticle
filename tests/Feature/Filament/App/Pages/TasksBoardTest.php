@@ -2262,3 +2262,10 @@ it('offers no add tile to a member and refuses a forged task status add', functi
     expect($component->instance()->getBoard()->canAddColumns())->toBeFalse()
         ->and(statusIds($this->statusField))->toHaveCount($count);
 });
+
+it('words the task add input placeholder and a taken status name', function (): void {
+    $component = livewire(TasksBoard::class)->call('addBoardColumn', 'done');
+
+    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('Status name')
+        ->and($component->errors()->get('boardNewColumn'))->toBe(['A status named "done" already exists.']);
+});

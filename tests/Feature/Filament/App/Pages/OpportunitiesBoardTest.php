@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\CustomFields\SetCustomFieldOptions;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SetBoardColumnCollapsed;
@@ -2162,4 +2163,46 @@ it('words the add tile by the attribute the board is grouped by', function (): v
 
     expect($component->instance()->getBoard()->getAddColumnLabel())->toBe('Add option')
         ->and(CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $tier->getKey())->orderBy('sort_order')->pluck('name')->all())->toBe(['Gold', 'Silver', 'Bronze']);
+});
+
+it('stores gray on a new option and leaves option colors off', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    expect($tier->refresh()->settings->enable_option_colors ?? false)->toBeFalse();
+
+    livewire(OpportunitiesBoard::class)->call('setBoardColumnField', $tier->code)->call('addBoardColumn', 'Bronze')->assertHasNoErrors();
+
+    $bronze = CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $tier->getKey())->where('name', 'Bronze')->firstOrFail();
+
+    expect($bronze->settings->color)->toBe(OptionColor::Gray->value)
+        ->and($tier->refresh()->settings->enable_option_colors ?? false)->toBeFalse();
+});
+
+it('refuses the add write for a member at the action', function (WorkspaceRole $role): void {
+    $member = makeBoardMember($this, $role);
+    $options = [...array_map(fn (CustomFieldOption $option): array => ['id' => (string) $option->getKey(), 'name' => (string) $option->name, 'was' => (string) $option->name], $this->stageField->options->all()), ['name' => 'Forged', 'color' => OptionColor::Gray->value]];
+
+    expect(fn () => resolve(SetCustomFieldOptions::class)->execute($member, $this->stageField, ['options' => $options, 'removed' => []]))
+        ->toThrow(HttpException::class);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->where('name', 'Forged')->exists())->toBeFalse();
+})->with([WorkspaceRole::Member, WorkspaceRole::Viewer]);
+
+it('words a taken stage name with the stage noun and the typed name', function (): void {
+    $taken = stageOption(stageIds($this->stageField)[0])->name;
+
+    $component = livewire(OpportunitiesBoard::class)->call('addBoardColumn', strtolower($taken));
+
+    expect($component->errors()->get('boardNewColumn'))->toBe([__('filament/pages/boards.stage_menu.name_taken', ['noun' => 'stage', 'name' => strtolower($taken)])])
+        ->and(__('filament/pages/boards.stage_menu.name_taken', ['noun' => 'stage', 'name' => 'Won']))->toBe('A stage named "Won" already exists.');
+});
+
+it('words the add input placeholder by the grouped attribute', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('Stage name');
+
+    $component->call('setBoardColumnField', $tier->code);
+
+    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('Option name');
 });

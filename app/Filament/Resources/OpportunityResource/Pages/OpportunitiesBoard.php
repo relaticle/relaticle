@@ -85,6 +85,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->addColumnUsing($this->addBoardStageUsing())
             ->addColumnLabel(fn (): string => __('filament/pages/boards.stage_menu.add', ['noun' => $this->boardStageNoun()]))
+            ->addColumnPlaceholder(fn (): string => __('filament/pages/boards.stage_menu.add_placeholder', ['noun' => $this->boardStageNoun()]))
             ->cardSchema(fn (Schema $schema): Schema => $schema->components($card))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')

@@ -234,7 +234,7 @@ final readonly class CustomFieldDefinitionValidator
     {
         return [
             'options.*.name.required' => 'Option names cannot be empty.',
-            'options.*.name.distinct' => 'Duplicate option names are not allowed.',
+            'options.*.name.distinct' => __('Duplicate option names are not allowed.'),
             'options.*.name.max' => 'Option names must be 255 characters or fewer.',
         ];
     }

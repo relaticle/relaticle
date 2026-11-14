@@ -376,11 +376,17 @@ trait HasBoardStageOrder
 
     protected function addBoardStage(string $name): void
     {
+        $name = trim($name);
         $field = $this->boardColumnField();
-        $options = [...$this->stageOptionEntries($field, '', []), ['name' => trim($name), 'color' => OptionColor::Gray->value]];
+
+        if ($field->options->contains(fn (CustomFieldOption $stage): bool => mb_strtolower((string) $stage->getAttribute('name')) === mb_strtolower($name))) {
+            throw ValidationException::withMessages(['name' => __('filament/pages/boards.stage_menu.name_taken', ['noun' => $this->boardStageNoun(), 'name' => $name])]);
+        }
+
+        $options = [...$this->stageOptionEntries($field, '', []), ['name' => $name, 'color' => OptionColor::Gray->value]];
 
         try {
-            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => [], 'keeps_colors' => true]);
         } catch (OptionsChangedException) {
             throw ValidationException::withMessages(['name' => __('filament/pages/boards.stage_menu.changed', ['noun' => $this->boardStageNoun()])]);
         }

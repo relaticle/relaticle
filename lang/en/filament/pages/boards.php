@@ -48,6 +48,8 @@ return [
             'option' => 'option',
         ],
         'add' => 'Add :noun',
+        'add_placeholder' => ':Noun name',
+        'name_taken' => 'A :noun named ":name" already exists.',
         'collapse' => 'Collapse :noun',
         'hide' => 'Hide :noun',
         'name' => 'Name of this :noun',

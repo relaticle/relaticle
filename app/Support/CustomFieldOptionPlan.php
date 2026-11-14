@@ -231,7 +231,7 @@ final readonly class CustomFieldOptionPlan
             throw ValidationException::withMessages(['options' => $errors]);
         }
 
-        return new self($targets, $removals, self::turnsOnColors($field, $targets), $field->getValueColumn() === 'json_value');
+        return new self($targets, $removals, ! ($data['keeps_colors'] ?? false) && self::turnsOnColors($field, $targets), $field->getValueColumn() === 'json_value');
     }
 
     /**
