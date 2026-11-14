@@ -74,23 +74,14 @@
     </div>
 
     @if ($isUnavailable())
-        <p role="alert" class="flex items-start gap-2 rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-700 ring-1 ring-danger-600/20 dark:bg-danger-400/10 dark:text-danger-400 dark:ring-danger-400/30" data-merge-error>
-            <x-filament::icon icon="lucide-circle-alert" class="mt-0.5 size-4 shrink-0" />
-            {{ __('filament/record-page.merge.unavailable') }}
-        </p>
+        @include('filament.app.merge-record.alert', ['marker' => 'data-merge-error', 'message' => __('filament/record-page.merge.unavailable')])
     @endif
 
     @error($getStatePath())
-        <p role="alert" class="flex items-start gap-2 rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-700 ring-1 ring-danger-600/20 dark:bg-danger-400/10 dark:text-danger-400 dark:ring-danger-400/30" data-merge-error>
-            <x-filament::icon icon="lucide-circle-alert" class="mt-0.5 size-4 shrink-0" />
-            {{ $message }}
-        </p>
+        @include('filament.app.merge-record.alert', ['marker' => 'data-merge-error', 'message' => $message])
     @enderror
 
-    @foreach ($getOverLimitMessages() as $message)
-        <p role="alert" class="flex items-start gap-2 rounded-lg bg-danger-50 px-3 py-2 text-sm text-danger-700 ring-1 ring-danger-600/20 dark:bg-danger-400/10 dark:text-danger-400 dark:ring-danger-400/30" data-merge-over-limit>
-            <x-filament::icon icon="lucide-circle-alert" class="mt-0.5 size-4 shrink-0" />
-            {{ $message }}
-        </p>
+    @foreach ($getOverLimitMessages() as $overLimitMessage)
+        @include('filament.app.merge-record.alert', ['marker' => 'data-merge-over-limit', 'message' => $overLimitMessage])
     @endforeach
 </div>
