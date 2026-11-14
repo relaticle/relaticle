@@ -198,7 +198,7 @@ trait HasBoardStageOrder
 
         $colorsOn = $this->boardColumnField()->settings->enable_option_colors ?? false;
 
-        $this->writeStageOption($optionId, ['color' => $color], fn (array $option): bool => $colorsOn && $option['stored'] === $color);
+        $this->writeStageOption($optionId, ['color' => $color], fn (array $option): bool => $colorsOn && strtolower((string) $option['stored']) === strtolower($color));
     }
 
     /**

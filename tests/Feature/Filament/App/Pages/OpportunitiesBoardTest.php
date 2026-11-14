@@ -1799,6 +1799,20 @@ it('rings the current stage color in the swatch grid', function (): void {
     expect(stageMenuOf($component, $id))->toMatch("/data-stage-swatch=\"{$pink}\"[^>]*aria-pressed=\"true\"|aria-pressed=\"true\"[^>]*data-stage-swatch=\"{$pink}\"/");
 });
 
+it('writes nothing when the picked color is the stored color in another case', function (): void {
+    $id = stageIds($this->stageField)[1];
+    $settings = $this->stageField->settings;
+    $settings->enable_option_colors = true;
+    $this->stageField->update(['settings' => $settings]);
+    stageOption($id)->update(['settings' => ['color' => strtoupper(OptionColor::Red->value)]]);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnColor', $id, OptionColor::Red->value)
+        ->assertHasNoErrors();
+
+    expect(stageOption($id)->settings->color)->toBe(strtoupper(OptionColor::Red->value));
+});
+
 it('refuses a color outside the palette and changes nothing', function (): void {
     $id = stageIds($this->stageField)[1];
     $before = stageOption($id)->settings->color;
