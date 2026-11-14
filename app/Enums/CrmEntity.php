@@ -173,6 +173,25 @@ enum CrmEntity: string
         };
     }
 
+    public function identity(): ?RecordIdentity
+    {
+        return match ($this) {
+            self::Company => RecordIdentity::Domains,
+            self::People => RecordIdentity::Emails,
+            self::Opportunity, self::Task, self::Note => null,
+        };
+    }
+
+    /** @return list<string> */
+    public function mergeCountRelations(): array
+    {
+        return match ($this) {
+            self::Company => ['people', 'opportunities', 'notes', 'tasks'],
+            self::People => ['contactOpportunities', 'notes', 'tasks'],
+            self::Opportunity, self::Task, self::Note => [],
+        };
+    }
+
     /** @return list<self> */
     public static function linkable(): array
     {

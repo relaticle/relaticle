@@ -14,6 +14,7 @@ use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
+use Filament\Models\Contracts\HasAvatar;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\Component;
 use Filament\Support\Enums\Alignment;
@@ -76,7 +77,7 @@ final class MergeRecordAction extends Action
 
         return new HtmlString(view('filament.app.merge-record.heading', [
             'name' => $subject->name,
-            'logo' => $subject instanceof Company ? $subject->logo : null,
+            'logo' => $subject instanceof HasAvatar ? $subject->getFilamentAvatarUrl() : null,
             'icon' => CrmEntity::tryFromModel($subject)?->icon(),
         ])->render());
     }

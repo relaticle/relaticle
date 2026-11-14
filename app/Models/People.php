@@ -25,6 +25,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
@@ -95,6 +96,14 @@ final class People extends Model implements HasCustomFields, HasMedia, HasTimeli
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * @return HasMany<Opportunity, $this>
+     */
+    public function contactOpportunities(): HasMany
+    {
+        return $this->hasMany(Opportunity::class, 'contact_id');
     }
 
     /**
