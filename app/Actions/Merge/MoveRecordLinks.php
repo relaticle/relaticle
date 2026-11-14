@@ -61,7 +61,7 @@ final readonly class MoveRecordLinks
             ->chunkById(500, function (Collection $values) use ($kept, $duplicate): void {
                 foreach ($values as $value) {
                     $ids = array_map(
-                        fn (string $id): string => $id === (string) $duplicate->getKey() ? (string) $kept->getKey() : $id,
+                        fn (mixed $id): mixed => (string) $id === (string) $duplicate->getKey() ? (string) $kept->getKey() : $id,
                         json_decode((string) $value->json_value, true),
                     );
 

@@ -422,6 +422,33 @@ it('repoints record-type attributes on other records to the kept company', funct
         ->and($read($unrelated))->toBe([$other->getKey()]);
 });
 
+it('repoints a record-type attribute that also holds a non-string element', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'opportunity',
+        'code' => 'partner',
+        'name' => 'Partner',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'settings' => new CustomFieldSettingsData(allow_multiple: true),
+    ]);
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($field, [$duplicate->getKey()]);
+    DB::table('custom_field_values')
+        ->where('custom_field_id', $field->getKey())
+        ->where('entity_id', $opportunity->getKey())
+        ->update(['json_value' => json_encode([123, null, $duplicate->getKey()])]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $stored = DB::table('custom_field_values')->where('custom_field_id', $field->getKey())->where('entity_id', $opportunity->getKey())->value('json_value');
+
+    expect(json_decode((string) $stored, true))->toBe([123, null, $kept->getKey()])
+        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+});
+
 it('points the kept company\'s own record attributes at itself instead of the duplicate', function (): void {
     foreach (['related_companies' => true, 'parent_company' => false] as $code => $allowMultiple) {
         CustomField::factory()->create([
