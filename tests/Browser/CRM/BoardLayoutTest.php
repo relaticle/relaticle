@@ -1014,3 +1014,25 @@ it('deletes a stage from its menu after the confirmation shows the card count', 
     expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->toBeNull();
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
+
+it('adds a stage from the tile after the last column and shows a taken name under the input', function (string $model, string $fieldCode, string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $taken = CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($ids[0])->name;
+
+    $page = openBoard($user, $path)->assertVisible('.ff-add-column-button');
+
+    $page->page()->locator('.ff-add-column-button')->click();
+    $page->page()->locator('.ff-add-column-input')->fill($taken);
+    $page->page()->locator('.ff-add-column-input')->press('Enter');
+    $page->assertScript(boardWaitFor("document.querySelector('.ff-add-column-error') !== null"), true);
+
+    $page->page()->locator('.ff-add-column-input')->fill('Escalated');
+    $page->page()->locator('.ff-add-column-input')->press('Enter');
+    $page->assertScript(boardWaitFor("[...document.querySelectorAll('.ff-column')].at(-1)?.textContent.includes('Escalated') === true"), true);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->where('name', 'Escalated')->count())->toBe(1);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');

@@ -2085,3 +2085,81 @@ it('tells the board user to reload when the options change under a delete, renam
 
     expect(stageOption($ids[1])->name)->not->toBe('Discovery')->and(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->not->toBeNull();
 })->with(['delete', 'rename', 'color']);
+
+it('adds a gray stage after the last one from the add tile', function (): void {
+    $before = stageIds($this->stageField);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->assertSee(__('filament/pages/boards.stage_menu.add', ['noun' => 'stage']))
+        ->call('addBoardColumn', '  Negotiation  ')
+        ->assertHasNoErrors();
+
+    $added = array_values(array_diff(stageIds($this->stageField), $before));
+
+    expect($added)->toHaveCount(1)
+        ->and(stageOption($added[0])->name)->toBe('Negotiation')
+        ->and(stageOption($added[0])->settings->color)->toBe(OptionColor::Gray->value)
+        ->and(stageIds($this->stageField))->toBe([...$before, $added[0]])
+        ->and(array_slice($component->instance()->getBoard()->getColumnIdentifiers(), -1))->toBe($added);
+});
+
+it('lands a new stage at the end of a member stored stage order', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class)->call('reorderBoardStages', array_reverse($ids));
+
+    $component->call('addBoardColumn', 'Negotiation');
+    $added = array_values(array_diff(stageIds($this->stageField), $ids));
+
+    expect($component->instance()->getBoard()->getColumnIdentifiers())->toBe([...array_reverse($ids), ...$added]);
+});
+
+it('shows a taken or blank stage name under the add input and writes nothing', function (string $name): void {
+    $count = count(stageIds($this->stageField));
+    $taken = stageOption(stageIds($this->stageField)[0])->name;
+
+    livewire(OpportunitiesBoard::class)
+        ->call('addBoardColumn', $name === 'taken' ? strtoupper($taken) : '   ')
+        ->assertHasErrors(['boardNewColumn']);
+
+    expect(stageIds($this->stageField))->toHaveCount($count);
+})->with(['taken', 'blank']);
+
+it('tells the board user to reload when the options change under an add', function (): void {
+    $armed = true;
+    $first = stageIds($this->stageField)[0];
+
+    DB::listen(function (QueryExecuted $query) use (&$armed, $first): void {
+        if ($armed && str_contains($query->sql, 'for update') && str_contains($query->sql, 'custom_fields')) {
+            $armed = false;
+            DB::table('custom_field_options')->where('id', $first)->update(['name' => 'Raced']);
+        }
+    });
+
+    livewire(OpportunitiesBoard::class)
+        ->call('addBoardColumn', 'Negotiation')
+        ->assertHasErrors(['boardNewColumn' => __('filament/pages/boards.stage_menu.changed', ['noun' => 'stage'])]);
+});
+
+it('offers no add tile to a member or a viewer and refuses a forged add', function (WorkspaceRole $role): void {
+    $count = count(stageIds($this->stageField));
+    $this->actingAs(makeBoardMember($this, $role));
+
+    $component = livewire(OpportunitiesBoard::class)->call('addBoardColumn', 'Forged');
+
+    expect($component->instance()->getBoard()->canAddColumns())->toBeFalse()
+        ->and($component->html())->not->toContain('ff-add-column')
+        ->and(stageIds($this->stageField))->toHaveCount($count);
+})->with([WorkspaceRole::Member, WorkspaceRole::Viewer]);
+
+it('words the add tile by the attribute the board is grouped by', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect($component->instance()->getBoard()->getAddColumnLabel())->toBe('Add stage');
+
+    $component->call('setBoardColumnField', $tier->code)->call('addBoardColumn', 'Bronze');
+
+    expect($component->instance()->getBoard()->getAddColumnLabel())->toBe('Add option')
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $tier->getKey())->orderBy('sort_order')->pluck('name')->all())->toBe(['Gold', 'Silver', 'Bronze']);
+});

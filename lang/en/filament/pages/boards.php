@@ -47,6 +47,7 @@ return [
             'status' => 'status',
             'option' => 'option',
         ],
+        'add' => 'Add :noun',
         'collapse' => 'Collapse :noun',
         'hide' => 'Hide :noun',
         'name' => 'Name of this :noun',

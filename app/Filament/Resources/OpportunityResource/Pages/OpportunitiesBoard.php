@@ -83,6 +83,8 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->collapsibleColumns(fn (string $columnId, bool $collapsed) => $this->setBoardColumnCollapsed($columnId, $collapsed))
             ->columnActions($this->boardStageActions())
             ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
+            ->addColumnUsing($this->addBoardStageUsing())
+            ->addColumnLabel(fn (): string => __('filament/pages/boards.stage_menu.add', ['noun' => $this->boardStageNoun()]))
             ->cardSchema(fn (Schema $schema): Schema => $schema->components($card))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')

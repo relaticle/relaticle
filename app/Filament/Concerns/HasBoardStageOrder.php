@@ -374,6 +374,27 @@ trait HasBoardStageOrder
         $this->rebuildBoard();
     }
 
+    protected function addBoardStage(string $name): void
+    {
+        $field = $this->boardColumnField();
+        $options = [...$this->stageOptionEntries($field, '', []), ['name' => trim($name), 'color' => OptionColor::Gray->value]];
+
+        try {
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
+        } catch (OptionsChangedException) {
+            throw ValidationException::withMessages(['name' => __('filament/pages/boards.stage_menu.changed', ['noun' => $this->boardStageNoun()])]);
+        }
+
+        $this->boardColumnFieldList = null;
+        $this->resolvedBoardColumnField = null;
+        $this->forgetStoredBoardState();
+    }
+
+    protected function addBoardStageUsing(): ?Closure
+    {
+        return $this->canEditStages() ? fn (string $name) => $this->addBoardStage($name) : null;
+    }
+
     private function hideStageFromMenu(mixed $optionId): void
     {
         if (is_string($optionId) && $this->visibleBoardColumnIds() === [$optionId]) {

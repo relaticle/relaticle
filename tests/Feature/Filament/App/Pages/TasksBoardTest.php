@@ -2225,3 +2225,40 @@ it('hides delete from a member and refuses a forged task status delete', functio
     expect(CustomFieldOption::query()->withoutGlobalScopes()->find($id))->not->toBeNull()
         ->and($component->html())->not->toContain('Delete status');
 });
+
+it('adds a gray task status after the last one and words the tile status', function (): void {
+    $before = statusIds($this->statusField);
+
+    $component = livewire(TasksBoard::class)
+        ->assertSee('Add status')
+        ->call('addBoardColumn', 'Blocked')
+        ->assertHasNoErrors();
+
+    $added = array_values(array_diff(statusIds($this->statusField), $before));
+
+    expect($added)->toHaveCount(1)
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($added[0])->settings->color)->toBe(OptionColor::Gray->value)
+        ->and(statusIds($this->statusField))->toBe([...$before, $added[0]])
+        ->and(array_slice($component->instance()->getBoard()->getColumnIdentifiers(), -1))->toBe($added);
+});
+
+it('shows a taken task status name under the add input', function (): void {
+    $count = count(statusIds($this->statusField));
+
+    livewire(TasksBoard::class)->call('addBoardColumn', 'DONE')->assertHasErrors(['boardNewColumn']);
+
+    expect(statusIds($this->statusField))->toHaveCount($count);
+});
+
+it('offers no add tile to a member and refuses a forged task status add', function (): void {
+    $count = count(statusIds($this->statusField));
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+
+    $component = livewire(TasksBoard::class)->call('addBoardColumn', 'Forged');
+
+    expect($component->instance()->getBoard()->canAddColumns())->toBeFalse()
+        ->and(statusIds($this->statusField))->toHaveCount($count);
+});
