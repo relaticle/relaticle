@@ -4,12 +4,10 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Filament\Pages;
 
-use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
-use Filament\Facades\Filament;
 use Filament\Pages\Page;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -41,10 +39,7 @@ final class ImportHistory extends Page implements HasTable
 
     public static function canAccess(): bool
     {
-        $user = auth()->user();
-
-        return $user instanceof User
-            && $user->hasWorkspaceCapability(Filament::getTenant()?->getKey(), WorkspaceCapability::DataImport);
+        return ImportPage::canAccess();
     }
 
     private function actingUser(): User
