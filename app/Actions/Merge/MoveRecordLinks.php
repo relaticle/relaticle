@@ -10,7 +10,6 @@ use App\Models\Company;
 use App\Models\CustomFieldValue;
 use App\Models\People;
 use Illuminate\Database\Query\Builder;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 final readonly class MoveRecordLinks
@@ -48,27 +47,23 @@ final readonly class MoveRecordLinks
 
     private function repointRecordAttributes(string $morph, Company|People $kept, Company|People $duplicate): void
     {
-        $fieldIds = DB::table('custom_fields')
-            ->where('tenant_id', $kept->workspace_id)
-            ->where('type', CustomFieldType::RECORD->value)
-            ->where('lookup_type', $morph)
-            ->select('id');
-
-        DB::table('custom_field_values')
-            ->where('tenant_id', $kept->workspace_id)
-            ->whereIn('custom_field_id', $fieldIds)
-            ->whereRaw('exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element = ?)', [$duplicate->getKey()])
-            ->chunkById(500, function (Collection $values) use ($kept, $duplicate): void {
-                foreach ($values as $value) {
-                    $ids = array_map(
-                        fn (mixed $id): mixed => (string) $id === (string) $duplicate->getKey() ? (string) $kept->getKey() : $id,
-                        json_decode((string) $value->json_value, true),
-                    );
-
-                    DB::table('custom_field_values')
-                        ->where('id', $value->id)
-                        ->update(['json_value' => json_encode(array_values(array_unique($ids)))]);
-                }
-            });
+        DB::update(
+            'update custom_field_values set json_value = ('
+                .'select jsonb_agg(swapped.element order by swapped.position) from ('
+                    .'select element, min(position) as position from ('
+                        ."select case when item #>> '{}' = ? then to_jsonb(?::text) else item end as element, position "
+                        .'from jsonb_array_elements(custom_field_values.json_value::jsonb) with ordinality as listed(item, position)'
+                    .') as renamed group by element'
+                .') as swapped'
+            .')::json '
+            .'where tenant_id = ? and custom_field_id in ('
+                .'select id from custom_fields where tenant_id = ? and type = ? and lookup_type = ?'
+            .') and exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element = ?)',
+            [
+                $duplicate->getKey(), $kept->getKey(),
+                $kept->workspace_id, $kept->workspace_id, CustomFieldType::RECORD->value, $morph,
+                $duplicate->getKey(),
+            ],
+        );
     }
 }
