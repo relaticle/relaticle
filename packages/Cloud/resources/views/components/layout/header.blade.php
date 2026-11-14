@@ -299,14 +299,14 @@
                 </div>
 
                 <div class="flex flex-1 items-center justify-end gap-2 sm:gap-3">
-                    <div class="hidden md:flex items-center gap-2">
+                    <div class="flex items-center gap-2 max-[359px]:hidden">
                         @auth('web')
                             <x-cloud::marketing.button size="sm" class="whitespace-nowrap" :href="app(\App\Support\Auth\LoginDestination::class)->resolve(auth('web')->user(), null)">
                                 {{ __('Open app') }}
                             </x-cloud::marketing.button>
                         @else
                             <a href="{{ route('login') }}" referrerpolicy="no-referrer-when-downgrade" data-analytics-intent="login" data-analytics-placement="header"
-                               class="whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-200 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-300 dark:hover:text-white">
+                               class="max-md:hidden whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-200 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-300 dark:hover:text-white">
                                 Sign In
                             </a>
 
