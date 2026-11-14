@@ -24,11 +24,15 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 
+/**
+ * @phpstan-type Card array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
+ * @phpstan-type Pairing array{other: Company|People, current: Company|People, values: MergedValues}
+ */
 final class MergeRecordPicker extends Field
 {
     protected string $view = 'filament.app.merge-record';
 
-    /** @var array<string, array{other: Company|People, current: Company|People, values: MergedValues}|null> */
+    /** @var array<string, Pairing|null> */
     private array $pairings = [];
 
     private Company|People|null $currentWithCounts = null;
@@ -84,7 +88,7 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @return array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}|null
+     * @return Card|null
      */
     public function getLeftCard(): ?array
     {
@@ -92,7 +96,7 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @return array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}|null
+     * @return Card|null
      */
     public function getRightCard(): ?array
     {
@@ -100,7 +104,7 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @return array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
+     * @return Card
      */
     public function getResultCard(): array
     {
@@ -138,7 +142,7 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @return array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}|null
+     * @return Card|null
      */
     private function otherCard(): ?array
     {
@@ -148,7 +152,7 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @return array{other: Company|People, current: Company|People, values: MergedValues}|null
+     * @return Pairing|null
      */
     private function pairing(): ?array
     {
@@ -170,7 +174,7 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @return array{other: Company|People, current: Company|People, values: MergedValues}|null
+     * @return Pairing|null
      */
     private function buildPairing(string $id, bool $keepsOther): ?array
     {
@@ -242,7 +246,7 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @return array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
+     * @return Card
      */
     private function card(Company|People $record): array
     {
@@ -255,8 +259,8 @@ final class MergeRecordPicker extends Field
     }
 
     /**
-     * @param  array{other: Company|People, current: Company|People, values: MergedValues}  $pairing
-     * @return array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
+     * @param  Pairing  $pairing
+     * @return Card
      */
     private function resultCard(array $pairing): array
     {
@@ -275,7 +279,7 @@ final class MergeRecordPicker extends Field
     /**
      * @param  list<array{label: string, href: string}>  $details
      * @param  callable(string): int  $count
-     * @return array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
+     * @return Card
      */
     private function cardData(string $name, ?string $logo, array $details, callable $count): array
     {
