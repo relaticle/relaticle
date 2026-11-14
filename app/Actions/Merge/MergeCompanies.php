@@ -7,9 +7,11 @@ namespace App\Actions\Merge;
 use App\Actions\Company\UpdateCompany;
 use App\Data\MergedValues;
 use App\Enums\CreationSource;
+use App\Enums\MediaCollection;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\User;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -17,6 +19,7 @@ final readonly class MergeCompanies
 {
     public function __construct(
         private CombineRecordValues $combine,
+        private MoveRecordLinks $moveLinks,
         private UpdateCompany $updateCompany,
     ) {}
 
@@ -35,6 +38,9 @@ final readonly class MergeCompanies
             if ($kept->creation_source === CreationSource::SAMPLE && $duplicate->creation_source !== CreationSource::SAMPLE) {
                 $kept->update(['creation_source' => $duplicate->creation_source]);
             }
+
+            $this->moveLinks->execute($kept, $duplicate);
+            $this->moveCompanyLinks($kept, $duplicate);
 
             $duplicate->delete();
 
@@ -59,6 +65,22 @@ final readonly class MergeCompanies
         abort_unless($locked->has((string) $kept->getKey()) && $locked->has((string) $duplicate->getKey()), 404);
 
         return [$locked[$kept->getKey()], $locked[$duplicate->getKey()]];
+    }
+
+    private function moveCompanyLinks(Company $kept, Company $duplicate): void
+    {
+        foreach (['people', 'opportunities'] as $table) {
+            DB::table($table)->where('company_id', $duplicate->getKey())->update(['company_id' => $kept->getKey()]);
+        }
+
+        $logos = fn (Company $company): Builder => DB::table('media')
+            ->where('model_type', $company->getMorphClass())
+            ->where('model_id', $company->getKey())
+            ->where('collection_name', MediaCollection::Logo->value);
+
+        if (! $logos($kept)->exists()) {
+            $logos($duplicate)->update(['model_id' => $kept->getKey()]);
+        }
     }
 
     private function assertWithinLimits(Company $kept, MergedValues $values): void
