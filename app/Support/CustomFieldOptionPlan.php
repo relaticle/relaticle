@@ -141,7 +141,7 @@ final readonly class CustomFieldOptionPlan
      *
      * @throws ValidationException
      */
-    public static function validated(CustomField $field, array $data, bool $capsClears = true): self
+    public static function validated(CustomField $field, array $data, bool $capsClears = true, bool $keepsColors = false): self
     {
         self::assertChoiceField($field);
 
@@ -231,7 +231,7 @@ final readonly class CustomFieldOptionPlan
             throw ValidationException::withMessages(['options' => $errors]);
         }
 
-        return new self($targets, $removals, ! ($data['keeps_colors'] ?? false) && self::turnsOnColors($field, $targets), $field->getValueColumn() === 'json_value');
+        return new self($targets, $removals, ! $keepsColors && self::turnsOnColors($field, $targets), $field->getValueColumn() === 'json_value');
     }
 
     /**

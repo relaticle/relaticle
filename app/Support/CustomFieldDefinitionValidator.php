@@ -233,9 +233,9 @@ final readonly class CustomFieldDefinitionValidator
     public static function optionNameMessages(): array
     {
         return [
-            'options.*.name.required' => 'Option names cannot be empty.',
+            'options.*.name.required' => __('Option names cannot be empty.'),
             'options.*.name.distinct' => __('Duplicate option names are not allowed.'),
-            'options.*.name.max' => 'Option names must be 255 characters or fewer.',
+            'options.*.name.max' => __('Option names must be 255 characters or fewer.'),
         ];
     }
 

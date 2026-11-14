@@ -1680,6 +1680,15 @@ it('shows an error in the menu and changes nothing for a blank or taken stage na
         ->and(stageMenuOf($component, $ids[1]))->toContain('data-stage-error');
 })->with(['blank' => '   ', 'taken' => 'taken', 'taken in another case' => 'taken-upper']);
 
+it('words a taken name in a rename the same way as in an add', function (): void {
+    $ids = stageIds($this->stageField);
+    $taken = strtoupper(stageOption($ids[0])->name);
+
+    $component = livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $ids[1], $taken);
+
+    expect($component->errors()->get('boardStageMenu.'.$ids[1]))->toBe([__('filament/pages/boards.stage_menu.name_taken', ['noun' => 'stage', 'name' => $taken])]);
+});
+
 it('clears the menu error once a rename succeeds', function (): void {
     $id = stageIds($this->stageField)[1];
 

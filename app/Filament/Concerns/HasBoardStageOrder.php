@@ -224,7 +224,7 @@ trait HasBoardStageOrder
         try {
             resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
         } catch (ValidationException $exception) {
-            $this->addError("boardStageMenu.{$option['id']}", $this->stageWriteFailure($exception));
+            $this->addError("boardStageMenu.{$option['id']}", $this->stageWriteFailure($exception, $change['name'] ?? null));
 
             return;
         }
@@ -330,11 +330,18 @@ trait HasBoardStageOrder
         ]);
     }
 
-    private function stageWriteFailure(ValidationException $exception): string
+    private function stageWriteFailure(ValidationException $exception, ?string $name = null): string
     {
-        return $exception instanceof OptionsChangedException
-            ? __('filament/pages/boards.stage_menu.changed', ['noun' => $this->boardStageNoun()])
-            : (string) collect($exception->errors())->flatten()->first();
+        return match (true) {
+            $exception instanceof OptionsChangedException => __('filament/pages/boards.stage_menu.changed', ['noun' => $this->boardStageNoun()]),
+            $name !== null && $this->failedOnDistinctName($exception) => __('filament/pages/boards.stage_menu.name_taken', ['noun' => $this->boardStageNoun(), 'name' => $name]),
+            default => (string) collect($exception->errors())->flatten()->first(),
+        };
+    }
+
+    private function failedOnDistinctName(ValidationException $exception): bool
+    {
+        return collect($exception->validator->failed())->contains(fn (array $rules): bool => array_key_exists('Distinct', $rules));
     }
 
     private function deleteBoardColumn(mixed $optionId): void
@@ -378,17 +385,12 @@ trait HasBoardStageOrder
     {
         $name = trim($name);
         $field = $this->boardColumnField();
-
-        if ($field->options->contains(fn (CustomFieldOption $stage): bool => mb_strtolower((string) $stage->getAttribute('name')) === mb_strtolower($name))) {
-            throw ValidationException::withMessages(['name' => __('filament/pages/boards.stage_menu.name_taken', ['noun' => $this->boardStageNoun(), 'name' => $name])]);
-        }
-
         $options = [...$this->stageOptionEntries($field, '', []), ['name' => $name, 'color' => OptionColor::Gray->value]];
 
         try {
-            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => [], 'keeps_colors' => true]);
-        } catch (OptionsChangedException) {
-            throw ValidationException::withMessages(['name' => __('filament/pages/boards.stage_menu.changed', ['noun' => $this->boardStageNoun()])]);
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []], keepsColors: true);
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages(['name' => $this->stageWriteFailure($exception, $name)]);
         }
 
         $this->boardColumnFieldList = null;
