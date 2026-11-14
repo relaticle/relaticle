@@ -51,7 +51,6 @@ it('merges a duplicate picked from the dialog into the current company', functio
         ->assertSeeIn('[data-merge-result]', 'brightline.health')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
         ->click('.fi-modal-footer-actions button[type=submit]')
-        ->wait(1.5)
         ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
@@ -67,11 +66,9 @@ it('keeps the other company when the member swaps the two', function (): void {
 
     pickInMergeDialog($page, 'Traders', 'Northwind Traders')
         ->click('[data-merge-swap]')
-        ->wait(1.2)
         ->assertSeeIn('[data-merge-right]', 'Northwind Traders')
         ->assertSeeIn('[data-merge-left] [data-merge-name]', 'Northwind')
         ->click('.fi-modal-footer-actions button[type=submit]')
-        ->wait(1.5)
         ->assertPathIs("/app/{$this->workspace->slug}/companies/{$other->getKey()}")
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
@@ -102,7 +99,6 @@ it('shows domains as links that open a new tab and a logo in the list and the ca
 
     $page = openMergeDialog($this->user, $this->workspace, $current)
         ->click('[data-merge-picker]')
-        ->wait(1.2)
         ->assertPresent('.fi-merge-pop li:has-text("Globex Europe") img');
 
     expect($page->script($links))->toBe([['https://globex.com', '_blank', 'noopener noreferrer'], ['https://globex.com', '_blank', 'noopener noreferrer']]);
@@ -142,7 +138,6 @@ it('merges a duplicate person picked from the dialog and shows emails and contac
         ->assertScript('document.querySelector("[data-merge-result] [data-merge-counts] li .sr-only").textContent', '1 opportunity as point of contact')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
         ->click('.fi-modal-footer-actions button[type=submit]')
-        ->wait(1.5)
         ->assertPathIs("/app/{$this->workspace->slug}/people/{$kept->getKey()}")
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();

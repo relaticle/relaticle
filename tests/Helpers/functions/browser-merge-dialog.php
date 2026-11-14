@@ -7,28 +7,15 @@ use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
 use Pest\Browser\Api\AwaitableWebpage;
-use Tests\Helpers\WorkspaceCustomField;
 
 function mergeDialogCompany(Workspace $workspace, User $owner, string $name, array $domains = []): Company
 {
-    $company = Company::factory()->recycle([$owner, $workspace])->create(['name' => $name]);
-
-    if ($domains !== []) {
-        $company->saveCustomFieldValue(WorkspaceCustomField::byCode($workspace->getKey(), 'company', 'domains'), $domains);
-    }
-
-    return $company;
+    return mergeCompanyRecord($workspace, $owner, ['name' => $name], $domains === [] ? [] : ['domains' => $domains]);
 }
 
 function mergeDialogPerson(Workspace $workspace, User $owner, string $name, array $emails = []): People
 {
-    $person = People::factory()->recycle([$owner, $workspace])->create(['name' => $name]);
-
-    if ($emails !== []) {
-        $person->saveCustomFieldValue(WorkspaceCustomField::byCode($workspace->getKey(), 'people', 'emails'), $emails);
-    }
-
-    return $person;
+    return mergePersonRecord($workspace, $owner, ['name' => $name], $emails === [] ? [] : ['emails' => $emails]);
 }
 
 function openMergeDialog(User $user, Workspace $workspace, Company|People $record, int $width = 1440, int $height = 900): AwaitableWebpage
@@ -47,7 +34,7 @@ function pickInMergeDialog(AwaitableWebpage $page, string $search, string $name)
         ->type('.fi-merge-pop input', $search)
         ->wait(1.2)
         ->click(".fi-merge-pop li:has-text(\"{$name}\")")
-        ->wait(1.2);
+        ->assertVisible('[data-merge-clear]');
 }
 
 const MERGE_SUBMIT_DISABLED = 'document.querySelector(".fi-modal-footer-actions button[type=submit]").getAttribute("aria-disabled") === "true"';

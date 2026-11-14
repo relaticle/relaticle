@@ -37,7 +37,6 @@ it('closes the search with Escape and picks a record with a click', function ():
     $page->click('[data-merge-picker]')
         ->assertVisible('.fi-merge-pop')
         ->click('.fi-merge-pop li:has-text("Globex Europe")')
-        ->wait(1.2)
         ->assertSeeIn('[data-merge-left]', 'Globex Europe')
         ->assertScript(MERGE_SUBMIT_DISABLED, false);
 });
@@ -52,7 +51,6 @@ it('picks the first result when Enter is pressed in the search', function (): vo
         ->type('.fi-merge-pop input', 'Globex')
         ->wait(1.2)
         ->keys('.fi-merge-pop input', 'Enter')
-        ->wait(1.2)
         ->assertSeeIn('[data-merge-left]', 'Globex Asia')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
         ->assertNoJavaScriptErrors();
@@ -70,7 +68,6 @@ it('moves the highlighted result with the arrow keys before Enter picks it', fun
         ->keys('.fi-merge-pop input', 'ArrowDown')
         ->assertAttribute('.fi-merge-pop li:nth-of-type(2)', 'aria-selected', 'true')
         ->keys('.fi-merge-pop input', 'Enter')
-        ->wait(1.2)
         ->assertSeeIn('[data-merge-left]', 'Globex Europe')
         ->assertNoJavaScriptErrors();
 });
@@ -84,7 +81,6 @@ it('moves focus to the clear button once a record is picked and back to the plus
     pickInMergeDialog($page, 'Europe', 'Globex Europe')
         ->assertScript('document.activeElement.matches("[data-merge-clear]")', true)
         ->click('[data-merge-clear]')
-        ->wait(1.2)
         ->assertScript('document.activeElement.matches("[data-merge-picker]")', true)
         ->assertNoJavaScriptErrors();
 });
@@ -141,7 +137,7 @@ it('merges when Enter is pressed outside the search once a record is picked', fu
         ->script('document.activeElement.blur()');
 
     $page->keys('[data-merge-dialog]', 'Enter')
-        ->wait(1.5)
+        ->assertSee('Records merged')
         ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
         ->assertNoJavaScriptErrors();
 
