@@ -15,7 +15,7 @@ final readonly class StripOAuthErrorHint
     {
         $response = $next($request);
 
-        if (! $request->is('oauth/token') || $response->isSuccessful()) {
+        if ($response->isSuccessful()) {
             return $response;
         }
 

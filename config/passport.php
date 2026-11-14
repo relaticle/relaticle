@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Http\Middleware\StripOAuthErrorHint;
+
 return [
 
     /*
@@ -17,7 +19,8 @@ return [
 
     'guard' => 'web',
 
-    'middleware' => [],
+    // Passport's HttpResponseException skips the exception handler, so only a route middleware can reach it.
+    'middleware' => [StripOAuthErrorHint::class],
 
     /*
     |--------------------------------------------------------------------------
