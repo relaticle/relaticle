@@ -69,6 +69,7 @@ use Relaticle\Chat\Support\ProviderRateGate;
 use Relaticle\Chat\Support\ProviderStreamError;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\StreamEventBroadcaster;
+use Relaticle\Chat\Support\TurnNotes;
 use Relaticle\Chat\Support\TurnPresence;
 use Throwable;
 
@@ -542,6 +543,8 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $this->reportTimeout($exception);
+
         // Unconditional, because this instance can never answer the question the
         // charge depends on: the queue rebuilds the command from the original
         // dispatch payload before calling failed(), so $streamedAnything is false
@@ -575,6 +578,15 @@ final class ProcessChatMessage implements ShouldQueue
         // Last, after persistFailedTurn: a reload landing mid-failed() must
         // never find the marker gone AND the rows unpersisted at once.
         $this->abandonTurn();
+    }
+
+    private function reportTimeout(?Throwable $exception): void
+    {
+        // The worker kills its own process after a timeout instead of rethrowing,
+        // so Worker::runJob() never reports it. Every other failure is rethrown and reported there.
+        if ($exception instanceof TimeoutExceededException) {
+            rescue(fn () => report($exception), report: false);
+        }
     }
 
     /**
@@ -678,9 +690,7 @@ final class ProcessChatMessage implements ShouldQueue
         }
 
         if ($exception instanceof TimeoutExceededException) {
-            return __('This reply hit the :seconds-second limit before it finished. Ask for a shorter answer, or for it in parts.', [
-                'seconds' => self::TIMEOUT_SECONDS,
-            ]);
+            return TurnNotes::timeout(self::TIMEOUT_SECONDS);
         }
 
         if ($this->isRateLimited($exception)) {
@@ -817,7 +827,7 @@ final class ProcessChatMessage implements ShouldQueue
             'attachments' => '[]',
             'steps' => StoredSteps::text($text),
             'usage' => '[]',
-            'meta' => json_encode(['error' => true], JSON_THROW_ON_ERROR),
+            'meta' => json_encode(['error' => true, 'failure' => ChatTelemetry::failureEvidence($exception, $this->resolved['provider'], $this->resolved['model'])], JSON_THROW_ON_ERROR),
             'document' => json_encode($document, JSON_THROW_ON_ERROR),
             'created_at' => $now,
             'updated_at' => $now,
@@ -1059,19 +1069,21 @@ final class ProcessChatMessage implements ShouldQueue
     {
         $reason = $streamedResponse->events->whereInstanceOf(StreamEnd::class)->last()?->reason;
 
+        $notes = TurnNotes::blankReply();
+
         if ($reason === FinishReason::Length->value) {
-            return __('This reply ran out of room before it said anything. Ask again, or ask for a shorter answer.');
+            return $notes['length'];
         }
 
         if ($reason === FinishReason::ContentFilter->value) {
-            return __('The model declined to answer this. Try rephrasing your request.');
+            return $notes['content_filter'];
         }
 
         if (! $this->origin->isTyped()) {
             return null;
         }
 
-        return __('Noted. Go on, or ask me a question.');
+        return $notes['noted'];
     }
 
     private function acknowledgeBlankTurn(?string $assistantMessageId, string $acknowledgement): void

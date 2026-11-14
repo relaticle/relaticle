@@ -33,6 +33,7 @@ use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\StepFailed;
 use Laravel\Ai\Events\ToolFailed;
 use Livewire\Livewire;
+use Relaticle\Chat\Commands\ChatHealthCommand;
 use Relaticle\Chat\Commands\ChatModelsCommand;
 use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
 use Relaticle\Chat\Commands\PurgeUnsentAttachmentsCommand;
@@ -117,6 +118,7 @@ final class ChatServiceProvider extends ServiceProvider
     private function registerCommands(): void
     {
         $this->commands([
+            ChatHealthCommand::class,
             ChatModelsCommand::class,
             ExpirePendingActionsCommand::class,
             PurgeUnsentAttachmentsCommand::class,
