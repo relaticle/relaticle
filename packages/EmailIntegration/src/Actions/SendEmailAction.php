@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\EmailVariableCatalogue;
@@ -118,7 +119,7 @@ final readonly class SendEmailAction
         );
 
         return DB::transaction(function () use ($user, $account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames): Email {
-            $inReplyTo = $this->lockedParent($account, $data['in_reply_to_email_id'] ?? null);
+            $inReplyTo = $this->lockedParent($user, $account, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
             $email = $account->emails()->chaperone()->create([
@@ -185,7 +186,7 @@ final readonly class SendEmailAction
         }
     }
 
-    private function lockedParent(ConnectedAccount $account, ?string $parentId): ?Email
+    private function lockedParent(User $user, ConnectedAccount $account, ?string $parentId): ?Email
     {
         // Shared with other writers, exclusive in MergeConversations, so the parent's key is never absorbed mid-merge.
         DB::select('select pg_advisory_xact_lock_shared(hashtext(?))', [$account->workspace_id]);
@@ -194,14 +195,13 @@ final readonly class SendEmailAction
             return null;
         }
 
-        // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
-        // from a client-controlled hidden field and Email has no workspace global scope,
-        // so an unscoped lookup would let a user thread their outbound mail onto
-        // another tenant's email and leak its thread_id / rfc_message_id.
-        return Email::query()
+        $parent = Email::query()
             ->where('workspace_id', $account->workspace_id)
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
             ->whereKey($parentId)
             ->first();
+
+        return $parent instanceof Email && $user->can('view', $parent) ? $parent : null;
     }
 
     /**
