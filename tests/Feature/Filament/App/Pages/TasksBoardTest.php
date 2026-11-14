@@ -2179,3 +2179,49 @@ it('collapses and hides a task status from the menu actions and refuses the last
     $component->callAction(TestAction::make('hideStage')->arguments(['column' => $ids[0]]))
         ->assertNotified(__('filament/pages/boards.stage_menu.last_visible', ['noun' => 'status']));
 });
+
+it('deletes a task status, clears its tasks and names the attribute status', function (): void {
+    $ids = statusIds($this->statusField);
+    $name = CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($ids[0])->name;
+    $task = taskInStatus($this, 'Acme brief', $name);
+    $action = TestAction::make('deleteStage')->arguments(['column' => $ids[0]]);
+
+    $component = livewire(TasksBoard::class)->mountAction($action);
+    $mounted = $component->instance()->getMountedAction();
+
+    expect($mounted->getModalHeading())->toBe('Delete "'.$name.'"?')
+        ->and($mounted->getModalDescription())->toBe('1 task will have no status. They show in the No Status column when it is on in View settings.');
+
+    $component->callMountedAction();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[0]))->toBeNull()
+        ->and($task->refresh()->customFieldValues()->where('custom_field_id', $this->statusField->getKey())->value('string_value'))->toBeNull()
+        ->and($component->html())->toContain('Delete status');
+});
+
+it('refuses to delete the Done status', function (): void {
+    $done = (string) $this->statusField->options->firstWhere('name', 'Done')->getKey();
+
+    livewire(TasksBoard::class)
+        ->callAction(TestAction::make('deleteStage')->arguments(['column' => $done]))
+        ->assertNotified(__('The task Status option "Done" marks a task complete, so it cannot be renamed or removed.'));
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($done))->not->toBeNull();
+});
+
+it('hides delete from a member and refuses a forged task status delete', function (): void {
+    $id = statusIds($this->statusField)[1];
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+    $action = TestAction::make('deleteStage')->arguments(['column' => $id]);
+
+    $component = livewire(TasksBoard::class)
+        ->assertActionHidden($action)
+        ->call('mountAction', 'deleteStage', ['column' => $id])
+        ->call('callMountedAction');
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($id))->not->toBeNull()
+        ->and($component->html())->not->toContain('Delete status');
+});

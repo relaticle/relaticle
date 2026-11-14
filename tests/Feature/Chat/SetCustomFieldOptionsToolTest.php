@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
@@ -23,6 +24,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SetCustomFieldOptionsTool::class, SetCustomFieldOptions::class, CustomFieldOptionPlan::class);
 
@@ -720,4 +722,103 @@ it('proposes a color the option already stores when option colors are off', func
     resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
 
     expect($this->lifecycle->refresh()->settings->enable_option_colors)->toBeTrue();
+});
+
+it('clears the values of a removed select option when the replacement is null and states the count on the card', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    $first = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    $second = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    $kept = setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Lead'));
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded)->not->toHaveKey('error')
+        ->and($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned (2 records lose their value)']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $logged = Activity::withoutGlobalScopes()
+        ->where('event', 'custom_field_changes')
+        ->where('subject_id', $first->getKey())
+        ->get()
+        ->map(fn (Activity $activity): string => $activity->properties['custom_field_changes'][0]['old']['label'])
+        ->all();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($churnedId))->toBeNull()
+        ->and(setOptionsStoredValue($first, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($second, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($kept, $this->lifecycle))->toBe(setOptionsId($this->lifecycle, 'Lead'))
+        ->and($logged)->toContain('Churned');
+});
+
+it('removes only the cleared option from multi-select values', function (): void {
+    $enterpriseId = setOptionsId($this->segments, 'Enterprise');
+    $smbId = setOptionsId($this->segments, 'SMB');
+    $startupId = setOptionsId($this->segments, 'Startup');
+    $only = setOptionsCompany($this->workspace, $this->segments, [$smbId]);
+    $mixed = setOptionsCompany($this->workspace, $this->segments, [$enterpriseId, $smbId, $startupId]);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'segments',
+        'options' => [['name' => 'Enterprise'], ['name' => 'Startup']],
+        'replacements' => ['SMB' => null],
+    ]]);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(setOptionsStoredValue($only, $this->segments))->toBe([])
+        ->and(setOptionsStoredValue($mixed, $this->segments))->toBe([$enterpriseId, $startupId])
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->find($smbId))->toBeNull();
+});
+
+it('shows the plain option name on the card when a cleared option holds no records', function (): void {
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned']);
+});
+
+it('still refuses a removal of a used option that carries neither a replacement nor the clear marker', function (): void {
+    setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Churned'));
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => [],
+    ]]);
+
+    expect($decoded['error'])->toContain('Records still use "Churned"');
+});
+
+it('clears values through the action and refuses a member', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    $company = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    $options = collect(['Lead', 'Customer'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $data = ['options' => $options, 'replacements' => [$churnedId => null], 'removed' => [$churnedId]];
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $member->switchWorkspace($this->workspace);
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($member, $this->lifecycle, $data))->toThrow(HttpException::class);
+    expect(setOptionsStoredValue($company, $this->lifecycle))->toBe($churnedId);
+
+    resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, $data);
+
+    expect(setOptionsStoredValue($company, $this->lifecycle))->toBeNull();
+});
+
+it('names the clear marker in the assistant instructions', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())->toContain('pass where they move in `replacements`, or null to clear their value');
 });

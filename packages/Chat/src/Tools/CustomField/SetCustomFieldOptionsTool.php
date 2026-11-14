@@ -68,7 +68,7 @@ final class SetCustomFieldOptionsTool implements Tool
                         ->description('The COMPLETE option list in display order. An existing option stays when an item names it in `name` or `current`. Every other existing option is removed.')
                         ->required(),
                     'replacements' => $schema->object()
-                        ->description('For each removed option that records still use: its current label mapped to the label of an option in `options` those records move to, e.g. {"Negotiation": "Proposal"}.'),
+                        ->description('For each removed option that records still use: its current label mapped to the label of an option in `options` those records move to, e.g. {"Negotiation": "Proposal"}. Map it to null to clear those records\' value instead: {"Negotiation": null}. Use null only when the user asked for the value to be cleared.'),
                 ]))
                 ->required()
                 ->description(

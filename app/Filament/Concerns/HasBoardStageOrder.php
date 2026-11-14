@@ -217,12 +217,7 @@ trait HasBoardStageOrder
         }
 
         $field = $this->boardColumnField();
-        $options = $field->options->map(static fn (CustomFieldOption $stage): array => [
-            'id' => (string) $stage->getKey(),
-            'name' => (string) $stage->getAttribute('name'),
-            'was' => (string) $stage->getAttribute('name'),
-            ...((string) $stage->getKey() === $option['id'] ? $change : []),
-        ])->all();
+        $options = $this->stageOptionEntries($field, $option['id'], $change);
 
         try {
             resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
@@ -235,6 +230,20 @@ trait HasBoardStageOrder
         $this->boardColumnFieldList = null;
         $this->forgetStoredBoardState();
         $this->rebuildBoard();
+    }
+
+    /**
+     * @param  array{name?: string, color?: string}  $change
+     * @return list<array{id: string, name: string, was: string, color?: string}>
+     */
+    private function stageOptionEntries(CustomField $field, string $changedId, array $change): array
+    {
+        return array_values($field->options->map(static fn (CustomFieldOption $stage): array => [
+            'id' => (string) $stage->getKey(),
+            'name' => (string) $stage->getAttribute('name'),
+            'was' => (string) $stage->getAttribute('name'),
+            ...((string) $stage->getKey() === $changedId ? $change : []),
+        ])->all());
     }
 
     /**
@@ -282,7 +291,76 @@ trait HasBoardStageOrder
                 ->label(fn (): string => __('filament/pages/boards.stage_menu.hide', ['noun' => $this->boardStageNoun()]))
                 ->icon('lucide-eye-off')
                 ->action(fn (array $arguments) => $this->hideStageFromMenu($arguments['column'] ?? null)),
+            Action::make('deleteStage')
+                ->label(fn (): string => __('filament/pages/boards.stage_menu.delete', ['noun' => $this->boardStageNoun()]))
+                ->icon('lucide-trash-2')
+                ->color('danger')
+                ->visible(fn (array $arguments): bool => ($arguments['column'] ?? null) !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages())
+                ->modalHeading(fn (array $arguments): string => __('filament/pages/boards.stage_menu.delete_heading', ['name' => $this->stageNameFor($arguments['column'] ?? null)]))
+                ->modalDescription(fn (array $arguments): string => $this->deleteStageDescription($arguments['column'] ?? null))
+                ->modalSubmitActionLabel(__('filament/pages/boards.stage_menu.delete_confirm'))
+                ->action(fn (array $arguments) => $this->deleteBoardColumn($arguments['column'] ?? null)),
         ];
+    }
+
+    private function stageNameFor(mixed $optionId): string
+    {
+        return is_string($optionId) ? (string) ($this->boardColumnOptions()->firstWhere('id', $optionId)['name'] ?? '') : '';
+    }
+
+    private function deleteStageDescription(mixed $optionId): string
+    {
+        $count = is_string($optionId) ? CustomFieldValue::query()->holdingOption($this->boardColumnField(), $optionId)->count() : 0;
+
+        if ($count === 0) {
+            return '';
+        }
+
+        $entity = $this->viewSwitcherEntity();
+
+        return __('filament/pages/boards.stage_menu.delete_body', [
+            'count' => number_format($count),
+            'records' => trans_choice('filament/pages/boards.stage_menu.records.'.($entity === CrmEntity::Opportunity || $entity === CrmEntity::Task ? $entity->value : 'record'), $count),
+            'attribute' => $this->boardStageNoun(),
+            'column' => $this->noValueColumnLabel(),
+        ]);
+    }
+
+    private function deleteBoardColumn(mixed $optionId): void
+    {
+        if (! is_string($optionId) || ! $this->boardColumnOptions()->contains('id', $optionId)) {
+            return;
+        }
+
+        $noun = $this->boardStageNoun();
+        $field = $this->boardColumnField();
+
+        if ($field->options->count() === 1) {
+            Notification::make()->warning()->title(__('filament/pages/boards.stage_menu.delete_only', ['noun' => $noun]))->send();
+
+            return;
+        }
+
+        if ($this->visibleBoardColumnIds() === [$optionId]) {
+            Notification::make()->warning()->title(__('filament/pages/boards.stage_menu.delete_last_visible', ['noun' => $noun]))->send();
+
+            return;
+        }
+
+        $options = array_values(array_filter($this->stageOptionEntries($field, '', []), static fn (array $entry): bool => $entry['id'] !== $optionId));
+
+        try {
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'replacements' => [$optionId => null], 'removed' => [$optionId]]);
+        } catch (ValidationException $exception) {
+            Notification::make()->danger()->title((string) collect($exception->errors())->flatten()->first())->send();
+
+            return;
+        }
+
+        $this->boardColumnFieldList = null;
+        $this->resolvedBoardColumnField = null;
+        $this->forgetStoredBoardState();
+        $this->rebuildBoard();
     }
 
     private function hideStageFromMenu(mixed $optionId): void

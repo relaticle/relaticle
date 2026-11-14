@@ -53,6 +53,17 @@ return [
         'color' => 'Change the color of this :noun',
         'set_color' => 'Set color to :color',
         'last_visible' => 'One :noun stays visible. Show another before hiding this one.',
+        'delete' => 'Delete :noun',
+        'delete_heading' => 'Delete ":name"?',
+        'delete_body' => ':count :records will have no :attribute. They show in the :column column when it is on in View settings.',
+        'delete_confirm' => 'Delete',
+        'delete_only' => 'A board needs at least one :noun. Add another before deleting this one.',
+        'delete_last_visible' => 'One :noun stays visible. Show another before deleting this one.',
+        'records' => [
+            'opportunity' => 'opportunity|opportunities',
+            'task' => 'task|tasks',
+            'record' => 'record|records',
+        ],
     ],
 
     'layout' => [

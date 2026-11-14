@@ -53,6 +53,10 @@ final readonly class SetCustomFieldOptions
                         $this->moveValues($field, $removal['option'], $options[$removal['replacement']]);
                     }
 
+                    if ($removal['clears'] !== null) {
+                        $this->clearValues($field, $removal['option']);
+                    }
+
                     $this->assertUnused($field, $removal['option']);
 
                     $removal['option']->delete();
@@ -174,6 +178,26 @@ final readonly class SetCustomFieldOptions
                         ->unique()
                         ->values()
                     : $toId);
+
+                $value->save();
+            });
+    }
+
+    private function clearValues(CustomField $field, CustomFieldOption $option): void
+    {
+        $optionId = (string) $option->getKey();
+        $column = $field->getValueColumn();
+
+        CustomFieldValue::query()
+            ->holdingOption($field, $optionId)
+            ->with(['entity' => function (MorphTo $entity): void {
+                $entity->withTrashed();
+            }])
+            ->eachById(function (CustomFieldValue $value) use ($field, $column, $optionId): void {
+                $value->setRelation('customField', $field);
+                $value->setAttribute($column, $column === 'json_value'
+                    ? collect($value->json_value)->reject(fn (mixed $id): bool => (string) $id === $optionId)->values()
+                    : null);
 
                 $value->save();
             });

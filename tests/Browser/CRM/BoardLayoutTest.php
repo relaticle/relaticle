@@ -986,3 +986,31 @@ it('draws the swatches as rounded tiles on the dropdown surface in light and dar
     $page->assertScript($surface, true);
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
+
+it('deletes a stage from its menu after the confirmation shows the card count', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $column = "[data-column-root=\"{$ids[1]}\"]";
+
+    TenantContextService::setTenantId($workspace->getKey());
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $model::factory()->recycle([$user, $workspace])->count(2)->create()
+        ->each(fn (Task|Opportunity $record) => $record->saveCustomFieldValue($field, $ids[1]));
+    TenantContextService::setTenantId(null);
+
+    $page = openBoard($user, $path)->assertVisible($column);
+
+    $page->page()->locator(boardHeaderTitle($ids[1]))->click();
+    $page->page()->locator('.fi-dropdown-panel:visible .fi-dropdown-list-item:has-text("Delete ")')->click();
+
+    $page->assertSee('2 '.($entity === CrmEntity::Task ? 'tasks' : 'opportunities').' will have no '.($entity === CrmEntity::Task ? 'status' : 'stage'));
+    $page->page()->locator('.fi-modal-window:visible .fi-modal-footer button:has-text("Delete")')->click();
+
+    $page->assertScript(boardWaitFor("document.querySelector('{$column}') === null"), true);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->toBeNull();
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');

@@ -20,7 +20,7 @@ final readonly class CustomFieldOptionPlan
 {
     /**
      * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
-     * @param  list<array{option: CustomFieldOption, replacement: ?int}>  $removals
+     * @param  list<array{option: CustomFieldOption, replacement: ?int, clears: ?int}>  $removals
      */
     private function __construct(
         public array $targets,
@@ -30,7 +30,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array{options: list<array{id?: string, name: string, was?: string, color?: string}>, replacements: array<string, string|int>, removed: list<string>}
+     * @return array{options: list<array{id?: string, name: string, was?: string, color?: string}>, replacements: array<string, string|int|null>, removed: list<string>}
      *
      * @throws ValidationException
      */
@@ -83,18 +83,44 @@ final readonly class CustomFieldOptionPlan
             $options[] = ['id' => $id, 'name' => $item['name'], 'was' => (string) $existing->name, ...self::colorEntry($item['color'])];
         }
 
+        [$replacements, $replacementErrors] = self::toolReplacements($input, $current, $options);
+        $errors = [...$errors, ...$replacementErrors];
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages(['options' => $errors]);
+        }
+
+        return ['options' => $options, 'replacements' => $replacements, 'removed' => array_values($current->except($claimedIds)->keys()->all())];
+    }
+
+    /**
+     * @param  array<string, mixed>  $input
+     * @param  Collection<string, CustomFieldOption>  $current
+     * @param  list<array{id?: string, name: string}>  $options
+     * @return array{array<string, string|int|null>, list<string>}
+     */
+    private static function toolReplacements(array $input, Collection $current, array $options): array
+    {
         $replacements = [];
+        $errors = [];
         $requested = is_array($input['replacements'] ?? null) ? $input['replacements'] : [];
 
         foreach ($requested as $removedName => $keptName) {
             $removed = self::findByName($current, trim((string) $removedName));
-            $target = self::targetIndexByName($options, self::text($keptName));
 
             if (! $removed instanceof CustomFieldOption) {
                 $errors[] = __('The field has no option named ":name".', ['name' => $removedName]);
 
                 continue;
             }
+
+            if ($keptName === null) {
+                $replacements[(string) $removed->getKey()] = null;
+
+                continue;
+            }
+
+            $target = self::targetIndexByName($options, self::text($keptName));
 
             if ($target === null) {
                 $errors[] = __('Records on ":name" must move to an option in the new list.', ['name' => $removed->name]);
@@ -105,11 +131,7 @@ final readonly class CustomFieldOptionPlan
             $replacements[(string) $removed->getKey()] = $options[$target]['id'] ?? $target;
         }
 
-        if ($errors !== []) {
-            throw ValidationException::withMessages(['options' => $errors]);
-        }
-
-        return ['options' => $options, 'replacements' => $replacements, 'removed' => array_values($current->except($claimedIds)->keys()->all())];
+        return [$replacements, $errors];
     }
 
     /**
@@ -149,14 +171,7 @@ final readonly class CustomFieldOptionPlan
 
         $removed = $current->except(array_column($options, 'id'));
 
-        $storedRemoved = array_map(strval(...), is_array($data['removed'] ?? null) ? $data['removed'] : []);
-        $currentRemoved = $removed->keys()->all();
-        sort($storedRemoved);
-        sort($currentRemoved);
-
-        if ($storedRemoved !== $currentRemoved) {
-            throw ValidationException::withMessages(['options' => self::changedSinceProposal($field)]);
-        }
+        self::assertRemovalsUnchanged($field, $data, $removed);
 
         if ($removed->isNotEmpty() && $field->settings->encrypted) {
             throw ValidationException::withMessages([
@@ -177,9 +192,10 @@ final readonly class CustomFieldOptionPlan
 
         foreach ($removed as $id => $option) {
             $hasReplacement = array_key_exists($id, $replacements);
-            $replacement = $hasReplacement ? self::targetIndex($targets, $replacements[$id]) : null;
+            $clears = $hasReplacement && $replacements[$id] === null;
+            $replacement = $hasReplacement && ! $clears ? self::targetIndex($targets, $replacements[$id]) : null;
 
-            if ($hasReplacement && $replacement === null) {
+            if ($hasReplacement && ! $clears && $replacement === null) {
                 $errors[] = __('Records on ":name" must move to an option in the new list.', ['name' => $option->name]);
             }
 
@@ -191,16 +207,17 @@ final readonly class CustomFieldOptionPlan
                 $errors[] = __('Records still use ":name", so it needs a replacement from the new list.', ['name' => $option->name]);
             }
 
-            $removals[] = ['option' => $option, 'replacement' => $replacement];
+            $removals[] = [
+                'option' => $option,
+                'replacement' => $replacement,
+                'clears' => $clears ? CustomFieldValue::query()->holdingOption($field, $id)->count() : null,
+            ];
         }
 
-        $moveCap = (int) config('chat.max_option_value_moves', 250);
-        $moveTotal = array_sum($moves);
+        $capError = self::moveCapError($moves);
 
-        if ($moveTotal > $moveCap) {
-            $errors[] = count($moves) === 1
-                ? __('":option" is used by :count records. This assistant moves at most :max records in one approval.', ['option' => array_key_first($moves), 'count' => number_format($moveTotal), 'max' => number_format($moveCap)])
-                : __('The options being removed are used by :count records in total. This assistant moves at most :max records in one approval.', ['count' => number_format($moveTotal), 'max' => number_format($moveCap)]);
+        if ($capError !== null) {
+            $errors[] = $capError;
         }
 
         if (self::isTaskStatus($field) && ! self::keepsDone($current, $targets)) {
@@ -216,6 +233,41 @@ final readonly class CustomFieldOptionPlan
         }
 
         return new self($targets, $removals, self::turnsOnColors($field, $targets));
+    }
+
+    /**
+     * @param  array<string, int>  $moves
+     */
+    private static function moveCapError(array $moves): ?string
+    {
+        $moveCap = (int) config('chat.max_option_value_moves', 250);
+        $moveTotal = array_sum($moves);
+
+        if ($moveTotal <= $moveCap) {
+            return null;
+        }
+
+        return count($moves) === 1
+            ? __('":option" is used by :count records. This assistant moves at most :max records in one approval.', ['option' => array_key_first($moves), 'count' => number_format($moveTotal), 'max' => number_format($moveCap)])
+            : __('The options being removed are used by :count records in total. This assistant moves at most :max records in one approval.', ['count' => number_format($moveTotal), 'max' => number_format($moveCap)]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  Collection<string, CustomFieldOption>  $removed
+     *
+     * @throws ValidationException
+     */
+    private static function assertRemovalsUnchanged(CustomField $field, array $data, Collection $removed): void
+    {
+        $stored = array_map(strval(...), is_array($data['removed'] ?? null) ? $data['removed'] : []);
+        $current = $removed->keys()->all();
+        sort($stored);
+        sort($current);
+
+        if ($stored !== $current) {
+            throw ValidationException::withMessages(['options' => self::changedSinceProposal($field)]);
+        }
     }
 
     /**
@@ -256,7 +308,7 @@ final readonly class CustomFieldOptionPlan
                 $rows[] = ['label' => __('Added'), 'value' => $target['name']];
 
                 if ($target['color'] !== null) {
-                    $rows[] = ['label' => __('Color'), 'value' => self::colorRow($target['name'], $target['color'])];
+                    $rows[] = ['label' => __('Color'), 'value' => $this->colorRow($target['name'], $target['color'])];
                 }
 
                 continue;
@@ -267,25 +319,38 @@ final readonly class CustomFieldOptionPlan
             }
 
             if ($target['color'] !== null && ($this->enablesColors || self::recolors($target))) {
-                $rows[] = ['label' => __('Color'), 'value' => self::colorRow($target['name'], $target['color'])];
+                $rows[] = ['label' => __('Color'), 'value' => $this->colorRow($target['name'], $target['color'])];
             }
         }
 
         foreach ($this->removals as $removal) {
             $rows[] = [
                 'label' => __('Removed'),
-                'value' => $removal['replacement'] === null
-                    ? (string) $removal['option']->name
-                    : __(':option (records move to :replacement)', [
-                        'option' => $removal['option']->name,
-                        'replacement' => $this->targets[$removal['replacement']]['name'],
-                    ]),
+                'value' => $this->removalText($removal),
             ];
         }
 
         $rows[] = ['label' => __('New order'), 'value' => implode(', ', array_column($this->targets, 'name'))];
 
         return $rows;
+    }
+
+    /**
+     * @param  array{option: CustomFieldOption, replacement: ?int, clears: ?int}  $removal
+     */
+    private function removalText(array $removal): string
+    {
+        $name = (string) $removal['option']->name;
+
+        if ($removal['replacement'] !== null) {
+            return __(':option (records move to :replacement)', ['option' => $name, 'replacement' => $this->targets[$removal['replacement']]['name']]);
+        }
+
+        if ($removal['clears'] === null || $removal['clears'] === 0) {
+            return $name;
+        }
+
+        return $name.' ('.trans_choice(':count record loses its value|:count records lose their value', $removal['clears']).')';
     }
 
     private static function assertChoiceField(CustomField $field): void
@@ -353,7 +418,7 @@ final readonly class CustomFieldOptionPlan
         return ! $field->settings->enable_option_colors && array_filter(array_column($targets, 'color')) !== [];
     }
 
-    private static function colorRow(string $name, string $color): string
+    private function colorRow(string $name, string $color): string
     {
         return $name.': '.(OptionColor::tryFrom($color)?->label() ?? $color);
     }

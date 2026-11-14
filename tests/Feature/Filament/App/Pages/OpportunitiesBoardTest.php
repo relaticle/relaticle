@@ -1878,3 +1878,154 @@ it('draws the menu dot and swatches through the same color path as the board hea
 
     expect($menu)->toContain('var(--color-500)')->not->toContain('background-color: '.OptionColor::Olive->value);
 });
+
+function deleteStageAction(string $id): TestAction
+{
+    return TestAction::make('deleteStage')->arguments(['column' => $id]);
+}
+
+it('deletes a stage, clears its cards and logs each record', function (): void {
+    $ids = stageIds($this->stageField);
+    $name = stageOption($ids[1])->name;
+    $first = opportunityInStage($this, 'Acme renewal', $name);
+    $second = opportunityInStage($this, 'Globex upsell', $name);
+    $kept = opportunityInStage($this, 'Initech', stageOption($ids[0])->name);
+
+    $logged = fn (): int => Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->whereIn('subject_id', [$first->getKey(), $second->getKey()])->count();
+    $before = $logged();
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->callAction(deleteStageAction($ids[1]))
+        ->assertHasNoActionErrors();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->toBeNull()
+        ->and($component->instance()->getBoard()->getColumnIdentifiers())->not->toContain($ids[1])
+        ->and($first->refresh()->customFieldValues()->where('custom_field_id', $this->stageField->getKey())->value('string_value'))->toBeNull()
+        ->and($kept->refresh()->customFieldValues()->where('custom_field_id', $this->stageField->getKey())->value('string_value'))->toBe($ids[0])
+        ->and($logged() - $before)->toBe(2);
+});
+
+it('shows the cards of a deleted stage under the no-value column when it is on', function (): void {
+    $ids = stageIds($this->stageField);
+    $opportunity = opportunityInStage($this, 'Acme renewal', stageOption($ids[1])->name);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->callAction(deleteStageAction($ids[1]));
+
+    $cards = $component->instance()->getBoard()->getBoardRecords(BoardStateData::NO_VALUE_COLUMN)->pluck('id')->all();
+
+    expect($cards)->toBe([$opportunity->getKey()]);
+});
+
+it('deletes an empty stage', function (): void {
+    $ids = stageIds($this->stageField);
+
+    livewire(OpportunitiesBoard::class)->callAction(deleteStageAction($ids[2]));
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[2]))->toBeNull();
+});
+
+function deleteConfirmation(Testable $component, string $id): array
+{
+    $action = $component->mountAction(deleteStageAction($id))->instance()->getMountedAction();
+
+    return [$action->getModalHeading(), $action->getModalDescription()];
+}
+
+it('words the confirmation with the stage name and the card count, and drops the body for an empty stage', function (): void {
+    $ids = stageIds($this->stageField);
+    $name = stageOption($ids[1])->name;
+    opportunityInStage($this, 'Acme renewal', $name);
+    opportunityInStage($this, 'Globex upsell', $name);
+    opportunityInStage($this, 'Initech', stageOption($ids[0])->name);
+
+    expect(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[1]))
+        ->toBe(['Delete "'.$name.'"?', '2 opportunities will have no stage. They show in the No Stage column when it is on in View settings.'])
+        ->and(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[0])[1])->toStartWith('1 opportunity will have no stage.')
+        ->and(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[2]))->toBe(['Delete "'.stageOption($ids[2])->name.'"?', null]);
+});
+
+it('words the confirmation with the option noun on another attribute', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $gold = (string) $tier->options->firstWhere('name', 'Gold')->getKey();
+    $opportunity = opportunityInStage($this, 'Acme renewal', stageOption(stageIds($this->stageField)[0])->name);
+    $opportunity->saveCustomFieldValue($tier, $gold);
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnField', $tier->code);
+
+    expect(deleteConfirmation($component, $gold)[1])->toBe('1 opportunity will have no option. They show in the No Tier column when it is on in View settings.');
+});
+
+it('never offers delete on the no-value column', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->assertActionHidden(deleteStageAction(BoardStateData::NO_VALUE_COLUMN));
+});
+
+it('hides delete from a member and a viewer and refuses a forged delete', function (WorkspaceRole $role): void {
+    $id = stageIds($this->stageField)[1];
+    $this->actingAs(makeBoardMember($this, $role));
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    $component->assertActionHidden(deleteStageAction($id))
+        ->call('mountAction', 'deleteStage', ['column' => $id])
+        ->call('callMountedAction');
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($id))->not->toBeNull()
+        ->and($component->html())->not->toContain('Delete stage');
+})->with([WorkspaceRole::Member, WorkspaceRole::Viewer]);
+
+it('shows delete to an owner in the menu', function (): void {
+    expect(livewire(OpportunitiesBoard::class)->html())->toContain('Delete stage');
+});
+
+it('refuses to delete the only option with a notification', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold']);
+    $gold = (string) $tier->options->first()->getKey();
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnField', $tier->code)
+        ->callAction(deleteStageAction($gold))
+        ->assertNotified(__('filament/pages/boards.stage_menu.delete_only', ['noun' => 'option']));
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($gold))->not->toBeNull();
+});
+
+it('refuses to delete the last visible stage with a notification', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class);
+
+    foreach (array_slice($ids, 1) as $id) {
+        $component->call('setBoardColumnVisible', $id, false);
+    }
+
+    $component->callAction(deleteStageAction($ids[0]))
+        ->assertNotified(__('filament/pages/boards.stage_menu.delete_last_visible', ['noun' => 'stage']));
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[0]))->not->toBeNull();
+});
+
+it('leaves the stored board state harmless when a collapsed, hidden and ordered stage is deleted', function (): void {
+    $ids = stageIds($this->stageField);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnCollapsed', $ids[1], true)
+        ->call('setBoardColumnVisible', $ids[2], false)
+        ->call('reorderBoardStages', array_reverse($ids))
+        ->callAction(deleteStageAction($ids[1]))
+        ->callAction(deleteStageAction($ids[2]));
+
+    $state = TablePreference::query()->sole()->board_state;
+    $board = $component->instance()->getBoard();
+
+    expect($state->collapsedColumns)->toContain($ids[1])
+        ->and($state->hiddenColumns)->toContain($ids[2])
+        ->and($board->getColumnIdentifiers())->not->toContain($ids[1])->not->toContain($ids[2])
+        ->and($board->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnCollapsed', $ids[1], true)->call('setBoardColumnVisible', $ids[2], true);
+
+    livewire(OpportunitiesBoard::class)->assertSuccessful();
+});
