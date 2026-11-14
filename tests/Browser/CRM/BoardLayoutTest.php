@@ -1141,7 +1141,7 @@ it('adds a stage from the tile after the last column and shows a taken name unde
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
 
-it('adds a stage in the color picked in its form, focused on open', function (string $model, string $fieldCode, string $path): void {
+it('adds a stage in the color picked in its form, focused on open with gray selected', function (string $model, string $fieldCode, string $path): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -1153,6 +1153,7 @@ it('adds a stage in the color picked in its form, focused on open', function (st
     $page->assertScript(boardWaitFor("document.activeElement === document.querySelector('.ff-add-column-input')"), true);
 
     $page->page()->locator('.ff-add-column-dot')->click();
+    $page->assertScript('document.querySelector(\'.ff-add-column-swatch[aria-pressed="true"]\').getAttribute("aria-label")', OptionColor::Gray->label());
     $page->page()->locator('.ff-add-column-swatch[aria-label="'.OptionColor::Blue->label().'"]')->click();
     $page->assertScript("document.querySelector('.ff-add-column-dot').style.getPropertyValue('--color-500')", $blue);
 

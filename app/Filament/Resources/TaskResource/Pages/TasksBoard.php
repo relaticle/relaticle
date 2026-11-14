@@ -8,6 +8,7 @@ use App\Actions\Task\UpdateTask;
 use App\Contracts\OrdersBoardStages;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField as TaskCustomField;
+use App\Enums\OptionColor;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Actions\MoveCardAction;
@@ -92,6 +93,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->addColumnUsing($this->addBoardStageUsing())
             ->addColumnColors(fn (): array => $this->boardStageColors())
+            ->addColumnDefaultColor(OptionColor::Gray->value)
             ->addColumnLabel(fn (): string => __('filament/pages/boards.stage_menu.add', ['noun' => $this->boardStageNoun()]))
             ->addColumnPlaceholder(fn (): string => __('filament/pages/boards.stage_menu.add_placeholder', ['noun' => $this->boardStageNoun()]))
             ->cardSchema(fn (Schema $schema): Schema => $schema->gap(false)->components($card))

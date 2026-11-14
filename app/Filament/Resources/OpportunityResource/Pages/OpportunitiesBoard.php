@@ -8,6 +8,7 @@ use App\Actions\Opportunity\UpdateOpportunity;
 use App\Contracts\OrdersBoardStages;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
+use App\Enums\OptionColor;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
@@ -85,6 +86,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->addColumnUsing($this->addBoardStageUsing())
             ->addColumnColors(fn (): array => $this->boardStageColors())
+            ->addColumnDefaultColor(OptionColor::Gray->value)
             ->addColumnLabel(fn (): string => __('filament/pages/boards.stage_menu.add', ['noun' => $this->boardStageNoun()]))
             ->addColumnPlaceholder(fn (): string => __('filament/pages/boards.stage_menu.add_placeholder', ['noun' => $this->boardStageNoun()]))
             ->cardSchema(fn (Schema $schema): Schema => $schema->components($card))
