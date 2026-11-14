@@ -262,19 +262,24 @@ it('refuses a tool call from an assistant whose user was removed from the worksp
 it('lets the workspace owner and a current member call tools', function (): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
     $workspace = $owner->currentWorkspace;
+    $member = User::factory()->create(['current_workspace_id' => $workspace->getKey()]);
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
 
-    event(invokingToolFor(assistantFor($owner, $workspace)));
-
-    expect(true)->toBeTrue();
+    expect(fn () => event(invokingToolFor(assistantFor($owner, $workspace))))->not->toThrow(MembershipRevokedException::class)
+        ->and(fn () => event(invokingToolFor(assistantFor($member, $workspace))))->not->toThrow(MembershipRevokedException::class);
 });
 
 it('does not guard an assistant with no workspace bound', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
+    $agent = new CrmAssistant()->withCurrentUser(['name' => 'x', 'id' => (string) $user->getKey(), 'role' => '', 'capabilities' => []]);
 
-    event(invokingToolFor(new CrmAssistant));
-    event(invokingToolFor(new CrmAssistant()->withCurrentUser(['name' => 'x', 'id' => (string) $user->getKey(), 'role' => '', 'capabilities' => []])));
+    expect(fn () => event(invokingToolFor($agent)))->not->toThrow(MembershipRevokedException::class);
+});
 
-    expect(true)->toBeTrue();
+it('does not guard an assistant with a workspace but no user', function (): void {
+    $workspace = User::factory()->withPersonalWorkspace()->create()->currentWorkspace;
+
+    expect(fn () => event(invokingToolFor(new CrmAssistant()->withWorkspace($workspace))))->not->toThrow(MembershipRevokedException::class);
 });
 
 it('ends a turn with the refusal before its first tool runs when the user was removed mid-turn', function (): void {
