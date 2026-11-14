@@ -150,7 +150,7 @@ it('labels a created event as created and hides the system-column diff', functio
     ]);
 
     $entry = $this->company->timeline()->get()->first();
-    $html = (new MergedActivityRenderer)->render($entry)->render();
+    $html = resolve(MergedActivityRenderer::class)->render($entry)->render();
 
     expect($html)
         ->not->toContain(__('activity-log::messages.entry.changed'))
@@ -167,7 +167,7 @@ it('still labels an updated event as changed with its diff', function (): void {
     ]);
 
     $entry = $this->company->timeline()->get()->first();
-    $html = (new MergedActivityRenderer)->render($entry)->render();
+    $html = resolve(MergedActivityRenderer::class)->render($entry)->render();
 
     expect($html)
         ->toContain(__('activity-log::messages.entry.changed'))
@@ -181,7 +181,7 @@ it('reads a company owner change by name on the record timeline', function (): v
     $this->company->update(['account_owner_id' => $seller->getKey()]);
 
     $entry = $this->company->timeline()->get()->first();
-    $html = (new MergedActivityRenderer)->render($entry)->render();
+    $html = resolve(MergedActivityRenderer::class)->render($entry)->render();
 
     expect($html)
         ->toContain('Account Owner')
@@ -211,7 +211,7 @@ it('offers the full text of a change too long for its row, and ships it once', f
     ]]]);
 
     $entry = $this->company->timeline()->get()->first();
-    $html = (new MergedActivityRenderer)->render($entry)->render();
+    $html = resolve(MergedActivityRenderer::class)->render($entry)->render();
 
     expect($html)
         ->toContain(__('workspaces.activity.full_change.show'))
@@ -226,7 +226,7 @@ it('offers no full text toggle for a change that fits its row', function (): voi
     ]);
 
     $entry = $this->company->timeline()->get()->first();
-    $html = (new MergedActivityRenderer)->render($entry)->render();
+    $html = resolve(MergedActivityRenderer::class)->render($entry)->render();
 
     expect($html)->not->toContain(__('workspaces.activity.full_change.show'));
 })->mutates(MergedActivityRenderer::class);

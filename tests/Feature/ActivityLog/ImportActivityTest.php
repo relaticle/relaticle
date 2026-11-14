@@ -294,7 +294,7 @@ it('keeps each imported record its own created entry, marked with the import', f
     runThreePersonImport($this);
 
     $person = People::query()->where('workspace_id', $this->workspace->getKey())->where('name', 'Ada')->sole();
-    $html = (new MergedActivityRenderer)->render($person->timeline()->get()->first())->render();
+    $html = resolve(MergedActivityRenderer::class)->render($person->timeline()->get()->first())->render();
 
     expect($html)->toContain(__('workspaces.activity.via_import', ['file' => 'test.csv']))
         ->and($html)->not->toContain(__('workspaces.activity.via_source', ['source' => CreationSource::IMPORT->getLabel()]));
