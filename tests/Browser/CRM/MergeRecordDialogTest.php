@@ -286,7 +286,69 @@ it('shows domains as links that open a new tab and a logo in the list and the ca
     $page->assertNoJavaScriptErrors();
 });
 
-it('stacks the cards on a phone', function (): void {
+const MERGE_LAYOUT = <<<'JS'
+    (() => {
+        const rect = (selector) => document.querySelector(selector).getBoundingClientRect();
+        const left = rect('[data-merge-left]');
+        const right = rect('[data-merge-right]');
+        const result = rect('[data-merge-result]');
+        const swap = rect('[data-merge-swap]');
+        const swapX = swap.left + swap.width / 2;
+        const swapY = swap.top + swap.height / 2;
+        const tolerance = 1.5;
+        const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        const border = (selector) => parseFloat(getComputedStyle(document.querySelector(selector)).borderTopWidth);
+
+        return {
+            sameRow: Math.abs(left.top - right.top) < tolerance && Math.abs(left.top - result.top) < tolerance,
+            sameHeight: Math.abs(left.height - right.height) < tolerance && Math.abs(left.height - result.height) < tolerance,
+            sameWidth: Math.abs(left.width - right.width) < tolerance && Math.abs(left.width - result.width) < tolerance,
+            resultAfterSources: result.left >= right.right,
+            swapClear: ! intersects(swap, left) && ! intersects(swap, right),
+            sourcesBordered: border('[data-merge-left] > div') > 0 && border('[data-merge-right] > div') > 0,
+            swapBetweenSlots: swapX > left.right && swapX < right.left,
+            swapStacked: swapY > left.bottom && swapY < right.top,
+            resultBelow: result.top >= right.bottom,
+            overflows: document.documentElement.scrollWidth > document.documentElement.clientWidth
+                || document.querySelector('.fi-modal-window').scrollWidth > document.querySelector('.fi-modal-window').clientWidth,
+        };
+    })();
+JS;
+
+it('lays the sources and the result in one row on a laptop and a desktop', function (): void {
+    $current = dialogCompany($this->workspace, $this->user, 'Harborline', ['harborline.com']);
+    dialogCompany($this->workspace, $this->user, 'Harborline Logistics', ['harborline-logistics.com']);
+
+    foreach ([[1440, 900], [1280, 800]] as [$width, $height]) {
+        $page = openMergeDialog($this->user, $this->workspace, $current, $width, $height);
+
+        expect($page->script(MERGE_LAYOUT))->toMatchArray([
+            'sameRow' => true,
+            'sameHeight' => true,
+            'sameWidth' => true,
+            'resultAfterSources' => true,
+            'swapBetweenSlots' => true,
+            'swapClear' => true,
+            'sourcesBordered' => true,
+            'overflows' => false,
+        ]);
+
+        pickInMergeDialog($page, 'Logistics', 'Harborline Logistics');
+
+        expect($page->script(MERGE_LAYOUT))->toMatchArray([
+            'sameRow' => true,
+            'sameHeight' => true,
+            'sameWidth' => true,
+            'resultAfterSources' => true,
+            'swapBetweenSlots' => true,
+            'swapClear' => true,
+            'sourcesBordered' => true,
+            'overflows' => false,
+        ]);
+    }
+});
+
+it('stacks the cards on a phone with the swap button between the two sources', function (): void {
     $current = dialogCompany($this->workspace, $this->user, 'Initech', ['initech.com']);
     dialogCompany($this->workspace, $this->user, 'Initech Ltd', ['initech.co.uk']);
 
@@ -294,22 +356,14 @@ it('stacks the cards on a phone', function (): void {
 
     pickInMergeDialog($page, 'Ltd', 'Initech Ltd');
 
-    $layout = <<<'JS'
-        (() => {
-            const top = (selector) => document.querySelector(selector).getBoundingClientRect();
-            const left = top('[data-merge-left]');
-            const right = top('[data-merge-right]');
-            const result = top('[data-merge-result]');
-
-            return {
-                stacked: right.top >= left.bottom && result.top >= right.bottom,
-                overflows: document.documentElement.scrollWidth > document.documentElement.clientWidth
-                    || document.querySelector('.fi-modal-window').scrollWidth > document.querySelector('.fi-modal-window').clientWidth,
-            };
-        })();
-    JS;
-
-    expect($page->script($layout))->toMatchArray(['stacked' => true, 'overflows' => false]);
+    expect($page->script(MERGE_LAYOUT))->toMatchArray([
+        'sameWidth' => true,
+        'swapStacked' => true,
+        'swapClear' => true,
+        'sourcesBordered' => true,
+        'resultBelow' => true,
+        'overflows' => false,
+    ]);
 });
 
 it('merges a duplicate person picked from the dialog and shows emails and contact opportunities', function (): void {

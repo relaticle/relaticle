@@ -1,9 +1,6 @@
 <div
-    @class([
-        'relative flex h-full min-w-0 flex-col items-center gap-4 p-5 text-center',
-        'rounded-xl bg-white shadow-xs ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10' => $isResult,
-    ])
-    @if ($isResult) data-merge-result @endif
+    class="relative flex h-full min-h-56 min-w-0 flex-col overflow-hidden rounded-xl border border-gray-950/10 bg-white shadow-xs dark:border-white/10 dark:bg-gray-900"
+    @if ($isResult ?? false) data-merge-result @endif
 >
     @if ($isClearable)
         <button
@@ -21,7 +18,7 @@
         </button>
     @endif
 
-    <div class="flex w-full flex-1 min-w-0 flex-col items-center gap-3">
+    <div class="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-5 text-center">
         @include('filament.app.merge-record.mark', ['logo' => $card['logo'], 'icon' => $card['icon'], 'size' => 'size-12 rounded-xl', 'iconSize' => 'size-6'])
 
         <p class="line-clamp-2 max-w-full break-words text-base font-semibold text-gray-950 dark:text-white" data-merge-name title="{{ $card['name'] }}">{{ $card['name'] }}</p>
@@ -46,7 +43,7 @@
         </div>
     </div>
 
-    <ul class="flex w-full flex-wrap items-center justify-center gap-1.5 border-t border-gray-950/5 pt-4 dark:border-white/10" data-merge-counts>
+    <ul class="flex w-full flex-wrap items-center justify-center gap-1.5 border-t border-gray-950/10 px-5 py-4 dark:border-white/10" data-merge-counts>
         @foreach ($card['counts'] as $count)
             @php($label = trans_choice("filament/record-page.merge.counts.{$count['key']}", $count['count']))
 
