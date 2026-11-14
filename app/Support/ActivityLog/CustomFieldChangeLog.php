@@ -16,26 +16,56 @@ final readonly class CustomFieldChangeLog
 {
     public function record(Model $entity, CustomField $field, mixed $old, mixed $new): void
     {
+        $change = $this->change($entity, $field, $old, $new);
+
+        if ($change !== null) {
+            LabelledChangeLog::write(...$change);
+        }
+    }
+
+    /**
+     * @param  iterable<array{0: Model, 1: mixed, 2: mixed}>  $values  entity, old value, new value
+     */
+    public function recordMany(CustomField $field, iterable $values): void
+    {
+        $changes = [];
+
+        foreach ($values as [$entity, $old, $new]) {
+            $change = $this->change($entity, $field, $old, $new);
+
+            if ($change !== null) {
+                $changes[] = $change;
+            }
+        }
+
+        LabelledChangeLog::writeMany($changes);
+    }
+
+    /**
+     * @return ?array{record: Model, code: string, label: string, type: string, old: array{value: mixed, label: string}, new: array{value: mixed, label: string}}
+     */
+    private function change(Model $entity, CustomField $field, mixed $old, mixed $new): ?array
+    {
         if ($this->isEmpty($old) && $this->isEmpty($new)) {
-            return;
+            return null;
         }
 
         // A normalization-only rewrite (a link field stripping its scheme) is not a user edit.
         // A first value skips the check: nothing was rewritten, and `false` normalizes to empty.
         if ($old !== null && CanonicalValue::each($field, $old) === CanonicalValue::each($field, $new)) {
-            return;
+            return null;
         }
 
         $dataType = CustomFieldsType::getFieldType($field->type)->dataType;
 
-        LabelledChangeLog::write(
-            $entity,
-            $field->code,
-            $field->name,
-            $field->type,
-            $this->describe($field, $dataType, $old),
-            $this->describe($field, $dataType, $new),
-        );
+        return [
+            'record' => $entity,
+            'code' => $field->code,
+            'label' => $field->name,
+            'type' => $field->type,
+            'old' => $this->describe($field, $dataType, $old),
+            'new' => $this->describe($field, $dataType, $new),
+        ];
     }
 
     /**

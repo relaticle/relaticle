@@ -20,7 +20,6 @@ use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
 use App\Jobs\CompleteExport;
 use App\Livewire\FilamentNotifications;
-use App\Models\ActivityLog\Activity as ActivityModel;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldSection;
@@ -40,8 +39,8 @@ use App\Services\WorkspaceActivationFacts;
 use App\Support\ActivityLog\CurrentImport;
 use App\Support\ActivityLog\MergedActivityRenderer;
 use App\Support\ActivityLog\RequestActivityBatch;
+use App\Support\ActivityLog\StampsActivity;
 use App\Support\BrandColors;
-use App\Support\CurrentSource;
 use App\Support\CurrentWorkspace;
 use App\Support\CustomFields\CustomFieldInput;
 use App\Support\CustomFields\CustomFieldSchemaCache;
@@ -123,7 +122,6 @@ use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use SocialiteProviders\Manager\SocialiteWasCalled;
 use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
-use Spatie\Activitylog\Contracts\Activity as ActivityContract;
 use Spatie\Activitylog\Support\PendingActivityLog;
 use Spatie\LaravelMarkdown\MarkdownRenderer;
 use Spatie\MailcoachMailer\Exceptions\InvalidMailerConfig;
@@ -406,35 +404,7 @@ final class AppServiceProvider extends ServiceProvider
     private function configureActivityLog(): void
     {
         // The facade resolves authentication before hostname-specific sessions are configured.
-        PendingActivityLog::beforeLogging(function (ActivityContract $activity): void {
-            if (! $activity instanceof ActivityModel) {
-                return;
-            }
-
-            if (blank($activity->getAttribute('batch_uuid'))) {
-                $activity->setAttribute('batch_uuid', $this->app->make(RequestActivityBatch::class)->id());
-            }
-
-            $import = $this->app->make(CurrentImport::class);
-
-            if ($import->id() !== null && $activity->getAttribute('subject_type') !== Relation::getMorphAlias(Import::class)) {
-                $activity->properties = ($activity->properties ?? new Collection)
-                    ->put('import_id', $import->id())
-                    ->put('import_file', $import->fileName());
-            }
-
-            $activity->properties = ($activity->properties ?? new Collection)
-                ->put(ActivityModel::SOURCE_PROPERTY, CurrentSource::get()->value);
-
-            // The causer stays the impersonated user because the record is theirs.
-            $administratorId = $this->app->make(Impersonator::class)->administratorId(request())
-                ?? Context::getHidden('impersonated_by');
-
-            if (is_string($administratorId)) {
-                $activity->properties = ($activity->properties ?? new Collection)
-                    ->put('impersonated_by', $administratorId);
-            }
-        });
+        PendingActivityLog::beforeLogging(StampsActivity::apply(...));
 
         Context::dehydrating(function (ContextRepository $context): void {
             $administratorId = $this->app->make(Impersonator::class)->administratorId(request());

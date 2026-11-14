@@ -9,10 +9,12 @@ use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldValue;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CustomFieldOptionPlan;
 use Filament\Facades\Filament;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -929,4 +931,91 @@ it('raises a distinct exception when the options changed under the caller', func
 
     expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]))
         ->toThrow(OptionsChangedException::class);
+});
+
+function setOptionsActivityRow(Company $company): array
+{
+    return Arr::except(
+        Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $company->getKey())->orderByDesc('id')->firstOrFail()->toArray(),
+        ['id', 'subject_id', 'created_at', 'updated_at'],
+    );
+}
+
+function setOptionsClearTheOldWay(Company $company, CustomField $field): void
+{
+    $column = $field->type === 'multi-select' ? 'json_value' : 'string_value';
+    $removing = $field->type === 'multi-select' ? 'SMB' : 'Churned';
+    $value = CustomFieldValue::query()->where('entity_id', $company->getKey())->where('custom_field_id', $field->getKey())->sole();
+    $value->setAttribute($column, $column === 'json_value'
+        ? collect($value->json_value)->reject(fn (string $id): bool => $id === setOptionsId($field, $removing))->values()
+        : null);
+    $value->save();
+}
+
+function setOptionsClearWithNull(object $test, CustomField $field, array $keep, string $removing): void
+{
+    $options = collect($keep)->map(fn (string $name): array => ['id' => setOptionsId($field, $name), 'name' => $name, 'was' => $name])->all();
+    $id = setOptionsId($field, $removing);
+
+    resolve(SetCustomFieldOptions::class)->execute($test->owner, $field, ['options' => $options, 'replacements' => [$id => null], 'removed' => [$id]], capsClears: false);
+}
+
+it('writes the same activity row in bulk as the per-record save wrote, for a single choice field', function (): void {
+    $churned = setOptionsId($this->lifecycle, 'Churned');
+    $twin = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    setOptionsClearTheOldWay($twin, $this->lifecycle);
+    $expected = setOptionsActivityRow($twin);
+
+    $live = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    $trashed = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    $trashed->delete();
+    $untouched = setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Lead'));
+    $otherField = setOptionsCompany($this->workspace, $this->segments, [setOptionsId($this->segments, 'SMB')]);
+    $untouchedLogs = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->whereIn('subject_id', [$untouched->getKey(), $otherField->getKey()])->count();
+
+    $intruder = User::factory()->withPersonalWorkspace()->create();
+    $foreignField = setOptionsChoiceField($intruder->currentWorkspace, 'lifecycle', 'Lifecycle', 'select', ['Lead', 'Customer', 'Churned']);
+    TenantContextService::setTenantId($intruder->currentWorkspace->getKey());
+    $foreign = setOptionsCompany($intruder->currentWorkspace, $foreignField, setOptionsId($foreignField, 'Churned'));
+    TenantContextService::setTenantId($this->workspace->getKey());
+    $foreignLogs = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $foreign->getKey())->count();
+
+    setOptionsClearWithNull($this, $this->lifecycle, ['Lead', 'Customer'], 'Churned');
+
+    expect($expected['workspace_id'])->toBe($this->workspace->getKey())
+        ->and(setOptionsActivityRow($live))->toEqual($expected)
+        ->and(setOptionsActivityRow($trashed))->toEqual($expected)
+        ->and(setOptionsStoredValue($live, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($trashed, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($untouched, $this->lifecycle))->toBe(setOptionsId($this->lifecycle, 'Lead'))
+        ->and(setOptionsStoredValue($otherField, $this->segments))->toBe([setOptionsId($this->segments, 'SMB')])
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->whereIn('subject_id', [$untouched->getKey(), $otherField->getKey()])->count())->toBe($untouchedLogs)
+        ->and(setOptionsStoredValue($foreign, $foreignField))->toBe(setOptionsId($foreignField, 'Churned'))
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $foreign->getKey())->count())->toBe($foreignLogs);
+});
+
+it('writes the same activity row in bulk as the per-record save wrote, for a multi choice field', function (): void {
+    [$enterprise, $smb, $startup] = array_map(fn (string $name): string => setOptionsId($this->segments, $name), ['Enterprise', 'SMB', 'Startup']);
+    $twin = setOptionsCompany($this->workspace, $this->segments, [$enterprise, $smb]);
+    setOptionsClearTheOldWay($twin, $this->segments);
+    $expected = setOptionsActivityRow($twin);
+
+    $mixed = setOptionsCompany($this->workspace, $this->segments, [$enterprise, $smb]);
+    $only = setOptionsCompany($this->workspace, $this->segments, [$smb]);
+    $trashed = setOptionsCompany($this->workspace, $this->segments, [$smb, $startup]);
+    $trashed->delete();
+    $other = setOptionsCompany($this->workspace, $this->segments, [$enterprise, $startup]);
+    $otherLogs = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $other->getKey())->count();
+
+    setOptionsClearWithNull($this, $this->segments, ['Enterprise', 'Startup'], 'SMB');
+
+    $onlyRow = setOptionsActivityRow($only);
+
+    expect(setOptionsActivityRow($mixed))->toEqual($expected)
+        ->and($onlyRow['properties']['custom_field_changes'][0]['new'])->toBe(['value' => null, 'label' => '—'])
+        ->and(setOptionsStoredValue($mixed, $this->segments))->toBe([$enterprise])
+        ->and(setOptionsStoredValue($only, $this->segments))->toBe([])
+        ->and(setOptionsStoredValue($trashed, $this->segments))->toBe([$startup])
+        ->and(setOptionsStoredValue($other, $this->segments))->toBe([$enterprise, $startup])
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $other->getKey())->count())->toBe($otherLogs);
 });
