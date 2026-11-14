@@ -1782,10 +1782,10 @@ it('sets a stage color from the palette and turns option colors on', function ()
     $this->stageField->update(['settings' => $settings]);
 
     livewire(OpportunitiesBoard::class)
-        ->call('setBoardColumnColor', $id, OptionColor::Blue->value)
+        ->call('setBoardColumnColor', $id, OptionColor::Red->value)
         ->assertHasNoErrors();
 
-    expect(stageOption($id)->settings->color)->toBe(OptionColor::Blue->value)
+    expect(stageOption($id)->settings->color)->toBe(OptionColor::Red->value)
         ->and($this->stageField->refresh()->settings->enable_option_colors)->toBeTrue();
 });
 
@@ -2152,7 +2152,7 @@ it('tells the board user to reload when the options change under a delete, renam
     match ($write) {
         'delete' => $component->callAction(deleteStageAction($ids[1]))->assertNotified($changed),
         'rename' => $component->call('renameBoardColumn', $ids[1], 'Discovery')->assertHasErrors(['boardStageMenu.'.$ids[1] => $changed]),
-        'color' => $component->call('setBoardColumnColor', $ids[1], OptionColor::Blue->value)->assertHasErrors(['boardStageMenu.'.$ids[1] => $changed]),
+        'color' => $component->call('setBoardColumnColor', $ids[1], OptionColor::Red->value)->assertHasErrors(['boardStageMenu.'.$ids[1] => $changed]),
     };
 
     expect(stageOption($ids[1])->name)->not->toBe('Discovery')->and(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->not->toBeNull();

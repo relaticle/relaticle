@@ -482,7 +482,15 @@ function openPlainBoard(): Testable
 
 function switcherRowHtml(string $html, string $key): string
 {
-    return preg_match('/data-view-key="'.preg_quote($key, '/').'".*?(?=data-view-key=|$)/s', $html, $match) === 1 ? $match[0] : '';
+    $start = strpos($html, 'data-view-key="'.$key.'"');
+
+    if ($start === false) {
+        return '';
+    }
+
+    $end = strpos($html, 'data-view-key=', $start + 1);
+
+    return substr($html, $start, $end === false ? null : $end - $start);
 }
 
 it('saves the current board as a view and opens it', function (): void {
