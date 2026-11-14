@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
+use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class SetCustomFieldOptions
@@ -41,6 +42,7 @@ final readonly class SetCustomFieldOptions
                 $field = CustomField::query()->withoutGlobalScopes()->whereKey($field->getKey())->lockForUpdate()->sole();
                 $plan = CustomFieldOptionPlan::validated($field, $data);
                 $options = $this->writeOptions($field, $plan);
+                $this->enableOptionColors($field, $plan);
                 $removed = array_column($plan->removals, 'option');
 
                 // The change log labels moved values from this relation; a reload would read the temporary names.
@@ -96,13 +98,19 @@ final readonly class SetCustomFieldOptions
                     'custom_field_id' => $field->getKey(),
                     'name' => $target['name'],
                     'sort_order' => $sortOrder,
+                    'settings' => new CustomFieldOptionSettingsData(color: $target['color']),
                 ]);
 
                 continue;
             }
 
-            if ($option->name !== $target['name']) {
-                $option->update(['name' => $target['name']]);
+            $changes = array_filter([
+                'name' => $option->name !== $target['name'] ? $target['name'] : null,
+                'settings' => $target['color'] !== null && $target['color'] !== $option->settings->color ? new CustomFieldOptionSettingsData(color: $target['color']) : null,
+            ]);
+
+            if ($changes !== []) {
+                $option->update($changes);
             }
 
             if ($option->sort_order !== $sortOrder) {
@@ -113,6 +121,17 @@ final readonly class SetCustomFieldOptions
         }
 
         return $options;
+    }
+
+    private function enableOptionColors(CustomField $field, CustomFieldOptionPlan $plan): void
+    {
+        if ($field->settings->enable_option_colors || array_filter(array_column($plan->targets, 'color')) === []) {
+            return;
+        }
+
+        $settings = $field->settings;
+        $settings->enable_option_colors = true;
+        $field->update(['settings' => $settings]);
     }
 
     private function freeTargetNames(CustomFieldOptionPlan $plan): void

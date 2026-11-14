@@ -36,6 +36,7 @@ use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Enums\FiltersLayout;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
@@ -80,6 +81,8 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->collapsedColumns(fn (): array => $this->collapsedBoardColumnIds())
             ->collapseAllColumns(fn (): bool => $this->storedBoardState()->columnsCollapsed)
             ->collapsibleColumns(fn (string $columnId, bool $collapsed) => $this->setBoardColumnCollapsed($columnId, $collapsed))
+            ->columnActions($this->boardStageActions())
+            ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->cardSchema(fn (Schema $schema): Schema => $schema->components($card))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')

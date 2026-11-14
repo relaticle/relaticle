@@ -26,7 +26,7 @@ return [
                 'App\Providers\HealthServiceProvider::boot' => 63,
                 'App\Services\AvatarService::getInitials' => 70,
                 'App\Support\CustomFieldOptionPlan::fromToolInput' => 77,
-                'App\Support\CustomFieldOptionPlan::validated' => 114,
+                'App\Support\CustomFieldOptionPlan::validated' => 100,
                 'Relaticle\Chat\Queries\ConversationMessagesQuery::get' => 88,
                 'Relaticle\Chat\Agents\CrmAssistant::staticInstructions' => 110,
                 'Relaticle\Chat\Http\Controllers\ChatController::send' => 141,

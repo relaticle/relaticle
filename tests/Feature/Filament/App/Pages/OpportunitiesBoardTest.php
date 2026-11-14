@@ -12,6 +12,7 @@ use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
+use App\Enums\OptionColor;
 use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MoveCardAction;
@@ -24,6 +25,7 @@ use App\Filament\Resources\OpportunityResource;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Tables\Concerns\CreatesTableAttribute;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -1610,4 +1612,210 @@ it('opens a new attribute with its no-value column expanded', function (): void 
         ->callAction('createColumnAttribute', data: ['name' => 'Lead tier', 'options' => [['name' => 'Hot']]]);
 
     expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+});
+
+function stageOption(string $id): CustomFieldOption
+{
+    return CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($id);
+}
+
+function stageMenuOf(Testable $component, string $id): string
+{
+    $dom = new DOMDocument;
+    libxml_use_internal_errors(true);
+    $dom->loadHTML('<?xml encoding="utf-8"?>'.$component->html());
+    $node = (new DOMXPath($dom))->query('//*[@data-stage-menu="'.$id.'"]')->item(0);
+
+    return $node === null ? '' : (string) $dom->saveHTML($node);
+}
+
+function makeBoardMember(object $test, WorkspaceRole $role = WorkspaceRole::Member): User
+{
+    $member = User::factory()->create();
+    $test->workspace->users()->attach($member, ['role' => $role->value]);
+    $member->switchWorkspace($test->workspace);
+
+    return $member;
+}
+
+it('renames a stage from its header menu, trims the name and logs the change', function (): void {
+    $id = stageIds($this->stageField)[1];
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('renameBoardColumn', $id, '  Discovery  ')
+        ->assertHasNoErrors();
+
+    expect(stageOption($id)->name)->toBe('Discovery')
+        ->and($component->instance()->getBoard()->getColumn($id)->getLabel())->toBe('Discovery')
+        ->and(Activity::withoutGlobalScopes()->where('subject_id', $id)->where('event', 'updated')->exists())->toBeTrue();
+});
+
+it('keeps the option order and the other stages when one is renamed', function (): void {
+    $ids = stageIds($this->stageField);
+    $names = CustomFieldOption::query()->withoutGlobalScopes()->whereIn('id', $ids)->pluck('name', 'id');
+
+    livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $ids[2], 'Discovery');
+
+    $after = CustomFieldOption::query()->withoutGlobalScopes()->whereIn('id', $ids)->orderBy('sort_order')->pluck('name', 'id');
+
+    expect($after->keys()->all())->toBe($ids)
+        ->and($after->except($ids[2])->all())->toBe($names->except($ids[2])->all());
+});
+
+it('shows an error in the menu and changes nothing for a blank or taken stage name', function (string $name): void {
+    $ids = stageIds($this->stageField);
+    $before = stageOption($ids[1])->name;
+    $taken = match ($name) {
+        'taken' => stageOption($ids[0])->name,
+        'taken-upper' => strtoupper(stageOption($ids[0])->name),
+        default => $name,
+    };
+
+    $component = livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $ids[1], $taken);
+
+    $component->assertHasErrors(['boardStageMenu']);
+
+    expect(stageOption($ids[1])->name)->toBe($before)
+        ->and(stageMenuOf($component, $ids[1]))->toContain('data-stage-error');
+})->with(['blank' => '   ', 'taken' => 'taken', 'taken in another case' => 'taken-upper']);
+
+it('clears the menu error once a rename succeeds', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    livewire(OpportunitiesBoard::class)
+        ->call('renameBoardColumn', $id, '')
+        ->assertHasErrors(['boardStageMenu'])
+        ->call('renameBoardColumn', $id, 'Discovery')
+        ->assertHasNoErrors();
+});
+
+it('ignores a rename of the same name and of an id the board does not own', function (): void {
+    $id = stageIds($this->stageField)[1];
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $tierId = (string) $tier->options->first()->getKey();
+    $name = stageOption($id)->name;
+
+    livewire(OpportunitiesBoard::class)
+        ->call('renameBoardColumn', $id, $name)
+        ->call('renameBoardColumn', $tierId, 'Platinum')
+        ->call('renameBoardColumn', BoardStateData::NO_VALUE_COLUMN, 'Nothing')
+        ->assertHasNoErrors();
+
+    expect(stageOption($id)->name)->toBe($name)
+        ->and(stageOption($tierId)->name)->toBe('Gold');
+});
+
+it('sets a stage color from the palette and turns option colors on', function (): void {
+    $id = stageIds($this->stageField)[1];
+    $settings = $this->stageField->settings;
+    $settings->enable_option_colors = false;
+    $this->stageField->update(['settings' => $settings]);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnColor', $id, OptionColor::Blue->value)
+        ->assertHasNoErrors();
+
+    expect(stageOption($id)->settings->color)->toBe(OptionColor::Blue->value)
+        ->and($this->stageField->refresh()->settings->enable_option_colors)->toBeTrue();
+});
+
+it('rings the current stage color in the swatch grid', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnColor', $id, OptionColor::Pink->value);
+
+    expect(stageMenuOf($component, $id))->toMatch('/data-stage-swatch="#ec4899"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-stage-swatch="#ec4899"/');
+});
+
+it('refuses a color outside the palette and changes nothing', function (): void {
+    $id = stageIds($this->stageField)[1];
+    $before = stageOption($id)->settings->color;
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnColor', $id, '#123456')
+        ->assertHasErrors(['boardStageMenu']);
+
+    expect(stageOption($id)->settings->color)->toBe($before);
+});
+
+it('refuses a forged rename or color from a member and from a viewer', function (WorkspaceRole $role): void {
+    $id = stageIds($this->stageField)[1];
+    $name = stageOption($id)->name;
+    $color = stageOption($id)->settings->color;
+    $this->actingAs(makeBoardMember($this, $role));
+
+    livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $id, 'Forged')->assertForbidden();
+    livewire(OpportunitiesBoard::class)->call('setBoardColumnColor', $id, OptionColor::Red->value)->assertForbidden();
+
+    expect(stageOption($id)->name)->toBe($name)
+        ->and(stageOption($id)->settings->color)->toBe($color);
+})->with([WorkspaceRole::Member, WorkspaceRole::Viewer]);
+
+it('renders the edit block for an admin and plain text with collapse and hide for a member', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    $admin = livewire(OpportunitiesBoard::class);
+
+    expect(stageMenuOf($admin, $id))->toContain('data-stage-edit="'.$id.'"')->toContain('data-stage-name-input')->toContain('data-stage-swatch');
+
+    $this->actingAs(makeBoardMember($this));
+    $member = livewire(OpportunitiesBoard::class);
+
+    expect(stageMenuOf($member, $id))->toContain(stageOption($id)->name)->not->toContain('data-stage-edit')->not->toContain('data-stage-name-input')->not->toContain('data-stage-swatch')
+        ->and($member->html())->toContain('Collapse stage')->toContain('Hide stage');
+});
+
+it('gives the no-value column collapse and hide but no edit block', function (): void {
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect(stageMenuOf($component, BoardStateData::NO_VALUE_COLUMN))->toContain('data-stage-menu')->not->toContain('data-stage-edit')->not->toContain('data-stage-name-input')->not->toContain('data-stage-swatch')
+        ->and($component->html())->toContain('Collapse stage');
+
+    $component->callAction(TestAction::make('collapseStage')->arguments(['column' => BoardStateData::NO_VALUE_COLUMN]));
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
+
+it('collapses and hides a stage from the menu actions', function (): void {
+    $ids = stageIds($this->stageField);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->callAction(TestAction::make('collapseStage')->arguments(['column' => $ids[1]]))
+        ->callAction(TestAction::make('hideStage')->arguments(['column' => $ids[2]]));
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[1]])
+        ->and(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe([$ids[2]]);
+});
+
+it('refuses to hide the last visible stage with a notification', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class);
+
+    foreach (array_slice($ids, 1) as $id) {
+        $component->call('setBoardColumnVisible', $id, false);
+    }
+
+    $component->callAction(TestAction::make('hideStage')->arguments(['column' => $ids[0]]))
+        ->assertNotified(__('filament/pages/boards.stage_menu.last_visible', ['noun' => 'stage']));
+
+    expect(TablePreference::query()->sole()->board_state->hiddenColumns)->not->toContain($ids[0]);
+});
+
+it('names the attribute the board is grouped by in the menu', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect($component->html())->toContain('Collapse stage')->not->toContain('Collapse option');
+
+    $component->call('setBoardColumnField', $tier->code);
+
+    expect($component->html())->toContain('Collapse option')->toContain('Hide option')->not->toContain('Collapse stage');
+});
+
+it('keeps the stage menu in the page after a rename re-renders the board', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    $component = livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $id, 'Discovery');
+
+    expect(stageMenuOf($component, $id))->toContain('value="Discovery"');
 });

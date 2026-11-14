@@ -7,17 +7,19 @@ namespace App\Support;
 use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\OptionColor;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 final readonly class CustomFieldOptionPlan
 {
     /**
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
      * @param  list<array{option: CustomFieldOption, replacement: ?int}>  $removals
      */
     private function __construct(
@@ -27,7 +29,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array{options: list<array{id?: string, name: string, was?: string}>, replacements: array<string, string|int>, removed: list<string>}
+     * @return array{options: list<array{id?: string, name: string, was?: string, color?: string}>, replacements: array<string, string|int>, removed: list<string>}
      *
      * @throws ValidationException
      */
@@ -63,7 +65,7 @@ final readonly class CustomFieldOptionPlan
             }
 
             if (! $existing instanceof CustomFieldOption) {
-                $options[] = ['name' => $item['name']];
+                $options[] = ['name' => $item['name'], ...self::colorEntry($item['color'])];
 
                 continue;
             }
@@ -77,7 +79,7 @@ final readonly class CustomFieldOptionPlan
             }
 
             $claimedIds[] = $id;
-            $options[] = ['id' => $id, 'name' => $item['name'], 'was' => (string) $existing->name];
+            $options[] = ['id' => $id, 'name' => $item['name'], 'was' => (string) $existing->name, ...self::colorEntry($item['color'])];
         }
 
         $replacements = [];
@@ -118,21 +120,7 @@ final readonly class CustomFieldOptionPlan
     {
         self::assertChoiceField($field);
 
-        /** @var list<array{id?: string, name: string, was?: string}> $options */
-        $options = Validator::make($data, [
-            'options' => ['required', 'array', 'list', 'max:'.CustomFieldDefinitionValidator::maxOptions()],
-            'options.*' => ['array:id,name,was'],
-            'options.*.id' => ['sometimes', 'string', 'distinct'],
-            'options.*.was' => ['required_with:options.*.id', 'string'],
-            'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
-            'replacements' => ['sometimes', 'array'],
-            'removed' => ['present', 'array'],
-            'removed.*' => ['string'],
-        ], [
-            'options.required' => __('List at least one option.'),
-            'options.max' => __('Too many options. At most :max per field.'),
-            'options.*.id.distinct' => __('Each existing option can appear only once.'),
-        ] + CustomFieldDefinitionValidator::optionNameMessages())->validate()['options'];
+        $options = self::validatedOptions($data);
 
         $current = self::currentOptions($field);
         $targets = [];
@@ -151,7 +139,7 @@ final readonly class CustomFieldOptionPlan
                 throw ValidationException::withMessages(['options' => self::changedSinceProposal($field)]);
             }
 
-            $targets[] = ['option' => $existing, 'name' => $option['name']];
+            $targets[] = ['option' => $existing, 'name' => $option['name'], 'color' => filled($option['color'] ?? null) ? $option['color'] : null];
         }
 
         if ($vanished !== []) {
@@ -230,6 +218,32 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
+     * @param  array<string, mixed>  $data
+     * @return list<array{id?: string, name: string, was?: string, color?: string}>
+     *
+     * @throws ValidationException
+     */
+    private static function validatedOptions(array $data): array
+    {
+        return Validator::make($data, [
+            'options' => ['required', 'array', 'list', 'max:'.CustomFieldDefinitionValidator::maxOptions()],
+            'options.*' => ['array:id,name,was,color'],
+            'options.*.color' => ['nullable', 'string', Rule::enum(OptionColor::class)],
+            'options.*.id' => ['sometimes', 'string', 'distinct'],
+            'options.*.was' => ['required_with:options.*.id', 'string'],
+            'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
+            'replacements' => ['sometimes', 'array'],
+            'removed' => ['present', 'array'],
+            'removed.*' => ['string'],
+        ], [
+            'options.required' => __('List at least one option.'),
+            'options.max' => __('Too many options. At most :max per field.'),
+            'options.*.id.distinct' => __('Each existing option can appear only once.'),
+            'options.*.color.enum' => __('An option color must be one of the palette colors.'),
+        ] + CustomFieldDefinitionValidator::optionNameMessages())->validate()['options'];
+    }
+
+    /**
      * @return list<array{label: string, value?: string, old?: string, new?: string}>
      */
     public function displayRows(): array
@@ -240,11 +254,19 @@ final readonly class CustomFieldOptionPlan
             if (! $target['option'] instanceof CustomFieldOption) {
                 $rows[] = ['label' => __('Added'), 'value' => $target['name']];
 
+                if ($target['color'] !== null) {
+                    $rows[] = ['label' => __('Color'), 'value' => self::colorRow($target['name'], $target['color'])];
+                }
+
                 continue;
             }
 
             if ($target['option']->name !== $target['name']) {
                 $rows[] = ['label' => __('Renamed'), 'old' => (string) $target['option']->name, 'new' => $target['name']];
+            }
+
+            if (self::recolors($target)) {
+                $rows[] = ['label' => __('Color'), 'value' => self::colorRow($target['name'], (string) $target['color'])];
             }
         }
 
@@ -289,18 +311,44 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @return array{name: string, current: string}
+     * @return array{name: string, current: string, color: string}
      */
     private static function toolItem(mixed $item): array
     {
         if (! is_array($item)) {
-            return ['name' => self::text($item), 'current' => ''];
+            return ['name' => self::text($item), 'current' => '', 'color' => ''];
         }
 
         return [
             'name' => self::text($item['name'] ?? null),
             'current' => self::text($item['current'] ?? null),
+            'color' => self::text($item['color'] ?? null),
         ];
+    }
+
+    /**
+     * @return array{color?: string}
+     */
+    private static function colorEntry(string $color): array
+    {
+        $known = OptionColor::fromInput($color);
+
+        return $color === '' ? [] : ['color' => $known instanceof OptionColor ? $known->value : $color];
+    }
+
+    /**
+     * @param  array{option: ?CustomFieldOption, name: string, color: ?string}  $target
+     */
+    private static function recolors(array $target): bool
+    {
+        return $target['option'] instanceof CustomFieldOption
+            && $target['color'] !== null
+            && $target['color'] !== $target['option']->settings->color;
+    }
+
+    private static function colorRow(string $name, string $color): string
+    {
+        return $name.': '.(OptionColor::tryFrom($color)?->label() ?? $color);
     }
 
     private static function text(mixed $value): string
@@ -340,7 +388,7 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
      */
     private static function targetIndex(array $targets, mixed $reference): ?int
     {
@@ -373,7 +421,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  Collection<string, CustomFieldOption>  $current
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
      */
     private static function keepsDone(Collection $current, array $targets): bool
     {
@@ -394,7 +442,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  Collection<string, CustomFieldOption>  $current
-     * @param  list<array{option: ?CustomFieldOption, name: string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
      */
     private static function sameList(Collection $current, array $targets): bool
     {
@@ -411,6 +459,6 @@ final readonly class CustomFieldOptionPlan
             $targets,
         );
 
-        return $before === $after;
+        return $before === $after && array_filter($targets, self::recolors(...)) === [];
     }
 }

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\SetCustomFieldOptions;
+use App\Enums\OptionColor;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -619,4 +620,77 @@ it('refuses approval when an option it keeps was renamed after the proposal', fu
         ->toThrow(ValidationException::class, 'changed after this proposal');
 
     expect(setOptionsNames($this->lifecycle))->toBe(['Prospect', 'Customer', 'Churned']);
+});
+
+it('sets an option color by palette name or hex and turns option colors on', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'color' => 'Blue'], ['name' => 'Customer', 'color' => OptionColor::Green->value], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['data']['options'][0])->toBe(['id' => $leadId, 'name' => 'Lead', 'was' => 'Lead', 'color' => OptionColor::Blue->value])
+        ->and($decoded['data']['options'][2])->not->toHaveKey('color')
+        ->and($decoded['display']['fields'])->toContain(['label' => 'Color', 'value' => 'Lead: Blue']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $colors = CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $this->lifecycle->getKey())->get()->mapWithKeys(fn (CustomFieldOption $option): array => [(string) $option->name => $option->settings->color]);
+
+    expect($colors->all())->toEqual(['Lead' => OptionColor::Blue->value, 'Customer' => OptionColor::Green->value, 'Churned' => null])
+        ->and($this->lifecycle->refresh()->settings->enable_option_colors)->toBeTrue();
+});
+
+it('adds an option with a color', function (): void {
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer'], ['name' => 'Churned'], ['name' => 'Partner', 'color' => 'purple']],
+    ]]);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->where('name', 'Partner')->sole()->settings->color)->toBe(OptionColor::Purple->value);
+});
+
+it('keeps the current color when an option carries none', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value]]);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Prospect', 'current' => 'Lead'], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings->color)->toBe(OptionColor::Red->value);
+});
+
+it('refuses a color outside the palette', function (): void {
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Prospect', 'current' => 'Lead', 'color' => 'teal'], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['error'])->toContain('color');
+    expect(PendingAction::query()->count())->toBe(0);
+});
+
+it('lets the action set a color through the same validation as the proposal', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    $options = collect(['Lead', 'Customer', 'Churned'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $options[0]['color'] = OptionColor::Orange->value;
+
+    resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings->color)->toBe(OptionColor::Orange->value);
+
+    $options[0]['color'] = '#000000';
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]))->toThrow(ValidationException::class);
 });

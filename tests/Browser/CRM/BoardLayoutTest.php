@@ -10,6 +10,7 @@ use App\Filament\Resources\OpportunityResource\Pages\OpportunitiesBoard;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Opportunity;
 use App\Models\Task;
 use App\Models\User;
@@ -906,5 +907,58 @@ it('still moves a card between two columns now that a column drags by its tray',
 
     expect((string) $stored)->toBe((string) $to->getKey())
         ->and(storedStageOrder($user, $entity))->toBeNull();
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('opens the stage menu on a header click, renames on Enter and recolors from the swatch grid', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $menu = "[data-stage-menu=\"{$ids[1]}\"]";
+    $option = fn (): CustomFieldOption => CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($ids[1]);
+
+    $page = openBoard($user, $path);
+
+    $page->page()->locator(boardHeaderTitle($ids[1]))->click();
+    $page->assertVisible("{$menu} [data-stage-name-input]");
+
+    $input = $page->page()->locator("{$menu} [data-stage-name-input]");
+    $input->fill('Discovery');
+    $input->press('Enter');
+    waitForPage($page, fn (): bool => $option()->name === 'Discovery');
+
+    expect($option()->name)->toBe('Discovery');
+    $page->assertScript(boardWaitFor('document.querySelector(\''.boardHeaderTitle($ids[1]).'\').textContent.trim() === "Discovery"'), true);
+
+    $page->page()->locator("{$menu} [data-stage-color-trigger]")->click();
+    $page->assertVisible("{$menu} [data-stage-swatches]");
+    $page->page()->locator("{$menu} [data-stage-swatch=\"#ec4899\"]")->click();
+    waitForPage($page, fn (): bool => $option()->settings->color === '#ec4899');
+
+    expect($option()->settings->color)->toBe('#ec4899');
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('selects a word on a double-click in the stage name input and does not collapse the column', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $menu = "[data-stage-menu=\"{$ids[1]}\"]";
+
+    $page = openBoard($user, $path);
+
+    $page->page()->locator(boardHeaderTitle($ids[1]))->click();
+
+    $input = $page->page()->locator("{$menu} [data-stage-name-input]");
+    $input->fill('Warm lead');
+    $input->dblclick(['position' => ['x' => 8, 'y' => 8]]);
+    $page->wait(1);
+
+    $page->assertScript("(() => { const input = document.querySelector('{$menu} [data-stage-name-input]'); return input.selectionEnd > input.selectionStart; })()", true)
+        ->assertScript('document.querySelectorAll(".ff-column[data-collapsed]").length', 0);
+
+    expect(storedBoardState($user, $entity)?->collapsedColumns ?? [])->toBe([]);
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');

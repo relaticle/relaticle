@@ -36,6 +36,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Enums\FiltersLayout;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
@@ -87,6 +88,8 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->collapsedColumns(fn (): array => $this->collapsedBoardColumnIds())
             ->collapseAllColumns(fn (): bool => $this->storedBoardState()->columnsCollapsed)
             ->collapsibleColumns(fn (string $columnId, bool $collapsed) => $this->setBoardColumnCollapsed($columnId, $collapsed))
+            ->columnActions($this->boardStageActions())
+            ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->cardSchema(fn (Schema $schema): Schema => $schema->gap(false)->components($card))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')

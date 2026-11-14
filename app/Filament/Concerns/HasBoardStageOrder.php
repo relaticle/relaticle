@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Actions\CustomFields\SetCustomFieldOptions;
 use App\Actions\Views\MoveBoardCard;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
@@ -12,11 +13,15 @@ use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
+use App\Enums\OptionColor;
+use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\SavedView;
+use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
@@ -32,6 +37,7 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\Flowforge\Column;
@@ -170,6 +176,128 @@ trait HasBoardStageOrder
         return $optionId === BoardStateData::NO_VALUE_COLUMN
             ? $this->showsNoValueColumn()
             : $this->boardColumnOptions()->contains('id', $optionId);
+    }
+
+    public function renameBoardColumn(mixed $optionId = null, mixed $name = null): void
+    {
+        $name = is_string($name) ? trim($name) : '';
+
+        $this->writeStageOption($optionId, ['name' => $name], fn (array $option): bool => $option['name'] === $name);
+    }
+
+    public function setBoardColumnColor(mixed $optionId = null, mixed $color = null): void
+    {
+        if (! is_string($color) || $color === '') {
+            return;
+        }
+
+        $this->writeStageOption($optionId, ['color' => $color], fn (array $option): bool => strtolower($option['color']) === strtolower($color));
+    }
+
+    /**
+     * @param  array{name?: string, color?: string}  $change
+     * @param  Closure(array{id: string, name: string, color: string}): bool  $unchanged
+     */
+    private function writeStageOption(mixed $optionId, array $change, Closure $unchanged): void
+    {
+        $option = is_string($optionId) ? $this->boardColumnOptions()->firstWhere('id', $optionId) : null;
+
+        if ($option === null) {
+            return;
+        }
+
+        $this->resetErrorBag('boardStageMenu');
+
+        if ($unchanged($option)) {
+            return;
+        }
+
+        $field = $this->boardColumnField();
+        $options = $field->options->map(static fn (CustomFieldOption $stage): array => [
+            'id' => (string) $stage->getKey(),
+            'name' => (string) $stage->getAttribute('name'),
+            'was' => (string) $stage->getAttribute('name'),
+            ...((string) $stage->getKey() === $option['id'] ? $change : []),
+        ])->all();
+
+        try {
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
+        } catch (ValidationException $exception) {
+            $this->addError('boardStageMenu', (string) collect($exception->errors())->flatten()->first());
+
+            return;
+        }
+
+        $this->boardColumnFieldList = null;
+        $this->forgetStoredBoardState();
+        $this->rebuildBoard();
+    }
+
+    /**
+     * @param  array<string, mixed>  $column
+     */
+    protected function boardStageMenu(array $column): Htmlable
+    {
+        $id = (string) $column['id'];
+        $current = OptionColor::fromInput((string) ($column['color'] ?? ''));
+        $dot = $current instanceof OptionColor ? $current->value : (str_starts_with((string) $column['color'], '#') ? (string) $column['color'] : OptionColor::Gray->value);
+
+        return new HtmlString(view('filament.app.board-stage-menu', [
+            'id' => $id,
+            'name' => (string) $column['label'],
+            'noun' => $this->boardStageNoun(),
+            'dot' => $dot,
+            'current' => $current,
+            'editable' => $id !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages(),
+            'error' => $this->getErrorBag()->first('boardStageMenu'),
+        ])->render());
+    }
+
+    /**
+     * @return list<Action>
+     */
+    protected function boardStageActions(): array
+    {
+        return [
+            Action::make('collapseStage')
+                ->label(fn (): string => __('filament/pages/boards.stage_menu.collapse', ['noun' => $this->boardStageNoun()]))
+                ->icon('lucide-panel-left-close')
+                ->action(fn (array $arguments) => $this->setBoardColumnCollapsed($arguments['column'] ?? null, true)),
+            Action::make('hideStage')
+                ->label(fn (): string => __('filament/pages/boards.stage_menu.hide', ['noun' => $this->boardStageNoun()]))
+                ->icon('lucide-eye-off')
+                ->action(fn (array $arguments) => $this->hideStageFromMenu($arguments['column'] ?? null)),
+        ];
+    }
+
+    private function hideStageFromMenu(mixed $optionId): void
+    {
+        if (is_string($optionId) && $this->visibleBoardColumnIds() === [$optionId]) {
+            Notification::make()->warning()->title(__('filament/pages/boards.stage_menu.last_visible', ['noun' => $this->boardStageNoun()]))->send();
+
+            return;
+        }
+
+        $this->setBoardColumnVisible($optionId, false);
+    }
+
+    private function canEditStages(): bool
+    {
+        $user = auth()->user();
+
+        return $user instanceof User && $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage);
+    }
+
+    private function boardStageNoun(): string
+    {
+        $entity = $this->viewSwitcherEntity();
+        $isBoardField = $this->boardColumnField()->code === $entity->boardFieldCode();
+
+        return __('filament/pages/boards.stage_menu.nouns.'.match (true) {
+            $isBoardField && $entity === CrmEntity::Opportunity => 'stage',
+            $isBoardField && $entity === CrmEntity::Task => 'status',
+            default => 'option',
+        });
     }
 
     public function boardLayoutToggles(): Htmlable

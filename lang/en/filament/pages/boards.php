@@ -41,6 +41,34 @@ return [
         'empty' => 'Empty',
     ],
 
+    'stage_menu' => [
+        'nouns' => [
+            'stage' => 'stage',
+            'status' => 'status',
+            'option' => 'option',
+        ],
+        'collapse' => 'Collapse :noun',
+        'hide' => 'Hide :noun',
+        'name' => 'Name of this :noun',
+        'color' => 'Change the color of this :noun',
+        'set_color' => 'Set color to :color',
+        'last_visible' => 'One :noun stays visible. Show another before hiding this one.',
+        'colors' => [
+            'red' => 'Red',
+            'orange' => 'Orange',
+            'amber' => 'Amber',
+            'lime' => 'Lime',
+            'green' => 'Green',
+            'cyan' => 'Cyan',
+            'blue' => 'Blue',
+            'magenta' => 'Magenta',
+            'purple' => 'Purple',
+            'pink' => 'Pink',
+            'olive' => 'Olive',
+            'gray' => 'Gray',
+        ],
+    ],
+
     'layout' => [
         'columns' => 'Columns',
         'card_size' => 'Card size',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Tools\CustomField;
 
 use App\Actions\CustomFields\SetCustomFieldOptions;
+use App\Enums\OptionColor;
 use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
@@ -39,7 +40,7 @@ final class SetCustomFieldOptionsTool implements Tool
 
     public function description(): string
     {
-        return 'Propose changing the options of existing choice fields (select, multi-select, radio, checkbox-list, toggle-buttons): rename, reorder, add and remove them in ONE proposal. Pass the complete list each field should end with, in order. An existing option you leave out is removed, so list every option that stays. Owners and admins only. Call ListCustomFieldsTool first: it returns each field\'s current options. The task Status option "Done" can be neither renamed nor removed. Returns a proposal for user approval.';
+        return 'Propose changing the options of existing choice fields (select, multi-select, radio, checkbox-list, toggle-buttons): rename, reorder, recolor, add and remove them in ONE proposal. Pass the complete list each field should end with, in order. An existing option you leave out is removed, so list every option that stays. Owners and admins only. Call ListCustomFieldsTool first: it returns each field\'s current options. The task Status option "Done" can be neither renamed nor removed. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -60,6 +61,9 @@ final class SetCustomFieldOptionsTool implements Tool
                                 ->required(),
                             'current' => $schema->string()
                                 ->description('To rename an existing option in place, its current label. Its records keep it under the new name.'),
+                            'color' => $schema->string()
+                                ->enum(array_map(static fn (OptionColor $color): string => $color->value, OptionColor::cases()))
+                                ->description('Optional color of the option, shown on boards and badges. One of: '.implode(', ', array_map(static fn (OptionColor $color): string => "{$color->name} ({$color->value})", OptionColor::cases())).'. Leave it out to keep the current color.'),
                         ]))
                         ->description('The COMPLETE option list in display order. An existing option stays when an item names it in `name` or `current`. Every other existing option is removed.')
                         ->required(),

@@ -14,6 +14,7 @@ use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\OptionColor;
 use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\CreateTaskAction;
@@ -2108,4 +2109,69 @@ it('keeps the task no-value collapse with the attribute it was set on', function
     $component->call('setBoardColumnField', $this->statusField->code);
 
     expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
+
+it('renames a task status from its header menu and names the attribute status', function (): void {
+    $id = statusIds($this->statusField)[1];
+
+    $component = livewire(TasksBoard::class)
+        ->call('renameBoardColumn', $id, 'Blocked')
+        ->assertHasNoErrors();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($id)->name)->toBe('Blocked')
+        ->and($component->html())->toContain('Collapse status')->toContain('Hide status')->not->toContain('Collapse stage');
+});
+
+it('refuses to rename the Done status and a taken status name in the menu', function (): void {
+    $done = $this->statusField->options->firstWhere('name', 'Done');
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+
+    livewire(TasksBoard::class)
+        ->call('renameBoardColumn', (string) $done->getKey(), 'Finished')
+        ->assertHasErrors(['boardStageMenu'])
+        ->call('renameBoardColumn', (string) $todo->getKey(), 'DONE')
+        ->assertHasErrors(['boardStageMenu']);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail((string) $done->getKey())->name)->toBe('Done')
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail((string) $todo->getKey())->name)->toBe('To do');
+});
+
+it('sets a task status color from the palette', function (): void {
+    $id = statusIds($this->statusField)[1];
+
+    livewire(TasksBoard::class)->call('setBoardColumnColor', $id, OptionColor::Cyan->value)->assertHasNoErrors();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($id)->settings->color)->toBe(OptionColor::Cyan->value);
+});
+
+it('refuses a forged task status rename from a member and shows no edit block', function (): void {
+    $id = statusIds($this->statusField)[1];
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+
+    livewire(TasksBoard::class)->call('renameBoardColumn', $id, 'Forged')->assertForbidden();
+    livewire(TasksBoard::class)->call('setBoardColumnColor', $id, OptionColor::Red->value)->assertForbidden();
+
+    $html = livewire(TasksBoard::class)->html();
+
+    expect($html)->not->toContain('data-stage-edit')->not->toContain('data-stage-swatch')->toContain('Collapse status');
+});
+
+it('collapses and hides a task status from the menu actions and refuses the last one', function (): void {
+    $ids = statusIds($this->statusField);
+    $component = livewire(TasksBoard::class)
+        ->callAction(TestAction::make('collapseStage')->arguments(['column' => $ids[0]]))
+        ->callAction(TestAction::make('hideStage')->arguments(['column' => $ids[1]]));
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]])
+        ->and(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe([$ids[1]]);
+
+    foreach (array_slice($ids, 2) as $id) {
+        $component->call('setBoardColumnVisible', $id, false);
+    }
+
+    $component->callAction(TestAction::make('hideStage')->arguments(['column' => $ids[0]]))
+        ->assertNotified(__('filament/pages/boards.stage_menu.last_visible', ['noun' => 'status']));
 });
