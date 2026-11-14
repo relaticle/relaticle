@@ -13,6 +13,7 @@ use Livewire\Component;
 use Livewire\Livewire;
 use Sentry\Breadcrumb;
 use Sentry\ClientBuilder;
+use Sentry\DataCollection\DataCollectionOptions;
 use Sentry\Event;
 use Sentry\Laravel\EventHandler;
 use Sentry\Laravel\Features\LivewirePackageIntegration;
@@ -257,16 +258,17 @@ it('keeps component state and call arguments out of livewire breadcrumbs', funct
         ->and(array_column($breadcrumbs, 0))->not->toContain('livewire');
 });
 
-it('opts into data collection with no bodies, no identity and no payloads', function (): void {
-    $collection = config('sentry.data_collection');
+it('resolves data collection with no bodies, no identity and no payloads', function (): void {
+    $hub = sentryHubSending(new SentryTransportSpy, sentryRequest('GET', '/app'));
+    $collection = $hub->getClient()->getOptions()->getDataCollection();
 
-    expect($collection)->toBeArray()
-        ->and($collection['http_bodies'])->toBe([])
-        ->and($collection['user_info'])->toBeFalse()
-        ->and($collection['database_query_data'])->toBeFalse()
-        ->and($collection['queues'])->toBeFalse()
-        ->and($collection['stack_frame_variables'])->toBeFalse()
-        ->and($collection['gen_ai'])->toBe(['inputs' => false, 'outputs' => false])
+    expect($collection)->toBeInstanceOf(DataCollectionOptions::class)
+        ->and($collection->shouldCollectUserInfo())->toBeFalse()
+        ->and($collection->getHttpBodies())->toBe([])
+        ->and($collection->shouldCollectDatabaseQueryData())->toBeFalse()
+        ->and($collection->shouldCollectQueues())->toBeFalse()
+        ->and($collection->getGenAi())->toBe(['inputs' => false, 'outputs' => false])
+        ->and($collection->getStackFrameVariables()->isOff())->toBeTrue()
         ->and(config('sentry.before_send'))->toBeCallable()
         ->and(config('sentry.before_send'))->not->toBeInstanceOf(Closure::class)
         ->and(config('sentry.before_send_transaction'))->toBeCallable();
