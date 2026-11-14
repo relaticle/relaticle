@@ -107,11 +107,18 @@ it('shows domains as links that open a new tab and a logo in the list and the ca
 
     expect($page->script($links))->toBe([['https://globex.com', '_blank', 'noopener noreferrer'], ['https://globex.com', '_blank', 'noopener noreferrer']]);
 
+    $visibleInResultTile = <<<'JS'
+        [...document.querySelector('[data-merge-result] span[aria-hidden="true"]').children].filter((child) => child.checkVisibility()).map((child) => child.tagName.toLowerCase())
+        JS;
+
+    expect($page->script($visibleInResultTile))->toBe(['svg']);
+
     $page->click('[data-merge-popover] li:has-text("Globex Europe")')
         ->wait(1.2)
         ->assertPresent('[data-merge-left] img');
 
-    expect($page->script($links))->toContain(['https://globex.eu', '_blank', 'noopener noreferrer']);
+    expect($page->script($links))->toContain(['https://globex.eu', '_blank', 'noopener noreferrer'])
+        ->and($page->script($visibleInResultTile))->toBe(['img']);
     $page->assertNoJavaScriptErrors();
 });
 
