@@ -92,8 +92,11 @@ string and not an empty list.
 `duplicate`'s, with duplicates removed after the field's own normalization. Order matters:
 `FetchFaviconForCompany` takes the first domain, so `kept`'s logo source stays the same.
 
-**Other multi-value custom attributes** (multi-select, checkbox list, tags, record-type): combined
-the same way, `kept`'s first.
+**Other multi-value custom attributes** (multi-select, checkbox list, tags, and any field whose
+`allow_multiple` setting is on): combined the same way, `kept`'s first. A field that holds a list but
+allows one value, such as a person's phone, follows the single-value rule. The limit is the field's
+own `max_values` (5 for domains and emails), and record-type fields have none. (Refined while
+planning.)
 
 The preview and the merge read this rule from one place, so the card cannot promise what the merge
 does not do.
@@ -128,6 +131,11 @@ merging the same records cannot interleave.
 **Person only**
 - `opportunities.contact_id`.
 - `email_participants.contact_id` and `meeting_attendees.contact_id`.
+
+Emails, meetings, their participants and attendees, and the communication counters belong to
+`packages/EmailIntegration`. Core dispatches `App\Events\RecordMerged` inside the transaction, and the
+package's listener moves its own rows, as it already reacts to core events elsewhere. (Refined while
+planning: core never names the package.)
 
 **Then** the duplicate is soft-deleted through the model, so its own `deleted` activity row is written.
 The duplicate's own custom attribute values are left on it.
@@ -175,7 +183,8 @@ One browser test walks the dialog: open, search, pick, swap, merge, land on the 
 
 - Merging more than two records at once
 - A duplicates review page (the banner is Phase 2)
-- Merging opportunities, tasks or notes
+- Merging two duplicate opportunities, tasks or notes into one. The notes, tasks and opportunities
+  linked to a merged company or person do move, as listed under What moves
 - Merging from Rela, the REST API or the MCP server
 - Undoing a merge
 - Per-field choice of which value wins
