@@ -21,6 +21,7 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
@@ -234,6 +235,11 @@ it('threads onto a teammate email the sender may view', function (): void {
         'direction' => EmailDirection::INBOUND,
         'privacy_tier' => EmailPrivacyTier::FULL,
         'status' => EmailStatus::SENT,
+    ]);
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $visible->getKey(),
+        'shared_with' => $this->user->getKey(),
+        'shared_by' => $teammate->getKey(),
     ]);
 
     $email = app(SendEmailAction::class)->execute($this->user, [
@@ -892,6 +898,11 @@ it('gives a queued reply the conversation key of the email it answers', function
         'thread_id' => null,
         'conversation_key' => str_repeat('a', 64),
     ]);
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $original->getKey(),
+        'shared_with' => $this->user->getKey(),
+        'shared_by' => $teammate->getKey(),
+    ]);
 
     $reply = app(SendEmailAction::class)->execute($this->user, [
         'connected_account_id' => $this->account->id,
@@ -920,6 +931,11 @@ it('keeps a reply from another mailbox in the conversation of a parent with no M
         'rfc_message_id' => null,
         'thread_id' => 'teammate-thread',
         'conversation_key' => str_repeat('c', 64),
+    ]);
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $original->getKey(),
+        'shared_with' => $this->user->getKey(),
+        'shared_by' => $teammate->getKey(),
     ]);
 
     $reply = app(SendEmailAction::class)->execute($this->user, [
