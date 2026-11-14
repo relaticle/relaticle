@@ -31,7 +31,9 @@ use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Exceptions\InsufficientCreditsException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Streaming\Events\Error;
+use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
+use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
@@ -39,6 +41,8 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Exceptions\ProviderStreamRejectedException;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
@@ -47,6 +51,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -328,6 +333,120 @@ it('shows timeout-specific copy when the turn times out', function (): void {
     expect($note)->toBe('This reply hit the 120-second limit before it finished. Ask for a shorter answer, or for it in parts.')
         ->and($balance->credits_remaining)->toBe(100)
         ->and($balance->credits_used)->toBe(0);
+});
+
+/** @return array{user: User, conversationId: string} */
+function signedInFailedTurnConversation(): array
+{
+    $user = User::factory()->withPersonalWorkspace()->create();
+    test()->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    return ['user' => $user, 'conversationId' => $conversationId];
+}
+
+function proposeTaskInTurn(string $conversationId, ?string $turnId, string $title): PendingAction
+{
+    resolve(CreateTaskTool::class)
+        ->setConversationId($conversationId)
+        ->setTurnId($turnId)
+        ->handle(new Request(['records' => [['title' => $title]]]));
+
+    return PendingAction::query()
+        ->where('conversation_id', $conversationId)
+        ->where('turn_id', $turnId === '' ? null : $turnId)
+        ->sole();
+}
+
+const TIMEOUT_NOTE_WITH_PROPOSALS = 'This reply hit the 120-second limit before it finished. The steps it proposed before then are below. Approve or discard them, then ask for the rest.';
+
+it('keeps the proposals a timed-out turn already made and cancels every other one', function (): void {
+    Event::fake([ChatStreamFailed::class]);
+
+    ['user' => $user, 'conversationId' => $conversationId] = signedInFailedTurnConversation();
+    $job = makeFailedTurnJob($user, $conversationId);
+
+    $earlier = proposeTaskInTurn($conversationId, (string) Str::ulid(), 'From an earlier turn');
+    $unlabelled = proposeTaskInTurn($conversationId, null, 'From no turn');
+    $own = proposeTaskInTurn($conversationId, $job->turnId, 'From this turn');
+
+    $job->failed(new TimeoutExceededException('timed out'));
+
+    $note = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->value('content');
+
+    expect($own->refresh()->status)->toBe(PendingActionStatus::Pending)
+        ->and($earlier->refresh()->status)->toBe(PendingActionStatus::Superseded)
+        ->and($unlabelled->refresh()->status)->toBe(PendingActionStatus::Superseded)
+        ->and($note)->toBe(TIMEOUT_NOTE_WITH_PROPOSALS);
+
+    Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $event): bool => $event->broadcastWith()['message'] === TIMEOUT_NOTE_WITH_PROPOSALS);
+});
+
+it('cancels the proposals of a turn that ended any other way', function (Throwable $exception, MessageOrigin $origin, string $turnId): void {
+    ['user' => $user, 'conversationId' => $conversationId] = signedInFailedTurnConversation();
+
+    $own = proposeTaskInTurn($conversationId, $turnId, 'From this turn');
+
+    new ProcessChatMessage(
+        user: $user,
+        workspace: $user->currentWorkspace,
+        message: 'Create a task',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'ollama', 'model' => 'qwen3:8b', 'id' => 'ollama', 'source' => 'auto'],
+        turnId: $turnId,
+        origin: $origin,
+    )->failed($exception);
+
+    expect($own->refresh()->status)->toBe(PendingActionStatus::Superseded);
+})->with([
+    'a provider error' => [new RuntimeException('boom'), MessageOrigin::Typed, '01TURNAAAAAAAAAAAAAAAAAAAA'],
+    'a greeting that timed out' => [new TimeoutExceededException('timed out'), MessageOrigin::Greeting, '01TURNAAAAAAAAAAAAAAAAAAAA'],
+    'a timeout on a turn that carries no turn id' => [new TimeoutExceededException('timed out'), MessageOrigin::Typed, ''],
+]);
+
+it('docks the proposals a timed-out turn kept below its note when the page is opened again', function (): void {
+    ['user' => $user, 'conversationId' => $conversationId] = signedInFailedTurnConversation();
+    $job = makeFailedTurnJob($user, $conversationId);
+    $own = proposeTaskInTurn($conversationId, $job->turnId, 'From this turn');
+
+    $job->failed(new TimeoutExceededException('timed out'));
+
+    $messages = Livewire::test(ChatInterface::class, ['conversationId' => $conversationId])->get('messages');
+
+    expect(array_column($messages, 'role'))->toBe(['user', 'assistant', 'assistant'])
+        ->and($messages[1]['content'])->toContain(TIMEOUT_NOTE_WITH_PROPOSALS)
+        ->and(array_column($messages[2]['pending_actions'], 'pending_action_id'))->toBe([(string) $own->getKey()])
+        ->and($messages[2]['pending_actions'][0]['status'])->toBe('pending');
+});
+
+it('applies a kept proposal when it is approved and hands the turn back to the assistant', function (): void {
+    Queue::fake();
+
+    ['user' => $user, 'conversationId' => $conversationId] = signedInFailedTurnConversation();
+    $job = makeFailedTurnJob($user, $conversationId);
+    $own = proposeTaskInTurn($conversationId, $job->turnId, 'From this turn');
+
+    $job->failed(new TimeoutExceededException('timed out'));
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $own->getKey(), context: 'conversation')
+        ->call('approveAll')
+        ->assertHasNoErrors();
+
+    $resumed = Queue::pushed(
+        ProcessChatMessage::class,
+        fn (ProcessChatMessage $turn): bool => $turn->resumesTurnId === $job->turnId && $turn->origin === MessageOrigin::Resume,
+    );
+
+    expect($own->refresh()->status)->toBe(PendingActionStatus::Approved)
+        ->and(Task::query()->where('title', 'From this turn')->exists())->toBeTrue()
+        ->and($resumed)->toHaveCount(1);
 });
 
 it('orders the backfilled failed turn before a later retried turn when sorted by id', function (): void {

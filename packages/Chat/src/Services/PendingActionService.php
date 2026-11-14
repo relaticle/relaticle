@@ -587,11 +587,14 @@ final readonly class PendingActionService
      *
      * @return list<PendingAction>
      */
-    public function supersedePendingForConversation(string $conversationId): array
+    public function supersedePendingForConversation(string $conversationId, ?string $exceptTurnId = null): array
     {
-        return DB::transaction(function () use ($conversationId): array {
+        return DB::transaction(function () use ($conversationId, $exceptTurnId): array {
             $pending = array_values(PendingAction::query()
                 ->where('conversation_id', $conversationId)
+                ->when($exceptTurnId !== null, fn (Builder $query): Builder => $query->where(
+                    fn (Builder $query): Builder => $query->whereNull('turn_id')->orWhere('turn_id', '!=', $exceptTurnId),
+                ))
                 ->pending()
                 ->lockForUpdate()
                 ->get()
