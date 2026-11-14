@@ -2444,8 +2444,16 @@ html.fi-record-stacked .fi-record-layout {
     background-color: var(--gray-500);
 }
 
-.ff-board .ff-add-row {
-    padding-inline: var(--ff-card-padding);
+.ff-board .ff-add-slot .ff-add-row {
+    @apply justify-center rounded-lg border border-dashed border-gray-200 bg-gray-100/70 px-3 py-1.5 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10;
+}
+
+.ff-board .ff-add-column-button {
+    @apply border border-dashed border-gray-300 bg-transparent hover:bg-gray-100 focus-visible:bg-gray-100 dark:border-white/15 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+}
+
+.ff-board .ff-add-column-form {
+    @apply rounded-menu;
 }
 
 .ff-board .ff-cell {

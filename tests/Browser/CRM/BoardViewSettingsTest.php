@@ -232,3 +232,18 @@ it('compacts cards flat and with lanes, every time it is pressed, and keeps phon
     'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
 ]);
+
+it('keeps the add row in place when the cards switch between compact and full', function (string $model, string $fieldCode, string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $addRow = 'JSON.stringify((() => { const row = document.querySelector(".ff-columns > .ff-column .ff-add-slot .ff-add-row"); const box = row.getBoundingClientRect(); const icon = row.querySelector(".ff-add-row-icon").getBoundingClientRect(); return [box.left, box.top, box.width, box.height, icon.left]; })())';
+
+    $page = openBoard($user, $path);
+    $full = $page->script($addRow);
+
+    pressLayout($page, 'card-size', 'compact', 'boardCardSize');
+
+    expect($page->script($addRow))->toBe($full);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
