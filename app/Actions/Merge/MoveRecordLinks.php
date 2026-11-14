@@ -9,33 +9,20 @@ use App\Enums\MediaCollection;
 use App\Models\Company;
 use App\Models\CustomFieldValue;
 use App\Models\People;
-use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 final readonly class MoveRecordLinks
 {
+    public function __construct(private MoveMorphPivot $movePivot) {}
+
     public function execute(Company|People $kept, Company|People $duplicate): void
     {
         $morph = $kept->getMorphClass();
 
-        $this->movePivot('noteables', 'note_id', 'noteable', $morph, $kept, $duplicate);
-        $this->movePivot('taskables', 'task_id', 'taskable', $morph, $kept, $duplicate);
+        $this->movePivot->execute('noteables', 'note_id', 'noteable', $kept, $duplicate);
+        $this->movePivot->execute('taskables', 'task_id', 'taskable', $kept, $duplicate);
         $this->moveAttachments($morph, $kept, $duplicate);
         $this->repointRecordAttributes($morph, $kept, $duplicate);
-    }
-
-    private function movePivot(string $table, string $itemColumn, string $prefix, string $morph, Company|People $kept, Company|People $duplicate): void
-    {
-        $this->linkedTo($table, $prefix, $morph, $duplicate)
-            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $kept)->select($itemColumn))
-            ->delete();
-
-        $this->linkedTo($table, $prefix, $morph, $duplicate)->update([$prefix.'_id' => $kept->getKey()]);
-    }
-
-    private function linkedTo(string $table, string $prefix, string $morph, Company|People $record): Builder
-    {
-        return DB::table($table)->where($prefix.'_type', $morph)->where($prefix.'_id', $record->getKey());
     }
 
     private function moveAttachments(string $morph, Company|People $kept, Company|People $duplicate): void

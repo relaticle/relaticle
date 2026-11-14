@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use App\Actions\Merge\MoveMorphPivot;
 use App\Models\Company;
 use App\Models\People;
 use Illuminate\Database\Query\Builder;
@@ -19,6 +20,7 @@ final readonly class MoveMergedRecordCommunication
     public function __construct(
         private EmailVisibilityService $visibility,
         private RecordCommunicationMetrics $metrics,
+        private MoveMorphPivot $movePivot,
     ) {}
 
     public function execute(Company|People $kept, Company|People $duplicate): void
@@ -32,8 +34,8 @@ final readonly class MoveMergedRecordCommunication
             $this->sharedMeetings($morph, $kept, $duplicate)->count(),
         );
 
-        $this->movePivot('emailables', 'email_id', 'emailable', $morph, $kept, $duplicate);
-        $this->movePivot('meetingables', 'meeting_id', 'meetingable', $morph, $kept, $duplicate);
+        $this->movePivot->execute('emailables', 'email_id', 'emailable', $kept, $duplicate);
+        $this->movePivot->execute('meetingables', 'meeting_id', 'meetingable', $kept, $duplicate);
 
         $column = $kept instanceof Company ? 'company_id' : 'contact_id';
 
@@ -77,15 +79,6 @@ final readonly class MoveMergedRecordCommunication
             ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $kept)->select($itemColumn))
             ->pluck($itemColumn)
             ->all();
-    }
-
-    private function movePivot(string $table, string $itemColumn, string $prefix, string $morph, Company|People $kept, Company|People $duplicate): void
-    {
-        $this->linkedTo($table, $prefix, $morph, $duplicate)
-            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $kept)->select($itemColumn))
-            ->delete();
-
-        $this->linkedTo($table, $prefix, $morph, $duplicate)->update([$prefix.'_id' => $kept->getKey()]);
     }
 
     private function linkedTo(string $table, string $prefix, string $morph, Company|People $record): Builder
