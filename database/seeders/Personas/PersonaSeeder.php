@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Database\Seeders\Personas;
 
+use App\Actions\Jetstream\DeleteWorkspace;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\OnboardingUseCase;
 use App\Enums\WorkspaceSetupStep;
@@ -29,11 +30,16 @@ final readonly class PersonaSeeder
     ) {}
 
     /**
-     * @return array{persona: Persona, workspace: Workspace, billing: string, note: string}
+     * @return array{persona: Persona, workspace: ?Workspace, billing: string, note: string}
      */
     public function seed(Persona $persona): array
     {
         $user = $this->account($persona->email, $persona->name);
+
+        if ($persona->workspace === null) {
+            return $this->freshSignup($user, $persona);
+        }
+
         $workspace = $this->workspace($user, $persona);
 
         $this->members($workspace, $persona);
@@ -49,6 +55,29 @@ final readonly class PersonaSeeder
             'workspace' => $workspace,
             'note' => $note,
             'billing' => Workspace::query()->with('subscriptions')->findOrFail($workspace->getKey())->billingStatus()->value,
+        ];
+    }
+
+    /**
+     * @return array{persona: Persona, workspace: null, billing: string, note: string}
+     */
+    private function freshSignup(User $user, Persona $persona): array
+    {
+        $workspaces = $user->ownedWorkspaces()->get();
+
+        foreach ($workspaces as $workspace) {
+            resolve(DeleteWorkspace::class)->delete($workspace);
+        }
+
+        $deleted = $workspaces->count();
+
+        $user->forceFill(['current_workspace_id' => null])->save();
+
+        return [
+            'persona' => $persona,
+            'workspace' => null,
+            'note' => $deleted > 0 ? "deleted {$deleted} workspace(s) from the last walk" : '',
+            'billing' => 'none',
         ];
     }
 

@@ -5,7 +5,7 @@ order: 3
 updated: "2026-10-06"
 ---
 
-Relaticle has a REST API for companies, people, opportunities, tasks, notes and custom fields. Use it to sync records with another system or to build your own integration. The [API reference](/developers/api) lists every endpoint, parameter and response, and the OpenAPI spec is at [/openapi.json](/openapi.json).
+Relaticle has a REST API for companies, people, opportunities, tasks, notes and custom attributes. Use it to sync records with another system or to build your own integration. The [API reference](/developers/api) lists every endpoint, parameter and response, and the OpenAPI spec is at [/openapi.json](/openapi.json).
 
 ## Base URL
 
@@ -53,13 +53,13 @@ An access token can also carry three email permissions: **Read email**, **Draft 
 | Opportunities | `/v1/opportunities` |
 | Tasks | `/v1/tasks` |
 | Notes | `/v1/notes` |
-| Custom fields | `/v1/custom-fields` (read only) |
+| Custom attributes (custom fields) | `/v1/custom-fields` (read only) |
 
-Each record resource supports list, create, read, update and delete. Responses follow [JSON:API](https://jsonapi.org/), and each record carries its custom field values under `custom_fields`. List endpoints take filtering, sorting and pagination parameters, which the [API reference](/developers/api) documents per endpoint.
+Each record resource supports list, create, read, update and delete. Responses follow [JSON:API](https://jsonapi.org/), and each record carries its custom attribute values under `custom_fields`. List endpoints take filtering, sorting and pagination parameters, which the [API reference](/developers/api) documents per endpoint.
 
 ## Filter a list
 
-The list endpoints for companies, people, opportunities, tasks and notes take a `filter` object. It can combine native fields, custom fields and linked records with `$and`, `$or` and `$not`. The [MCP guide](/developers/mcp) describes the full grammar, and the MCP server and Rela, the built-in AI assistant, read the same filter.
+The list endpoints for companies, people, opportunities, tasks and notes take a `filter` object. It can combine native fields, custom attributes and linked records with `$and`, `$or` and `$not`. The [MCP guide](/developers/mcp) describes the full grammar, and the MCP server and Rela, the built-in AI assistant, read the same filter.
 
 `GET /v1/companies?filter[name][$contains]=Acme` sends a filter in the query string, as nested brackets. The query string carries every value as text, and Relaticle converts it to the type of the field.
 
@@ -93,7 +93,7 @@ curl https://api.relaticle.com/v1/opportunities/query \
 
 The response has the same shape as the matching `GET` list. To fetch the next page, send the same body with the next `page`. The `links` URLs in a response cannot be fetched with `GET`, so page a query by sending the body again.
 
-For a long result, page with a cursor instead of `page`. Send `"cursor": true` for the first page, then send the same body with `cursor` set to `meta.next_cursor` from the previous response. A request that sends both `page` and `cursor` returns `422`, on a `GET` list too. The last page has a `next_cursor` of `null`. Cursor paging sorts by `name` (`title` on tasks and notes), `created_at` or `updated_at`. A custom field sort needs `page`, and asking for one with a cursor returns `400`. A cursor that is neither `true` nor a value from a previous page returns `422`. `GET` lists take the same values as `?cursor=true`.
+For a long result, page with a cursor instead of `page`. Send `"cursor": true` for the first page, then send the same body with `cursor` set to `meta.next_cursor` from the previous response. A request that sends both `page` and `cursor` returns `422`, on a `GET` list too. The last page has a `next_cursor` of `null`. Cursor paging sorts by `name` (`title` on tasks and notes), `created_at` or `updated_at`. A custom attribute sort needs `page`, and asking for one with a cursor returns `400`. A cursor that is neither `true` nor a value from a previous page returns `422`. `GET` lists take the same values as `?cursor=true`.
 
 A date operand is `YYYY-MM-DD` or an ISO 8601 date-time such as `2026-10-01T09:30:00Z`. Any other format returns `422`. A date-time with an offset, such as `2026-10-01T13:00:00+05:00`, is read as the same instant in UTC. A date without a time covers that whole UTC day.
 
@@ -101,11 +101,11 @@ A body that is not a JSON object returns `422`. That includes truncated JSON, a 
 
 Spaces around an operand are ignored. A blank operand returns `422`. Use `$is_empty` to find records without a value.
 
-`sort` takes a native field or a custom field that holds one value. Records without a value for a custom field sort last in both directions. A field that holds a list, such as email, phone, link or tags, returns `400` as a sort.
+`sort` takes a native field or a custom attribute that holds one value. Records without a value for a custom attribute sort last in both directions. A field that holds a list, such as email, phone, link or tags, returns `400` as a sort.
 
 ## Value formats
 
-Relaticle stores some custom field values in one form, whatever spelling a request sends. A read returns the stored form.
+Relaticle stores some custom attribute values in one form, whatever spelling a request sends. A read returns the stored form.
 
 | Field | Stored as |
 |---|---|
@@ -118,7 +118,7 @@ A phone needs a country code. A phone without one returns `422`.
 
 ## Upsert: find or create a record
 
-`POST /v1/people/upsert` and `POST /v1/companies/upsert` update the record that already holds a value, or create one when none does. Name a custom field marked unique and the value to look for:
+`POST /v1/people/upsert` and `POST /v1/companies/upsert` update the record that already holds a value, or create one when none does. Name a custom attribute marked unique and the value to look for:
 
 ```json
 {

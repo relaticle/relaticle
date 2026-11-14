@@ -10,6 +10,13 @@ use Relaticle\CustomFields\FieldTypeSystem\BaseFieldType;
 
 final readonly class CanonicalValue
 {
+    private const string PHONE_PATTERN = '/^\+\d{1,15}(;ext=\d+)?$/';
+
+    public static function isPhone(CustomField $field, string $value): bool
+    {
+        return preg_match(self::PHONE_PATTERN, self::of($field, $value)) === 1;
+    }
+
     public static function of(CustomField $field, string $value): string
     {
         $type = CustomFieldsType::getFieldTypeInstance($field->type);

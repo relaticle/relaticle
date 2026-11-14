@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Jobs;
 
+use App\Actions\Onboarding\StartDataArrivedTurn;
 use App\Contracts\Entitlements;
 use App\Features\SetupConversation;
 use App\Models\User;
@@ -36,7 +37,9 @@ use Laravel\Ai\Streaming\Events\StreamEvent;
 use Laravel\Ai\Streaming\Events\TextDelta;
 use Laravel\Ai\Streaming\Events\ToolCall;
 use Laravel\Pennant\Feature;
+use Relaticle\Chat\Actions\RecordNextSteps;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Data\SetupOption;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
@@ -49,11 +52,13 @@ use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
 use Relaticle\Chat\Exceptions\ProviderStreamRejectedException;
 use Relaticle\Chat\Models\AgentConversation;
+use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\AiModelResolver;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\SetupOptions;
 use Relaticle\Chat\Services\TipTapDocumentParser;
 use Relaticle\Chat\Services\TurnContinuationService;
 use Relaticle\Chat\Support\AssistantText;
@@ -99,6 +104,8 @@ final class ProcessChatMessage implements ShouldQueue
         public readonly MessageOrigin $origin = MessageOrigin::Typed,
         public readonly ?string $resumesTurnId = null,
         public readonly ?array $attachment = null,
+        public readonly ?string $claimKey = null,
+        public readonly ?string $nextStep = null,
     ) {
         $this->onConnection('redis-chat');
         $this->onQueue('chat');
@@ -160,7 +167,7 @@ final class ProcessChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
                 message: __('billing.access.paused_chat'),
             ));
-            TurnPresence::clear($this->conversationId, $this->turnId);
+            $this->abandonTurn();
 
             return;
         }
@@ -196,7 +203,7 @@ final class ProcessChatMessage implements ShouldQueue
                 conversationId: $this->conversationId,
             );
             $this->releaseAuth();
-            TurnPresence::clear($this->conversationId, $this->turnId);
+            $this->abandonTurn();
 
             return;
         }
@@ -223,7 +230,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withWorkspace($this->workspace);
-            $agent->withSetupMode($this->isSetupConversation());
+            $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation());
             $agent->withTurnOrigin($this->origin);
             $agent->withCurrentUser([
                 'name' => $this->user->name,
@@ -261,7 +268,7 @@ final class ProcessChatMessage implements ShouldQueue
                 message: 'The assistant could not start. Please try again.',
             ));
             $this->releaseAuth();
-            TurnPresence::clear($this->conversationId, $this->turnId);
+            $this->abandonTurn();
 
             return;
         }
@@ -346,7 +353,7 @@ final class ProcessChatMessage implements ShouldQueue
                 return;
             }
 
-            $response->then(function (StreamedAgentResponse $streamedResponse) use ($creditService, $startedAt): void {
+            $response->then(function (StreamedAgentResponse $streamedResponse) use ($agent, $creditService, $startedAt): void {
                 $refundedBlankTurn = $this->settleBlankTurn($streamedResponse, $creditService);
 
                 // input_tokens stays the UNCACHED remainder, with the cache legs next
@@ -369,16 +376,16 @@ final class ProcessChatMessage implements ShouldQueue
 
                 $this->persistMentions($streamedResponse->userMessageId);
                 $this->persistUserDocument($streamedResponse->userMessageId);
-                $this->persistUserAttachment($streamedResponse->userMessageId);
+                $this->persistUserMeta($streamedResponse->userMessageId);
                 $this->materializeAssistantDocument($streamedResponse, $startedAt);
                 $this->maybeTitleFromTurn($streamedResponse);
-                $this->suggestNextSteps($streamedResponse);
+                $this->suggestNextSteps($streamedResponse, $agent->awaitsFirstRecord());
 
                 // Both rows are persisted by now (RememberConversation's own
                 // then() ran before this one), so a reload can rebuild the turn
                 // from the database. Any throw above lands in failed(), which
                 // clears too.
-                TurnPresence::clear($this->conversationId, $this->turnId);
+                $this->closeCompletedTurn();
             });
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
@@ -447,21 +454,7 @@ final class ProcessChatMessage implements ShouldQueue
                         maxAttempts: self::MAX_RATE_LIMIT_RETRIES,
                         delaySeconds: 0,
                     ));
-                    dispatch(new self(
-                        user: $this->user,
-                        workspace: $this->workspace,
-                        message: $this->message,
-                        conversationId: $this->conversationId,
-                        resolved: $next,
-                        mentions: $this->mentions,
-                        document: $this->document,
-                        pageContext: $this->pageContext,
-                        turnId: $this->turnId,
-                        failoverDepth: $this->failoverDepth + 1,
-                        origin: $this->origin,
-                        resumesTurnId: $this->resumesTurnId,
-                        attachment: $this->attachment,
-                    ));
+                    $this->dispatchFailover($next);
 
                     return;
                 }
@@ -585,6 +578,39 @@ final class ProcessChatMessage implements ShouldQueue
 
         // Last, after persistFailedTurn: a reload landing mid-failed() must
         // never find the marker gone AND the rows unpersisted at once.
+        $this->abandonTurn();
+    }
+
+    /**
+     * @param  array{provider: string|null, model: string|null, id: string|null, source: string}  $next
+     */
+    private function dispatchFailover(array $next): void
+    {
+        dispatch(new self(
+            user: $this->user,
+            workspace: $this->workspace,
+            message: $this->message,
+            conversationId: $this->conversationId,
+            resolved: $next,
+            mentions: $this->mentions,
+            document: $this->document,
+            pageContext: $this->pageContext,
+            turnId: $this->turnId,
+            failoverDepth: $this->failoverDepth + 1,
+            origin: $this->origin,
+            resumesTurnId: $this->resumesTurnId,
+            attachment: $this->attachment,
+            claimKey: $this->claimKey ?? null,
+            nextStep: $this->nextStep ?? null,
+        ));
+    }
+
+    private function abandonTurn(): void
+    {
+        if (($this->claimKey ?? null) !== null) {
+            Cache::forget($this->claimKey);
+        }
+
         TurnPresence::clear($this->conversationId, $this->turnId);
     }
 
@@ -666,9 +692,12 @@ final class ProcessChatMessage implements ShouldQueue
      * note, and are accepted rather than solved with more machinery.
      */
     /** @return array<string, mixed> */
-    private function failedTurnUserMeta(): array
+    private function userRowMeta(): array
     {
-        return $this->attachment === null ? [] : ['attachment' => $this->attachment];
+        return array_filter([
+            'attachment' => $this->attachment,
+            'next_step' => $this->nextStep ?? null,
+        ], static fn (mixed $value): bool => $value !== null);
     }
 
     private function persistFailedTurn(?Throwable $exception): void
@@ -712,7 +741,7 @@ final class ProcessChatMessage implements ShouldQueue
                 'attachments' => '[]',
                 'steps' => '[]',
                 'usage' => '[]',
-                'meta' => json_encode($this->failedTurnUserMeta(), JSON_THROW_ON_ERROR),
+                'meta' => json_encode($this->userRowMeta(), JSON_THROW_ON_ERROR),
                 'document' => json_encode($this->document, JSON_THROW_ON_ERROR),
                 'origin' => $this->origin->value,
                 'created_at' => $now,
@@ -869,23 +898,19 @@ final class ProcessChatMessage implements ShouldQueue
             ->update(['document' => json_encode($this->document, JSON_THROW_ON_ERROR)]);
     }
 
-    private function persistUserAttachment(?string $userMessageId): void
+    private function persistUserMeta(?string $userMessageId): void
     {
-        if ($this->attachment === null) {
-            return;
-        }
+        $additions = $this->userRowMeta();
 
-        if ($userMessageId === null) {
+        if ($additions === [] || $userMessageId === null) {
             return;
         }
 
         $existing = json_decode((string) DB::table('agent_conversation_messages')->where('id', $userMessageId)->value('meta'), associative: true);
-        $meta = is_array($existing) ? $existing : [];
-        $meta['attachment'] = $this->attachment;
 
         DB::table('agent_conversation_messages')
             ->where('id', $userMessageId)
-            ->update(['meta' => json_encode($meta, JSON_THROW_ON_ERROR)]);
+            ->update(['meta' => json_encode([...(is_array($existing) ? $existing : []), ...$additions], JSON_THROW_ON_ERROR)]);
     }
 
     /**
@@ -1074,7 +1099,7 @@ final class ProcessChatMessage implements ShouldQueue
      * its reply. That is the moment suggestions are worth the most: the record
      * was just written and what follows it is genuinely open.
      */
-    private function suggestNextSteps(StreamedAgentResponse $streamedResponse): void
+    private function suggestNextSteps(StreamedAgentResponse $streamedResponse, bool $askedForFirstRecord): void
     {
         $reply = AssistantText::finalReply($streamedResponse->text, $this->textAfterLastToolCall, $this->sawToolCall);
 
@@ -1092,6 +1117,18 @@ final class ProcessChatMessage implements ShouldQueue
             return;
         }
 
+        if ($this->offersSetupOptions()) {
+            $this->offerSetupOptions($messageId);
+
+            return;
+        }
+
+        if ($askedForFirstRecord && $this->origin->isTyped()) {
+            $this->offerWaysInBesideTheAsk($messageId);
+
+            return;
+        }
+
         dispatch(new SuggestNextSteps(
             conversationId: $this->conversationId,
             messageId: $messageId,
@@ -1104,6 +1141,47 @@ final class ProcessChatMessage implements ShouldQueue
                     ->all()
             )),
         ));
+    }
+
+    private function offersSetupOptions(): bool
+    {
+        return config('chat.next_steps.enabled', true)
+            && $this->isSetupConversation()
+            && in_array($this->origin, [MessageOrigin::Greeting, MessageOrigin::DataArrived], true);
+    }
+
+    private function offerSetupOptions(string $messageId): void
+    {
+        $this->recordSetupOptions($messageId, resolve(SetupOptions::class)->for($this->user, $this->workspace));
+    }
+
+    // The ask needs a typed name, so a model-written chip beside it only costs a turn.
+    private function offerWaysInBesideTheAsk(string $messageId): void
+    {
+        if (! config('chat.next_steps.enabled', true) || ! $this->isSetupConversation()) {
+            return;
+        }
+
+        $this->recordSetupOptions($messageId, array_values(array_filter(
+            resolve(SetupOptions::class)->besideTheAsk($this->user, $this->workspace),
+            fn (SetupOption $option): bool => $option->id !== $this->nextStep,
+        )));
+    }
+
+    /**
+     * @param  list<SetupOption>  $options
+     */
+    private function recordSetupOptions(string $messageId, array $options): void
+    {
+        if ($options === []) {
+            return;
+        }
+
+        resolve(RecordNextSteps::class)->execute(
+            $this->conversationId,
+            $messageId,
+            array_map(static fn (SetupOption $option): array => $option->toArray(), $options),
+        );
     }
 
     private function turnLeftAProposal(): bool
@@ -1157,6 +1235,25 @@ final class ProcessChatMessage implements ShouldQueue
     private function modelLabel(): ?string
     {
         return resolve(ModelRegistry::class)->find((string) ($this->resolved['id'] ?? ''))?->displayLabel();
+    }
+
+    private function closeCompletedTurn(): void
+    {
+        TurnPresence::clear($this->conversationId, $this->turnId);
+
+        if (in_array($this->origin, [MessageOrigin::Resume, MessageOrigin::Greeting], true) && $this->isSetupConversation()) {
+            resolve(StartDataArrivedTurn::class)->execute($this->workspace);
+        }
+    }
+
+    private function opensConversation(): bool
+    {
+        return $this->origin->isTyped()
+            && $this->workspace->isInSetupWindow()
+            && ! AgentConversationMessage::query()
+                ->where('conversation_id', $this->conversationId)
+                ->where('role', 'assistant')
+                ->exists();
     }
 
     private function isSetupConversation(): bool

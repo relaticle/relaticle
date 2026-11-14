@@ -13,6 +13,7 @@ use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\Cloud\CloudServiceProvider;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
+use Relaticle\Cloud\Marketing\Http\Controllers\AssistantPagesController;
 
 mutates(CloudServiceProvider::class, PlanEntitlements::class, StripeBilling::class, NoBilling::class);
 
@@ -116,6 +117,10 @@ it('keeps a legal link the operator configured', function (): void {
 
 it('links the documentation to its own public root', function (): void {
     expect(config('documentation.public_url'))->toBe(url()->getPublicUrl());
+});
+
+it('gives the assistant the hosted chatgpt plugin link', function (): void {
+    expect(config('chat.chatgpt_plugin_url'))->toBe(AssistantPagesController::CHATGPT_PLUGIN_URL);
 });
 
 it('never lets an inactivity deletion proceed when billing is off', function (): void {

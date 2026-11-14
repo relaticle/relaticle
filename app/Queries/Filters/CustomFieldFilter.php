@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace App\Queries\Filters;
 
+use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\FilterErrors;
@@ -17,7 +19,10 @@ use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder as QueryBuilder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Spatie\QueryBuilder\Filters\Filter;
 
 /**
@@ -28,9 +33,18 @@ final readonly class CustomFieldFilter implements Filter
     // The link field type validates each item with max:2048, so a longer operand can never equal a stored value.
     private const int MAX_OPERAND_LENGTH = 2048;
 
-    private const string LIST_ELEMENTS = "jsonb_array_elements_text(case when jsonb_typeof(json_value::jsonb) = 'array' then json_value::jsonb else '[]'::jsonb end)";
+    private const string RECORD_ELEMENTS = "jsonb_array_elements_text(case jsonb_typeof(json_value::jsonb) when 'array' then json_value::jsonb when 'string' then jsonb_build_array(json_value::jsonb) else '[]'::jsonb end)";
+
+    private const string TRIMMED_LOWERED_OPERANDS = 'array(select lower(btrim(operand)) from unnest(?::text[]) as operand)';
 
     private const string LOWERED_OPERANDS = 'array(select lower(operand) from unnest(?::text[]) as operand)';
+
+    private const array LIST_STORED_TYPES = [
+        CustomFieldType::EMAIL->value,
+        CustomFieldType::PHONE->value,
+        CustomFieldType::LINK->value,
+        CustomFieldType::DOMAIN->value,
+    ];
 
     private const array DOMAIN_OF = [
         CustomFieldType::EMAIL->value => "lower(split_part(element, '@', 2))",
@@ -77,32 +91,68 @@ final readonly class CustomFieldFilter implements Filter
         );
 
         foreach ($value as $fieldCode => $operators) {
-            $field = $fields[$fieldCode];
-            $valueColumn = $field->getValueColumn();
-            $supportedOperators = CustomFieldFilterSchema::operatorsForType($field->type);
-
-            if (! is_array($operators) || $operators === []) {
-                throw FilterErrors::at((string) $fieldCode, __('validation.filter.operator_object', ['name' => $fieldCode, 'operator' => array_key_first($supportedOperators)]));
-            }
-
-            $entry = $options[$fieldCode] ?? null;
-
-            foreach ($operators as $operator => $operand) {
-                $this->assertSupported($fieldCode, (string) $operator, $supportedOperators);
-
-                if ($operator === 'domain') {
-                    $this->applyDomain($query, $field, $operand, $supportedOperators['domain']['properties']);
-
-                    continue;
-                }
-
-                $operand = $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null);
-                $operand = $this->resolveOptions($fieldCode, $operator, $entry, $operand);
-                $operand = $this->spellings($field, $operator, $operand);
-
-                $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
-            }
+            $this->applyField($query, $fields[$fieldCode], $operators, $options[$fieldCode] ?? null);
         }
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  array{ids: array<string, list<string>>, labels: list<string>}|null  $entry
+     */
+    private function applyField(Builder $query, CustomField $field, mixed $operators, ?array $entry): void
+    {
+        $fieldCode = $field->code;
+        $valueColumn = $field->getValueColumn();
+        $supportedOperators = CustomFieldFilterSchema::operatorsForType($field->type);
+
+        if (! is_array($operators) || $operators === []) {
+            throw FilterErrors::at($fieldCode, __('validation.filter.operator_object', ['name' => $fieldCode, 'operator' => array_key_first($supportedOperators)]));
+        }
+
+        $comparisons = [];
+
+        foreach ($operators as $operator => $operand) {
+            $this->assertSupported($fieldCode, (string) $operator, $supportedOperators);
+
+            if ($operator === 'domain') {
+                $this->applyDomain($query, $field, $operand, $supportedOperators['domain']['properties']);
+
+                continue;
+            }
+
+            $operand = $this->recordIds($field, $operator, $this->normalizeOperand($fieldCode, $operator, $operand, $supportedOperators[$operator], $entry !== null));
+            $operand = $this->resolveOptions($fieldCode, $operator, $entry, $operand);
+            $operand = $this->spellings($field, $operator, $operand);
+
+            if (array_key_exists($operator, CustomFieldFilterSchema::COMPARISONS)) {
+                $comparisons[$operator] = $operand;
+
+                continue;
+            }
+
+            $this->applyCondition($query, $field, $valueColumn, $operator, $operand);
+        }
+
+        if ($comparisons !== []) {
+            $this->applyComparisons($query, $field, $valueColumn, $comparisons);
+        }
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     * @param  array<string, mixed>  $comparisons
+     */
+    private function applyComparisons(Builder $query, CustomField $field, string $valueColumn, array $comparisons): void
+    {
+        $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $comparisons): void {
+            $q->where('custom_field_id', $field->getKey());
+
+            foreach ($comparisons as $operator => $operand) {
+                $this->coversTheWholeDay($field, $operand)
+                    ? $this->wholeDay($q, $valueColumn, $operator, $operand)
+                    : $q->where($valueColumn, CustomFieldFilterSchema::COMPARISONS[$operator], $operand);
+            }
+        });
     }
 
     /**
@@ -147,6 +197,21 @@ final readonly class CustomFieldFilter implements Filter
             'name' => "{$fieldCode} {$operator}",
             'expected' => $expected,
         ]));
+    }
+
+    private function recordIds(CustomField $field, string $operator, mixed $operand): mixed
+    {
+        if ($field->type !== CustomFieldType::RECORD->value || ! is_array($operand)) {
+            return $operand;
+        }
+
+        $invalid = array_find($operand, static fn (string $id): bool => ! Str::isUlid($id));
+
+        if ($invalid !== null) {
+            throw FilterErrors::at("{$field->code}.{$operator}", __('validation.filter.record_id', ['name' => "{$field->code} {$operator}", 'value' => $invalid]));
+        }
+
+        return $operand;
     }
 
     /**
@@ -215,19 +280,48 @@ final readonly class CustomFieldFilter implements Filter
                 $this->containsAny($q, $field, $operand);
             }),
             '$is_empty' => $this->emptiness($query, $field, $operand === true),
-            default => $query->whereHas('customFieldValues', function (Builder $q) use ($field, $valueColumn, $operator, $operand): void {
+            '$contains', '$starts_with', '$ends_with' => in_array($field->type, self::LIST_STORED_TYPES, true)
+                ? $this->partialListMatch($query, $field, $operator, (string) $operand)
+                : $this->partialTextMatch($query, $field, $valueColumn, $operator, (string) $operand),
+            '$in' => $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
+                ->where('custom_field_id', $field->getKey())
+                ->whereIn($valueColumn, $operand)),
+            '$has_any' => $query->whereHas('customFieldValues', function (Builder $q) use ($field, $operand): void {
                 $q->where('custom_field_id', $field->getKey());
-
-                match ($operator) {
-                    '$eq', '$gt', '$gte', '$lt', '$lte' => $this->coversTheWholeDay($field, $operand)
-                        ? $this->wholeDay($q, $valueColumn, $operator, $operand)
-                        : $q->where($valueColumn, CustomFieldFilterSchema::COMPARISONS[$operator], $operand),
-                    '$contains' => $q->where($valueColumn, 'ILIKE', '%'.LikePattern::escape((string) $operand).'%'),
-                    '$in' => $q->whereIn($valueColumn, $operand),
-                    '$has_any' => $this->containsAny($q, $field, $operand),
-                    default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
-                };
+                $this->containsAny($q, $field, $operand);
             }),
+            default => throw new \LogicException("Unsupported custom field filter operator [{$operator}]."),
+        };
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function partialTextMatch(Builder $query, CustomField $field, string $valueColumn, string $operator, string $operand): void
+    {
+        $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
+            ->where('custom_field_id', $field->getKey())
+            ->where($valueColumn, 'ILIKE', $this->likePattern($operator, $operand)));
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function partialListMatch(Builder $query, CustomField $field, string $operator, string $operand): void
+    {
+        $query->whereHas('customFieldValues', fn (Builder $q): Builder => $q
+            ->where('custom_field_id', $field->getKey())
+            ->whereRaw('exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element ilike ?)', [$this->likePattern($operator, $operand)]));
+    }
+
+    private function likePattern(string $operator, string $operand): string
+    {
+        $escaped = LikePattern::escape($operand);
+
+        return match ($operator) {
+            '$starts_with' => "{$escaped}%",
+            '$ends_with' => "%{$escaped}",
+            default => "%{$escaped}%",
         };
     }
 
@@ -251,9 +345,15 @@ final readonly class CustomFieldFilter implements Filter
      */
     private function emptiness(Builder $query, CustomField $field, bool $empty): void
     {
-        $holdingAValue = static function (Builder $values) use ($field): void {
+        $holdingAValue = function (Builder $values) use ($field): void {
             /** @var Builder<CustomFieldValue> $values */
             $values->holdingAValue($field);
+
+            $liveRecords = $this->liveRecordLinks($field);
+
+            if ($liveRecords instanceof QueryBuilder) {
+                $values->whereExists($liveRecords);
+            }
         };
 
         $empty
@@ -267,11 +367,70 @@ final readonly class CustomFieldFilter implements Filter
      */
     private function containsAny(Builder $query, CustomField $field, array $values): void
     {
-        $matches = in_array($field->type, [CustomFieldType::EMAIL->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value], true)
-            ? 'lower(element) = any('.self::LOWERED_OPERANDS.')'
-            : 'element = any(?::text[])';
+        $isRecord = $field->type === CustomFieldType::RECORD->value;
 
-        $query->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$matches})", [$this->textArray($values)]);
+        if ($isRecord) {
+            $values = $this->liveRecordIds($field, $values);
+
+            if ($values === []) {
+                $query->whereRaw('false');
+
+                return;
+            }
+        }
+
+        $matches = match (true) {
+            $field->type === CustomFieldType::TAGS_INPUT->value => 'lower(btrim(element)) = any('.self::TRIMMED_LOWERED_OPERANDS.')',
+            in_array($field->type, [CustomFieldType::EMAIL->value, CustomFieldType::LINK->value, CustomFieldType::DOMAIN->value, CustomFieldType::RECORD->value], true) => 'lower(element) = any('.self::LOWERED_OPERANDS.')',
+            default => 'element = any(?::text[])',
+        };
+
+        $elements = $isRecord ? self::RECORD_ELEMENTS : CustomFieldValue::LIST_ELEMENTS;
+
+        $query->whereRaw("exists (select 1 from {$elements} as element where {$matches})", [$this->textArray($values)]);
+    }
+
+    /**
+     * @param  array<int, string>  $ids
+     * @return array<int, string>
+     */
+    private function liveRecordIds(CustomField $field, array $ids): array
+    {
+        $entity = CrmEntity::tryFrom((string) $field->lookup_type);
+
+        if ($entity === null) {
+            return [];
+        }
+
+        $model = $entity->model();
+
+        return $model::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $field->tenant_id)
+            ->whereKey(array_map(Str::lower(...), $ids))
+            ->pluck('id')
+            ->map(static fn (mixed $id): string => (string) $id)
+            ->all();
+    }
+
+    private function liveRecordLinks(CustomField $field): ?QueryBuilder
+    {
+        $entity = $field->type === CustomFieldType::RECORD->value ? CrmEntity::tryFrom((string) $field->lookup_type) : null;
+
+        if ($entity === null) {
+            return null;
+        }
+
+        $model = $entity->model();
+
+        $liveRecord = $model::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $field->tenant_id)
+            ->where((new $model)->getQualifiedKeyName(), DB::raw('element::bpchar'))
+            ->selectRaw('1')
+            ->toBase();
+
+        return DB::query()->fromRaw(self::RECORD_ELEMENTS.' as element')->selectRaw('1')->whereExists($liveRecord);
     }
 
     /**
@@ -313,7 +472,7 @@ final readonly class CustomFieldFilter implements Filter
 
             $matching = fn (Builder $values): Builder => $values
                 ->where('custom_field_id', $field->getKey())
-                ->whereRaw('exists (select 1 from '.self::LIST_ELEMENTS." as element where {$expression} = any(".self::LOWERED_OPERANDS.'))', [$this->textArray($domains)]);
+                ->whereRaw('exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS." as element where {$expression} = any(".self::LOWERED_OPERANDS.'))', [$this->textArray($domains)]);
 
             match ($operator) {
                 '$in' => $query->whereHas('customFieldValues', $matching),
@@ -370,7 +529,7 @@ final readonly class CustomFieldFilter implements Filter
             throw FilterErrors::at($path, __('validation.filter.phone_country_code', ['name' => $field->code]));
         }
 
-        if (preg_match('/^\+\d{1,15}(;ext=\d+)?$/', $canonical) !== 1) {
+        if (! CanonicalValue::isPhone($field, $value)) {
             throw FilterErrors::at($path, __('validation.filter.phone_invalid', ['name' => $field->code, 'value' => $value]));
         }
     }

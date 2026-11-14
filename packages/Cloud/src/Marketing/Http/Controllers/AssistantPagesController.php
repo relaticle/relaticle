@@ -9,7 +9,7 @@ use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 
 final readonly class AssistantPagesController
 {
-    private const string CHATGPT_PLUGIN_URL = 'https://chatgpt.com/plugins/plugin_asdk_app_6a92c3af04a0819180ed6652ebe09961';
+    public const string CHATGPT_PLUGIN_URL = 'https://chatgpt.com/plugins/plugin_asdk_app_6a92c3af04a0819180ed6652ebe09961';
 
     public function show(string $assistant): View
     {

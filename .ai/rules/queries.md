@@ -109,6 +109,9 @@ transport` fails the reverse.
 A new surface gets its adapter on its own side. A panel filter lives under `app/Filament` and
 imports `App\Queries`.
 
+`App\Queries\Filters\TreeFilter` is the entry point for a transport that owns the Eloquent builder, as a
+Filament table does. It validates a tree with `FilterTree` and applies it with the `EntityFilters` registry.
+
 ## One owner per fact
 
 - `EntityFilters::definitions()` owns the filter names each entity accepts. A list query never
@@ -152,8 +155,8 @@ the REST guide. Update those by hand.
   without that guard, so read them by hand.
 - **An operator.** Add it to `operatorsForType()` and compile it in
   `CustomFieldFilter::applyCondition()`. A native field shares the type's operators, so
-  compile it in `NativeFilter` too: its `text()` treats every operator but `$contains` as
-  equality. `ListFilterSurfacesTest` fails until its operator table lists it ("publishes
+  compile it in `NativeFilter::text()` too: its `match` throws on an operator it does not
+  compile. `ListFilterSurfacesTest` fails until its operator table lists it ("publishes
   exactly the operators of each custom field type"), and then until a case runs it on every
   surface ("applies every operator of every custom field type alike on the api and mcp").
   A native field that shares the type fails the same way until a case runs the operator on
@@ -188,6 +191,17 @@ the REST guide. Update those by hand.
 - `$not` is a set complement: `NOT EXISTS` over the matching keys. It never compiles as SQL
   `NOT (...)`, which drops a row whose column is null. `ListFilterTest` is the gate ("returns
   records with an empty value under $not").
+  The inner matched set reads deleted rows when the model soft-deletes. The outer query alone
+  decides which rows are listed.
+  `FilterBarTest` "lists neither the live nor the deleted record when a negated name rule matches
+  both" is the gate.
+- A record custom field counts an id only when it names a live record of its lookup type in the
+  field's workspace. A link to a deleted record is no link. Restoring the record brings the link back.
+  `ListFilterTest` "treats a record custom field link to a deleted record as no link" and "does not
+  count a record custom field link to another workspace record" are the gates.
+- A tags field compares `lower(btrim(element))` with the operands lowered and trimmed, for `$has_any`
+  and `$has_none`, so `VIP`, `vip` and ` vip ` are one tag on every surface. `ListFilterTest` "matches
+  tags without regard to case or surrounding spaces" is the gate.
 - `$not_in` and `$has_none` keep a record whose value is empty too. A relation and a custom
   field compile them as `NOT EXISTS`. A native column compiles `$not_in` as `whereNotIn` with
   `orWhereNull`.

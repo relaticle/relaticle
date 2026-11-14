@@ -84,6 +84,37 @@ it('runs an ordinary conversation without setup mode', function (): void {
     CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->agent->setupMode === false);
 });
 
+it('tells rela a new workspace has no records on the turn that opens an ordinary conversation, and not on the next', function (): void {
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
+        'workspace_id' => $this->workspace->getKey(),
+        'title' => 'ordinary',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    CrmAssistant::fake(['Which company do you work with?', 'Sure.']);
+
+    runTurn($this->user, $this->workspace, $conversationId);
+    runTurn($this->user, $this->workspace, $conversationId);
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+    CrmAssistant::assertPrompted(fn ($prompt): bool => ! str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+});
+
+it('keeps telling rela so on every turn of the setup conversation', function (): void {
+    CrmAssistant::fake(['Which company do you work with?', 'Sure.']);
+
+    runTurn($this->user, $this->workspace, $this->workspace->setupConversation->id);
+    runTurn($this->user, $this->workspace, $this->workspace->setupConversation->id);
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+    CrmAssistant::assertNotPrompted(fn ($prompt): bool => ! str_contains($prompt->agent->dynamicInstructions(), "records: none\n"));
+});
+
 it('drops setup mode when the flag is off', function (): void {
     $conversationId = $this->workspace->setupConversation->id;
     Feature::define(SetupConversation::class, false);
@@ -104,11 +135,23 @@ it('runs the greeting on the opener and carries its instructions in the turn blo
         && str_contains($prompt->agent->dynamicInstructions(), "<turn>\n".MessageOrigin::Greeting->directive()."\n</turn>"));
 });
 
-it('asks for a list of people or companies in the greeting', function (): void {
+it('says a pasted list works in the greeting and never calls records contacts', function (): void {
     expect(MessageOrigin::Greeting->directive())
-        ->toContain('paste a list of people or companies in any columns and any order')
+        ->toContain('says a pasted list works too')
         ->not->toContain('contacts');
 });
+
+it('keeps the greeting to two short paragraphs with one bold question', function (): void {
+    expect(MessageOrigin::Greeting->directive())
+        ->toContain('Write two short paragraphs, 40 words at most in total')
+        ->toContain('The second paragraph is one question in bold, then one short plain sentence')
+        ->toContain('Bold the question and nothing else')
+        ->not->toContain('Three short paragraphs');
+});
+
+it('leaves a count of zero out of the greeting and the data arrived message', function (MessageOrigin $origin): void {
+    expect($origin->directive())->toContain('Name only what arrived: leave out a count of zero');
+})->with([MessageOrigin::Greeting, MessageOrigin::DataArrived]);
 
 it('saves the greeting as its opener with a greeting origin', function (): void {
     CrmAssistant::fake(['Hi Jane, your workspace is ready.']);

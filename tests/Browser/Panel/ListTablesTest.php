@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-use App\Enums\CreationSource;
+use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CustomFields\OpportunityField;
+use App\Enums\CustomFieldType;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -48,31 +49,98 @@ function seedListRows(User $user): void
     ]);
 }
 
-it('stacks each list row into a card so no column sits off a phone screen', function (string $path, string $filledColumn): void {
+it('stacks each list row into a card so no column sits off a phone screen', function (string $path, string $filledColumn, bool $searchable): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/{$path}")
+    visitAs($user, "/app/{$workspace->slug}/{$path}", 390, 844)
         ->assertVisible('.fi-ta-row')
         ->assertScript(ROWS_STACKED, true)
         ->assertScript(CELL_LABELS_SHOWN, true)
         ->assertScript("(() => { const cell = document.querySelector('.fi-ta-row [class~=\"fi-ta-cell-{$filledColumn}\"]'); return getComputedStyle(cell).display === 'grid' && cell.querySelector('.fi-ta-cell-label').offsetParent !== null; })()", true)
         ->assertScript(TABLE_SCROLLS_SIDEWAYS, false)
-        ->assertScript(SEARCH_FILLS_TOOLBAR, true)
+        ->assertScript($searchable ? SEARCH_FILLS_TOOLBAR : 'document.querySelector(".fi-ta-search-field") === null', true)
         ->assertNoJavaScriptErrors();
 })->with([
-    'tasks' => ['tasks', 'relations'],
-    'companies' => ['companies', 'updated-at'],
-    'people' => ['people', 'company.name'],
-    'opportunities' => ['opportunities', 'custom-fields.amount'],
-    'import-history' => ['import-history', 'status'],
+    'tasks' => ['tasks', 'relations', false],
+    'companies' => ['companies', 'updated-at', false],
+    'people' => ['people', 'company.name', false],
+    'opportunities' => ['opportunities?view=all', 'custom-fields.amount', false],
+    'import-history' => ['import-history', 'status', true],
 ]);
+
+it('shows the bulk bar only while a record is selected, and the rows stay put', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    seedListRows($user);
+
+    $firstRowTop = 'Math.round(document.querySelector(".fi-ta-row").getBoundingClientRect().top)';
+
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
+        ->assertVisible('[data-filter-bar]')
+        ->assertMissing('.fi-bulk-bar');
+
+    $before = $page->script($firstRowTop);
+
+    $page->click('.fi-ta-record-checkbox')
+        ->assertVisible('.fi-bulk-bar')
+        ->assertSeeIn('.fi-bulk-bar-count', '1')
+        ->assertSeeIn('.fi-bulk-bar-selection', 'Selected')
+        ->assertMissing('.fi-ta-selection-indicator')
+        ->assertScript($firstRowTop, $before)
+        ->click('.fi-bulk-bar-selection')
+        ->assertMissing('.fi-bulk-bar')
+        ->assertNoJavaScriptErrors();
+});
+
+it('moves focus to the select all checkbox when the selection is cleared from the bulk bar', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    seedListRows($user);
+
+    visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
+        ->click('.fi-ta-record-checkbox')
+        ->assertVisible('.fi-bulk-bar')
+        ->click('.fi-bulk-bar-selection')
+        ->assertMissing('.fi-bulk-bar')
+        ->assertScript('document.activeElement === document.querySelector(".fi-ta-table thead .fi-ta-selection-cell input[type=checkbox]")', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('deletes a selected record from the bulk bar\'s More menu, which opens above the bar', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Atlas Freight']);
+
+    $menuAboveBar = <<<'JS'
+        (() => {
+            const panel = [...document.querySelectorAll('.fi-dropdown-panel')].find((candidate) => candidate.style.display === 'block');
+
+            return Math.round(panel.getBoundingClientRect().bottom) <= Math.round(document.querySelector('.fi-bulk-bar').getBoundingClientRect().top);
+        })();
+    JS;
+
+    visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
+        ->click('.fi-ta-record-checkbox')
+        ->click('.fi-bulk-bar .fi-dropdown-trigger')
+        ->assertScript($menuAboveBar, true)
+        ->click('Delete selected')
+        ->click('.fi-modal-open .fi-modal-footer-actions button.fi-color-danger')
+        ->assertDontSee('Atlas Freight')
+        ->assertMissing('.fi-bulk-bar')
+        ->assertNoJavaScriptErrors();
+
+    expect($company->fresh()->trashed())->toBeTrue();
+});
 
 it('keeps the list table header row on desktop', function (): void {
     $this->withVite();
@@ -81,10 +149,7 @@ it('keeps the list table header row on desktop', function (): void {
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/tasks")
+    visitAs($user, "/app/{$workspace->slug}/tasks", 1440, 900)
         ->assertVisible('.fi-ta-header-cell.fi-ta-header-cell-title')
         ->assertScript(CELL_LABELS_SHOWN, false)
         ->assertNoJavaScriptErrors();
@@ -97,36 +162,31 @@ it('keeps a linked company chip inside its cell link', function (): void {
     $workspace = $user->ownedWorkspaces()->first();
     seedListRows($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/people")
+    visitAs($user, "/app/{$workspace->slug}/people")
         ->assertScript('document.querySelector(\'[class~="fi-ta-cell-company.name"] a.fi-ta-col .fi-record-chip\') !== null', true)
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps a long record name inside its phone card, clear of the row menu', function (): void {
+it('keeps a long record name inside its phone card, clear of its checkbox', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     Company::factory()->recycle([$user, $workspace])->create(['name' => 'Long Name Industries International Holdings Limited']);
 
-    $titleClearOfMenu = <<<'JS'
+    $titleClearOfCheckbox = <<<'JS'
         (() => {
             const row = document.querySelector('.fi-ta-row');
             const range = document.createRange();
             range.selectNodeContents(row.querySelector('.fi-ta-cell-content .fi-record-chip, .fi-ta-cell-content .fi-ta-text-item'));
 
-            return Math.ceil(range.getBoundingClientRect().right) <= Math.floor(row.querySelector('.fi-ta-actions button').getBoundingClientRect().left);
+            return Math.ceil(range.getBoundingClientRect().right) <= Math.floor(row.querySelector('.fi-ta-record-checkbox').getBoundingClientRect().left);
         })();
     JS;
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(320, 568)
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies", 320, 568)
         ->assertVisible('.fi-ta-row')
-        ->assertScript($titleClearOfMenu, true)
+        ->assertScript($titleClearOfCheckbox, true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -139,10 +199,7 @@ it('hides a column set visibleFrom sm in a phone card and shows it from sm up', 
 
     $createdAtDisplayed = 'getComputedStyle(document.querySelector(\'.fi-ta-row [class~="fi-ta-cell-created-at"]\')).display !== "none"';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 844)
         ->assertVisible('.fi-ta-row')
         ->assertScript($createdAtDisplayed, false);
 
@@ -160,36 +217,38 @@ it('hides a phone card row whose value is empty', function (): void {
 
     $emptyRowShown = 'getComputedStyle(document.querySelector(\'.fi-ta-row [class~="fi-ta-cell-company.name"]\')).display !== "none"';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/people")
+    visitAs($user, "/app/{$workspace->slug}/people", 390, 844)
         ->assertVisible('.fi-ta-row')
         ->assertScript($emptyRowShown, false)
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps every filter select option inside the phone filter sheet', function (): void {
+it('keeps every filter field option inside the phone filter sheet', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     Company::factory()->recycle([$user, $workspace])->create();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 664)
-        ->navigate("/app/{$workspace->slug}/companies")
+    foreach (range(1, 12) as $number) {
+        resolve(CreateCustomField::class)->execute($user, [
+            'entity_type' => 'company',
+            'name' => "Note {$number}",
+            'code' => "note_{$number}",
+            'type' => CustomFieldType::TEXT->value,
+        ]);
+    }
+
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 664)
         ->assertVisible('.fi-ta-row')
-        ->click('.fi-ta-filters-dropdown .fi-dropdown-trigger button')
-        ->click('.fi-ta-filters .fi-select-input-btn >> nth=0')
-        ->assertVisible('.fi-ta-filters [role=option] >> nth=0')
+        ->click('[data-filter-add]')
+        ->assertVisible('[data-filter-bar] [data-pop-item] >> nth=0')
         ->assertNoJavaScriptErrors();
 
     $lastOptionReachable = <<<'JS'
         (() => {
-            const sheet = document.querySelector('.fi-ta-filters').closest('.fi-dropdown-panel');
-            const options = [...sheet.querySelectorAll('[role=option]')];
+            const sheet = [...document.querySelectorAll('[data-filter-bar] [data-pop]')].find((pop) => pop.checkVisibility());
+            const options = [...sheet.querySelectorAll('[data-pop-item]')];
             const last = options.at(-1);
 
             last.scrollIntoView({ block: 'nearest' });
@@ -198,54 +257,87 @@ it('keeps every filter select option inside the phone filter sheet', function ()
             const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
 
             return {
-                options: options.length,
+                listsEveryField: options.length >= 13,
                 insideScreen: box.bottom <= innerHeight && box.top >= 0,
                 reachable: last.contains(hit),
             };
         })();
     JS;
 
-    expect($page->script($lastOptionReachable))->toBe(['options' => count(CreationSource::cases()), 'insideScreen' => true, 'reachable' => true]);
+    expect($page->script($lastOptionReachable))->toBe(['listsEveryField' => true, 'insideScreen' => true, 'reachable' => true]);
 });
 
-it('keeps the toolbar with the bulk actions in view on a phone while rows are ticked', function (): void {
+it('keeps the bulk bar above the tab bar on a phone while rows are ticked', function (): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
     Company::factory()->count(15)->recycle([$user, $workspace])->create();
 
-    $toolbarGap = <<<'JS'
+    $barClearOfTabBar = <<<'JS'
         (() => {
-            const toolbar = document.querySelector('.fi-ta-header-ctn').getBoundingClientRect();
-            const topbar = document.querySelector('.fi-topbar-ctn').getBoundingClientRect();
+            const bar = document.querySelector('.fi-bulk-bar').getBoundingClientRect();
+            const tabBar = document.querySelector('.fi-bottom-nav').getBoundingClientRect();
+            const more = document.querySelector('.fi-bulk-bar .fi-dropdown-trigger button').getBoundingClientRect();
 
-            return Math.round(toolbar.top - topbar.bottom);
+            return bar.bottom <= tabBar.top
+                && bar.left >= 0 && bar.right <= innerWidth
+                && document.querySelector('.fi-bulk-bar').contains(document.elementFromPoint(more.left + more.width / 2, more.top + more.height / 2));
         })();
     JS;
 
-    $bulkTriggerHit = <<<'JS'
-        (() => {
-            const trigger = [...document.querySelectorAll('.fi-ta-header-ctn button')]
-                .find((button) => button.checkVisibility() && (button.getAttribute('title') ?? button.getAttribute('aria-label') ?? '').includes('Bulk'));
-            const box = trigger.getBoundingClientRect();
-
-            return trigger.contains(document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2));
-        })();
-    JS;
-
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 664)
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 664)
         ->assertVisible('.fi-ta-row >> nth=14');
 
     $page->script('window.scrollTo(0, document.documentElement.scrollHeight)');
 
-    expect($page->script($toolbarGap))->toBeLessThan(0);
+    $page->click('.fi-ta-row >> nth=14 >> .fi-ta-record-checkbox')
+        ->assertVisible('.fi-bulk-bar')
+        ->assertScript($barClearOfTabBar, true)
+        ->assertNoJavaScriptErrors();
+});
 
-    $page->click('.fi-ta-row >> nth=14 >> .fi-ta-record-checkbox');
+it('keeps the last option of a long choice list inside the phone filter sheet', function (): void {
+    $this->withVite();
 
-    expect($page->script($toolbarGap))->toBe(0)
-        ->and($page->script($bulkTriggerHit))->toBeTrue();
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    Company::factory()->recycle([$user, $workspace])->create();
+
+    resolve(CreateCustomField::class)->execute($user, [
+        'entity_type' => 'company',
+        'name' => 'Tier',
+        'code' => 'tier',
+        'type' => CustomFieldType::SELECT->value,
+        'options' => array_map(static fn (int $number): array => ['name' => "Tier {$number}"], range(1, 14)),
+    ]);
+
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 390, 664)
+        ->assertVisible('.fi-ta-row')
+        ->click('[data-filter-add]')
+        ->click('[data-pop-item][data-field="custom_fields.tier"]')
+        ->click('[data-pop]:not([style*="display: none"]) [data-condition="is_any_of"]')
+        ->assertVisible('[data-filter-option] >> nth=0')
+        ->assertNoJavaScriptErrors();
+
+    $lastOptionReachable = <<<'JS'
+        (() => {
+            const sheet = [...document.querySelectorAll('[data-filter-bar] [data-pop]')].find((pop) => pop.checkVisibility());
+            const options = [...sheet.querySelectorAll('[data-filter-option]')];
+            const last = options.at(-1);
+
+            last.scrollIntoView({ block: 'nearest' });
+
+            const box = last.getBoundingClientRect();
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
+
+            return {
+                listsEveryOption: options.length === 14,
+                insideScreen: box.bottom <= innerHeight && box.top >= 0,
+                reachable: last.contains(hit),
+            };
+        })();
+    JS;
+
+    expect($page->script($lastOptionReachable))->toBe(['listsEveryOption' => true, 'insideScreen' => true, 'reachable' => true]);
 });

@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Tables\Concerns;
 
+use App\Filament\Components\Tables\ColumnHeaderLabel;
+use App\Filament\Tables\FilterBar\FilterFieldCatalog;
 use Filament\Actions\Action;
 use Filament\Forms\Components\TextInput;
 use Filament\Support\Components\Attributes\Unexposed;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Locked;
 
 trait HasColumnMenu
@@ -68,8 +72,6 @@ trait HasColumnMenu
 
     protected function tableColumnLabel(string $columnName, string $original): string
     {
-        $this->originalTableColumnLabels[$columnName] = $original;
-
         return $this->tableColumnLabels[$columnName] ?? $original;
     }
 
@@ -98,6 +100,57 @@ trait HasColumnMenu
             fn (array $item): array => $item['name'] === $columnName ? [...$item, 'isToggled' => false] : $item,
             $this->tableColumns,
         ), wasReordered: true);
+    }
+
+    public function toggleTableColumn(string $columnName): void
+    {
+        $item = collect($this->tableColumns)->first(fn (array $item): bool => $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE && $item['name'] === $columnName);
+
+        if ($item === null || ! $this->getTable()->getColumn($columnName)?->isToggleable()) {
+            return;
+        }
+
+        if ($item['isToggled']) {
+            $this->hideTableColumn($columnName);
+
+            return;
+        }
+
+        $others = array_values(array_filter($this->tableColumns, fn (array $other): bool => $other['name'] !== $columnName));
+
+        $this->applyTableColumnManager([...$others, [...$item, 'isToggled' => true]], wasReordered: true);
+    }
+
+    /**
+     * @return list<array{name: string, label: Htmlable, text: string, isShown: bool, isPinned: bool, isLocked: bool}>
+     */
+    protected function viewSettingsColumns(): array
+    {
+        $columns = [];
+
+        foreach ($this->tableColumns as $item) {
+            $column = $item['type'] === self::TABLE_COLUMN_MANAGER_COLUMN_TYPE && ! $item['isHidden'] ? $this->getTable()->getColumn($item['name']) : null;
+
+            if ($column === null) {
+                continue;
+            }
+
+            $label = $column->getLabel();
+            $label = $label instanceof Htmlable ? $label : new HtmlString(e((string) $label));
+
+            $text = ColumnHeaderLabel::text($label);
+
+            $columns[] = [
+                'name' => $item['name'],
+                'label' => $item['name'] === $this->getTableTitleColumn() ? ColumnHeaderLabel::make($text, FilterFieldCatalog::columnIcon($item['name'])) : $label,
+                'text' => $text,
+                'isShown' => $item['isToggled'],
+                'isPinned' => in_array($item['name'], $this->tablePinnedColumns, true),
+                'isLocked' => ! $column->isToggleable(),
+            ];
+        }
+
+        return $columns;
     }
 
     /**
@@ -148,9 +201,17 @@ trait HasColumnMenu
         $this->stampResizableColumns($this->getTable());
     }
 
+    /**
+     * @return array<string, string>
+     */
+    protected function mergedTableColumnLabels(): array
+    {
+        return [...$this->originalTableColumnLabels, ...$this->tableColumnLabels];
+    }
+
     private function currentTableColumnLabel(string $columnName): ?string
     {
-        return $this->tableColumnLabels[$columnName] ?? $this->originalTableColumnLabels[$columnName] ?? null;
+        return $this->mergedTableColumnLabels()[$columnName] ?? null;
     }
 
     private function isMovableTableColumn(string $columnName, ?string $beforeColumnName): bool

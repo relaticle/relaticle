@@ -35,7 +35,7 @@ it('still saves task assignees through the pivot after the migration', function 
     expect($task->assignees->pluck('id')->all())->toContain($mate->getKey());
 });
 
-it('keeps the assignee filter usable and bounded on the tasks list', function (): void {
+it('keeps the assignee rule usable and bounded on the tasks list', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
     $this->workspace->users()->attach($mate, ['role' => 'member']);
 
@@ -45,30 +45,35 @@ it('keeps the assignee filter usable and bounded on the tasks list', function ()
     $assignedToUser = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $assignedToUser->assignees()->attach($this->user);
 
-    DB::enableQueryLog();
+    $stranger = User::factory()->create(['name' => 'Stranger Danger']);
 
     livewire(ManageTasks::class)
-        ->assertTableFilterExists('assignees')
+        ->assertTableFilterExists('conditions')
         ->assertOk()
-        ->filterTable('assignees', [$mate->getKey()])
+        ->set('tableFilters.conditions.rules', [['field' => 'assignees', 'condition' => 'is_any_of', 'value' => [$mate->getKey()]]])
         ->assertCanSeeTableRecords([$assignedToMate])
-        ->assertCanNotSeeTableRecords([$assignedToUser]);
-
-    $pinnedOrderQueries = collect(DB::getQueryLog())
-        ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'workspace_member_select_is_current_user'));
-
-    DB::disableQueryLog();
-
-    expect($pinnedOrderQueries)->not->toBeEmpty();
+        ->assertCanNotSeeTableRecords([$assignedToUser])
+        ->set('tableFilters.conditions.rules', [['field' => 'assignees', 'condition' => 'is_any_of', 'value' => [$stranger->getKey()]]])
+        ->assertSet('tableFilters.conditions.rules', [])
+        ->assertCanSeeTableRecords([$assignedToMate, $assignedToUser]);
 });
 
-it('runs the bounded assignee filter query on the tasks board without a Postgres distinct/order-by conflict', function (): void {
+it('runs the bounded assignee query when the tasks board column form validates its assignees without a Postgres distinct/order-by conflict', function (): void {
     $mate = User::factory()->create(['name' => 'Mate Member']);
     $this->workspace->users()->attach($mate, ['role' => 'member']);
 
     DB::enableQueryLog();
 
-    livewire(TasksBoard::class)->assertOk();
+    $component = livewire(TasksBoard::class);
+    $column = $component->instance()->getBoard()->getColumnIdentifiers()[0];
+
+    $component
+        ->call('mountAction', 'addCard', ['column' => $column])
+        ->set('mountedActions.0.data.title', 'Board picker task')
+        ->set('mountedActions.0.data.assignees', [$mate->getKey()])
+        ->call('callMountedAction')
+        ->assertOk()
+        ->assertHasNoErrors();
 
     $pinnedOrderQueries = collect(DB::getQueryLog())
         ->filter(fn (array $query): bool => str_contains((string) $query['query'], 'workspace_member_select_is_current_user'));

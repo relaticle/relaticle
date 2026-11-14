@@ -99,14 +99,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                     'date' => $item->dueAt->setTimezone($timezone)->format('M j, Y'),
                 ])),
                 'upcoming' => $this->cards($this->digest->upcoming, fn (): string => __('mail.task_digest.due_today_chip')),
-                'tasksUrl' => TaskResource::getUrl(
-                    name: 'index',
-                    parameters: [
-                        'tableFilters' => ['assigned_to_me' => ['isActive' => true]],
-                        'tenant' => $this->workspace,
-                    ],
-                    panel: 'app',
-                ),
+                'tasksUrl' => TaskResource::assignedToMeUrl($this->workspace),
                 'settingsUrl' => NotificationPreferences::getUrl(panel: 'app', tenant: $this->workspace),
                 'unsubscribeUrl' => $this->unsubscribeUrl(),
                 'workspaceName' => $this->workspaceName(),

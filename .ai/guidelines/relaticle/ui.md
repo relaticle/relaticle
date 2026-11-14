@@ -10,9 +10,10 @@
   reported done. Tests passing is not sufficient for UI work.
 - agent-browser and the Browser suite both drive Chromium. CI runs WebKit only
   for test files tagged `pest()->group('webkit')`, in the `Browser Tests (WebKit)`
-  job of `.github/workflows/ci.yml`. A defect that only WebKit shows passes every
-  other gate. After the Chromium pass, run the browser tests for the surfaces you
-  changed in WebKit: `php artisan test --compact <files> --browser safari`.
+  job of `.github/workflows/ci.yml`. That job runs on pushes to main and before a
+  release deploy, never on a pull request, where a defect that only WebKit shows
+  passes every gate. After the Chromium pass, run the browser tests for the surfaces
+  you changed in WebKit: `php artisan test --compact <files> --browser safari`.
   Install the engine once per machine with `pnpm exec playwright install webkit`.
 - When WebKit breaks a surface Chromium passes, tag the test file that covers it
   with `pest()->group('webkit')`, so CI keeps checking it in WebKit.
@@ -56,6 +57,23 @@
 - With Cloud present, the app and sysadmin panels load `packages/Cloud/resources/css/filament/{app,admin}/theme.css` in place
   of the core themes. Each imports its core theme and adds Cloud's `@source` directories. A class added to a Cloud billing view
   or sysadmin page reaches CSS only through them, and `packages/Cloud/tests/Feature/AppPanelThemeTest.php` pins the swap.
+
+## Menus
+
+- Every menu in the panels draws from five tokens in `resources/css/theme.css`: `menu-row` (32px rows),
+  `menu-icon` (16px icons), `menu-max` (the 28rem height cap), `menu` (10px panel corners) and `menu-item`
+  (6px row corners). The stock Filament
+  dropdown takes them in `resources/css/filament/app/theme.css`, and the filter bar, Views and View settings use them
+  as `h-menu-row`, `size-menu-icon`, `rounded-menu` and `rounded-menu-item`.
+- A custom menu uses those utilities and never a raw height, icon size or radius. A phone sheet keeps its taller rows.
+  `tests/Browser/Panel/MenusTest.php` opens Views, View settings, the filter picker, Import / Export and a column menu,
+  and fails when a row, an icon or a corner leaves the spec. A new menu joins its dataset.
+- A menu stops at `menu-max` (28rem) or 16px above the window edge, whichever comes first, and only its list scrolls.
+  A Filament dropdown gets the room from its `size` prop. The filter bar measures it on open into `--menu-room`. The same
+  test fails a menu that runs past the window at 320px tall.
+- A menu marks its current item with `fi-menu-check`, a 16px check at the row's end, and never with a fill or a text
+  color. A fill on a row means hover or keyboard focus. The same test fails a current row that is filled, recolored or
+  missing its check in Views, the sort chooser and a column menu.
 
 ## Scripts
 

@@ -48,6 +48,12 @@
                         {{ $this->downloadFailedRowsAction }}
                     @endif
                 @endif
+
+                @if($this->continueUrl)
+                    <x-filament::button tag="a" :href="$this->continueUrl" class="shrink-0">
+                        {{ __('import-wizard-new::preview.continue_with_assistant', ['name' => config('chat.assistant_name')]) }}
+                    </x-filament::button>
+                @endif
             </div>
         @elseif($this->isImporting)
             <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">

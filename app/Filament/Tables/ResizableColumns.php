@@ -62,6 +62,7 @@ final class ResizableColumns
         $column->extraHeaderAttributes([
             ...$attributes,
             'data-column-hideable' => $column->isToggleable() ? '1' : '0',
+            'data-column-sortable' => $column->isSortable() ? '1' : '0',
             'x-data' => 'resizableColumn('.Js::from($name).', '.Js::from($columnId).", {$min}, {$max})",
             'class' => 'fi-ta-resizable-header',
             'style' => $style,

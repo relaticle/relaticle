@@ -46,12 +46,12 @@ it('leaves the empty list description off a search or filter that finds nothing'
     ]);
 
     livewire(ListCompanies::class)
-        ->searchTable('zzqx-no-match')
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'zzqx-no-match']])
         ->assertCountTableRecords(0)
         ->assertDontSee('Companies you add or import appear here.');
 
     livewire(ListCompanies::class)
-        ->filterTable('creation_source', [CreationSource::IMPORT->value])
+        ->set('tableFilters.conditions.rules', [['field' => 'creation_source', 'condition' => 'is_any_of', 'value' => [CreationSource::IMPORT->value]]])
         ->assertCountTableRecords(0)
         ->assertDontSee('Companies you add or import appear here.');
 });
@@ -109,17 +109,39 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['name', 'accountOwner.name', 'creator.name', 'deleted_at', 'created_at', 'updated_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a contains rule on its name', function (): void {
     $records = Company::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
-
-    $visibleRecords = $records->filter(fn (Model $record) => data_get($record, $column) === $search);
+    $value = $records->first()->name;
 
     livewire(ListCompanies::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($visibleRecords)
-        ->assertCountTableRecords($visibleRecords->count());
-})->with(['name', 'accountOwner.name', 'creator.name']);
+        ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->name === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->name !== $value));
+});
+
+it('narrows the list by accountOwner to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = Company::factory()->recycle([$this->user, $this->workspace])->create(['account_owner_id' => $this->user->getKey()]);
+    $theirs = Company::factory()->recycle([$this->user, $this->workspace])->create(['account_owner_id' => $colleague->getKey()]);
+
+    livewire(ListCompanies::class)
+        ->call('setFilterRules', [['field' => 'accountOwner', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = Company::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = Company::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ListCompanies::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = Company::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
@@ -189,8 +211,8 @@ it('can create a company', function (): void {
 it('can edit a company', function (): void {
     $record = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListCompanies::class)
-        ->callAction(TestAction::make('edit')->table($record), data: [
+    livewire(ViewCompany::class, ['record' => $record->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Updated Company',
         ])
         ->assertHasNoActionErrors();
@@ -198,13 +220,12 @@ it('can edit a company', function (): void {
     expect($record->refresh()->name)->toBe('Updated Company');
 });
 
-it('can delete a company', function (): void {
+it('offers delete for a company in the bulk bar, not on its row', function (): void {
     $record = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ListCompanies::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates name is required on create', function (): void {
@@ -218,7 +239,7 @@ it('validates name is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ListCompanies::class)
         ->assertTableFilterExists($filter);
-})->with(['creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating a company', function (): void {
     livewire(ListCompanies::class)
@@ -278,9 +299,9 @@ it('adds a newly typed tags-input value to the option list when editing a compan
 
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ListCompanies::class)
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->callAction(
-            TestAction::make('edit')->table($company),
+            TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'),
             data: [
                 'name' => $company->name,
                 'custom_fields' => ['edit_labels282' => ['Existing', 'TypedDuringEdit']],

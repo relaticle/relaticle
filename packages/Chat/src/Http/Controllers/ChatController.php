@@ -75,17 +75,24 @@ final readonly class ChatController
         return ['auto', ...array_map(static fn (ModelDescriptor $m): string => $m->id, $this->registry->all())];
     }
 
-    public function send(Request $request, ?string $conversation = null): JsonResponse
+    /** @return array<string, list<mixed>> */
+    private function sendRules(): array
     {
-        $validated = $request->validate([
+        return [
             'document' => ['required', 'array'],
             'model' => ['nullable', 'string', Rule::in($this->modelIds())],
             'conversation_id' => ['nullable', 'string', 'uuid'],
             'attachment_id' => ['nullable', 'string', 'uuid'],
+            'next_step' => ['nullable', 'string', 'max:40', 'regex:/^[a-z_]+$/'],
             'page_context' => ['nullable', 'array'],
             'page_context.type' => ['required_with:page_context', 'string', 'max:32'],
             'page_context.id' => ['required_with:page_context', 'string', 'max:26'],
-        ]);
+        ];
+    }
+
+    public function send(Request $request, ?string $conversation = null): JsonResponse
+    {
+        $validated = $request->validate($this->sendRules());
 
         /** @var User $user */
         $user = $request->user();
@@ -121,32 +128,10 @@ final readonly class ChatController
             403
         );
 
-        if (filled($validated['model'] ?? null) && $validated['model'] !== 'auto') {
-            $descriptor = $this->registry->find($validated['model']);
+        $modelDenied = $this->modelDeniedResponse($workspace, $validated['model'] ?? null);
 
-            if ($descriptor instanceof ModelDescriptor && ! $this->entitlements->allowsModel($workspace, $descriptor)) {
-                if ($this->modelAccess->isTrialLocked($workspace) && $descriptor->allowedForPlan($workspace->plan)) {
-                    return response()->json([
-                        'error' => 'model_not_allowed',
-                        'message' => __('Add your own records to unlock premium models during your trial.'),
-                        'plan' => $workspace->plan->value,
-                        'requested_model' => $descriptor->id,
-                        'upgrade_available' => false,
-                        'upgrade_url' => null,
-                    ], 403);
-                }
-
-                $isFree = $workspace->plan === Plan::Free;
-
-                return response()->json([
-                    'error' => 'model_not_allowed',
-                    'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $workspace->plan->getLabel()]),
-                    'plan' => $workspace->plan->value,
-                    'requested_model' => $descriptor->id,
-                    'upgrade_available' => $isFree,
-                    'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
-                ], 403);
-            }
+        if ($modelDenied instanceof JsonResponse) {
+            return $modelDenied;
         }
 
         if ($attachment instanceof ChatAttachment && $attachment->isText() && ! $attachment->fitsConversationTextBudget()) {
@@ -234,6 +219,7 @@ final readonly class ChatController
             pageContext: $pageContext,
             turnId: $turnId,
             attachment: $attachment?->meta(),
+            nextStep: $validated['next_step'] ?? null,
         ));
 
         if ($attachment instanceof ChatAttachment) {
@@ -244,6 +230,41 @@ final readonly class ChatController
             'status' => 'processing',
             'conversation_id' => $conversation,
         ]);
+    }
+
+    private function modelDeniedResponse(Workspace $workspace, ?string $model): ?JsonResponse
+    {
+        if (blank($model) || $model === 'auto') {
+            return null;
+        }
+
+        $descriptor = $this->registry->find($model);
+
+        if (! $descriptor instanceof ModelDescriptor || $this->entitlements->allowsModel($workspace, $descriptor)) {
+            return null;
+        }
+
+        if ($this->modelAccess->isTrialLocked($workspace) && $descriptor->allowedForPlan($workspace->plan)) {
+            return response()->json([
+                'error' => 'model_not_allowed',
+                'message' => __('Add your own records to unlock premium models during your trial.'),
+                'plan' => $workspace->plan->value,
+                'requested_model' => $descriptor->id,
+                'upgrade_available' => false,
+                'upgrade_url' => null,
+            ], 403);
+        }
+
+        $isFree = $workspace->plan === Plan::Free;
+
+        return response()->json([
+            'error' => 'model_not_allowed',
+            'message' => __(':model is not available on the :plan plan.', ['model' => $descriptor->label, 'plan' => $workspace->plan->getLabel()]),
+            'plan' => $workspace->plan->value,
+            'requested_model' => $descriptor->id,
+            'upgrade_available' => $isFree,
+            'upgrade_url' => $isFree ? $this->billing->url($workspace) : null,
+        ], 403);
     }
 
     private function creditsExhaustedResponse(Workspace $workspace): JsonResponse

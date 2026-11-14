@@ -18,9 +18,9 @@ final class ListCustomFieldsTool implements Tool
 {
     public function description(): string
     {
-        return 'List the custom field definitions configured for this workspace, optionally filtered to one'
+        return 'List the custom attribute (custom field) definitions configured for this workspace, optionally filtered to one'
             .' entity type. Returns each field\'s entity_type, name, code, type, active status, whether it is'
-            .' system-defined, and its options (for choice-type fields). Use this to answer "what custom fields'
+            .' system-defined, and its options (for choice-type fields). Use this to answer "what custom attributes (custom fields)'
             .' do I have" and to find a field\'s entity_type + code before proposing an update or an options change.';
     }
 

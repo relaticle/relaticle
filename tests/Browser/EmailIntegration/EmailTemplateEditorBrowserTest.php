@@ -33,10 +33,7 @@ it('wraps the template body toolbar onto a phone screen', function (): void {
     $user = userWithMailbox();
     $workspace = $user->currentWorkspace;
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(440, 956)
-        ->navigate(templatesTabPath($workspace))
+    visitAs($user, templatesTabPath($workspace), 440, 956)
         ->click(__('filament/resources/email-template.actions.create.label'))
         ->assertVisible('.fi-modal-open .fi-fo-rich-editor-toolbar')
         ->assertScript("(() => { const toolbar = document.querySelector('.fi-modal-open .fi-fo-rich-editor-toolbar'); return toolbar.scrollWidth <= toolbar.clientWidth; })()", true)
@@ -49,10 +46,7 @@ it('starts the merge tags panel closed and opens it from the toolbar', function 
     $user = userWithMailbox();
     $workspace = $user->currentWorkspace;
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate(templatesTabPath($workspace))
+    visitAs($user, templatesTabPath($workspace), 393, 852)
         ->click(__('filament/resources/email-template.actions.create.label'))
         ->assertVisible('.fi-modal-open .fi-fo-rich-editor-toolbar')
         ->assertMissing('.fi-modal-open .fi-fo-rich-editor-panels')

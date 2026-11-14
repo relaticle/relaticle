@@ -12,8 +12,10 @@ use Filament\Auth\Notifications\ResetPassword as FilamentResetPassword;
 use Filament\Auth\Notifications\VerifyEmail as FilamentVerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange as FilamentVerifyEmailChange;
 use Filament\Facades\Filament;
+use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Queue;
 
 mutates(VerifyEmail::class);
 mutates(VerifyEmailChange::class);
@@ -124,4 +126,17 @@ it('sends the branded reset mail through the model method with the panel reset u
         ResetPassword::class,
         fn (ResetPassword $notification): bool => $notification->url === Filament::getResetPasswordUrl('token', $user),
     );
+});
+
+it('queues the sign-in and recovery links encrypted', function (): void {
+    Queue::fake();
+    $user = User::factory()->unverified()->create();
+
+    $user->sendEmailVerificationNotification();
+    $user->sendPasswordResetNotification('token');
+    Notification::route('mail', 'new@example.com')->notify(new VerifyEmailChange);
+    $user->notify(new NoticeOfEmailChangeRequest('new@example.com', 'https://relaticle.test/block'));
+
+    Queue::assertPushed(SendQueuedNotifications::class, 4);
+    Queue::assertNotPushed(SendQueuedNotifications::class, fn (SendQueuedNotifications $job): bool => ! $job->shouldBeEncrypted);
 });

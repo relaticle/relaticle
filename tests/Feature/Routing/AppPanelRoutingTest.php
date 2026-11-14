@@ -44,6 +44,16 @@ describe('app panel configuration - path mode (default)', function () {
             ->toContain(EditProfile::class, Security::class, NotificationPreferences::class)
             ->and(array_count_values($components))->each->toBe(1);
     });
+
+    it('heads each Settings cluster page with its nav label', function () {
+        $user = User::factory()->withWorkspace()->create();
+        $this->actingAs($user);
+        Filament::setTenant($user->currentWorkspace);
+
+        foreach (Filament::getPanel('app')->getClusteredComponents(Settings::class) as $page) {
+            expect(resolve($page)->getHeading())->toBe($page::getNavigationLabel(), "[{$page}] heading");
+        }
+    });
 });
 
 describe('getAppUrl macro - path mode', function () {

@@ -26,7 +26,11 @@ final readonly class CustomFieldFilterSchema
 
     public const string EMPTINESS_RULE = '$is_empty takes true or false.';
 
+    public const string PARTIAL_MATCH_RULE = '$contains, $starts_with and $ends_with ignore letter case. On a field that holds several values they match when any value matches, compared as stored.';
+
     public const string EMPTY_MATCH_RULE = '$not_in and $has_none also match records where the field is empty.';
+
+    public const string RECORD_LINK_RULE = 'A record field link to a deleted record counts as no link.';
 
     /** @var array<string, array<string, list<string>>> */
     public const array DOMAIN_EXAMPLE = ['domain' => ['$in' => ['acme.com']]];
@@ -35,7 +39,9 @@ final readonly class CustomFieldFilterSchema
     public const array COMPARISONS = ['$eq' => '=', '$gt' => '>', '$gte' => '>=', '$lt' => '<', '$lte' => '<='];
 
     /** @var array<int, string> */
-    private const array STRING_OPERATORS = ['$eq', '$contains'];
+    public const array PARTIAL_OPERATORS = ['$contains', '$starts_with', '$ends_with'];
+
+    private const array STRING_OPERATORS = ['$eq', ...self::PARTIAL_OPERATORS];
 
     /** @var array<int, string> */
     private const array BOOLEAN_OPERATORS = ['$eq'];
@@ -83,10 +89,14 @@ final readonly class CustomFieldFilterSchema
             CustomFieldType::TEXT => self::buildOperators(self::STRING_OPERATORS, 'string'),
             CustomFieldType::EMAIL, CustomFieldType::LINK => [
                 ...self::buildOperators(['$has_any', '$has_none'], 'array'),
+                ...self::buildOperators(self::PARTIAL_OPERATORS, 'string'),
                 'domain' => ['type' => 'object', 'properties' => self::buildOperators(self::DOMAIN_OPERATORS, 'array')],
             ],
-            CustomFieldType::PHONE, CustomFieldType::DOMAIN,
-            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT => self::buildOperators(['$has_any', '$has_none'], 'array'),
+            CustomFieldType::PHONE, CustomFieldType::DOMAIN => [
+                ...self::buildOperators(['$has_any', '$has_none'], 'array'),
+                ...self::buildOperators(self::PARTIAL_OPERATORS, 'string'),
+            ],
+            CustomFieldType::MULTI_SELECT, CustomFieldType::CHECKBOX_LIST, CustomFieldType::TAGS_INPUT, CustomFieldType::RECORD => self::buildOperators(['$has_any', '$has_none'], 'array'),
             CustomFieldType::CURRENCY => self::buildOperators(array_keys(self::COMPARISONS), 'number'),
             CustomFieldType::NUMBER => self::buildOperators(array_keys(self::COMPARISONS), 'integer'),
             CustomFieldType::DATE => self::buildOperators(array_keys(self::COMPARISONS), 'string', 'date'),
@@ -105,6 +115,7 @@ final readonly class CustomFieldFilterSchema
     public static function valueRules(): string
     {
         $typesByMatching = [];
+        $partialSentences = [];
         $domainTypes = [];
 
         foreach (CustomFieldType::cases() as $type) {
@@ -112,6 +123,11 @@ final readonly class CustomFieldFilterSchema
 
             if ($matching !== null) {
                 $typesByMatching[$matching][] = $type->value;
+            }
+
+            if ($type->partialMatching() !== null) {
+                $article = str_starts_with($type->value, 'e') ? 'an' : 'a';
+                $partialSentences[] = "On {$article} {$type->value} field, ".Arr::join(self::PARTIAL_OPERATORS, ', ', ' and ')." match against {$type->partialMatching()}.";
             }
 
             if (isset(self::operatorsForType($type->value)['domain'])) {
@@ -125,6 +141,7 @@ final readonly class CustomFieldFilterSchema
             $sentences[] = ucfirst(Arr::join($types, ', ', ' and '))." values match {$matching}.";
         }
 
+        array_push($sentences, ...$partialSentences);
         $sentences[] = ucfirst(Arr::join($domainTypes, ', ', ' and ')).' fields also take a domain sub-field with '.implode(' or ', self::DOMAIN_OPERATORS).', such as '.self::json(self::DOMAIN_EXAMPLE).', which matches '.self::DOMAIN_MEANING.'.';
         $sentences[] = self::generalRules();
 
@@ -133,7 +150,7 @@ final readonly class CustomFieldFilterSchema
 
     public static function generalRules(): string
     {
-        return self::EMPTY_MATCH_RULE.' '.self::EMPTINESS_RULE;
+        return self::EMPTY_MATCH_RULE.' '.self::EMPTINESS_RULE.' '.self::RECORD_LINK_RULE.' '.self::PARTIAL_MATCH_RULE;
     }
 
     /**
@@ -203,7 +220,7 @@ final readonly class CustomFieldFilterSchema
     /**
      * @return Collection<string, CustomField>
      */
-    private function sortableFields(User $user, string $entityType): Collection
+    public function sortableFields(User $user, string $entityType): Collection
     {
         // Postgres has no ordering operator for the json column that holds list values.
         return collect(resolve(WorkspaceCustomFields::class)->remember(

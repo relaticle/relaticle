@@ -45,6 +45,7 @@ use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsTrail;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -62,7 +63,7 @@ use Relaticle\EmailIntegration\Support\SharingTierChangeConfirmation;
  */
 final class EmailAccountSettingsPage extends Page implements HasSchemas
 {
-    use HasConnectedAccountActions, HasEmailFeatureFlag, HasWorkspaceSettingsNavigation, InteractsWithSchemas;
+    use HasConnectedAccountActions, HasEmailFeatureFlag, HasEmailSettingsTrail, HasWorkspaceSettingsNavigation, InteractsWithSchemas;
 
     protected string $view = 'email-integration::filament.pages.email-account-settings';
 
@@ -109,15 +110,6 @@ final class EmailAccountSettingsPage extends Page implements HasSchemas
     public function getTitle(): string
     {
         return $this->account()->email_address;
-    }
-
-    public function getHeadingStart(): Htmlable
-    {
-        return new HtmlString(view('filament.app.record-breadcrumb', [
-            'url' => EmailAccountsPage::getUrl(),
-            'icon' => 'lucide-mail',
-            'label' => __('workspaces.tabs.email'),
-        ])->render());
     }
 
     public function account(): ConnectedAccount

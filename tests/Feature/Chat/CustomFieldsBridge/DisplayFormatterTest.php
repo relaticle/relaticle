@@ -279,3 +279,36 @@ it('names the record on a stored record card, not its id', function (): void {
         ->and($rows[0]['value'])->toBe('Initech')
         ->and($rows[0]['values'])->toBe(['Initech']);
 });
+
+it('leaves a deleted record out of a record custom field instead of printing its id', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspaceId = $user->currentWorkspace->getKey();
+    $live = Company::factory()->create(['workspace_id' => $workspaceId, 'name' => 'Globex']);
+    $gone = Company::factory()->create(['workspace_id' => $workspaceId, 'name' => 'Gone']);
+    $gone->delete();
+
+    $section = CustomFieldSection::query()->create(['tenant_id' => $workspaceId, 'entity_type' => 'task', 'name' => 'Links', 'code' => 'links', 'type' => 'section', 'sort_order' => 96, 'active' => true]);
+    $field = CustomField::query()->create([
+        'tenant_id' => $workspaceId,
+        'custom_field_section_id' => $section->getKey(),
+        'entity_type' => 'task',
+        'code' => 'linked_company',
+        'name' => 'Linked Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'sort_order' => 1,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+
+    TenantContextService::setTenantId($workspaceId);
+
+    try {
+        $format = fn (array $ids): array => resolve(CustomFieldsDisplayFormatter::class)->format($user, 'task', [$field->code => $ids], null)[0]['values'];
+
+        expect($format([$live->getKey(), $gone->getKey()]))->toBe(['Globex'])
+            ->and($format([$gone->getKey()]))->toBe([]);
+    } finally {
+        TenantContextService::setTenantId(null);
+    }
+});

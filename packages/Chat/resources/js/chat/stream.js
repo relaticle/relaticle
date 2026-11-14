@@ -50,7 +50,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         aggregate_crm: 'Crunching the numbers…',
         list_activity: 'Reading recent activity…',
         list_workspace_members: 'Looking up workspace members…',
-        list_custom_fields: 'Reading custom fields…',
+        list_custom_fields: 'Reading custom attributes…',
         search_docs: 'Searching the documentation…',
         guide_to_page: 'Finding the right page…',
         create_company: 'Drafting a company…',
@@ -69,10 +69,10 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         update_note: 'Preparing note changes…',
         delete_note: 'Preparing note deletion…',
         invite_workspace_member: 'Preparing a workspace invitation…',
-        create_custom_field: 'Drafting a custom field…',
-        update_custom_field: 'Preparing custom field changes…',
-        set_custom_field_options: 'Preparing field option changes…',
-        delete_custom_field: 'Preparing custom field deletion…',
+        create_custom_field: 'Drafting a custom attribute…',
+        update_custom_field: 'Preparing custom attribute changes…',
+        set_custom_field_options: 'Preparing attribute option changes…',
+        delete_custom_field: 'Preparing custom attribute deletion…',
         request_web_access: 'Asking to search the web…',
         web_search: 'Searching the web…',
         web_fetch: 'Reading a web page…',
@@ -347,7 +347,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         if (label) return label;
 
         // A tool shipped without a label must still never leak its identifier:
-        // read it back as words ("Running add custom field options…").
+        // read it back as words ("Running add custom attribute options…").
         return this.streamTexts.runningName.replace(':name', normalized.replace(/_/g, ' '));
     },
 
@@ -483,6 +483,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
         // only ever flips for a resumed one. Cleared by stream_end, stream
         // failure, and the watchdog, exactly as a sent turn is.
         this.isStreaming = true;
+        this.nextSteps = [];
         const bubble = this.targetBubbleFor(event.invocation_id ?? null);
 
         // A turn with no user row (a resume, the setup greeting) anchors on its own

@@ -82,7 +82,7 @@ test('viewer is not offered an import action it would be refused', function (str
     $this->actingAs($this->viewer);
     Filament::setTenant($this->workspace);
 
-    livewire($page)->assertActionHidden('import');
+    openList($page)->assertActionHidden('import');
 })->with([
     'companies' => [ListCompanies::class],
     'people' => [ListPeople::class],
@@ -102,7 +102,7 @@ test('viewer is not offered the header export action', function (string $page): 
     $this->actingAs($this->viewer);
     Filament::setTenant($this->workspace);
 
-    livewire($page)->assertActionHidden('export');
+    openList($page)->assertActionHidden('export');
 })->with([
     'companies' => [ListCompanies::class],
     'people' => [ListPeople::class],
@@ -115,7 +115,7 @@ test('member is still offered the header export action', function (string $page)
     $this->actingAs($this->member);
     Filament::setTenant($this->workspace);
 
-    livewire($page)->assertActionVisible('export');
+    openList($page)->assertActionVisible('export');
 })->with([
     'companies' => [ListCompanies::class],
     'people' => [ListPeople::class],

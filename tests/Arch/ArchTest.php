@@ -179,6 +179,8 @@ arch('avoid mutation')
         'App\Support\Passport\WorkspaceBearerTokenResponse',
         // Extends the framework's DatabaseSessionHandler; PHP forbids a readonly class extending a non-readonly one.
         'App\Support\Impersonation\ImpersonationSessionHandler',
+        // Rebound over the framework's CSRF middleware to drop the readable XSRF-TOKEN cookie; PHP forbids a readonly class extending a non-readonly one.
+        'App\Http\Middleware\PreventRequestForgery',
         'App\View',
         'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
@@ -233,6 +235,8 @@ arch('avoid inheritance')
         'App\Support\Passport\WorkspaceBearerTokenResponse',
         // userId() is the framework's only hook for the id a database session row carries.
         'App\Support\Impersonation\ImpersonationSessionHandler',
+        // $addHttpCookie is the framework's only switch for the XSRF-TOKEN cookie.
+        'App\Http\Middleware\PreventRequestForgery',
     ]);
 
 // Packages are kept final by pint (final_class, repo-wide) and strict-typed by

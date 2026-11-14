@@ -115,15 +115,38 @@ it('can sort `:dataset` column', function (string $column): void {
         ->assertCanSeeTableRecords($records->sortByDesc($sortingKey), inOrder: true);
 })->with(['creator.name', 'created_at', 'updated_at', 'deleted_at']);
 
-it('can search `:dataset` column', function (string $column): void {
+it('narrows the list with a contains rule on its title', function (): void {
     $records = Task::factory(3)->recycle([$this->user, $this->workspace])->create();
-    $search = data_get($records->first(), $column);
+    $value = $records->first()->title;
 
     livewire(ManageTasks::class)
-        ->searchTable($search instanceof BackedEnum ? $search->value : $search)
-        ->assertCanSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) === $search))
-        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record) => data_get($record, $column) !== $search));
-})->with(['title', 'assignees.name', 'creator.name']);
+        ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => $value]])
+        ->assertCanSeeTableRecords($records->filter(fn (Model $record): bool => $record->title === $value))
+        ->assertCanNotSeeTableRecords($records->filter(fn (Model $record): bool => $record->title !== $value));
+});
+
+it('narrows the list by creator to the records one member holds', function (): void {
+    $colleague = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($colleague, ['role' => 'member']);
+    $mine = Task::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $this->user->getKey()]);
+    $theirs = Task::factory()->recycle([$this->user, $this->workspace])->create(['creator_id' => $colleague->getKey()]);
+
+    livewire(ManageTasks::class)
+        ->call('setFilterRules', [['field' => 'creator', 'condition' => 'is_any_of', 'value' => [$colleague->getKey()]]])
+        ->assertCanSeeTableRecords([$theirs])
+        ->assertCanNotSeeTableRecords([$mine]);
+});
+
+it('narrows the list to the tasks assigned to a member', function (): void {
+    $assigned = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $other = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $assigned->assignees()->attach($this->user);
+
+    livewire(ManageTasks::class)
+        ->call('setFilterRules', [['field' => 'assignees', 'condition' => 'is_any_of', 'value' => [$this->user->getKey()]]])
+        ->assertCanSeeTableRecords([$assigned])
+        ->assertCanNotSeeTableRecords([$other]);
+});
 
 it('cannot display trashed records by default', function (): void {
     $records = Task::factory()->count(4)->recycle([$this->user, $this->workspace])->create();
@@ -408,13 +431,12 @@ it('leaves a user from another workspace out of the assignee picker when the pay
         ->assertMountedActionModalDontSee('Otto Outsider');
 });
 
-it('can delete a task', function (): void {
+it('offers delete for a task in the bulk bar, not on its row', function (): void {
     $record = Task::factory()->recycle([$this->user, $this->workspace])->create();
 
     livewire(ManageTasks::class)
-        ->callAction(TestAction::make('delete')->table($record));
-
-    $this->assertSoftDeleted($record);
+        ->assertActionDoesNotExist(TestAction::make('delete')->table($record))
+        ->assertActionExists(TestAction::make('delete')->table()->bulk());
 });
 
 it('validates title is required on create', function (): void {
@@ -428,7 +450,7 @@ it('validates title is required on create', function (): void {
 it('has `:dataset` filter', function (string $filter): void {
     livewire(ManageTasks::class)
         ->assertTableFilterExists($filter);
-})->with(['assigned_to_me', 'assignees', 'creation_source', 'trashed']);
+})->with(['conditions', 'trashed']);
 
 it('sets creator_id and workspace_id via observer when creating a task', function (): void {
     livewire(ManageTasks::class)

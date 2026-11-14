@@ -12,9 +12,7 @@ it('renders a single shimmer indicator with default label when streaming starts 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/chats")
+    $page = visitAs($user, "/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->script(<<<'JS'
@@ -49,9 +47,7 @@ it('updates the shimmer label when a tool call is in progress', function (): voi
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/chats")
+    $page = visitAs($user, "/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->script(<<<'JS'
@@ -88,9 +84,7 @@ it('renders the shimmer for a resumed turn whose last row is the proposal reply'
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/chats")
+    $page = visitAs($user, "/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $resolveInterface = ChatBrowser::resolveInterface();
@@ -126,9 +120,7 @@ it('removes the shimmer once content arrives in the latest assistant message', f
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/chats")
+    $page = visitAs($user, "/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->script(<<<'JS'
@@ -203,7 +195,7 @@ it('renders a human label for every tool the assistant can call', function (): v
     // have no mapping at all.
     $byName = array_combine($toolNames, $labels);
     expect($byName['ListCompaniesTool'])->toBe('Searching companies…')
-        ->and($byName['SetCustomFieldOptionsTool'])->toBe('Preparing field option changes…')
+        ->and($byName['SetCustomFieldOptionsTool'])->toBe('Preparing attribute option changes…')
         ->and($byName['SearchDocsTool'])->toBe('Searching the documentation…')
         ->and($byName['RequestWebAccessTool'])->toBe('Asking to search the web…')
         ->and($byName['WebSearch'])->toBe('Searching the web…')

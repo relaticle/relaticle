@@ -18,7 +18,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 
 #[Title('Create Task')]
-#[Description('Create a new task in the CRM. Use the crm-schema resource to discover available custom fields.')]
+#[Description('Create a new task in the CRM. Use the crm-schema resource to discover available custom attributes (custom fields).')]
 final class CreateTaskTool extends BaseCreateTool
 {
     use OperatesOnCrmEntity;

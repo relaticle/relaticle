@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Attributes\MimeType;
 use Laravel\Mcp\Server\Attributes\Uri;
 use Laravel\Mcp\Server\Resource;
 
-#[Description('Schema for notes including available custom fields. Read this before creating or updating notes.')]
+#[Description('Schema for notes including available custom attributes (custom fields). Read this before creating or updating notes.')]
 #[Uri('relaticle://schema/note')]
 #[MimeType('application/json')]
 #[Cacheable(ttlMs: CustomFieldSchemaCache::TTL * 1000, scope: CacheScope::Private)]

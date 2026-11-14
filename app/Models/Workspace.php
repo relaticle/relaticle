@@ -209,6 +209,9 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
 
     public const int TRIAL_EXTENSION_DAYS = 7;
 
+    // The window the day-one goal checks return in.
+    public const int SETUP_WINDOW_DAYS = 14;
+
     /**
      * The event map for the model.
      *
@@ -376,6 +379,11 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     public function isPersonalWorkspace(): bool
     {
         return $this->personal_workspace;
+    }
+
+    public function isInSetupWindow(): bool
+    {
+        return (bool) $this->created_at?->gt(now()->subDays(self::SETUP_WINDOW_DAYS));
     }
 
     public function isScheduledForDeletion(): bool

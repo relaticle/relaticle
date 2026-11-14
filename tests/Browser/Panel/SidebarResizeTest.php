@@ -12,8 +12,7 @@ it('resizes the sidebar from its edge, keeps the width across pages, and resets 
 
     $width = '(() => Math.round(document.querySelector(".fi-sidebar").getBoundingClientRect().width))()';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->assertScript($width, 288)
         ->keys('.fi-sidebar-resize-handle', ['ArrowRight', 'ArrowRight'])
@@ -39,8 +38,7 @@ it('collapses the sidebar when dragged past half its minimum and reopens it from
 
     $width = '(() => Math.round(document.querySelector(".fi-sidebar").getBoundingClientRect().width))()';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->drag('.fi-sidebar-resize-handle', '.fi-sidebar-nav .fi-sidebar-item-icon >> nth=0')
         ->assertScript($width, 48)
@@ -63,8 +61,7 @@ it('collapses the sidebar with an arrow key past its minimum and reopens it from
 
     $width = '(() => Math.round(document.querySelector(".fi-sidebar").getBoundingClientRect().width))()';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->assertScript($width, 288)
         ->assertScript('typeof Alpine.$data(document.querySelector(".fi-sidebar-resize-handle")).nudge', 'function')
@@ -85,8 +82,7 @@ it('fits every get started step on one line in the default sidebar', function ()
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900);
     $page->script('localStorage.setItem("activation-checklist:open", "true")');
 
@@ -104,8 +100,7 @@ it('focuses the sidebar search field from a click on its key cap or magnifier', 
 
     $searchIsFocused = 'document.activeElement.matches(".fi-sidebar-search .fi-input")';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->click('.fi-sidebar-search .fi-input-wrp-label')
         ->assertScript($searchIsFocused, true);
@@ -126,8 +121,7 @@ it('keeps every navigation row 32px tall on the collapsed rail', function (): vo
 
     $rowHeights = '[...document.querySelectorAll(".fi-sidebar-nav .fi-sidebar-item-btn")].filter((row) => row.getClientRects().length > 0).every((row) => Math.round(row.getBoundingClientRect().height) === 32)';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->assertScript($rowHeights, true)
         ->click('[data-sidebar-workspace-toggle]')
@@ -145,8 +139,7 @@ it('hands the toggle to the top bar on collapse and back on expand, keeping the 
 
     $navTop = 'Math.round(document.querySelector(".fi-sidebar-nav .fi-sidebar-item-icon").getBoundingClientRect().top)';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->resize(1440, 900)
         ->assertVisible('[data-sidebar-workspace-toggle]')
         ->assertMissing('[data-sidebar-expand-toggle]');

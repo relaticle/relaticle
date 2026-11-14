@@ -27,9 +27,6 @@ return [
         'creator' => [
             'label' => 'Created By',
         ],
-        'creation_source' => [
-            'label' => 'Creation Source',
-        ],
         'created_at' => [
             'label' => 'Creation Date',
         ],

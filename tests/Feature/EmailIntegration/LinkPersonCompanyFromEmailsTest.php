@@ -6,6 +6,7 @@ use App\Actions\People\CreatePeople;
 use App\Actions\People\UpdatePeople;
 use App\Enums\CreationSource;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\UpdatePeopleTool;
@@ -229,8 +230,8 @@ it('links a company when a work email is added later on the panel', function ():
 
     $person = People::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Panel Update Jane']);
 
-    livewire(ListPeople::class)
-        ->callAction(TestAction::make('edit')->table($person), data: [
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Panel Update Jane',
             'custom_fields' => ['emails' => ['jane@paneledit.com']],
         ])
@@ -275,8 +276,8 @@ it('keeps a person unlinked when the company is cleared on the panel', function 
 
     expect($person->company_id)->not->toBeNull();
 
-    livewire(ListPeople::class)
-        ->callAction(TestAction::make('edit')->table($person), data: [
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->callAction(TestAction::make('edit')->schemaComponent('recordActions', schema: 'infolist'), data: [
             'name' => 'Panel Jane',
             'company_id' => null,
         ])

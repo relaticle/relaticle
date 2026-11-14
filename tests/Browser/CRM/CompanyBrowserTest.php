@@ -13,9 +13,7 @@ it('can create a company through the browser', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies")
         ->press('New company')
         ->type('[id="mountedActionSchema0.name"]', 'Browser Test Corp')
         ->press('Create')
@@ -30,9 +28,7 @@ it('paints the header action dropdown above the table toolbar', function (): voi
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies")
         ->assertSee('Import / Export');
 
     $page->script(<<<'JS'
@@ -66,9 +62,7 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies")
         ->assertVisible('[data-page-heading]')
         ->assertSeeIn('[data-page-heading]', 'Companies')
         ->assertMissing('main h1')
@@ -118,15 +112,15 @@ it('keeps app page headings in the topbar across navigation and viewport sizes',
         ->assertPathIs("/app/{$workspace->slug}/tasks/board")
         ->assertVisible('[data-page-heading]')
         ->assertSeeIn('[data-page-heading]', 'Tasks')
-        ->assertVisible('.fi-board-header .fi-ta-search-field')
+        ->assertVisible('.fi-board-header [data-filter-bar]')
         ->assertNoJavaScriptErrors()
         ->assertScript('(() => document.querySelectorAll("[data-page-heading]").length === 1)()')
         ->assertScript('(() => document.querySelector("[data-page-heading] h1")?.textContent.trim() === "Tasks")()')
         ->assertVisible('.fi-board-header .fi-view-switcher')
         ->assertScript('(() => document.querySelector("[data-page-heading] .fi-view-switcher") === null)()')
-        ->assertScript('(() => !document.querySelector("main .fi-header-heading").getClientRects().length)()')
+        ->assertScript('(() => [...document.querySelectorAll("main .fi-header-heading")].every((heading) => ! heading.getClientRects().length))()')
         ->click('.fi-view-switcher .fi-dropdown-trigger button')
-        ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/tasks']")
+        ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/tasks?view=all']")
         ->assertPathIs("/app/{$workspace->slug}/tasks")
         ->assertScript('(() => document.querySelectorAll("[data-page-heading]").length === 1)()');
 
@@ -146,7 +140,7 @@ it('keeps the header row and its controls in place when switching between the li
 
     $headerRow = <<<'JS'
         (() => {
-            const row = document.querySelector('.fi-board-header') ?? document.querySelector('main .fi-header');
+            const row = document.querySelector('.fi-board-header-row') ?? document.querySelector('main .fi-header');
             const controlTops = [...row.querySelectorAll('button, input')]
                 .filter((control) => control.getClientRects().length > 0)
                 .map((control) => control.getBoundingClientRect().top);
@@ -155,10 +149,7 @@ it('keeps the header row and its controls in place when switching between the li
         })();
     JS;
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/opportunities")
+    $page = visitAs($user, "/app/{$workspace->slug}/opportunities?view=all", 1440, 900)
         ->assertVisible('main .fi-header .fi-view-switcher');
 
     $list = $page->script($headerRow);
@@ -166,7 +157,7 @@ it('keeps the header row and its controls in place when switching between the li
     $page->click('.fi-view-switcher .fi-dropdown-trigger button')
         ->click(".fi-view-switcher a[href$='/app/{$workspace->slug}/opportunities/board']")
         ->assertPathIs("/app/{$workspace->slug}/opportunities/board")
-        ->assertVisible('.fi-board-header .fi-ta-search-field');
+        ->assertVisible('.fi-board-header [data-filter-bar]');
 
     $board = $page->script($headerRow);
 

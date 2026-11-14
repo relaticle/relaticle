@@ -42,6 +42,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Relaticle\EmailIntegration\Actions\LinkPersonCompanyFromEmails;
 use Relaticle\EmailIntegration\Filament\Actions\ComposeEmailAction;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
@@ -312,7 +313,11 @@ trait HasRecordPageLayout
                 ->icon('lucide-square-pen')
                 ->color('gray')
                 ->size(Size::Small)
-                ->after(function (): void {
+                ->after(function (LinkPersonCompanyFromEmails $linkPersonCompanyFromEmails): void {
+                    if ($this->getRecord() instanceof People) {
+                        $linkPersonCompanyFromEmails->execute($this->getRecord());
+                    }
+
                     $this->getRecord()->refresh()->load('customFieldValues.customField.options');
 
                     $this->forceRender();

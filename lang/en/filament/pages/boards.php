@@ -4,22 +4,59 @@ declare(strict_types=1);
 
 return [
     'view_switcher' => [
-        'label' => 'Switch view',
-        'list' => 'List',
         'board' => 'Board',
         'cards' => 'Cards',
+        'opportunity_board' => 'Pipeline',
+    ],
+
+    'stage_order_failed' => 'The stage order could not be saved.',
+
+    'view_settings' => [
+        'panel' => 'Board view settings',
+        'stage_actions' => 'Actions for :stage',
+        'grouped_by' => 'Grouped by',
+        'lanes' => 'Lanes',
+        'no_lanes' => 'No lanes',
+        'no_lanes_short' => 'None',
+        'visible_columns' => 'Visible columns',
+        'show_column' => 'Show :column',
+        'last_column' => 'One column stays visible.',
+        'no_value_column' => 'No :attribute',
+        'show_labels' => 'Show attribute labels',
+        'hide_empty' => 'Hide empty attributes',
+        'visible_attributes' => 'Visible attributes',
+        'attribute_actions' => 'Actions for :attribute',
+        'remove_attribute' => 'Remove from card',
+        'attribute_created_off_card' => ':name created. This type of attribute does not show on a card.',
+        'columns_grouped_by_created' => ':name created. The columns are now grouped by it.',
+        'add_attribute' => 'Add attribute to view',
+        'search_attributes' => 'Search :entity attributes…',
+        'all_attributes_shown' => 'Every attribute is on the card',
+        'no_attribute_matches' => 'No attribute matches',
+    ],
+
+    'card_attributes' => [
+        'description' => 'Description',
+        'checklist' => 'Checklist',
+        'empty' => 'Empty',
+    ],
+
+    'layout' => [
+        'column_width' => 'Column width',
+        'card_size' => 'Card size',
+        'narrow' => 'Narrow columns',
+        'wide' => 'Wide columns',
+        'compact' => 'Compact cards',
+        'full' => 'Full cards',
     ],
 
     'move_denied' => 'You do not have permission to move this card.',
 
+    'sorted_no_reorder' => 'Cards are sorted by :field. Clear the sort to arrange them by hand.',
+
     'move_to' => [
         'label' => 'Move to',
         'moved' => 'Moved to :column',
-    ],
-
-    'filters_button' => [
-        'label' => 'Filters',
-        'clear' => 'Clear filters',
     ],
 
     'opportunities' => [
@@ -28,10 +65,6 @@ return [
             'add' => 'Add Opportunity',
             'edit' => 'Edit',
             'delete' => 'Delete',
-        ],
-        'filters' => [
-            'company' => 'Company',
-            'contact' => 'Point of Contact',
         ],
         'form' => [
             'name_placeholder' => 'Enter opportunity title',
@@ -48,9 +81,6 @@ return [
             'add' => 'Add Task',
             'edit' => 'Edit',
             'delete' => 'Delete',
-        ],
-        'filters' => [
-            'assignee' => 'Assignee',
         ],
         'groupings' => [
             'assignee' => 'Assignee',

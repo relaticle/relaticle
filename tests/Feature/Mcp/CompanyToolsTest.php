@@ -43,6 +43,11 @@ beforeEach(function (): void {
     $this->workspace = $this->user->personalWorkspace();
 });
 
+function companyPageUrl(Workspace $workspace, Company $company): string
+{
+    return rtrim((string) config('app.url'), '/')."/app/{$workspace->slug}/companies/{$company->getKey()}";
+}
+
 it('can get a company by ID', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
 
@@ -53,6 +58,37 @@ it('can get a company by ID', function (): void {
             ->where('data.id', $company->getKey())
             ->where('data.attributes.name', 'Acme Corp')
             ->missing('relationship_meta')
+            ->etc());
+});
+
+it('links a fetched company to its page in the app', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(GetCompanyTool::class, ['id' => $company->id])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('data.url', companyPageUrl($this->workspace, $company))
+            ->etc());
+});
+
+it('links a created company to its page in the app', function (): void {
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateCompanyTool::class, ['name' => 'Linked On Create'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('data.url', companyPageUrl($this->workspace, Company::query()->where('name', 'Linked On Create')->sole()))
+            ->etc());
+});
+
+it('links an updated company to its page in the app', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateCompanyTool::class, ['id' => $company->id, 'name' => 'Renamed'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('data.url', companyPageUrl($this->workspace, $company))
             ->etc());
 });
 

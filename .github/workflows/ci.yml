@@ -128,9 +128,9 @@ jobs:
       fail-fast: false
       matrix:
         php: [8.5]
-        shard: [1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
-    name: Tests (Shard ${{ matrix.shard }}/8)
+    name: Tests (Shard ${{ matrix.shard }}/9)
 
     services:
       postgres:
@@ -187,7 +187,7 @@ jobs:
           php artisan key:generate
           php artisan passport:keys --force --no-interaction
 
-      # The newest recording from a main run's Record Shard Timings job. The committed file is the fallback.
+      # The newest recording from this branch's last green run, then from main's. The committed file is the fallback.
       - name: Restore shard timings
         uses: actions/cache/restore@v6
         with:
@@ -198,9 +198,10 @@ jobs:
       - name: Tests
         run: composer test:pest:ci -- --log-junit junit.xml
         env:
-          SHARD: ${{ matrix.shard }}/8
+          SHARD: ${{ matrix.shard }}/9
 
       - name: Upload timings
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
           name: junit-tests-${{ matrix.shard }}
@@ -287,15 +288,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3, 4, 5]
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
         browser: [chromium]
-        # Tests tagged `pest()->group('webkit')` cover surfaces where WebKit has broken
-        # while Chromium passed: the rich editor freeze, the model picker icons.
-        include:
-          - shard: webkit
-            browser: webkit
+        # Tests tagged `pest()->group('webkit')` cover surfaces where WebKit broke while Chromium
+        # passed. They run on pushes to main and before a release deploy, never on a pull request.
+        include: ${{ fromJSON(github.event_name == 'pull_request' && '[]' || '[{"shard":"webkit","browser":"webkit"}]') }}
 
-    name: Browser Tests (${{ matrix.browser == 'webkit' && 'WebKit' || format('Shard {0}/5', matrix.shard) }})
+    name: Browser Tests (${{ matrix.browser == 'webkit' && 'WebKit' || format('Shard {0}/8', matrix.shard) }})
 
     # A browser test that waits on an element which never appears hangs rather
     # than fails, and without a ceiling the job runs until GitHub cancels it at
@@ -388,11 +387,11 @@ jobs:
           restore-keys: pest-timings-
 
       - name: Browser Tests
-        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/5 --parallel --processes=3', matrix.shard) }} --log-junit junit.xml
+        run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/8 --parallel --processes=3', matrix.shard) }} --log-junit junit.xml
 
       # The WebKit job reruns classes the Chromium shards already time, so it records nothing.
       - name: Upload timings
-        if: matrix.browser != 'webkit'
+        if: ${{ !cancelled() && matrix.browser != 'webkit' }}
         uses: actions/upload-artifact@v7
         with:
           name: junit-browser-${{ matrix.shard }}
@@ -409,20 +408,20 @@ jobs:
             storage/logs
           if-no-files-found: ignore
 
-  # Pest refuses --update-shards with --shard, so main runs rebuild tests/.pest/shards.json from
-  # the JUnit reports of their own shards, and the next run splits by those timings.
+  # Pest refuses --update-shards with --shard, so a run rebuilds tests/.pest/shards.json from the
+  # JUnit reports of its own shards, red ones included, and the branch's next run splits by them.
   shard-timings:
     runs-on: ubuntu-latest
     name: Record Shard Timings
     needs: [tests, browser-tests]
-    if: github.event_name == 'push'
+    if: ${{ !cancelled() }}
 
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
       - name: Download timings
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           pattern: junit-*
           path: junit
@@ -435,6 +434,9 @@ jobs:
         with:
           path: tests/.pest/shards.json
           key: pest-timings-${{ github.run_id }}
+
+      - name: Fail a class that outgrew its lane
+        run: php bin/shard-timings.php --over-budget
 
   # The one check branch protection requires, so resharding or renaming a job above
   # never leaves auto-merge waiting on a check that no longer reports.

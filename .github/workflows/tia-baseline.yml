@@ -1,10 +1,15 @@
 name: TIA Baseline
 
 # Pest looks for this workflow filename and for an artifact named
-# pest-tia-baseline. It runs nightly rather than on every push: one recording holds a
-# runner for 23 minutes, and on a busy day the test jobs already queue for runners.
-# `composer test:affected` reads the artifact. A baseline is void once one of the
-# files Pest fingerprints changes, so a push to main that touches one records again.
+# pest-tia-baseline. It runs nightly rather than on every push, and a push to main
+# records again only when it touches one of the files Pest fingerprints, because a
+# baseline is void once one of them changes. `composer test:affected` reads the artifact.
+#
+# Recording runs every test under PCOV, which costs about 1.8 times a plain run and
+# kept one 4-core runner busy for 30 to 45 minutes. Eight arm runners each record the
+# whole graph for a time-balanced share of the test files, and the baseline job merges
+# the parts. Pest downloads the newest successful run on any branch, so a failed part
+# must fail the whole run rather than publish a partial graph.
 
 on:
   schedule:
@@ -16,6 +21,8 @@ on:
       - phpunit.xml
       - pnpm-lock.yaml
       - vite.config.js
+      - bin/tia-baseline.php
+      - .github/workflows/tia-baseline.yml
   workflow_dispatch:
 
 # A manual run replaces a nightly one still in flight.
@@ -27,10 +34,16 @@ permissions:
   contents: read
 
 jobs:
-  baseline:
-    runs-on: ubuntu-latest
-    name: Record TIA Baseline
-    timeout-minutes: 45
+  record:
+    # x64 runners draw CPUs up to 1.65x apart; arm runners give four Neoverse-N2 cores
+    # every time. The graph holds no architecture, so x64 machines replay it unchanged.
+    runs-on: ubuntu-24.04-arm
+    name: Record TIA Baseline (Part ${{ matrix.part }}/8)
+    timeout-minutes: 20
+    strategy:
+      fail-fast: true
+      matrix:
+        part: [1, 2, 3, 4, 5, 6, 7, 8]
 
     services:
       postgres:
@@ -53,9 +66,9 @@ jobs:
       # directory unless told otherwise. Pinning it gives the upload step a path.
       RELATICLE_PEST_TIA_STORAGE: ${{ github.workspace }}/storage/framework/testing/pest-tia
       RELATICLE_PEST_TIA_SHARED: '1'
-      # The run uses phpunit.xml, the file the graph fingerprint tracks, so the
-      # CI-only values of phpunit.ci.xml come from the environment instead.
-      # Without them .env.testing supplies the local Postgres user, with no password.
+      # The run reads phpunit.xml through the generated phpunit.tia.xml, so the CI-only
+      # values of phpunit.ci.xml come from the environment instead. Without them
+      # .env.testing supplies the local Postgres user, with no password.
       DB_HOST: 127.0.0.1
       DB_PORT: 5432
       DB_DATABASE: relaticle_testing
@@ -90,6 +103,8 @@ jobs:
           extensions: json, dom, curl, libxml, mbstring, zip, intl
           tools: composer:v2
           coverage: pcov
+          # Opcache without JIT, which PCOV rules out, saves recompiling views and config every test.
+          ini-values: opcache.enable_cli=1, opcache.memory_consumption=512, opcache.max_accelerated_files=50000
 
       - name: Install PHP dependencies
         run: composer install --no-interaction --no-progress --ansi --prefer-dist --optimize-autoloader
@@ -100,8 +115,47 @@ jobs:
           php artisan key:generate
           php artisan passport:keys --force --no-interaction
 
-      - name: Record TIA baseline
-        run: vendor/bin/pest --parallel --tia --fresh
+      # The newest recording from a main run's Record Shard Timings job. The committed file is the fallback.
+      - name: Restore shard timings
+        uses: actions/cache/restore@v6
+        with:
+          path: tests/.pest/shards.json
+          key: pest-timings-${{ github.run_id }}
+          restore-keys: pest-timings-
+
+      - name: Select this part's test files
+        run: php bin/tia-baseline.php config ${{ matrix.part }} 8
+
+      - name: Record TIA graph
+        run: vendor/bin/pest --configuration=phpunit.tia.xml --parallel --tia --fresh
+
+      - name: Upload TIA graph
+        uses: actions/upload-artifact@v7
+        with:
+          name: tia-part-${{ matrix.part }}
+          path: storage/framework/testing/pest-tia/graph.json
+          if-no-files-found: error
+          retention-days: 1
+
+  baseline:
+    runs-on: ubuntu-latest
+    name: Merge TIA Baseline
+    needs: record
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Download TIA graphs
+        uses: actions/download-artifact@v8
+        with:
+          pattern: tia-part-*
+          path: parts
+
+      # The runner image's own PHP is enough: the merge reads and writes JSON only.
+      - name: Merge TIA graphs
+        run: php bin/tia-baseline.php merge parts storage/framework/testing/pest-tia
 
       - name: Upload TIA baseline
         uses: actions/upload-artifact@v7

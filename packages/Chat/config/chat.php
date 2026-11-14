@@ -17,6 +17,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | ChatGPT Plugin Link
+    |--------------------------------------------------------------------------
+    |
+    | The page where a user installs the hosted ChatGPT plugin. Empty on a
+    | self-hosted install, where the assistant gives the connector address only.
+    */
+
+    'chatgpt_plugin_url' => env('CHAT_CHATGPT_PLUGIN_URL'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Batch Write Cap
     |--------------------------------------------------------------------------
     |

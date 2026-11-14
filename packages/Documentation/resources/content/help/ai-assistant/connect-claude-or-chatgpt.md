@@ -35,7 +35,7 @@ workspace, revoke the connector and connect again.
 
 Search and read companies, people, opportunities, tasks, and notes; create,
 update, and delete them; attach tasks and notes to records; and read your
-workspace's custom fields so its answers use your real schema.
+workspace's custom attributes so its answers use your real schema.
 
 One thing to know: changes made through a connector are applied directly.
 The review card you get in Relaticle's own built-in chat doesn't exist here,

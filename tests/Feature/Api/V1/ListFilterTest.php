@@ -7,6 +7,7 @@ use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Http\Requests\Api\V1\IndexRequest;
 use App\Models\Company;
+use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
@@ -23,6 +24,7 @@ use App\Queries\FilterTree;
 use App\Queries\Operand;
 use App\Queries\TreeAllowedFilter;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\Helpers\WorkspaceCustomField;
@@ -144,6 +146,21 @@ it('reads a bare date on a custom date-time field as the whole day', function ()
         ->and($due('$gte', '2026-01-01'))->toBe($on('2026-01-01T00:00:00', '2026-01-01T09:00:00', '2026-01-01T23:59:59', '2026-01-02T00:00:00'))
         ->and($due('$gt', '2026-01-01'))->toBe($on('2026-01-02T00:00:00'))
         ->and($due('$lte', '2026-01-01T09:00:00'))->toBe($on('2025-12-31T23:59:00', '2026-01-01T00:00:00', '2026-01-01T09:00:00'));
+});
+
+it('reads both bounds of a custom attribute range from one value row', function (): void {
+    $ids = collect(['2025-12-31T23:59:00Z', '2026-01-01T09:00:00Z', '2026-01-02T00:00:00Z'])
+        ->mapWithKeys(fn (string $due): array => [$due => $this->postJson('/api/v1/tasks', ['title' => "Due {$due}", 'custom_fields' => ['due_date' => $due]])->assertCreated()->json('data.id')]);
+    $range = ['custom_fields' => ['due_date' => ['$gte' => '2026-01-01T00:00:00Z', '$lt' => '2026-01-02T00:00:00Z']]];
+
+    DB::enableQueryLog();
+    $found = listIds($this, 'tasks', $range);
+    $statements = collect(DB::getQueryLog())->pluck('query')->filter(fn (string $sql): bool => str_contains($sql, 'from "tasks"') && str_contains($sql, 'custom_field_values'));
+    DB::disableQueryLog();
+
+    expect($found)->toBe([$ids['2026-01-01T09:00:00Z']])
+        ->and($statements)->not->toBeEmpty()
+        ->and($statements->every(fn (string $sql): bool => substr_count($sql, 'exists (') === 1))->toBeTrue();
 });
 
 it('filters creation_source with $in and $not_in', function (): void {
@@ -446,6 +463,58 @@ it('counts a person whose company is trashed as having no company', function ():
         ->and(listIds($this, 'people', ['company' => ['$is_empty' => false]]))->toBe([]);
 });
 
+it('treats a record custom field link to a deleted record as no link', function (): void {
+    $field = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'people']);
+    $live = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $gone = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $orphaned = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $mixed = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $orphaned->saveCustomFieldValue($field, [$gone->id]);
+    $mixed->saveCustomFieldValue($field, [$live->id, $gone->id]);
+    $gone->delete();
+
+    $partner = fn (array $condition): array => listIds($this, 'companies', ['custom_fields' => ['partner' => $condition]]);
+
+    expect($partner(['$is_empty' => true]))->toBe([$orphaned->id])
+        ->and($partner(['$is_empty' => false]))->toBe([$mixed->id])
+        ->and($partner(['$has_any' => [$gone->id]]))->toBe([])
+        ->and($partner(['$has_none' => [$gone->id]]))->toEqualCanonicalizing([$orphaned->id, $mixed->id])
+        ->and($partner(['$has_any' => [$live->id]]))->toBe([$mixed->id]);
+
+    $gone->restore();
+
+    expect($partner(['$has_any' => [$gone->id]]))->toEqualCanonicalizing([$orphaned->id, $mixed->id]);
+});
+
+it('reads a record custom field holding a bare id as one link', function (): void {
+    $field = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'people']);
+    $live = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $gone = People::factory()->recycle([$this->user, $this->workspace])->create();
+    $linked = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $orphaned = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $linked->saveCustomFieldValue($field, [$live->id]);
+    $orphaned->saveCustomFieldValue($field, [$gone->id]);
+    CustomFieldValue::query()->withoutGlobalScopes()->where('custom_field_id', $field->getKey())->where('entity_id', $linked->id)->update(['json_value' => json_encode($live->id)]);
+    CustomFieldValue::query()->withoutGlobalScopes()->where('custom_field_id', $field->getKey())->where('entity_id', $orphaned->id)->update(['json_value' => json_encode($gone->id)]);
+    $gone->delete();
+
+    $partner = fn (array $condition): array => listIds($this, 'companies', ['custom_fields' => ['partner' => $condition]]);
+
+    expect($partner(['$is_empty' => false]))->toBe([$linked->id])
+        ->and($partner(['$is_empty' => true]))->toBe([$orphaned->id])
+        ->and($partner(['$has_any' => [$live->id]]))->toBe([$linked->id]);
+});
+
+it('does not count a record custom field link to another workspace record', function (): void {
+    $field = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'people']);
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreign = People::factory()->recycle([$stranger, $stranger->personalWorkspace()])->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $company->saveCustomFieldValue($field, [$foreign->id]);
+
+    expect(listIds($this, 'companies', ['custom_fields' => ['partner' => ['$is_empty' => true]]]))->toBe([$company->id]);
+});
+
 it('keeps a top-level condition and an $or group in one workspace-bound conjunction', function (): void {
     $stranger = User::factory()->withPersonalWorkspace()->create();
     $match = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme', 'creation_source' => CreationSource::API]);
@@ -543,7 +612,7 @@ it('ignores an empty custom_fields at the top level and rejects it inside a grou
 
     $this->postJson('/api/v1/opportunities/query', ['filter' => ['$not' => ['custom_fields' => null]]])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors(['filter.$not.custom_fields' => 'Custom field filters must be an object keyed by field code.']);
+        ->assertJsonValidationErrors(['filter.$not.custom_fields' => 'Custom attribute (custom field) filters must be an object keyed by field code.']);
 });
 
 it('hints the sigil for a bare operator on a relation node', function (): void {
@@ -687,6 +756,22 @@ it('keeps a lone true in a list operand as text over the query string', function
     $ids = $this->getJson('/api/v1/companies?filter[custom_fields][labels][$has_any]=true')->assertOk()->json('data.*.id');
 
     expect($ids)->toBe([$tagged->id]);
+});
+
+it('matches tags without regard to case or surrounding spaces', function (): void {
+    $labels = app(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Labels', 'code' => 'labels', 'type' => 'tags-input']);
+    $variants = collect(['VIP', 'vip', ' vip '])->map(function (string $tag) use ($labels): string {
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $company->saveCustomFieldValue($labels, [$tag]);
+
+        return $company->id;
+    })->sort()->values()->all();
+    $other = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $other->saveCustomFieldValue($labels, ['lead']);
+
+    expect(listIds($this, 'companies', ['custom_fields' => ['labels' => ['$has_any' => ['vip']]]]))->toBe($variants)
+        ->and(listIds($this, 'companies', ['custom_fields' => ['labels' => ['$has_any' => [' Vip ']]]]))->toBe($variants)
+        ->and(listIds($this, 'companies', ['custom_fields' => ['labels' => ['$has_none' => ['VIP']]]]))->toBe([$other->id]);
 });
 
 it('keeps a boolean true boolean and a text true text in a query body', function (): void {

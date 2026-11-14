@@ -41,7 +41,7 @@ final class CreateCustomFieldTool implements Tool
 
     public function description(): string
     {
-        return 'Propose creating one or more custom field definitions on CRM entities, all in one proposal. Field names and codes must be unique per entity, so check ListCustomFieldsTool first. Admin-only: returns an error for members and viewers. Returns a proposal for user approval.';
+        return 'Propose creating one or more custom attribute (custom field) definitions on CRM entities, all in one proposal. Field names and codes must be unique per entity, so check ListCustomFieldsTool first. Admin-only: returns an error for members and viewers. Returns a proposal for user approval.';
     }
 
     public function schema(JsonSchema $schema): array
@@ -185,8 +185,8 @@ final class CreateCustomFieldTool implements Tool
             actionData: $isBatch ? ['_batch' => true, 'records' => $actionRecords] : $actionRecords[0],
             displayData: $isBatch
                 ? [
-                    'title' => __('Create Custom Fields'),
-                    'summary' => __('Create :count custom fields', ['count' => count($items)]),
+                    'title' => __('Create Custom Attributes'),
+                    'summary' => __('Create :count custom attributes', ['count' => count($items)]),
                     'items' => $items,
                 ]
                 : $items[0],
@@ -259,7 +259,7 @@ final class CreateCustomFieldTool implements Tool
         $replace = ['name' => $name, 'type' => $typeLabel, 'entity' => $entityType, 'options' => implode(', ', $optionNames)];
 
         return [
-            'title' => __('Create Custom Field'),
+            'title' => __('Create Custom Attribute'),
             'summary' => $optionNames === []
                 ? __('Create ":name" (:type) on :entity', $replace)
                 : __('Create ":name" (:type) on :entity with options: :options', $replace),

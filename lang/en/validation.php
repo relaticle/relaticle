@@ -30,9 +30,9 @@ return [
     'custom_field' => [
         'unknown_option' => ':field: option ":value" is not one of: :labels.',
         'ambiguous_option' => ':field: option ":value" is ambiguous, pass the option ID.',
-        'unknown_filter_field' => '":field" is not a filterable custom field on :entity. Available: :available.',
-        'filter_not_object' => 'Custom field filters must be an object keyed by field code.',
-        'filter_code_not_string' => 'Custom field filter codes must be strings.',
+        'unknown_filter_field' => '":field" is not a filterable custom attribute (custom field) on :entity. Available: :available.',
+        'filter_not_object' => 'Custom attribute (custom field) filters must be an object keyed by field code.',
+        'filter_code_not_string' => 'Custom attribute (custom field) filter codes must be strings.',
         'operand_too_long' => ':field: pass values of at most :max characters.',
         'single_option' => ':field: pass a single option label or ID.',
         'option_list' => ':field: pass an array of option labels or IDs.',

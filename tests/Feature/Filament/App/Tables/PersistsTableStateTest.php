@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-use App\Actions\TableLayouts\SaveTablePreference;
+use App\Actions\Views\SaveTablePreference;
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -12,7 +12,7 @@ use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\PersistsTableState;
 use App\Models\Company;
-use App\Models\TableLayout;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
@@ -51,19 +51,17 @@ function createdAtHiddenAndFirst(array $columns): array
     ];
 }
 
-it('brings back hidden columns, order, sort, filters, search and page size on a new visit', function (string $page): void {
-    $component = livewire($page);
+it('brings back hidden columns, order, sort, filters and page size on a new visit', function (string $page): void {
+    $component = openList($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
-        ->set('tableSort', 'created_at:desc')
-        ->set('tableSearch', 'acme')
+        ->call('sortTable', 'created_at', 'desc')
         ->set('tableRecordsPerPage', 50)
         ->set('tableFilters', ['trashed' => ['value' => 0]]);
 
     session()->flush();
-    $revisit = livewire($page);
+    $revisit = openList($page);
 
     expect($revisit->get('tableSort'))->toBe('created_at:desc')
-        ->and($revisit->get('tableSearch'))->toBe('acme')
         ->and((int) $revisit->get('tableRecordsPerPage'))->toBe(50)
         ->and($revisit->get('tableFilters.trashed.value'))->toEqual(0)
         ->and($revisit->get('tableColumns.0.name'))->toBe('created_at')
@@ -71,30 +69,30 @@ it('brings back hidden columns, order, sort, filters, search and page size on a 
 })->with('remembered list pages');
 
 it('writes nothing when a table is opened', function (string $page): void {
-    livewire($page);
+    openList($page);
 
     expect(savedPreferences())->toBe(0);
 
-    livewire($page)->set('tableSearch', 'acme');
+    openList($page)->call('sortTable', 'created_at', 'desc');
     $updatedAt = TablePreference::query()->withoutGlobalScopes()->value('updated_at');
 
     $this->travelTo(now()->addHour());
     session()->flush();
-    livewire($page);
+    openList($page);
 
     expect(TablePreference::query()->withoutGlobalScopes()->value('updated_at'))->toEqual($updatedAt);
 })->with('remembered list pages');
 
 it('writes one row per member, workspace and table', function (): void {
-    livewire(ListCompanies::class)->set('tableSearch', 'a')->set('tableSearch', 'ab');
-    livewire(ListPeople::class)->set('tableSearch', 'a');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'asc')->call('sortTable', 'created_at', 'desc');
+    livewire(ListPeople::class)->call('sortTable', 'created_at', 'desc');
 
     expect(savedPreferences())->toBe(2);
 });
 
 it('keeps state apart per workspace', function (): void {
     $first = $this->user->currentWorkspace;
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
 
     $other = Workspace::factory()->create();
     $this->user->workspaces()->attach($other, ['role' => 'admin']);
@@ -103,7 +101,7 @@ it('keeps state apart per workspace', function (): void {
 
     expect(livewire(ListCompanies::class)->get('tableSort'))->toBeNull();
 
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:asc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'asc');
     Filament::setTenant($first);
     session()->flush();
 
@@ -112,7 +110,7 @@ it('keeps state apart per workspace', function (): void {
 });
 
 it('keeps one member\'s sort from showing for another member of the workspace', function (): void {
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
 
     $colleague = User::factory()->create(['current_workspace_id' => $this->user->currentWorkspace->getKey()]);
     $this->user->currentWorkspace->users()->attach($colleague, ['role' => 'member']);
@@ -130,16 +128,15 @@ it('brings back a grouping on a new visit', function (): void {
 });
 
 it('writes nothing on a follow-up request that changes nothing', function (string $page): void {
-    livewire($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
+    openList($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
 
     expect(savedPreferences())->toBe(0);
 })->with('remembered list pages');
 
 it('writes nothing on follow-up requests when a saved state is open', function (string $page): void {
-    $component = livewire($page);
+    $component = openList($page);
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')), true)
-        ->set('tableSort', 'created_at:desc')
-        ->set('tableSearch', 'acme')
+        ->call('sortTable', 'created_at', 'desc')
         ->set('tableRecordsPerPage', 50)
         ->set('tableFilters', ['trashed' => ['value' => 0]])
         ->call('updateResizableColumnWidth', 'created_at', '300');
@@ -147,13 +144,13 @@ it('writes nothing on follow-up requests when a saved state is open', function (
 
     $this->travelTo(now()->addHour());
     session()->flush();
-    livewire($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
+    openList($page)->call('$refresh')->call('gotoPage', 2)->call('$refresh');
 
     expect(TablePreference::query()->withoutGlobalScopes()->value('updated_at'))->toEqual($updatedAt);
 })->with('remembered list pages');
 
 it('lets a query string sort win over saved state and writes nothing', function (): void {
-    livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
     $updatedAt = TablePreference::query()->withoutGlobalScopes()->value('updated_at');
 
     $this->travelTo(now()->addHour());
@@ -161,6 +158,27 @@ it('lets a query string sort win over saved state and writes nothing', function 
 
     expect($component->get('tableSort'))->toBe('name:asc')
         ->and(TablePreference::query()->withoutGlobalScopes()->value('updated_at'))->toEqual($updatedAt);
+});
+
+it('keeps the query string sorts the table can apply and drops the rest', function (): void {
+    $component = Livewire::withQueryParams(['sort' => 'no_such_column:asc', 'then_sort' => 'name:desc,created_at:sideways,name:asc,,created_at'])->test(ListCompanies::class);
+
+    expect($component->get('tableSort'))->toBe('name:desc')
+        ->and($component->get('tableThenSorts'))->toBe('created_at:asc');
+});
+
+it('keeps the stored sorts whose columns still exist', function (): void {
+    TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(
+            columns: [['type' => 'column', 'name' => 'name', 'isToggled' => true]],
+            sort: 'custom_fields.gone:asc,created_at:desc,name:asc',
+        ),
+    ]);
+
+    livewire(ListCompanies::class)
+        ->assertSet('tableSort', 'created_at:desc')
+        ->assertSet('tableThenSorts', 'name:asc');
 });
 
 it('opens at the default page size when the saved one is not offered', function (): void {
@@ -219,7 +237,7 @@ it('loads a filter saved for a deleted custom field', function (): void {
 });
 
 it('stops writing table state to the session', function (): void {
-    $component = livewire(ListCompanies::class)->set('tableSort', 'created_at:desc');
+    $component = livewire(ListCompanies::class)->call('sortTable', 'created_at', 'desc');
     $component->call('applyTableColumnManager', createdAtHiddenAndFirst($component->get('tableColumns')));
 
     expect(session()->has($component->instance()->getTableSortSessionKey()))->toBeFalse()
@@ -228,10 +246,10 @@ it('stops writing table state to the session', function (): void {
 });
 
 it('brings back a width on a new visit', function (string $page): void {
-    livewire($page)->call('updateResizableColumnWidth', 'created_at', '300');
+    openList($page)->call('updateResizableColumnWidth', 'created_at', '300');
     session()->flush();
 
-    expect(livewire($page)->instance()->tableColumnWidths)->toBe(['created_at' => 300]);
+    expect(openList($page)->instance()->tableColumnWidths)->toBe(['created_at' => 300]);
 })->with('remembered list pages');
 
 it('saves a width in the same request that resizes it', function (): void {
@@ -249,10 +267,10 @@ it('drops a saved width for a column the table no longer has', function (): void
     expect(livewire(ListCompanies::class)->instance()->tableColumnWidths)->toBe(['created_at' => 250]);
 });
 
-it('saves the table without its layout when the layout is deleted just before the save', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
-    $staleCopy = TableLayout::query()->withoutGlobalScopes()->findOrFail($layout->getKey());
-    $layout->delete();
+it('saves the table without its view when the view is deleted just before the save', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create(['entity' => CrmEntity::Company]);
+    $staleCopy = SavedView::query()->withoutGlobalScopes()->findOrFail($view->getKey());
+    $view->delete();
 
     $preference = resolve(SaveTablePreference::class)->execute(
         $this->user,
@@ -261,9 +279,10 @@ it('saves the table without its layout when the layout is deleted just before th
         new TableStateData(sort: 'name:asc'),
         $staleCopy,
         'hash',
+        null,
     );
 
-    expect($preference->active_layout_id)->toBeNull()
-        ->and($preference->applied_layout_hash)->toBeNull()
+    expect($preference->active_view_id)->toBeNull()
+        ->and($preference->applied_view_hash)->toBeNull()
         ->and($preference->state->sort)->toBe('name:asc');
 });

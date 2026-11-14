@@ -23,10 +23,7 @@ it('lists every linked record from the count in the relations column and closes 
     $shown = "[...document.querySelectorAll('.fi-linked-records-cell-panel')].filter((panel) => panel._x_isShown).length";
     $links = "[...document.querySelectorAll('.fi-linked-records-cell-panel a')].filter((link) => link.offsetParent !== null).length";
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/notes/list")
+    visitAs($user, "/app/{$workspace->slug}/notes/list", 1440, 900)
         ->waitForText('Quarterly review')
         ->assertSeeIn('.fi-linked-records-cell > a', 'Northwind Traders')
         ->assertSeeIn('.fi-linked-records-cell-more', '+3')

@@ -142,7 +142,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'cancel_email' => __('Preparing to cancel an email…'),
             'reschedule_email' => __('Preparing to reschedule an email…'),
             'retry_email' => __('Preparing to send an email again…'),
-            'list_custom_fields' => __('Reading custom fields…'),
+            'list_custom_fields' => __('Reading custom attributes…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
             'get_credit_balance' => __('Checking your AI credits…'),
@@ -166,10 +166,10 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'delete_note' => __('Preparing note deletion…'),
             'invite_workspace_member' => __('Preparing a workspace invitation…'),
             'remove_sample_data' => __('Preparing sample data removal…'),
-            'create_custom_field' => __('Drafting a custom field…'),
-            'update_custom_field' => __('Preparing custom field changes…'),
-            'set_custom_field_options' => __('Preparing field option changes…'),
-            'delete_custom_field' => __('Preparing custom field deletion…'),
+            'create_custom_field' => __('Drafting a custom attribute…'),
+            'update_custom_field' => __('Preparing custom attribute changes…'),
+            'set_custom_field_options' => __('Preparing attribute option changes…'),
+            'delete_custom_field' => __('Preparing custom attribute deletion…'),
         ]),
     }),
 
@@ -193,6 +193,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
     // and only one of them can be on screen. Seeded from the last assistant row
     // on mount, replaced by the `.next_steps` broadcast, emptied on every send.
     nextSteps: [],
+    pendingNextStepId: null,
+    isSetupConversation: @js($isSetupConversation),
+    {{-- Each icon carries its own size: an SVG that arrives as a string collapses to 0x0 in WebKit without one. --}}
+    setupButtonIcons: @js(collect(\Relaticle\Chat\Data\SetupOption::ICONS)->mapWithKeys(fn (string $name): array => [$name => svg($name, 'size-4 shrink-0')->toHtml()])->all()),
+    codeCopy: @js([
+        'copy' => __('Copy code'),
+        'copied' => __('Copied'),
+        'copyIcon' => svg('lucide-copy', 'size-3.5')->toHtml(),
+        'copiedIcon' => svg('lucide-check', 'size-3.5 text-green-400')->toHtml(),
+    ]),
     @include('chat::livewire.chat.partials._model-state', ['persistSelection' => true])
     pageContext: @js($pageContextType && $pageContextId ? ['type' => $pageContextType, 'id' => $pageContextId] : null),
     pageContextLabel: @js($pageContextLabel),

@@ -197,8 +197,8 @@ it('narrows a list to the same records through the table filter and the api', fu
     $midMarket->saveCustomFieldValue($field, $value('Mid-Market'));
     $smb->saveCustomFieldValue($field, $value('SMB'));
 
-    livewire(ListOpportunities::class)
-        ->filterTable('custom_fields.segment', [$stored('Enterprise'), $stored('Mid-Market')])
+    openList(ListOpportunities::class)
+        ->set('tableFilters.conditions.rules', [['field' => 'custom_fields.segment', 'condition' => $operator === '$in' ? 'is_any_of' : 'has_any_of', 'value' => [$stored('Enterprise'), $stored('Mid-Market')]]])
         ->assertCanSeeTableRecords([$enterprise, $midMarket])
         ->assertCanNotSeeTableRecords([$smb, $blank]);
 
@@ -367,16 +367,20 @@ it('states the matching, emptiness and operand rules on every surface', function
     $rules = [
         CustomFieldFilterSchema::EMPTINESS_RULE,
         CustomFieldFilterSchema::EMPTY_MATCH_RULE,
+        CustomFieldFilterSchema::RECORD_LINK_RULE,
+        CustomFieldFilterSchema::PARTIAL_MATCH_RULE,
         CustomFieldType::TAGS_INPUT->filterMatching(),
         CustomFieldType::PHONE->filterMatching(),
+        CustomFieldType::PHONE->partialMatching(),
+        CustomFieldType::LINK->partialMatching(),
     ];
 
     $usage = resolve($schemaResource)->toSchema($user)['usage'];
 
     expect(FilterDescription::of($mcpTool))->toContain(...$rules)
         ->and((new CrmAssistant)->staticInstructions())->toContain(...$rules)
-        ->and($usage)->toContain(CustomFieldFilterSchema::EMPTINESS_RULE, CustomFieldFilterSchema::EMPTY_MATCH_RULE, EntityFilters::limits())
-        ->and($usage)->not->toContain(CustomFieldType::PHONE->filterMatching(), CustomFieldType::TAGS_INPUT->filterMatching());
+        ->and($usage)->toContain(CustomFieldFilterSchema::EMPTINESS_RULE, CustomFieldFilterSchema::EMPTY_MATCH_RULE, CustomFieldFilterSchema::PARTIAL_MATCH_RULE, EntityFilters::limits())
+        ->and($usage)->not->toContain(CustomFieldType::PHONE->filterMatching(), CustomFieldType::TAGS_INPUT->filterMatching(), CustomFieldType::PHONE->partialMatching(), CustomFieldType::LINK->partialMatching());
 })->with(array_map(fn (array $row): array => [$row[7], $row[8]], crmSurfaces()));
 
 it('states the custom_fields rule and the choice rule once on every surface that carries them', function (CrmEntity $entity, string $chatTool, string $schemaResource, string $mcpTool): void {

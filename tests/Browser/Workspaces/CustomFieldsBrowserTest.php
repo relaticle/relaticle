@@ -16,10 +16,7 @@ it('stacks the entity tabs above the fields and keeps the name column readable o
     $tabsAboveFields = '(() => { const tabs = [...document.querySelectorAll(".fi-page-content .fi-tabs")].find((tabs) => tabs.getClientRects().length).getBoundingClientRect(); const table = document.querySelector(".fi-page-content .fi-ta").getBoundingClientRect(); return tabs.bottom <= table.top; })()';
     $nameColumnReadable = '(() => { const header = [...document.querySelectorAll(".fi-page-content .fi-ta *")].find((element) => getComputedStyle(element).display === "grid"); return header.children[1].getBoundingClientRect().width >= 150; })()';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/workspace/custom-fields")
+    visitAs($user, "/app/{$workspace->slug}/workspace/custom-fields", 390, 844)
         ->assertScript($tabsAboveFields, true)
         ->assertScript($nameColumnReadable, true)
         ->assertScript('document.documentElement.scrollWidth <= window.innerWidth', true)

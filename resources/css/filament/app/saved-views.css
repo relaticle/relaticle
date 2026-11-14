@@ -1,0 +1,417 @@
+/* The small tile in front of a view: green for a table, orange for a board, blue for cards. */
+.fi-view-tile {
+    @apply flex size-5 shrink-0 items-center justify-center rounded-md text-white;
+
+    & .fi-icon {
+        @apply size-3.5;
+    }
+}
+
+.fi-view-tile-success {
+    @apply bg-success-500 dark:bg-success-600;
+}
+
+.fi-view-tile-orange {
+    @apply bg-orange-500 dark:bg-orange-600;
+}
+
+.fi-view-tile-info {
+    @apply bg-info-500 dark:bg-info-600;
+}
+
+.fi-view-switcher-label {
+    @apply block max-w-56 truncate max-sm:max-w-32;
+}
+
+.fi-ta-views-row-created {
+    @apply px-2 py-1.5 text-xs text-gray-500 dark:text-gray-400;
+}
+
+/* A saved view's row highlights as one, its buttons included. */
+.fi-ta-views-row {
+    @apply relative flex items-center rounded-menu-item;
+
+    &:hover,
+    &:has(:focus-visible),
+    &:has([aria-expanded='true']) {
+        @apply bg-gray-50 dark:bg-white/5;
+
+        & .fi-ta-views-row-actions .fi-icon {
+            @apply text-gray-700 dark:text-gray-200;
+        }
+    }
+
+    & > .fi-dropdown-list-item {
+        @apply bg-transparent!;
+    }
+}
+
+.fi-ta-views-list {
+    @apply flex flex-col;
+}
+
+.fi-ta-views-row-actions {
+    @apply flex shrink-0 items-center gap-0.5 pe-1;
+
+    & .fi-icon-btn .fi-icon {
+        @apply text-gray-400 dark:text-gray-500;
+    }
+
+    & .fi-icon-btn {
+        @apply m-0 size-6;
+    }
+
+    & .fi-icon-btn .fi-icon {
+        @apply size-menu-icon!;
+    }
+}
+
+:is(.fi-ta-views-row-menu, .fi-board-stages-row-menu) {
+    @apply max-w-56!;
+}
+
+/* Filament's size option caps the panel at the room below the trigger. The menu inside shrinks to it. */
+:is(.fi-view-switcher, .fi-view-settings) > .fi-dropdown-panel:not([style*='display: none']) {
+    @apply flex! flex-col;
+}
+
+/* Search and Create stay in view; only the views between them scroll. */
+.fi-ta-views-panel {
+    @apply flex max-h-menu-max min-h-0 flex-col;
+
+    & .fi-dropdown-list-item {
+        @apply hover:bg-gray-50 focus-visible:bg-gray-50 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+    }
+
+    & > .fi-dropdown-list {
+        @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/5;
+    }
+}
+
+.fi-ta-views-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto;
+}
+
+/* The menu panel's own padding, which a phone sheet doubles. */
+:is(.fi-ta-views-panel, .fi-view-settings-panel) {
+    --menu-inset: var(--spacing);
+
+    @media (width < 40rem) {
+        --menu-inset: calc(var(--spacing) * 2);
+    }
+}
+
+/* Each part gives the panel padding back, so its rule reaches the panel's edges. A scroll box does too, or it would clip the rule. */
+:is(.fi-ta-views-panel, .fi-view-settings-panel) :is(.fi-board-main-view, .fi-ta-views-scroll, .fi-view-settings-scroll, .fi-view-settings-footer, .fi-board-section-heading),
+.fi-ta-views-panel > .fi-dropdown-list {
+    margin-inline: calc(var(--menu-inset) * -1);
+    padding-inline: var(--menu-inset);
+}
+
+.fi-ta-views-search {
+    @apply -mt-1 mb-1 gap-2;
+    margin-inline: calc(var(--menu-inset) * -1);
+    padding-inline: calc(var(--menu-inset) + var(--spacing));
+}
+
+.fi-ta-views-draggable {
+    @apply cursor-grab;
+}
+
+.fi-ta-views-save-current .fi-icon {
+    @apply text-gray-500 dark:text-gray-400;
+}
+
+.fi-view-controls {
+    @apply flex min-w-0 items-center gap-2;
+}
+
+.fi-view-settings-trigger .fi-view-settings-icon {
+    @apply size-4 text-gray-500 dark:text-gray-400;
+}
+
+@media (width < 40rem) {
+    .fi-view-settings-trigger .fi-view-settings-text {
+        @apply sr-only;
+    }
+}
+
+.fi-view-settings-panel {
+    @apply flex max-h-menu-max min-h-0 flex-col;
+
+    & .fi-dropdown-list-item {
+        @apply hover:bg-gray-50 focus-visible:bg-gray-50 dark:hover:bg-white/5 dark:focus-visible:bg-white/5;
+    }
+}
+
+.fi-view-settings-footer {
+    @apply mt-1 shrink-0 border-t border-gray-100 pt-1 dark:border-white/5;
+}
+
+.fi-view-settings-view {
+    @apply flex min-h-0 flex-1 flex-col;
+}
+
+/* ps-1 plus the 32px back button puts the chevron over the row icons and the title on the row labels. */
+.fi-view-settings-search {
+    @apply -mx-1 -mt-1 mb-1 ps-1 pe-2 max-sm:-mx-2 max-sm:ps-3;
+
+    & > .fi-icon-btn {
+        @apply m-0 size-8 shrink-0;
+
+        & .fi-icon {
+            @apply size-menu-icon!;
+        }
+    }
+
+    & input {
+        @apply max-sm:ps-1;
+    }
+}
+
+.fi-view-settings-scroll {
+    @apply min-h-0 flex-1 overflow-y-auto;
+}
+
+.fi-view-settings-note {
+    @apply flex items-center gap-2;
+
+    & .fi-icon {
+        @apply size-menu-icon;
+    }
+}
+
+.fi-view-settings-list {
+    @apply flex shrink-0 flex-col;
+}
+
+.fi-view-settings-row {
+    @apply flex h-menu-row items-center gap-1 rounded-menu-item pe-1 ps-0.5 text-sm text-gray-950 dark:text-white;
+
+    &:hover,
+    &:has(:focus-visible),
+    &:has([aria-expanded='true']) {
+        @apply bg-gray-50 dark:bg-white/5;
+    }
+}
+
+.fi-view-settings-handle {
+    @apply flex size-6 shrink-0 items-center justify-center text-gray-400 dark:text-gray-500;
+
+    & .fi-icon {
+        @apply size-menu-icon;
+    }
+}
+
+.fi-view-settings-grip {
+    @apply cursor-grab touch-none;
+}
+
+.fi-view-settings-label {
+    @apply flex min-w-0 flex-1 items-center;
+}
+
+.fi-view-settings-row .fi-icon-btn {
+    @apply m-0 size-6;
+
+    & .fi-icon {
+        @apply size-menu-icon!;
+    }
+}
+
+.fi-view-settings-row-menu-trigger {
+    @apply aria-expanded:bg-gray-100 dark:aria-expanded:bg-white/10;
+
+    & .fi-icon {
+        @apply text-gray-400 dark:text-gray-500;
+    }
+
+    .fi-view-settings-row:hover &,
+    &:focus-visible,
+    &[aria-expanded='true'] {
+        & .fi-icon {
+            @apply text-gray-700 dark:text-gray-200;
+        }
+    }
+}
+
+:is(.fi-view-settings-row-menu, .fi-board-stages-row-menu) .fi-dropdown-list + .fi-dropdown-list {
+    @apply mt-1 border-t border-gray-100 pt-1 dark:border-white/5;
+}
+
+.fi-view-settings-add {
+    @apply flex flex-1 items-center justify-between gap-2;
+}
+
+.fi-view-settings-add-chevron {
+    @apply size-menu-icon text-gray-400 dark:text-gray-500;
+}
+
+.fi-board-settings-value {
+    @apply flex min-w-0 items-center gap-1 text-gray-500 dark:text-gray-400;
+}
+
+.fi-board-settings-value-text {
+    @apply min-w-0 truncate;
+}
+
+.fi-board-panel-title {
+    @apply min-w-0 flex-1 truncate text-sm text-gray-500 max-sm:ps-1 max-sm:text-base dark:text-gray-400;
+}
+
+.fi-board-stage-grip {
+    @apply flex size-6 shrink-0 cursor-grab touch-none items-center justify-center text-gray-400 dark:text-gray-500;
+
+    & .fi-icon {
+        @apply size-menu-icon;
+    }
+
+    .fi-board-stage-row:hover &,
+    .fi-board-stage-row:has(:focus-visible) & {
+        @apply text-gray-700 dark:text-gray-200;
+    }
+}
+
+.fi-board-stage-switch {
+    @apply flex shrink-0 items-center pe-1;
+
+    & .fi-toggle:disabled {
+        @apply cursor-not-allowed opacity-50;
+    }
+}
+
+.fi-board-stage {
+    @apply flex h-menu-row min-w-0 flex-1 items-center gap-2 text-sm text-gray-950 dark:text-white;
+}
+
+.fi-board-stage-off {
+    @apply text-gray-500 dark:text-gray-400;
+}
+
+.fi-board-stage-mark {
+    @apply flex size-menu-icon shrink-0 items-center justify-center;
+}
+
+.fi-board-stage-mark .fi-icon {
+    @apply size-menu-icon text-gray-400 dark:text-gray-500;
+}
+
+.fi-board-switch-row {
+    @apply flex min-h-menu-row cursor-pointer items-center gap-2 rounded-menu-item ps-2 pe-1 text-sm text-gray-950 hover:bg-gray-50 dark:text-white dark:hover:bg-white/5;
+
+    & > .fi-icon {
+        @apply size-menu-icon shrink-0 text-gray-400 dark:text-gray-500;
+    }
+}
+
+.fi-board-switch-label {
+    @apply min-w-0 flex-1 truncate;
+}
+
+.fi-board-main-view {
+    @apply overflow-y-auto overscroll-contain;
+}
+
+.fi-board-attributes-scroll {
+    @apply min-h-16 overscroll-contain;
+}
+
+.fi-board-section-heading {
+    @apply mt-1 shrink-0 border-t border-gray-100 pb-1 pt-2 text-xs font-medium text-gray-500 dark:border-white/5 dark:text-gray-400;
+
+    :is(.fi-ta-views-panel, .fi-view-settings-panel) & {
+        padding-inline: calc(var(--menu-inset) + var(--spacing) * 2);
+    }
+}
+
+.fi-board-stage-dot {
+    @apply size-2 rounded-full bg-(--color-500);
+}
+
+.fi-board-stage-dot-empty {
+    @apply size-2 rounded-full border-[1.5px] border-gray-400 dark:border-gray-500;
+}
+
+.fi-board-stage-grip-space {
+    @apply size-6 shrink-0;
+}
+
+.fi-board-no-value-row {
+    @apply flex items-center;
+}
+
+.fi-board-stage-divider {
+    @apply my-1 border-gray-100 dark:border-white/5;
+    margin-inline: calc(var(--menu-inset) * -1);
+}
+
+[data-column-root='__none__'] .ff-column-heading::before {
+    content: '';
+    @apply size-2 shrink-0 rounded-full border-[1.5px] border-gray-400 dark:border-gray-500;
+}
+
+.fi-board-stage-name {
+    @apply min-w-0 truncate;
+}
+
+[data-column-root] > .ff-column-header {
+    @apply cursor-grab;
+}
+
+.ff-column-placeholder {
+    @apply opacity-40;
+}
+
+.ff-column-dragging {
+    @apply cursor-grabbing rounded-xl bg-gray-50 opacity-95 shadow-lg dark:bg-gray-900;
+}
+
+/* The create-view type choice: one radio group drawn as two cards. The radio stays in the DOM for keyboard and screen readers. */
+.fi-view-type-radio {
+    @apply gap-3;
+
+    & > .fi-fo-radio-label {
+        @apply relative cursor-pointer items-center self-stretch rounded-menu border border-gray-200 bg-white p-3 transition-colors hover:bg-gray-50 dark:border-white/10 dark:bg-white/5 dark:hover:bg-white/10;
+
+        &:has(.fi-radio-input:checked) {
+            @apply border-primary-500 bg-primary-50 dark:border-primary-400 dark:bg-primary-500/10;
+        }
+
+        &:has(.fi-radio-input:focus-visible) {
+            @apply ring-2 ring-primary-500/40;
+        }
+
+        & > .fi-radio-input {
+            @apply sr-only;
+        }
+
+        & > .fi-fo-radio-label-text {
+            @apply grid-cols-[auto_1fr] items-center gap-x-3 gap-y-0.5;
+
+            & > p:first-child {
+                @apply contents;
+            }
+        }
+    }
+
+    & .fi-view-type-tile {
+        @apply row-span-2 flex size-10 items-center justify-center rounded-menu-item border border-gray-200 bg-gray-50 text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400;
+
+        & .fi-icon,
+        & svg {
+            @apply size-5;
+        }
+    }
+
+    & > .fi-fo-radio-label:has(.fi-radio-input:checked) .fi-view-type-tile {
+        @apply border-primary-200 bg-primary-100 text-primary-600 dark:border-primary-400/30 dark:bg-primary-500/20 dark:text-primary-400;
+    }
+
+    & .fi-view-type-name {
+        @apply self-end text-sm leading-5 font-semibold text-gray-950 dark:text-white;
+    }
+
+    & .fi-fo-radio-label-description {
+        @apply self-start text-xs leading-5;
+    }
+}

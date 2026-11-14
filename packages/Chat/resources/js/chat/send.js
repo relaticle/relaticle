@@ -249,6 +249,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         const text = (editor?.getText() ?? this.input).trim();
         if (!text && !this.pendingAttachment) return;
         if (text.length > 5000) return;
+        const nextStepForSend = this.pendingNextStepId ?? null;
 
         // The strip described what to do after the PREVIOUS answer. The moment
         // the user says something, whatever they said is the next step, and
@@ -306,6 +307,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
             created_at: nowIso,
             page_context: contextForSend,
             attachment: attachmentForSend,
+            nextStep: nextStepForSend,
             sendState: 'sending',
         }));
         this.pageContextConsumed = true;
@@ -322,7 +324,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         // binding is never notified to re-render.
         const userMsg = this.messages[this.messages.length - 1];
 
-        await this.deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachmentForSend);
+        await this.deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachmentForSend, nextStepForSend);
     },
 
     // Re-sends a FAILED optimistic bubble in place: same clientKey, same
@@ -350,7 +352,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
         this.markPendingActionsSuperseded();
 
         const payload = this.plainDocument(msg.document) ?? this.documentFromInput(msg.content);
-        await this.deliverMessage(msg, payload, msg.page_context ?? null, draftConversationId, msg.attachment ?? null);
+        await this.deliverMessage(msg, payload, msg.page_context ?? null, draftConversationId, msg.attachment ?? null, msg.nextStep ?? null);
     },
 
     // Shared failure path for a non-OK create/send response. Paints the
@@ -404,7 +406,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     // started (see the capture comments in sendMessage()/resendMessage()):
     // clearDraft() re-derives the storage key from it, and is called on every
     // path below that lands sendState at 'sent'.
-    async deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachment = null) {
+    async deliverMessage(userMsg, payload, contextForSend, draftConversationId, attachment = null, nextStep = null) {
         const isFirstMessage = !this.conversationId;
 
         this.stopWatchingTurn();
@@ -479,6 +481,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
                         model: this.selectedModel,
                         page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                         attachment_id: attachment?.id ?? null,
+                        next_step: nextStep,
                     }),
                     signal: this.streamAbortController.signal,
                 });
@@ -553,6 +556,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
                     model: this.selectedModel,
                     page_context: contextForSend ? { type: contextForSend.type, id: contextForSend.id } : null,
                     attachment_id: attachment?.id ?? null,
+                    next_step: nextStep,
                 }),
                 signal: this.streamAbortController.signal,
             });

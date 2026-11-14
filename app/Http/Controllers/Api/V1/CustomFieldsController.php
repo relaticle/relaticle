@@ -15,7 +15,7 @@ use Knuckles\Scribe\Attributes\ResponseFromApiResource;
 /**
  * @group Custom Fields
  *
- * List custom field definitions configured for your workspace.
+ * List custom attribute (custom field) definitions configured for your workspace.
  */
 final readonly class CustomFieldsController
 {

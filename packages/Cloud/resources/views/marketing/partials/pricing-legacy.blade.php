@@ -3,7 +3,7 @@
         __('Unlimited users and data'),
         __('MCP server for AI agents'),
         __('REST API with full CRUD'),
-        __('Custom fields'),
+        __('Custom attributes'),
         __('Multiple workspaces'),
     ];
 

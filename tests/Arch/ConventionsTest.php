@@ -197,6 +197,36 @@ it('keeps migrations out of the test suite', function (): void {
     );
 });
 
+it('signs browser tests in with visitAs outside the tests about signing in', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $keepTheLoginForm = [
+        'tests/Browser/CRM/ResizableColumnsTest.php',
+        'tests/Browser/EmailIntegration/AccessRequestOpenEmailBrowserTest.php',
+        'tests/Browser/EmailIntegration/ComposerRecipientsBrowserTest.php',
+        'tests/Browser/EmailIntegration/EmailAccountSyncErrorBrowserTest.php',
+        'tests/Browser/EmailIntegration/MailboxImportNotificationBrowserTest.php',
+        'tests/Browser/EmailIntegration/MailboxImportProgressBrowserTest.php',
+    ];
+
+    $callers = array_values(array_filter(
+        phpFilesUnder([$root.'/tests/Browser']),
+        fn (string $path): bool => ! str_starts_with($path, 'tests/Browser/Auth/')
+            && ! str_starts_with($path, 'tests/Browser/Onboarding/')
+            && str_contains((string) file_get_contents($root.'/'.$path), 'loginViaBrowser('),
+    ));
+
+    sort($callers);
+
+    expect(array_values(array_diff($callers, $keepTheLoginForm)))->toBe(
+        [],
+        'A browser test signs in with visitAs() (.ai/guidelines/relaticle/testing.md). The login form costs every test 0.71s in CI. Replace loginViaBrowser() in: '.implode(', ', array_diff($callers, $keepTheLoginForm)),
+    )->and(array_values(array_diff($keepTheLoginForm, $callers)))->toBe(
+        [],
+        'The login form list only shrinks. Remove the files that no longer call loginViaBrowser(): '.implode(', ', array_diff($keepTheLoginForm, $callers)),
+    );
+});
+
 it('keeps compiled agent guidelines in sync with their .ai sources', function (): void {
     $root = dirname(__DIR__, 2);
 
@@ -870,6 +900,59 @@ it('keeps the retired contact and deal words out of record copy', function (): v
         [],
         'A person record is a person or people, and Opportunity labels the record (.ai/guidelines/relaticle/architecture.md, '.
         'Business language). "Your people" reads as the reader\'s staff (.ai/guidelines/relaticle/writing.md). '.
+        'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
+    );
+});
+
+it('keeps the retired custom field words out of published copy', function (): void {
+    $root = dirname(__DIR__, 2);
+
+    $filesCarryingTheSynonym = [
+        'lang/en/validation.php',
+        'packages/Documentation/resources/content/docs/guides/contributing.md',
+        'packages/Documentation/resources/content/docs/guides/mcp.md',
+        'packages/Documentation/resources/content/docs/guides/rest-api.md',
+        'resources/views/scribe/index.blade.php',
+    ];
+
+    $spaced = '/\bcustom\s+fields?\b/i';
+    $hyphenated = '/(?<![\w\/.:\-\'"`])custom-fields?(?![\w\-\/:\'"`]|\.(?:php|js|json|css|png|md)\b)/i';
+
+    $offenders = [];
+
+    foreach (['lang', 'resources/views', 'resources/js', 'packages'] as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory)),
+            '/\.(php|md|js|json)$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $relativePath = str_replace($root.'/', '', $file->getPathname());
+
+            $isPublishedCopy = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
+                && ! in_array($relativePath, $filesCarryingTheSynonym, true);
+
+            if (! $isPublishedCopy) {
+                continue;
+            }
+
+            $contents = (string) file_get_contents($file->getPathname());
+
+            foreach ([$spaced, $hyphenated] as $pattern) {
+                preg_match_all($pattern, $contents, $matches, PREG_OFFSET_CAPTURE);
+
+                foreach ($matches[0] as [, $offset]) {
+                    $offenders[] = $relativePath.':'.(substr_count($contents, "\n", 0, $offset) + 1);
+                }
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'A property a record carries beyond the built-in ones is a custom attribute in published copy (.ai/guidelines/relaticle/architecture.md, '.
+        'Business language). "Custom field" survives in code, the API and tool names, and in the listed files that carry it as a synonym. '.
         'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
 });

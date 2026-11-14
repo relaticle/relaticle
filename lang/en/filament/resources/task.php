@@ -41,15 +41,6 @@ return [
         'copy_id' => 'Copy task ID',
     ],
 
-    'filters' => [
-        'assigned_to_me' => [
-            'label' => 'Assigned to me',
-        ],
-        'creation_source' => [
-            'label' => 'Creation Source',
-        ],
-    ],
-
     'empty_state' => [
         'description' => 'Tasks you add appear here.',
     ],

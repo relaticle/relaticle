@@ -13,7 +13,7 @@ final class NextStepsSuggested implements ShouldBroadcastNow
     use InteractsWithSockets;
 
     /**
-     * @param  list<array{label: string, prompt: string}>  $steps
+     * @param  list<array<string, mixed>>  $steps
      */
     public function __construct(
         public readonly string $conversationId,

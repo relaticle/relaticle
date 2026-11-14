@@ -7,6 +7,7 @@ namespace App\Models;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\NoteField;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\CustomFieldType;
 use Database\Factories\CustomFieldFactory;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -31,6 +32,8 @@ final class CustomField extends BaseCustomField
 
     // The borderless canvas fills the form's slack, which only reads as a document where
     // the editor is the form's main field. Elsewhere it would swallow the fields around it.
+    private const string FALLBACK_ICON = 'lucide-layout-grid';
+
     /** @var array<string, string> */
     private const array DOCUMENT_FIELDS = [
         CrmEntity::Note->value => NoteField::BODY->value,
@@ -51,6 +54,11 @@ final class CustomField extends BaseCustomField
     public function hasValues(): bool
     {
         return CustomFieldValue::query()->holdingAValue($this)->exists();
+    }
+
+    public function typeIcon(): string
+    {
+        return CustomFieldType::tryFrom($this->type)?->icon() ?? self::FALLBACK_ICON;
     }
 
     public function isDocument(): bool

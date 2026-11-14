@@ -79,9 +79,7 @@ it('lists a CRM person once when they are also a recent correspondent', function
         'role' => EmailParticipantRole::FROM,
     ]);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email")
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
         ->type('[role="combobox"]', 'dana@globex')
@@ -110,9 +108,7 @@ it('opens the composer from a record emails tab addressed to the person with the
 
     $floatingComposer = 'Livewire.all().map((component) => Livewire.find(component.id)).find((component) => component.get("dock") === "floating")';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/people/{$person->getKey()}")
+    visitAs($user, "/app/{$workspace->slug}/people/{$person->getKey()}")
         ->click('[role="tab"]:has-text("Emails")')
         ->click('button[x-tooltip][wire\\:click*="composer:open"]')
         ->waitForText(__('filament/emails/composer.title'))
@@ -144,9 +140,7 @@ it('opens a saved draft from a click on its drafts table row', function (): void
         'creation_source' => EmailCreationSource::COMPOSE,
     ]);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email")
         ->click('Half-written pitch')
         ->assertVisible('#email-composer-subject')
         ->assertValue('#email-composer-subject', 'Half-written pitch')
@@ -163,9 +157,7 @@ it('closes the composer with escape and keeps the draft', function (): void {
         'last_synced_at' => now(),
     ]));
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email")
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
         ->type('[role="combobox"]', 'half-typed')
@@ -206,9 +198,7 @@ it('puts the caret on the recipient in a new email and on the message in an addr
         'role' => EmailParticipantRole::TO,
     ]);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email")
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
         ->assertScript('document.activeElement.closest("[data-composer-to]") !== null', true)
@@ -238,10 +228,7 @@ it('keeps mass sending in reach on a phone by leaving the composer full screen',
     $workspace = $user->currentWorkspace;
     connectSendingMailbox($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email", 393, 852)
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
         ->assertVisible('#composer-mass-send-toggle')
@@ -256,10 +243,7 @@ it('stacks the mass send recipients under the compose column on a phone', functi
     $workspace = $user->currentWorkspace;
     connectSendingMailbox($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email", 393, 852)
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
         ->click('label[for="composer-mass-send-toggle"]')
@@ -290,9 +274,7 @@ it('adds mass send recipients from the search without a script error', function 
         $person->saveCustomFieldValue($emailsField, [$address], $workspace);
     }
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email")
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
         ->click('label[for="composer-mass-send-toggle"]')
@@ -315,9 +297,7 @@ it('fits a shrunk composer onto a phone screen with every field on it', function
     $workspace = $user->currentWorkspace;
     connectSendingMailbox($user);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/email")
+    visitAs($user, "/app/{$workspace->slug}/email")
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
         ->click('[aria-label="'.__('filament/emails/composer.actions.shrink').'"]')
@@ -386,10 +366,7 @@ it('keeps the recipient suggestions under the field while a forwarded email scro
 
     $suggestionsUnderField = '(() => { const field = document.querySelector(".fi-email-reader-panel [role=combobox]").getBoundingClientRect(); const list = [...document.querySelectorAll("[role=listbox]")].find((listbox) => listbox.checkVisibility()).getBoundingClientRect(); return Math.round(list.top - field.bottom); })()';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/workspace/email/access-requests")
+    $page = visitAs($user, "/app/{$workspace->slug}/workspace/email/access-requests", 393, 852)
         ->click('button[wire\\:click*="openEmail"]')
         ->assertVisible('.fi-email-reader-panel')
         ->click('.fi-email-reader-panel button[aria-label="'.__('filament/pages/email-inbox.reply_forward.modal_headings.forward').'"]')

@@ -457,7 +457,7 @@ it('refuses to remove options from an encrypted field', function (): void {
         'options' => [['name' => 'Gold']],
     ]]);
 
-    expect($decoded['error'])->toContain('encrypted field')
+    expect($decoded['error'])->toContain('encrypted attribute')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 

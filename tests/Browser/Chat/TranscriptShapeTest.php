@@ -502,14 +502,19 @@ it('styles inline code and tables in a reply with the chat prose classes', funct
             const code = bubble.querySelector('p code');
             const blockCode = bubble.querySelector('pre code');
             const prose = code.closest('.prose');
-
-            return JSON.stringify({
+            const styles = {
                 codeBefore: getComputedStyle(code, '::before').content,
                 codeBackground: getComputedStyle(code).backgroundColor,
                 firstChildMarginTop: getComputedStyle(prose.firstElementChild).marginTop,
                 cellPaddingLeft: getComputedStyle(bubble.querySelector('td')).paddingLeft,
                 blockCodeBackground: getComputedStyle(blockCode).backgroundColor,
-            });
+            };
+
+            document.documentElement.classList.add('dark');
+            styles.darkBlockBackground = getComputedStyle(blockCode.closest('pre')).backgroundColor;
+            styles.darkPageBackground = getComputedStyle(document.body).backgroundColor;
+
+            return JSON.stringify(styles);
         })();
     JS), true, 512, JSON_THROW_ON_ERROR);
 
@@ -517,7 +522,8 @@ it('styles inline code and tables in a reply with the chat prose classes', funct
         ->and($styles['codeBackground'])->not->toBe('rgba(0, 0, 0, 0)')
         ->and($styles['firstChildMarginTop'])->toBe('0px')
         ->and($styles['cellPaddingLeft'])->toBe('8px')
-        ->and($styles['blockCodeBackground'])->toBe('rgba(0, 0, 0, 0)');
+        ->and($styles['blockCodeBackground'])->toBe('rgba(0, 0, 0, 0)')
+        ->and($styles['darkBlockBackground'])->not->toBe($styles['darkPageBackground']);
 });
 
 /**
@@ -568,6 +574,69 @@ it('copies both message shapes as the same plain text with absolute record urls'
     $expected = "Closed [Acme Corporation]({$origin}/r/company/01ABCDEF) this morning.";
 
     expect($result['copied'])->toBe([$expected, $expected]);
+});
+
+it('gives each code block its own copy button and opens outside links in a new tab, from both pipelines', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $markdown = "Open the [plugin page](https://plugins.example.test/relaticle) or [your tasks](/app/{$workspace->slug}/tasks).\n\n```\nhttps://mcp.example.test\n```\n\n```\nMove my current clients into the workspace, with every open opportunity.\n```";
+    $markdownJson = json_encode($markdown, JSON_THROW_ON_ERROR);
+    $conversationId = (string) Str::uuid7();
+    ChatBrowser::seedConversation($user, $workspace->getKey(), 'code blocks', $conversationId);
+    transcriptShapeInsertMessage($conversationId, $user, $markdown, now()->toImmutable());
+    DB::table('agent_conversation_messages')->where('conversation_id', $conversationId)->update(['role' => 'assistant']);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('plugin page');
+
+    $resolveInterface = ChatBrowser::resolveInterface();
+
+    $result = json_decode((string) $page->script(<<<JS
+        (async () => {
+            {$resolveInterface}
+
+            const copied = [];
+            Object.defineProperty(navigator, 'clipboard', {
+                configurable: true,
+                value: { writeText: (text) => { copied.push(text); return Promise.resolve(); } },
+            });
+
+            data.messages.push({ role: 'assistant', rendered: true, editing: false, editText: '', content: {$markdownJson}, prerendered: false });
+
+            await data.\$nextTick();
+            await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+            const bubbles = Array.from(document.querySelectorAll('[data-assistant-bubble]')).slice(-2);
+            const buttons = bubbles.flatMap((bubble) => Array.from(bubble.querySelectorAll('pre [data-code-copy]')));
+            const idleLabels = buttons.map((button) => button.getAttribute('aria-label'));
+
+            for (const button of buttons) {
+                button.click();
+                await new Promise((resolve) => setTimeout(resolve, 50));
+            }
+
+            return JSON.stringify({
+                copied,
+                idleLabels,
+                copiedLabels: buttons.map((button) => button.getAttribute('aria-label')),
+                iconWidths: buttons.map((button) => Math.round(button.querySelector('svg')?.getBoundingClientRect().width ?? 0)),
+                overflowing: bubbles.flatMap((bubble) => Array.from(bubble.querySelectorAll('pre'))).filter((pre) => pre.scrollWidth > pre.clientWidth).length,
+                links: bubbles.flatMap((bubble) => Array.from(bubble.querySelectorAll('a')).map((link) => [link.textContent, link.target, link.rel])),
+            });
+        })();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    $url = 'https://mcp.example.test';
+    $prompt = 'Move my current clients into the workspace, with every open opportunity.';
+    $links = [['plugin page', '_blank', 'noopener noreferrer'], ['your tasks', '', '']];
+
+    expect($result['copied'])->toBe([$url, $prompt, $url, $prompt])
+        ->and($result['idleLabels'])->toBe(array_fill(0, 4, 'Copy code'))
+        ->and($result['copiedLabels'])->toBe(array_fill(0, 4, 'Copied'))
+        ->and($result['iconWidths'])->toBe([14, 14, 14, 14])
+        ->and($result['overflowing'])->toBe(0)
+        ->and($result['links'])->toBe([...$links, ...$links]);
 });
 
 /**

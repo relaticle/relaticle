@@ -74,7 +74,7 @@ final class LocalSeeder extends Seeder
 
             $rows[] = [
                 $persona->label(),
-                $persona->workspace,
+                $persona->workspace ?? '-',
                 $this->billingCell($persona, $result['billing']),
                 $result['note'],
             ];
@@ -94,9 +94,9 @@ final class LocalSeeder extends Seeder
      */
     private function billingCell(Persona $persona, string $actual): string
     {
-        return $actual === $persona->expect->value
-            ? $actual
-            : "{$actual} (EXPECTED {$persona->expect->value})";
+        $expected = $persona->expect->value ?? 'none';
+
+        return $actual === $expected ? $actual : "{$actual} (EXPECTED {$expected})";
     }
 
     /**

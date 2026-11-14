@@ -32,10 +32,10 @@
             $mcpDocsUrl,
         ],
         [
-            __('Does the AI see your fields?'),
-            __('Your custom fields, option lists, and relations are where the real data lives. An assistant that only sees the defaults is guessing.'),
-            __('Every active custom field is readable and settable by the assistant and by agents, with option labels shown as text, not raw IDs.'),
-            __('Custom fields over MCP'),
+            __('Does the AI see your attributes?'),
+            __('Your custom attributes, option lists, and relations are where the real data lives. An assistant that only sees the defaults is guessing.'),
+            __('Every active custom attribute is readable and settable by the assistant and by agents, with option labels shown as text, not raw IDs.'),
+            __('Custom attributes over MCP'),
             $mcpDocsUrl.'#schema-resources',
         ],
         [
@@ -113,7 +113,7 @@
         ],
         [
             __('Does Relaticle work with Claude and ChatGPT?'),
-            __('Yes. Connect either one to the MCP server and it can search, create, and update companies, people, opportunities, tasks, and notes in your workspace, including custom fields. The setup takes a few minutes and is documented for each assistant.'),
+            __('Yes. Connect either one to the MCP server and it can search, create, and update companies, people, opportunities, tasks, and notes in your workspace, including custom attributes. The setup takes a few minutes and is documented for each assistant.'),
         ],
         [
             __('What does the AI cost?'),

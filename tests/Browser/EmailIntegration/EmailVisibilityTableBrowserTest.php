@@ -19,10 +19,7 @@ it('stacks each visibility entry into a card with a full-width search on a phone
         'created_by' => $user->id,
     ]);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/workspace/email/privacy")
+    visitAs($user, "/app/{$workspace->slug}/workspace/email/privacy", 393, 852)
         ->waitForText('acme.example')
         ->assertScript('document.documentElement.scrollWidth <= innerWidth', true)
         ->assertScript("getComputedStyle(document.querySelector('.ei-stacked-table > thead')).display", 'none')
@@ -42,10 +39,7 @@ it('opens the enforcement picker as a sheet along the bottom edge of a phone', f
         'created_by' => $user->id,
     ]);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(393, 852)
-        ->navigate("/app/{$workspace->slug}/workspace/email/privacy")
+    visitAs($user, "/app/{$workspace->slug}/workspace/email/privacy", 393, 852)
         ->waitForText('legal@acme.example')
         ->click('.ei-enforcement-picker-trigger')
         ->wait(0.5)
@@ -64,10 +58,7 @@ it('keeps the enforcement picker inside its card on the narrowest phone', functi
         'created_by' => $user->id,
     ]);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(320, 568)
-        ->navigate("/app/{$workspace->slug}/workspace/email/privacy")
+    visitAs($user, "/app/{$workspace->slug}/workspace/email/privacy", 320, 568)
         ->waitForText('legal@acme.example')
         ->assertScript("(() => { const trigger = document.querySelector('.ei-enforcement-picker-trigger'); const card = trigger.closest('td').getBoundingClientRect(); return trigger.getBoundingClientRect().right <= card.right + 1; })()", true)
         ->assertScript("(() => { const label = document.querySelector('.ei-enforcement-picker-trigger > span'); return label.scrollWidth <= label.clientWidth; })()", true)

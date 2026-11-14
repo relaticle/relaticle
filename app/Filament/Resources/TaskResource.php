@@ -4,40 +4,41 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Enums\FilterCondition;
 use App\Filament\Actions\CopyToClipboardAction;
+use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
-use App\Filament\Components\Forms\WorkspaceMemberSelect;
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Components\Tables\EmptyListDescription;
-use App\Filament\Components\Tables\Filters\RecordSelectFilter;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\LinkedRecordsColumn;
 use App\Filament\Components\Tables\RecordChipColumn;
-use App\Filament\Concerns\RemembersViewMode;
+use App\Filament\Exports\TaskExporter;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
+use App\Filament\Tables\BulkBar;
+use App\Filament\Tables\FilterBar\ConditionsFilter;
+use App\Filament\Tables\FilterBar\FilterRuleCompiler;
+use App\Filament\Tables\RowActions;
 use App\Models\CustomField;
 use App\Models\Task;
 use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\ForceDeleteAction;
+use Filament\Actions\ExportAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
 use Filament\Actions\ViewAction;
 use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
@@ -45,11 +46,10 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Relaticle\CustomFields\Contracts\ValueResolvers;
+use Relaticle\ImportWizard\Filament\Pages\ImportTasks;
 
 final class TaskResource extends Resource
 {
-    use RemembersViewMode;
-
     protected static ?string $model = Task::class;
 
     protected static ?string $navigationLabel = null;
@@ -80,9 +80,43 @@ final class TaskResource extends Resource
         return CrmEntity::Task->icon();
     }
 
+    public static function assignedToMeUrl(?Workspace $tenant = null): string
+    {
+        return self::getUrl('index', [
+            'filters' => [ConditionsFilter::NAME => [
+                'match' => 'all',
+                'rules' => [['field' => 'assignees', 'condition' => FilterCondition::IsAnyOf->value, 'value' => [FilterRuleCompiler::ME]]],
+            ]],
+        ], panel: 'app', tenant: $tenant);
+    }
+
     public static function form(Schema $schema): Schema
     {
         return TaskForm::get($schema);
+    }
+
+    /**
+     * @return list<Action|ActionGroup>
+     */
+    public static function collectionActions(): array
+    {
+        return [
+            ImportExportActionGroup::make([
+                Action::make('import')
+                    ->label(__('filament/resources/task.pages.list.actions.import.label'))
+                    ->icon('lucide-upload')
+                    ->url(ImportTasks::getUrl())
+                    ->visible(ImportTasks::canAccess(...)),
+                ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
+            ])->label(__('filament/resources/task.pages.list.actions.import_export.label')),
+            CreateTaskAction::make()
+                ->icon('lucide-plus')
+                ->authorize(self::canCreate(...))
+                ->size(Size::Small)
+                ->slideOver()
+                ->model(Task::class)
+                ->schema(fn (Schema $schema): Schema => self::form($schema->columns(2))),
+        ];
     }
 
     public static function table(Table $table): Table
@@ -94,47 +128,27 @@ final class TaskResource extends Resource
 
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/task.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
-            ->searchable()
-            ->filters([
-                Filter::make('assigned_to_me')
-                    ->label(__('filament/resources/task.filters.assigned_to_me.label'))
-                    ->query(fn (Builder $query): Builder => $query->whereHas('assignees', function (Builder $query): void {
-                        $query->where('users.id', auth()->id());
-                    }))
-                    ->toggle(),
-                RecordSelectFilter::make('assignees')
-                    ->multiple()
-                    ->relationship('assignees', 'name', WorkspaceMemberSelect::currentWorkspaceMembers())
-                    ->searchable()
-                    ->preload(),
-                SelectFilter::make('creation_source')
-                    ->label(__('filament/resources/task.filters.creation_source.label'))
-                    ->options(CreationSource::class)
-                    ->multiple(),
-                TrashedFilter::make(),
-            ])
             ->groups(array_filter([
                 ...collect(['status', 'priority'])->map(fn (string $fieldCode): ?\Filament\Tables\Grouping\Group => $customFields->has($fieldCode) ? self::makeCustomFieldGroup($fieldCode, $customFields, $valueResolver) : null
                 )->filter()->toArray(),
             ]))
             ->recordActions([
-                ActionGroup::make([
-                    self::copyActions(),
+                RowActions::withoutMenu([
                     EditTaskAction::make(),
-                    RestoreAction::make(),
-                    DeleteAction::make(),
-                    ForceDeleteAction::make(),
                     ViewAction::make()
                         ->visible(fn (Task $record): bool => Gate::denies('update', $record)),
                 ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
+                BulkBar::make([
+                    RestoreBulkAction::make(),
+                ], more: [
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
                 ]),
             ]);
     }
@@ -146,7 +160,6 @@ final class TaskResource extends Resource
     {
         return [
             TextColumn::make('title')
-                ->searchable()
                 ->limit(50)
                 ->weight('medium'),
             LinkedRecordsColumn::make('relations')
@@ -154,11 +167,9 @@ final class TaskResource extends Resource
             RecordChipColumn::make('assignees.name')
                 ->label(__('filament/resources/task.fields.assignees.label'))
                 ->collapsed()
-                ->searchable()
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('creator.name')
                 ->label(__('filament/resources/task.fields.creator.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable()
                 ->visibleFrom('sm')
@@ -199,6 +210,14 @@ final class TaskResource extends Resource
     {
         /** @var Workspace */
         return Filament::getTenant();
+    }
+
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportTasks::getRouteName()];
     }
 
     public static function getPages(): array

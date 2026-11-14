@@ -29,7 +29,7 @@ final readonly class MarketingNavigation
                     __('Features'),
                     url('/#features'),
                     icon: 'features',
-                    description: __('Records, pipelines, and custom fields'),
+                    description: __('Records, pipelines, and custom attributes'),
                 ),
                 Feature::active(EmailIntegration::class) ? new NavItem(
                     __('Email and calendar'),

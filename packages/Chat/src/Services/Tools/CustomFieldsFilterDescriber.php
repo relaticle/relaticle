@@ -49,7 +49,7 @@ final readonly class CustomFieldsFilterDescriber
         }
 
         if ($nestedExample !== null && isset($rules['relation'])) {
-            $rules['relation'] .= "; nested custom field example {$nestedExample}";
+            $rules['relation'] .= "; nested custom attribute (custom field) example {$nestedExample}";
         }
 
         if ($rules !== []) {
@@ -63,7 +63,7 @@ final readonly class CustomFieldsFilterDescriber
 
         if ($customFieldExample === null) {
             $lines[] = '';
-            $lines[] = 'No filterable custom fields are defined for this entity type.';
+            $lines[] = 'No filterable custom attributes (custom fields) are defined for this entity type.';
 
             return implode("\n", $lines);
         }
@@ -71,7 +71,7 @@ final readonly class CustomFieldsFilterDescriber
         array_push($lines, ...$this->customFieldLines($customFields, $types));
 
         $lines[] = '';
-        $lines[] = 'Custom field example: '.$this->exampleJson($customFieldExample);
+        $lines[] = 'Custom attribute (custom field) example: '.$this->exampleJson($customFieldExample);
 
         return implode("\n", $lines);
     }
@@ -95,6 +95,7 @@ final readonly class CustomFieldsFilterDescriber
             $line = "- {$type}: operators ".implode(', ', $entry['operators']);
             $line .= isset($entry['sub_fields']) ? '; sub-field domain takes '.implode(', ', $entry['sub_fields']['domain']['operators'])." and matches {$entry['sub_fields']['domain']['matches']}, example ".$this->exampleJson($entry['sub_fields']['domain']['example']) : '';
             $line .= isset($entry['matching']) ? "; values match {$entry['matching']}" : '';
+            $line .= isset($entry['partial_matching']) ? "; partial matches compare against {$entry['partial_matching']}" : '';
             $lines[] = $line.(isset($entry['example']) ? '; example '.$this->exampleJson($entry['example']) : '');
         }
 

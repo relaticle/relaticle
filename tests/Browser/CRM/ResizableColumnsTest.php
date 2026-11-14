@@ -48,15 +48,38 @@ function dragFeedbackMidDrag(string $column): string
             const y = box.top + box.height / 2;
             handle.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1, isPrimary: true, clientX: x, clientY: y }));
             document.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
-            const badge = document.querySelector('.column-resize-badge');
+            const guideline = document.querySelector('.column-resize-guideline');
             const feedback = {
-                badge: badge !== null && badge.isConnected && getComputedStyle(badge).display !== 'none',
+                guideline: guideline !== null && getComputedStyle(guideline).display !== 'none',
                 handleActive: document.querySelector(`%s .column-resize-handle-bar`).classList.contains('active'),
+                widthReadout: [...document.body.querySelectorAll('*')].some((element) => element.children.length === 0 && /^\s*\d+\s*px\s*$/.test(element.textContent) && element.checkVisibility()),
             };
             document.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1, isPrimary: true, clientX: x + 40, clientY: y }));
-            return feedback.badge && feedback.handleActive;
+            return feedback.guideline && feedback.handleActive && ! feedback.widthReadout;
         })();
     JS, headerSelector($column), headerSelector($column));
+}
+
+function tableAreaBottomGap(): string
+{
+    return <<<'JS'
+        (() => {
+            const container = document.querySelector('.fi-ta-content-ctn');
+            const pagination = document.querySelector('.fi-ta-ctn .fi-pagination');
+            const lowest = Math.max(container.getBoundingClientRect().bottom, pagination ? pagination.getBoundingClientRect().bottom : 0);
+            return Math.abs(Math.round(lowest - window.innerHeight)) <= 1;
+        })();
+    JS;
+}
+
+function pageScrollsVertically(): string
+{
+    return <<<'JS'
+        (() => {
+            const layout = document.querySelector('.fi-layout');
+            return document.scrollingElement.scrollHeight > window.innerHeight + 1 || layout.scrollHeight > layout.clientHeight + 1;
+        })();
+    JS;
 }
 
 beforeEach(function (): void {
@@ -69,10 +92,7 @@ beforeEach(function (): void {
 });
 
 it('resizes a column by dragging its edge and keeps the width after a reload', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $page->assertScript('document.querySelector(".column-resize-handle-bar").tabIndex', -1);
@@ -85,6 +105,27 @@ it('resizes a column by dragging its edge and keeps the width after a reload', f
         ->refresh()
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar')
         ->assertScript(headerWidth('created_at'), $before + 120)
+        ->assertNoJavaScriptErrors();
+});
+
+it('leaves no focus ring behind after a mouse resize', function (): void {
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    $page->click(headerSelector('created_at').' .fi-ta-resizable-label')
+        ->wait(0.5)
+        ->keys(':focus', 'Escape')
+        ->wait(0.3)
+        ->drag(headerSelector('created_at').' .column-resize-handle-bar', headerSelector('updated_at'))
+        ->wait(1)
+        ->assertScript('document.querySelector(":focus-visible")', null)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows the edge guideline but no pixel width while a column is resized', function (): void {
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
+        ->assertVisible(headerSelector('name').' .column-resize-handle-bar')
+        ->assertScript(dragFeedbackMidDrag('name'), true)
         ->assertNoJavaScriptErrors();
 });
 
@@ -120,10 +161,10 @@ function fittedColumnShowsEverything(string $column): string
                 range.selectNodeContents(root);
                 return Math.max(...[...range.getClientRects()].map((box) => box.right));
             };
-            const handle = th.querySelector('.fi-ta-column-handle').getBoundingClientRect();
+            const cellRight = th.getBoundingClientRect().right;
             const cells = [...document.querySelectorAll(`td.fi-ta-cell-${CSS.escape(th.dataset.resizableColumnId)}`)];
             return [
-                rightEdge(th.querySelector('.fi-ta-header-cell-sort-btn')) <= handle.left,
+                rightEdge(th.querySelector('.fi-ta-header-cell-sort-btn')) <= cellRight,
                 cells.every((td) => rightEdge(td) <= td.getBoundingClientRect().right),
             ];
         })()
@@ -131,10 +172,7 @@ function fittedColumnShowsEverything(string $column): string
 }
 
 it('fits a column to its content on double-click', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
@@ -152,33 +190,42 @@ function narrowestHeaderState(string $column): string
     return sprintf(<<<'JS'
         (() => {
             const th = document.querySelector(`%s`);
-            const menuLeft = th.querySelector('.fi-ta-column-handle').getBoundingClientRect().left;
-            const chevron = th.querySelector('.fi-ta-header-cell-sort-btn > svg')?.getBoundingClientRect();
+            const cellRight = th.getBoundingClientRect().right;
             const text = th.querySelector('.fi-ta-header-cell-field > .truncate');
             const textBox = text.getBoundingClientRect();
+            const barLeft = th.querySelector('.column-resize-handle-bar').getBoundingClientRect().left;
             return {
                 width: Math.round(th.getBoundingClientRect().width),
                 textVisible: textBox.width >= 16,
                 textEllipsized: text.scrollWidth > text.clientWidth,
-                textClearOfMenu: textBox.right <= menuLeft,
-                chevronAfterText: chevron ? chevron.width > 0 && chevron.left >= textBox.right : true,
-                chevronClearOfMenu: chevron ? chevron.right <= menuLeft : true,
-                chevronGap: chevron ? Math.round(menuLeft - chevron.right) : null,
+                textClearOfBar: textBox.right <= barLeft,
+                textClearOfNext: textBox.right <= cellRight,
             };
         })()
     JS, headerSelector($column));
 }
 
-it('stops narrowing where the name, the sort chevron and the options button still fit', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+it('stops narrowing where a long name is ellipsized clear of the resize bar and the next header', function (): void {
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+    $labels = [
+        'name' => 'Annual recurring revenue per account',
+        'created_at' => 'Date the first contract was signed',
+        'custom_fields.domains' => 'Every domain the company owns',
+    ];
+
+    foreach ($labels as $column => $label) {
+        $page->script('Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.mountAction("editTableColumnLabel", { column: '.json_encode($column).' })');
+        $page->assertVisible('.fi-modal-window input')
+            ->type('.fi-modal-window input', $label)
+            ->click('.fi-modal-window button[type="submit"]')
+            ->assertMissing('.fi-modal-window')
+            ->assertSeeIn(headerSelector($column), $label);
+    }
 
     $states = [];
 
-    foreach (['name', 'created_at', 'custom_fields.domains'] as $column) {
+    foreach (array_keys($labels) as $column) {
         $page->script(dragColumnEdge($column, -$page->script(headerWidth($column))));
         $states[$column] = $page->script(narrowestHeaderState($column));
 
@@ -186,23 +233,18 @@ it('stops narrowing where the name, the sort chevron and the options button stil
             'width' => ResizableColumns::MIN_WIDTH,
             'textVisible' => true,
             'textEllipsized' => true,
-            'textClearOfMenu' => true,
-            'chevronAfterText' => true,
-            'chevronClearOfMenu' => true,
+            'textClearOfBar' => true,
+            'textClearOfNext' => true,
         ]);
     }
 
-    expect($states['name']['chevronGap'])->toBe($states['created_at']['chevronGap']);
     $page->assertNoJavaScriptErrors();
 });
 
-it('fits a column so its header controls and its widest cell stay in view', function (): void {
+it('fits a column so its header name and its widest cell stay in view', function (): void {
     Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Beekeepers International Holdings']);
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     foreach (['name', 'created_at'] as $column) {
@@ -219,10 +261,7 @@ it('keeps resizing after navigating to another table and after sorting', functio
     $savedWidth = sprintf('(() => document.querySelector(`%s`).dataset.resizableWidth)()', headerSelector('name'));
     $oneHandlePerHeader = '(() => [...document.querySelectorAll(`th[x-data^="resizableColumn"]`)].every((th) => th.querySelectorAll(".column-resize-handle-bar").length === 1))()';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click("a.fi-sidebar-item-btn[href$='/app/{$this->workspace->slug}/people']")
         ->assertPathIs("/app/{$this->workspace->slug}/people")
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
@@ -232,7 +271,7 @@ it('keeps resizing after navigating to another table and after sorting', functio
     $page->script(dragColumnEdge('name', 120));
     $page->wait(1);
 
-    $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', headerSelector('name')));
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSorts([{ column: "name", direction: "asc" }])');
 
     $page->wait(1)
         ->assertScript($savedWidth, (string) ($before + 120))
@@ -241,29 +280,60 @@ it('keeps resizing after navigating to another table and after sorting', functio
         ->assertNoJavaScriptErrors();
 });
 
-it('keeps the table head pinned while the page scrolls', function (): void {
+it('keeps the table head pinned while the rows scroll', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
 
-    $headOffset = '(() => { const layout = document.querySelector(".fi-layout"); return Math.abs(Math.round(document.querySelector("thead").getBoundingClientRect().top - layout.getBoundingClientRect().top)); })()';
+    $headOffset = '(() => { const container = document.querySelector(".fi-ta-content-ctn"); return Math.abs(Math.round(document.querySelector("thead").getBoundingClientRect().top - container.getBoundingClientRect().top)); })()';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 700)
-        ->navigate("/app/{$this->workspace->slug}/people")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1440, 700)
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
 
-    $page->script('document.querySelector(".fi-layout").scrollTo(0, 600)');
+    $page->script('document.querySelector(".fi-ta-content-ctn").scrollTo(0, 600)');
 
     $page->wait(0.5)
+        ->assertScript('document.querySelector(".fi-ta-content-ctn").scrollTop > 0', true)
         ->assertScript($headOffset, 0)
         ->assertNoJavaScriptErrors();
 });
 
+it('puts the horizontal scrollbar at the bottom of the screen with few records', function (): void {
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
+        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
+
+    $page->assertScript(tableAreaBottomGap(), true)
+        ->assertScript('(() => { const c = document.querySelector(".fi-ta-content-ctn"); return c.scrollWidth > c.clientWidth; })()', true)
+        ->assertScript(pageScrollsVertically(), false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('puts the horizontal scrollbar at the bottom of the screen with many records and scrolls the rows inside the table', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(60)->create();
+
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1440, 900)
+        ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
+
+    $page->script('(() => { const select = document.querySelector(".fi-pagination-records-per-page-select:not(.fi-compact) select"); select.value = "50"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
+
+    $page->wait(1.5)
+        ->assertScript('document.querySelectorAll(".fi-ta-content-ctn tbody tr").length', 50)
+        ->assertScript(tableAreaBottomGap(), true)
+        ->assertScript(pageScrollsVertically(), false)
+        ->assertScript('(() => { const c = document.querySelector(".fi-ta-content-ctn"); return c.scrollHeight > c.clientHeight + 1; })()', true)
+        ->assertScript('document.querySelector(".fi-ta-ctn .fi-pagination") !== null', true)
+        ->assertScript('(() => { const p = document.querySelector(".fi-ta-ctn .fi-pagination").getBoundingClientRect(); return p.top >= 0 && p.bottom <= window.innerHeight + 1; })()', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the empty state inside the table area', function (): void {
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/tasks", 1440, 900);
+
+    $page->assertScript('(() => { const empty = document.querySelector(".fi-ta-empty-state").getBoundingClientRect(); return empty.height > 200 && empty.bottom <= window.innerHeight + 1; })()', true)
+        ->assertScript(pageScrollsVertically(), false)
+        ->assertNoJavaScriptErrors();
+});
+
 it('resizes a column by the dragged amount when the table is narrower than the screen', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(2200, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 2200, 900)
         ->assertVisible(headerSelector('accountOwner.name').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('accountOwner.name'));
@@ -277,16 +347,13 @@ it('resizes a column by the dragged amount when the table is narrower than the s
 });
 
 it('keeps a width when the table is sorted straight after the drag', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
 
     $page->script(dragColumnEdge('created_at', 120));
-    $page->script(sprintf('document.querySelector(`%s .fi-ta-header-cell-sort-btn`).click()', headerSelector('name')));
+    $page->script('Livewire.all().find((component) => /List(Companies|People)/.test(component.name)).$wire.setFilterBarSorts([{ column: "name", direction: "asc" }])');
 
     $page->wait(1.5)
         ->assertScript(headerWidth('created_at'), $before + 120)
@@ -296,10 +363,7 @@ it('keeps a width when the table is sorted straight after the drag', function ()
 it('keeps a dragged width after signing in again', function (): void {
     $savedWidth = sprintf('(() => document.querySelector(`%s`).dataset.resizableWidth)()', headerSelector('created_at'));
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
@@ -326,10 +390,7 @@ it('keeps a dragged width after signing in again', function (): void {
 it('keeps a dragged width on a column that sets its own width, and the actions column gives up the space', function (): void {
     $actionsWidth = '(() => Math.round(document.querySelector("th.fi-ta-actions-header-cell").getBoundingClientRect().width))()';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1920, 900)
-        ->navigate("/app/{$this->workspace->slug}/people")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1920, 900)
         ->assertVisible(headerSelector('custom_fields.emails').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('custom_fields.emails'));
@@ -362,10 +423,7 @@ it('rebuilds a table only when its own component morphs', function (): void {
     $isLocked = 'document.querySelector("table.fi-ta-resizable-table").dataset.resizableLayoutLocked === "1"';
     $unlock = 'delete document.querySelector("table.fi-ta-resizable-table").dataset.resizableLayoutLocked';
 
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $page->script($unlock);
@@ -379,10 +437,7 @@ it('rebuilds a table only when its own component morphs', function (): void {
 });
 
 it('releases a column at the last pointer position when several moves land in one frame', function (): void {
-    $page = loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/companies")
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $before = $page->script(headerWidth('created_at'));
@@ -412,10 +467,7 @@ it('ends a text value cut by its column width with an ellipsis', function (): vo
 
     $title = 'document.querySelector("td.fi-ta-cell-title .fi-ta-text-item")';
 
-    loginViaBrowser($this->user)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/tasks")
+    visitAs($this->user, "/app/{$this->workspace->slug}/tasks", 1440, 900)
         ->assertScript("getComputedStyle({$title}).textOverflow === 'ellipsis' && getComputedStyle({$title}).display === 'block'", true)
         ->assertScript("{$title}.scrollWidth > {$title}.clientWidth", true)
         ->assertNoJavaScriptErrors();

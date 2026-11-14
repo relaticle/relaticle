@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -19,25 +19,18 @@ use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationMana
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager;
+use App\Filament\Tables\BulkBar;
+use App\Filament\Tables\RowActions;
 use App\Models\Company;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ExportBulkAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -46,6 +39,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
+use Relaticle\ImportWizard\Filament\Pages\ImportCompanies;
 
 final class CompanyResource extends Resource
 {
@@ -77,34 +71,25 @@ final class CompanyResource extends Resource
     {
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/company.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
-            ->filters([
-                SelectFilter::make('creation_source')
-                    ->label(__('filament/resources/company.fields.creation_source.label'))
-                    ->options(CreationSource::class)
-                    ->multiple(),
-                TrashedFilter::make(),
-            ])
             ->recordActions([
-                ActionGroup::make([
+                RowActions::withoutMenu([
                     PreviewRecordAction::make()->page(ViewCompany::class),
-                    ViewAction::make(),
-                    EditAction::make(),
-                    RestoreAction::make(),
-                    DeleteAction::make(),
-                    ForceDeleteAction::make(),
                 ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
+                BulkBar::make([
                     MassSendBulkAction::forCompanies(),
                     ExportBulkAction::make()
                         ->authorize('exportAny', Company::class)
                         ->exporter(CompanyExporter::class),
+                    RestoreBulkAction::make(),
+                ], more: [
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
                 ]),
             ]);
     }
@@ -118,16 +103,13 @@ final class CompanyResource extends Resource
             RecordChipColumn::make('name')
                 ->previewable()
                 ->label(__('filament/resources/company.fields.name.label'))
-                ->searchable()
                 ->sortable(),
             RecordChipColumn::make('accountOwner.name')
                 ->label(__('filament/resources/company.fields.account_owner.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable(),
             TextColumn::make('creator.name')
                 ->label(__('filament/resources/company.fields.created_by.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable()
                 ->visibleFrom('sm')
@@ -140,7 +122,6 @@ final class CompanyResource extends Resource
             TextColumn::make('created_at')
                 ->label(__('filament/resources/company.fields.created_at.label'))
                 ->dateTime()
-                ->searchable()
                 ->sortable()
                 ->visibleFrom('sm')
                 ->toggleable(),
@@ -151,7 +132,6 @@ final class CompanyResource extends Resource
                 ->label(__('filament/resources/company.fields.updated_at.label'))
                 ->since()
                 ->dateTimeTooltip()
-                ->searchable()
                 ->sortable()
                 ->toggleable(),
         ];
@@ -167,6 +147,14 @@ final class CompanyResource extends Resource
             EmailsRelationManager::class,
             MeetingsRelationManager::class,
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportCompanies::getRouteName()];
     }
 
     public static function getPages(): array

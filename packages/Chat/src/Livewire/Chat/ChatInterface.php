@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
@@ -51,6 +52,8 @@ final class ChatInterface extends BaseLivewireComponent
      */
     public bool $turnInFlight = false;
 
+    public bool $isSetupConversation = false;
+
     public string $context = 'conversation';
 
     public ?string $pageContextType = null;
@@ -68,7 +71,7 @@ final class ChatInterface extends BaseLivewireComponent
     private const int MAX_PROMPT_LENGTH = 5000;
 
     /**
-     * @var array<int, array{id?: string, role: string, content: string, created_at?: ?string, document?: array<string, mixed>, pending_actions?: array<int, mixed>, display_blocks?: list<array<string, mixed>>, next_steps?: list<array{label: string, prompt: string}>, feedback?: array{rating: string, category: ?string}|null, mentions?: list<array{type: string, id: string, label: string, url?: ?string}>, page_context?: array{type: string, id: string, label: string, url?: ?string}|null, attachment?: array{id: string, name: string, kind: string, row_count: int}|null}>
+     * @var array<int, array{id?: string, role: string, content: string, created_at?: ?string, document?: array<string, mixed>, pending_actions?: array<int, mixed>, display_blocks?: list<array<string, mixed>>, next_steps?: list<array{id: ?string, kind: string, label: string, prompt: ?string, url: ?string, icon: ?string}>, feedback?: array{rating: string, category: ?string}|null, mentions?: list<array{type: string, id: string, label: string, url?: ?string}>, page_context?: array{type: string, id: string, label: string, url?: ?string}|null, attachment?: array{id: string, name: string, kind: string, row_count: int}|null}>
      */
     public array $messages = [];
 
@@ -104,6 +107,11 @@ final class ChatInterface extends BaseLivewireComponent
             $this->oldestMessageId = $this->messages === [] ? null : ($this->messages[0]['id'] ?? null);
             $this->hasMoreMessages = count($this->messages) === self::PAGE_SIZE;
             $this->appendInFlightTurnState($this->conversationId);
+            $this->isSetupConversation = AgentConversation::query()
+                ->ownedBy($this->authUser())
+                ->whereKey($this->conversationId)
+                ->setup()
+                ->exists();
             $this->greetIfSetupConversation($this->conversationId);
         }
     }
@@ -202,7 +210,7 @@ final class ChatInterface extends BaseLivewireComponent
      * the client renders it exactly as the persisted one will after the turn.
      *
      * @param  array{origin: string, message: string, document: array<string, mixed>, mentions: list<array{type: string, id: string, label: string}>, page_context: array{type: string, id: string, label: string}|null, started_at: string}  $presence
-     * @return array{role: string, content: string, created_at: string, document: array<string, mixed>, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, feedback: null, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: ?string}|null}
+     * @return array{role: string, content: string, created_at: string, document: array<string, mixed>, pending_actions: array<int, mixed>, display_blocks: list<array<string, mixed>>, next_steps: list<array{id: ?string, kind: string, label: string, prompt: ?string, url: ?string, icon: ?string}>, feedback: null, mentions: list<array{type: string, id: string, label: string, url: ?string}>, page_context: array{type: string, id: string, label: string, url: ?string}|null}
      */
     private function inFlightUserMessage(array $presence): array
     {
@@ -306,7 +314,7 @@ final class ChatInterface extends BaseLivewireComponent
      * query below is scoped to the authed participant and workspace, so an id from
      * the client cannot reach another user's conversation.
      *
-     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>, next_steps: list<array{label: string, prompt: string}>, sources: list<array{url: string, title: string|null, domain: string}>}|null
+     * @return array{id: string, content: string, pending_actions: list<array<string, mixed>>, display_blocks: list<array<string, mixed>>, next_steps: list<array{id: ?string, kind: string, label: string, prompt: ?string, url: ?string, icon: ?string}>, sources: list<array{url: string, title: string|null, domain: string}>}|null
      */
     #[Renderless]
     public function latestAssistantMessage(?string $conversationId = null): ?array

@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Attributes\MimeType;
 use Laravel\Mcp\Server\Attributes\Uri;
 use Laravel\Mcp\Server\Resource;
 
-#[Description('Schema for tasks including available custom fields. Read this before creating or updating tasks.')]
+#[Description('Schema for tasks including available custom attributes (custom fields). Read this before creating or updating tasks.')]
 #[Uri('relaticle://schema/task')]
 #[MimeType('application/json')]
 #[Cacheable(ttlMs: CustomFieldSchemaCache::TTL * 1000, scope: CacheScope::Private)]

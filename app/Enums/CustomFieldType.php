@@ -126,7 +126,19 @@ enum CustomFieldType: string
             self::DOMAIN => 'as a bare host or a full URL, with or without www',
             self::PHONE => 'in any format, and the operand needs a country code such as +1 415 555 0100',
             self::TAGS_INPUT => 'the exact stored value',
+            self::RECORD => 'the ID of a linked record',
             self::DATE_TIME => 'a date without a time, such as 2026-10-01, as that whole day',
+            default => null,
+        };
+    }
+
+    public function partialMatching(): ?string
+    {
+        return match ($this) {
+            self::EMAIL => 'the address as stored',
+            self::PHONE => 'the stored number, such as +14155550100, with an extension as ;ext=12 and no spaces',
+            self::LINK => 'the link as it was saved, which keeps a scheme only when one was typed',
+            self::DOMAIN => 'the bare host, without a scheme or www',
             default => null,
         };
     }
@@ -138,7 +150,7 @@ enum CustomFieldType: string
             self::TEXT => ['$contains' => $this->example()],
             self::NUMBER, self::CURRENCY, self::DATE, self::DATE_TIME => ['$gte' => $this->example()],
             self::CHECKBOX, self::TOGGLE => ['$eq' => $this->example()],
-            self::EMAIL, self::PHONE, self::LINK, self::DOMAIN, self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => ['$has_any' => $this->example()],
+            self::EMAIL, self::PHONE, self::LINK, self::DOMAIN, self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT, self::RECORD => ['$has_any' => $this->example()],
             self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => ['$in' => [$this->example()]],
             default => [],
         };
@@ -163,6 +175,37 @@ enum CustomFieldType: string
             self::SELECT, self::RADIO, self::TOGGLE_BUTTONS,
             self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => true,
             default => false,
+        };
+    }
+
+    public function makesBoardColumns(): bool
+    {
+        return in_array($this, [self::SELECT, self::RADIO, self::TOGGLE_BUTTONS], true);
+    }
+
+    public function fitsOnCard(): bool
+    {
+        return match ($this) {
+            self::TEXTAREA, self::RICH_EDITOR, self::RECORD, self::FILE_UPLOAD => false,
+            self::TEXT, self::NUMBER, self::EMAIL, self::PHONE, self::LINK, self::DOMAIN,
+            self::CHECKBOX, self::CHECKBOX_LIST, self::RADIO, self::TAGS_INPUT, self::COLOR_PICKER,
+            self::TOGGLE, self::TOGGLE_BUTTONS, self::CURRENCY, self::DATE, self::DATE_TIME,
+            self::SELECT, self::MULTI_SELECT => true,
+        };
+    }
+
+    public function filterFieldKind(): ?FilterFieldKind
+    {
+        return match ($this) {
+            self::TEXT => FilterFieldKind::Text,
+            self::NUMBER, self::CURRENCY => FilterFieldKind::Number,
+            self::DATE, self::DATE_TIME => FilterFieldKind::Date,
+            self::SELECT, self::RADIO, self::TOGGLE_BUTTONS => FilterFieldKind::Choice,
+            self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT => FilterFieldKind::MultiChoice,
+            self::CHECKBOX, self::TOGGLE => FilterFieldKind::Checkbox,
+            self::EMAIL, self::PHONE, self::LINK, self::DOMAIN => FilterFieldKind::MultiText,
+            self::RECORD => FilterFieldKind::Record,
+            self::TEXTAREA, self::RICH_EDITOR, self::COLOR_PICKER, self::FILE_UPLOAD => null,
         };
     }
 }

@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
+use App\Filament\Actions\ImportExportActionGroup;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\RecordChipColumn;
-use App\Filament\Concerns\RemembersViewMode;
 use App\Filament\Exports\OpportunityExporter;
 use App\Filament\Resources\OpportunityResource\Forms\OpportunityForm;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
@@ -19,33 +19,30 @@ use App\Filament\Resources\OpportunityResource\RelationManagers\EmailsRelationMa
 use App\Filament\Resources\OpportunityResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\OpportunityResource\RelationManagers\TasksRelationManager;
+use App\Filament\Tables\BulkBar;
+use App\Filament\Tables\RowActions;
 use App\Models\Opportunity;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
+use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
+use Filament\Actions\ExportAction;
 use Filament\Actions\ExportBulkAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
-use Filament\Actions\ViewAction;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Size;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Override;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
+use Relaticle\ImportWizard\Filament\Pages\ImportOpportunities;
 
 final class OpportunityResource extends Resource
 {
-    use RemembersViewMode;
-
     protected static ?string $model = Opportunity::class;
 
     protected static ?string $recordTitleAttribute = 'name';
@@ -61,17 +58,40 @@ final class OpportunityResource extends Resource
         return OpportunityForm::get($schema);
     }
 
+    /**
+     * @return list<Action|ActionGroup>
+     */
+    public static function collectionActions(): array
+    {
+        return [
+            ImportExportActionGroup::make([
+                Action::make('import')
+                    ->label(__('filament/resources/opportunity.pages.list.actions.import.label'))
+                    ->icon('lucide-upload')
+                    ->url(ImportOpportunities::getUrl())
+                    ->visible(ImportOpportunities::canAccess(...)),
+                ExportAction::make()->exporter(OpportunityExporter::class)->authorize('exportAny', Opportunity::class),
+            ])->label(__('filament/resources/opportunity.pages.list.actions.import_export.label')),
+            CreateAction::make()
+                ->icon('lucide-plus')
+                ->authorize(self::canCreate(...))
+                ->size(Size::Small)
+                ->model(Opportunity::class)
+                ->schema(fn (Schema $schema): Schema => self::form($schema->columns(2))),
+        ];
+    }
+
     public static function table(Table $table): Table
     {
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/opportunity.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns([
                 RecordChipColumn::make('name')
-                    ->previewable()
-                    ->searchable(),
+                    ->previewable(),
                 TextColumn::make('creator.name')
                     ->label(__('filament/resources/opportunity.fields.creator.label'))
-                    ->searchable()
                     ->sortable()
                     ->toggleable()
                     ->visibleFrom('sm')
@@ -91,29 +111,18 @@ final class OpportunityResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
-            ->filters([
-                SelectFilter::make('creation_source')
-                    ->label(__('filament/resources/opportunity.fields.creation_source.label'))
-                    ->options(CreationSource::class)
-                    ->multiple(),
-                TrashedFilter::make(),
-            ])
             ->recordActions([
-                ActionGroup::make([
+                RowActions::withoutMenu([
                     PreviewRecordAction::make()->page(ViewOpportunity::class),
-                    ViewAction::make(),
-                    EditAction::make(),
-                    RestoreAction::make(),
-                    DeleteAction::make(),
-                    ForceDeleteAction::make(),
                 ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
+                BulkBar::make([
                     ExportBulkAction::make()
                         ->authorize('exportAny', Opportunity::class)
                         ->exporter(OpportunityExporter::class),
                     RestoreBulkAction::make(),
+                ], more: [
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
                 ]),
@@ -129,6 +138,14 @@ final class OpportunityResource extends Resource
             EmailsRelationManager::class,
             MeetingsRelationManager::class,
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportOpportunities::getRouteName()];
     }
 
     #[Override]
