@@ -24,6 +24,7 @@ use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
+use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\WorkspaceCustomField;
 
@@ -189,6 +190,17 @@ it('moves the duplicate\'s history to the kept person and adds a merged entry', 
         ->and($merged->properties['duplicate_name'])->toBe('Dana W')
         ->and($merged->causer_id)->toBe($this->user->getKey())
         ->and($merged->workspace_id)->toBe($this->workspace->getKey());
+});
+
+it('shows who merged the duplicate on the kept person\'s timeline', function (): void {
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.']);
+
+    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    livewire(ActivityLogLivewire::class, ['subjectClass' => People::class, 'subjectKey' => $kept->getKey()])
+        ->assertSee(e($this->user->name.' merged Dana W. into this record'), escape: false)
+        ->assertSeeHtml('data-event="record_merged"');
 });
 
 it('makes the kept person real data when the duplicate was real', function (): void {

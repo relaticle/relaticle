@@ -21,6 +21,7 @@ return [
         'record_merged' => [
             'label' => 'Merged',
             'description' => ':name merged into this record',
+            'description_by' => ':causer merged :name into this record',
         ],
         'meeting.created' => [
             'label' => 'Meeting scheduled',

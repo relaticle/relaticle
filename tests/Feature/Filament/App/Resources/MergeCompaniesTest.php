@@ -529,7 +529,7 @@ it('shows the merge on the kept company\'s timeline', function (): void {
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
     livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => $kept->getKey()])
-        ->assertSee(e('Brightline Health Inc.').' merged into this record', escape: false)
+        ->assertSee(e($this->user->name.' merged Brightline Health Inc. into this record'), escape: false)
         ->assertSeeHtml('data-event="record_merged"');
 });
 

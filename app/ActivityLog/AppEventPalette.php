@@ -40,12 +40,22 @@ enum AppEventPalette: string implements HasIcon, HasLabel
     {
         return match ($this) {
             self::NoteCreated, self::TaskCreated => null,
-            self::RecordMerged => (string) __('activity-log.events.record_merged.description', ['name' => $entry->properties['duplicate_name'] ?? '']),
+            self::RecordMerged => $this->mergedDescription($entry),
         };
     }
 
     public function badge(): null
     {
         return null;
+    }
+
+    private function mergedDescription(TimelineEntry $entry): string
+    {
+        $causer = $entry->causer?->getAttribute('name');
+        $name = $entry->properties['duplicate_name'] ?? '';
+
+        return is_string($causer) && $causer !== ''
+            ? (string) __('activity-log.events.record_merged.description_by', ['causer' => $causer, 'name' => $name])
+            : (string) __('activity-log.events.record_merged.description', ['name' => $name]);
     }
 }

@@ -7,6 +7,7 @@ return [
         'record_merged' => [
             'label' => 'Fusionné',
             'description' => ':name a été fusionné dans cet enregistrement',
+            'description_by' => ':causer a fusionné :name dans cet enregistrement',
         ],
     ],
 ];
