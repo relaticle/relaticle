@@ -2190,7 +2190,7 @@ it('deletes a task status, clears its tasks and names the attribute status', fun
     $mounted = $component->instance()->getMountedAction();
 
     expect($mounted->getModalHeading())->toBe('Delete "'.$name.'"?')
-        ->and($mounted->getModalDescription())->toBe('1 task will have no status. They show in the No Status column when it is on in View settings.');
+        ->and($mounted->getModalDescription())->toBe('1 task will have no status. It shows in the No Status column when it is on in View settings.');
 
     $component->callMountedAction();
 

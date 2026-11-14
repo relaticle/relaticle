@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\CustomFields\SetCustomFieldOptions;
 use App\Enums\OptionColor;
+use App\Exceptions\OptionsChangedException;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -821,4 +822,111 @@ it('clears values through the action and refuses a member', function (): void {
 
 it('names the clear marker in the assistant instructions', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())->toContain('pass where they move in `replacements`, or null to clear their value');
+});
+
+it('counts only live records in the clear count on the card', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned (1 record loses its value)']);
+});
+
+it('shows no count when only trashed records hold the cleared option', function (): void {
+    setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Churned'))->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned']);
+});
+
+it('says records lose the option, not their value, on a multi-select field', function (): void {
+    $smbId = setOptionsId($this->segments, 'SMB');
+    setOptionsCompany($this->workspace, $this->segments, [$smbId]);
+    setOptionsCompany($this->workspace, $this->segments, [$smbId, setOptionsId($this->segments, 'Startup')]);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'segments',
+        'options' => [['name' => 'Enterprise'], ['name' => 'Startup']],
+        'replacements' => ['SMB' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'SMB (2 records lose this option)']);
+});
+
+it('refuses at proposal to clear more records than the cap allows, trashed ones counted', function (): void {
+    config(['chat.max_option_value_moves' => 2]);
+
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['error'])->toContain('"Churned" would be cleared on 3 records. This assistant clears or moves at most 2 records in one approval.')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses at approval to clear more records than the cap allows', function (): void {
+    config(['chat.max_option_value_moves' => 2]);
+
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    $late = [setOptionsCompany($this->workspace, $this->lifecycle, $churnedId), setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)];
+
+    expect(fn (): PendingAction => resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner))
+        ->toThrow(ValidationException::class, 'This assistant clears or moves at most 2 records in one approval.');
+
+    expect(setOptionsStoredValue($late[0], $this->lifecycle))->toBe($churnedId);
+});
+
+it('lets a caller that opts out clear more records than the cap', function (): void {
+    config(['chat.max_option_value_moves' => 1]);
+
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    $companies = [setOptionsCompany($this->workspace, $this->lifecycle, $churnedId), setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)];
+    $options = collect(['Lead', 'Customer'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $data = ['options' => $options, 'replacements' => [$churnedId => null], 'removed' => [$churnedId]];
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, $data))->toThrow(ValidationException::class);
+
+    resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, $data, capsClears: false);
+
+    expect(setOptionsStoredValue($companies[0], $this->lifecycle))->toBeNull();
+});
+
+it('raises a distinct exception when the options changed under the caller', function (): void {
+    $options = collect(['Lead', 'Customer', 'Churned'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $options[0]['was'] = 'Other';
+    $options[0]['name'] = 'Renamed';
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]))
+        ->toThrow(OptionsChangedException::class);
 });

@@ -17,6 +17,7 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Enums\OptionColor;
 use App\Enums\WorkspaceCapability;
+use App\Exceptions\OptionsChangedException;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
@@ -29,6 +30,7 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -222,7 +224,7 @@ trait HasBoardStageOrder
         try {
             resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
         } catch (ValidationException $exception) {
-            $this->addError("boardStageMenu.{$option['id']}", (string) collect($exception->errors())->flatten()->first());
+            $this->addError("boardStageMenu.{$option['id']}", $this->stageWriteFailure($exception));
 
             return;
         }
@@ -296,6 +298,8 @@ trait HasBoardStageOrder
                 ->icon('lucide-trash-2')
                 ->color('danger')
                 ->visible(fn (array $arguments): bool => ($arguments['column'] ?? null) !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages())
+                ->modalIcon('lucide-trash-2')
+                ->modalWidth(Width::Medium)
                 ->modalHeading(fn (array $arguments): string => __('filament/pages/boards.stage_menu.delete_heading', ['name' => $this->stageNameFor($arguments['column'] ?? null)]))
                 ->modalDescription(fn (array $arguments): string => $this->deleteStageDescription($arguments['column'] ?? null))
                 ->modalSubmitActionLabel(__('filament/pages/boards.stage_menu.delete_confirm'))
@@ -310,7 +314,7 @@ trait HasBoardStageOrder
 
     private function deleteStageDescription(mixed $optionId): string
     {
-        $count = is_string($optionId) ? CustomFieldValue::query()->holdingOption($this->boardColumnField(), $optionId)->count() : 0;
+        $count = is_string($optionId) ? CustomFieldValue::query()->holdingOptionOnLiveRecord($this->boardColumnField(), $optionId)->count() : 0;
 
         if ($count === 0) {
             return '';
@@ -318,12 +322,19 @@ trait HasBoardStageOrder
 
         $entity = $this->viewSwitcherEntity();
 
-        return __('filament/pages/boards.stage_menu.delete_body', [
+        return trans_choice('filament/pages/boards.stage_menu.delete_body', $count, [
             'count' => number_format($count),
             'records' => trans_choice('filament/pages/boards.stage_menu.records.'.($entity === CrmEntity::Opportunity || $entity === CrmEntity::Task ? $entity->value : 'record'), $count),
             'attribute' => $this->boardStageNoun(),
             'column' => $this->noValueColumnLabel(),
         ]);
+    }
+
+    private function stageWriteFailure(ValidationException $exception): string
+    {
+        return $exception instanceof OptionsChangedException
+            ? __('filament/pages/boards.stage_menu.changed', ['noun' => $this->boardStageNoun()])
+            : (string) collect($exception->errors())->flatten()->first();
     }
 
     private function deleteBoardColumn(mixed $optionId): void
@@ -350,9 +361,9 @@ trait HasBoardStageOrder
         $options = array_values(array_filter($this->stageOptionEntries($field, '', []), static fn (array $entry): bool => $entry['id'] !== $optionId));
 
         try {
-            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'replacements' => [$optionId => null], 'removed' => [$optionId]]);
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'replacements' => [$optionId => null], 'removed' => [$optionId]], capsClears: false);
         } catch (ValidationException $exception) {
-            Notification::make()->danger()->title((string) collect($exception->errors())->flatten()->first())->send();
+            Notification::make()->danger()->title($this->stageWriteFailure($exception))->send();
 
             return;
         }

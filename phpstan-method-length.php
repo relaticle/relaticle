@@ -25,7 +25,7 @@ return [
                 'App\Providers\Filament\AppPanelProvider::panel' => 251,
                 'App\Providers\HealthServiceProvider::boot' => 63,
                 'App\Services\AvatarService::getInitials' => 70,
-                'App\Support\CustomFieldOptionPlan::validated' => 95,
+                'App\Support\CustomFieldOptionPlan::validated' => 92,
                 'Relaticle\Chat\Queries\ConversationMessagesQuery::get' => 88,
                 'Relaticle\Chat\Agents\CrmAssistant::staticInstructions' => 110,
                 'Relaticle\Chat\Http\Controllers\ChatController::send' => 141,

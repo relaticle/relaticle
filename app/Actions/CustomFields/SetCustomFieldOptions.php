@@ -22,7 +22,7 @@ final readonly class SetCustomFieldOptions
     /**
      * @param  array<string, mixed>  $data
      */
-    public function execute(User $user, CustomField $field, array $data): CustomField
+    public function execute(User $user, CustomField $field, array $data, bool $capsClears = true): CustomField
     {
         abort_unless(
             $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage),
@@ -38,9 +38,9 @@ final readonly class SetCustomFieldOptions
         TenantContextService::setTenantId($workspaceId);
 
         try {
-            DB::transaction(function () use ($field, $data): void {
+            DB::transaction(function () use ($field, $data, $capsClears): void {
                 $field = CustomField::query()->withoutGlobalScopes()->whereKey($field->getKey())->lockForUpdate()->sole();
-                $plan = CustomFieldOptionPlan::validated($field, $data);
+                $plan = CustomFieldOptionPlan::validated($field, $data, $capsClears);
                 $options = $this->writeOptions($field, $plan);
                 $this->enableOptionColors($field, $plan);
                 $removed = array_column($plan->removals, 'option');

@@ -38,6 +38,7 @@ use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Support\Enums\Width;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -1942,7 +1943,7 @@ it('words the confirmation with the stage name and the card count, and drops the
 
     expect(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[1]))
         ->toBe(['Delete "'.$name.'"?', '2 opportunities will have no stage. They show in the No Stage column when it is on in View settings.'])
-        ->and(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[0])[1])->toStartWith('1 opportunity will have no stage.')
+        ->and(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[0])[1])->toBe('1 opportunity will have no stage. It shows in the No Stage column when it is on in View settings.')
         ->and(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[2]))->toBe(['Delete "'.stageOption($ids[2])->name.'"?', null]);
 });
 
@@ -1954,7 +1955,7 @@ it('words the confirmation with the option noun on another attribute', function 
 
     $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnField', $tier->code);
 
-    expect(deleteConfirmation($component, $gold)[1])->toBe('1 opportunity will have no option. They show in the No Tier column when it is on in View settings.');
+    expect(deleteConfirmation($component, $gold)[1])->toBe('1 opportunity will have no option. It shows in the No Tier column when it is on in View settings.');
 });
 
 it('never offers delete on the no-value column', function (): void {
@@ -2029,3 +2030,58 @@ it('leaves the stored board state harmless when a collapsed, hidden and ordered 
 
     livewire(OpportunitiesBoard::class)->assertSuccessful();
 });
+
+it('counts only live cards in the confirmation and gives a stage holding only trashed cards no body', function (): void {
+    $ids = stageIds($this->stageField);
+    $name = stageOption($ids[1])->name;
+    opportunityInStage($this, 'Acme renewal', $name);
+    opportunityInStage($this, 'Globex upsell', $name)->delete();
+    opportunityInStage($this, 'Initech', stageOption($ids[0])->name)->delete();
+
+    expect(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[1])[1])->toStartWith('1 opportunity will have no stage.')
+        ->and(deleteConfirmation(livewire(OpportunitiesBoard::class), $ids[0])[1])->toBeNull();
+});
+
+it('opens the delete confirmation at medium width with an icon', function (): void {
+    $action = livewire(OpportunitiesBoard::class)->mountAction(deleteStageAction(stageIds($this->stageField)[1]))->instance()->getMountedAction();
+
+    expect($action->getModalWidth())->toBe(Width::Medium)
+        ->and($action->getModalIcon())->toBe('lucide-trash-2');
+});
+
+it('deletes a stage holding more cards than the assistant cap', function (): void {
+    config(['chat.max_option_value_moves' => 1]);
+    $ids = stageIds($this->stageField);
+    $name = stageOption($ids[1])->name;
+    opportunityInStage($this, 'Acme renewal', $name);
+    opportunityInStage($this, 'Globex upsell', $name);
+
+    livewire(OpportunitiesBoard::class)->callAction(deleteStageAction($ids[1]));
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->toBeNull();
+});
+
+it('tells the board user to reload when the options change under a delete, rename or color write', function (string $write): void {
+    $ids = stageIds($this->stageField);
+    $other = $ids[0];
+    $armed = true;
+
+    DB::listen(function (QueryExecuted $query) use (&$armed, $other): void {
+        if ($armed && str_contains($query->sql, 'for update') && str_contains($query->sql, 'custom_fields')) {
+            $armed = false;
+            DB::table('custom_field_options')->where('id', $other)->update(['name' => 'Raced']);
+        }
+    });
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    $changed = __('filament/pages/boards.stage_menu.changed', ['noun' => 'stage']);
+
+    match ($write) {
+        'delete' => $component->callAction(deleteStageAction($ids[1]))->assertNotified($changed),
+        'rename' => $component->call('renameBoardColumn', $ids[1], 'Discovery')->assertHasErrors(['boardStageMenu.'.$ids[1] => $changed]),
+        'color' => $component->call('setBoardColumnColor', $ids[1], OptionColor::Blue->value)->assertHasErrors(['boardStageMenu.'.$ids[1] => $changed]),
+    };
+
+    expect(stageOption($ids[1])->name)->not->toBe('Discovery')->and(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[1]))->not->toBeNull();
+})->with(['delete', 'rename', 'color']);
