@@ -1554,6 +1554,29 @@ it('collapses every column from the bar and keeps it after a reload', function (
         ->and(TablePreference::query()->sole()->board_state->columnsCollapsed)->toBeFalse();
 });
 
+it('opens the stages collapsed one by one from the bar, with or without collapse all', function (bool $all): void {
+    $ids = stageIds($this->stageField);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', $ids[1], true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true);
+
+    if ($all) {
+        $component->call('setBoardColumnsCollapsed', true);
+    }
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([$ids[1]]);
+
+    $component->call('setBoardColumnsCollapsed', false);
+
+    $state = TablePreference::query()->sole()->board_state;
+
+    expect($state->columnsCollapsed)->toBeFalse()
+        ->and($state->collapsedColumns)->toBe([])
+        ->and($state->collapsedNoValueColumns)->toBe([]);
+})->with(['with collapse all' => true, 'without' => false]);
+
 it('renders a collapsed stage that was then deleted or hidden without error', function (string $case): void {
     $ids = stageIds($this->stageField);
     livewire(OpportunitiesBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);

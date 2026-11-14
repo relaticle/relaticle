@@ -32,7 +32,7 @@ final readonly class SetBoardColumnCollapsed
             $entity,
             function (BoardStateData $stored) use ($fieldCode, $optionIds, $optionId, $collapsed, $alone): array {
                 if (! $collapsed && $stored->columnsCollapsed) {
-                    return $this->expandOutOfAll($stored, $fieldCode, $optionIds, $alone ? $optionId : null);
+                    return $stored->expandingColumns($fieldCode, $optionIds, $alone ? $optionId : null);
                 }
 
                 if ($optionId === BoardStateData::NO_VALUE_COLUMN) {
@@ -50,21 +50,5 @@ final readonly class SetBoardColumnCollapsed
             },
             $view,
         );
-    }
-
-    /**
-     * @param  list<string>  $optionIds
-     * @return array<string, mixed>
-     */
-    private function expandOutOfAll(BoardStateData $stored, string $fieldCode, array $optionIds, ?string $openOnly): array
-    {
-        $noValue = array_values(array_diff($stored->collapsedNoValueColumns, [$fieldCode]));
-        $collapsed = $openOnly === null ? [] : array_values(array_diff($optionIds, [$openOnly]));
-
-        return [
-            'columns_collapsed' => false,
-            'collapsed_columns' => BoardStateData::withColumnIds($stored->collapsedColumns, $optionIds, $collapsed),
-            'collapsed_no_value_columns' => $openOnly === null || $openOnly === BoardStateData::NO_VALUE_COLUMN ? $noValue : [...$noValue, $fieldCode],
-        ];
     }
 }

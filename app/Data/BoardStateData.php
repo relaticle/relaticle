@@ -52,6 +52,22 @@ final class BoardStateData extends Data
     }
 
     /**
+     * @param  list<string>  $fieldOptionIds
+     * @return array<string, mixed>
+     */
+    public function expandingColumns(string $fieldCode, array $fieldOptionIds, ?string $openOnly = null): array
+    {
+        $noValue = array_values(array_diff($this->collapsedNoValueColumns, [$fieldCode]));
+        $collapsed = $openOnly === null ? [] : array_values(array_diff($fieldOptionIds, [$openOnly]));
+
+        return [
+            'columns_collapsed' => false,
+            'collapsed_columns' => self::withColumnIds($this->collapsedColumns, $fieldOptionIds, $collapsed),
+            'collapsed_no_value_columns' => $openOnly === null || $openOnly === self::NO_VALUE_COLUMN ? $noValue : [...$noValue, $fieldCode],
+        ];
+    }
+
+    /**
      * @param  list<string>  $order
      * @param  list<string>  $moved
      * @return list<string>

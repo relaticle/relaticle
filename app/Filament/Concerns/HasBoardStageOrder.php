@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Concerns;
 
 use App\Actions\CustomFields\SetCustomFieldOptions;
+use App\Actions\Views\ExpandBoardColumns;
 use App\Actions\Views\MoveBoardCard;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
@@ -149,11 +150,13 @@ trait HasBoardStageOrder
     {
         $collapsed = filter_var($collapsed, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
 
-        if ($collapsed === null || $collapsed === $this->storedBoardState()->columnsCollapsed) {
+        if ($collapsed === null || ($collapsed === $this->storedBoardState()->columnsCollapsed && ($collapsed || $this->collapsedBoardColumnIds() === []))) {
             return;
         }
 
-        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), ['columns_collapsed' => $collapsed], $view));
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => $collapsed
+            ? resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), ['columns_collapsed' => true], $view)
+            : resolve(ExpandBoardColumns::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $this->boardColumnField()->code, $view));
 
         if ($saved instanceof BoardStateData) {
             $this->boardStateWritten($saved);
