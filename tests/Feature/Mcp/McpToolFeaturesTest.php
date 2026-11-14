@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Enums\MediaCollection;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
@@ -13,6 +14,8 @@ use App\Mcp\Tools\Note\DetachNoteFromEntitiesTool;
 use App\Mcp\Tools\Note\ListNotesTool;
 use App\Mcp\Tools\Note\UpdateNoteTool;
 use App\Mcp\Tools\Opportunity\CreateOpportunityTool;
+use App\Mcp\Tools\Opportunity\GetOpportunityTool;
+use App\Mcp\Tools\Opportunity\ListOpportunitiesTool;
 use App\Mcp\Tools\Opportunity\UpdateOpportunityTool;
 use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\UpdatePeopleTool;
@@ -29,6 +32,9 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\Fluent\AssertableJson;
 
 beforeEach(function () {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -806,6 +812,112 @@ describe('relationship includes filter sensitive fields', function () {
             ->assertDontSee('workspace_id')
             ->assertDontSee('creator_id')
             ->assertDontSee('deleted_at');
+    });
+});
+
+describe('relationship includes return custom fields', function () {
+    beforeEach(function (): void {
+        $this->company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $this->person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $this->company->id]);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(UpdatePeopleTool::class, ['id' => $this->person->id, 'custom_fields' => ['job_title' => 'VP Sales']])
+            ->assertOk();
+    });
+
+    it('returns the custom fields of people a show tool expands', function (): void {
+        RelaticleServer::actingAs($this->user)
+            ->tool(GetCompanyTool::class, ['id' => $this->company->id, 'include' => ['people']])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+                ->where('data.people.0.custom_fields.job_title', 'VP Sales')
+                ->etc());
+    });
+
+    it('returns the body of notes a show tool expands', function (): void {
+        $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+        $note->companies()->attach($this->company);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(UpdateNoteTool::class, ['id' => $note->id, 'custom_fields' => ['body' => 'Renewal call with procurement']])
+            ->assertOk();
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(GetCompanyTool::class, ['id' => $this->company->id, 'include' => ['notes']])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+                ->where('data.notes.0.custom_fields.body', fn (string $body): bool => str_contains($body, 'Renewal call with procurement'))
+                ->etc());
+    });
+
+    it('resolves the images of expanded notes in one media lookup', function (): void {
+        foreach (range(1, 3) as $index) {
+            $media = $this->workspace->addMediaFromString(onePixelPng())->usingFileName("{$index}.png")
+                ->withAttributes(['workspace_id' => $this->workspace->getKey()])
+                ->toMediaCollection(MediaCollection::PendingUploads->value);
+
+            RelaticleServer::actingAs($this->user)
+                ->tool(CreateNoteTool::class, [
+                    'title' => "Call {$index}",
+                    'company_ids' => [$this->company->id],
+                    'custom_fields' => ['body' => "<p><img src=\"stale\" data-id=\"{$media->uuid}\"></p>"],
+                ])
+                ->assertOk();
+        }
+
+        app()->forgetScopedInstances();
+
+        $mediaLookups = 0;
+        DB::listen(function (QueryExecuted $query) use (&$mediaLookups): void {
+            $mediaLookups += (int) str_contains($query->sql, 'from "media"');
+        });
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(GetCompanyTool::class, ['id' => $this->company->id, 'include' => ['notes']])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json->has('data.notes', 3)->etc());
+
+        expect($mediaLookups)->toBe(1);
+    });
+
+    it('returns the custom fields of a contact a show tool expands', function (): void {
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $this->person->id]);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(GetOpportunityTool::class, ['id' => $opportunity->id, 'include' => ['contact']])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+                ->where('data.contact.custom_fields.job_title', 'VP Sales')
+                ->etc());
+    });
+
+    it('returns the custom fields of a contact a list tool expands', function (): void {
+        Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $this->person->id]);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListOpportunitiesTool::class, ['include' => ['contact']])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+                ->where('items.0.contact.custom_fields.job_title', 'VP Sales')
+                ->etc());
+    });
+
+    it('loads the custom fields of expanded contacts once for the whole list', function (): void {
+        People::factory(2)->recycle([$this->user, $this->workspace])->create()
+            ->push($this->person)
+            ->each(fn (People $person) => Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $person->id]));
+
+        $valueQueries = 0;
+        DB::listen(function (QueryExecuted $query) use (&$valueQueries): void {
+            $valueQueries += (int) str_contains($query->sql, 'from "custom_field_values"');
+        });
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(ListOpportunitiesTool::class, ['include' => ['contact']])
+            ->assertOk()
+            ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json->has('items', 3)->etc());
+
+        expect($valueQueries)->toBe(2);
     });
 });
 
