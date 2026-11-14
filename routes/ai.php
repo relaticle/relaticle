@@ -8,6 +8,7 @@ use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\RequireConsent;
 use App\Http\Middleware\RequireMcpResource;
 use App\Http\Middleware\SetApiWorkspaceContext;
+use App\Http\Middleware\StripOAuthErrorHint;
 use App\Http\Middleware\ValidateMcpOrigin;
 use App\Mcp\Servers\RelaticleServer;
 use Illuminate\Support\Facades\Route;
@@ -25,11 +26,11 @@ Route::middleware('throttle:mcp-oauth')->group(static fn () => Mcp::oauthRoutes(
 // Defer registration until after Passport (which boots later) has registered its routes,
 // so our POST /oauth/authorize wins the dispatch slot in the route collection.
 app()->booted(static function (): void {
-    Route::middleware(['web', 'auth', 'verified', 'throttle:mcp-oauth'])
+    Route::middleware(['web', 'auth', 'verified', 'throttle:mcp-oauth', StripOAuthErrorHint::class])
         ->post('/oauth/authorize', [ApproveAuthorizationController::class, 'approve'])
         ->name('passport.authorizations.approve');
 
-    Route::middleware(['web', RequireConsent::class, RequireMcpResource::class])
+    Route::middleware(['web', RequireConsent::class, RequireMcpResource::class, StripOAuthErrorHint::class])
         ->get('/oauth/authorize', [AuthorizationController::class, 'authorize'])
         ->name('passport.authorizations.authorize');
 });
