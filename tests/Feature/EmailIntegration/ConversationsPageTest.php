@@ -19,11 +19,13 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Facade;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Relaticle\Chat\Jobs\SummarizeEmailConversationJob;
 use Relaticle\EmailIntegration\Actions\MarkConversationsDone;
 use Relaticle\EmailIntegration\Actions\MarkConversationsRead;
 use Relaticle\EmailIntegration\Actions\MarkConversationsUnread;
@@ -70,6 +72,7 @@ use function Pest\Laravel\actingAs;
 mutates(ForgetConversationCountsListener::class, EmailInboxPage::class, HasConversationReader::class, ConversationsQuery::class, MarkEmailAsReadAction::class, ConversationView::class, PreferredEmailCopyService::class, ConversationFilters::class, EmailFilter::class, EmailSearchService::class, HasConversationFilters::class, MarkConversationsDone::class, ReopenConversations::class, MarkConversationsRead::class, MarkConversationsUnread::class, PrepareConversationTriage::class, TriageOutcome::class, TriageSkipReason::class, UnlinkedSendersQuery::class, HasUnlinkedSenders::class, AddEmailAddressToPerson::class);
 
 beforeEach(function (): void {
+    Queue::fake([SummarizeEmailConversationJob::class]);
     $this->owner = User::factory()->withWorkspace()->create();
     $this->workspace = $this->owner->currentWorkspace;
     $this->teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);

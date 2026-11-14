@@ -241,7 +241,6 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
     {
         $email = Email::query()
             ->where('user_id', $this->authUser()->getKey())
-            ->where('workspace_id', $this->authUser()->current_workspace_id)
             ->whereKey($emailId)
             ->first();
 

@@ -7,12 +7,12 @@
             :action="$this->connectMailboxAction"
             :secondary-action="$this->connectAzureAction"
         />
-    @else
-        <x-email-integration::mailbox-health-banner
-            :mailboxes="$this->unhealthyMailboxes"
-            class="border-b border-gray-200/60 dark:border-white/10"
-        />
     @endif
+
+    <x-email-integration::mailbox-health-banner
+        :mailboxes="$this->unhealthyMailboxes"
+        class="border-b border-gray-200/60 dark:border-white/10"
+    />
 
     @if ($this->showsConversations)
         <x-email-integration::live-conversations :user-id="auth()->id()" :workspace-id="filament()->getTenant()?->getKey()" />

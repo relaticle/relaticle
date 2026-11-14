@@ -75,7 +75,9 @@ final readonly class SendEmailAction
 
         abort_unless($account->isSendable(), 403);
 
-        $this->variables->assertResolved($data['subject'], $data['body_html']);
+        if ($data['creation_source'] !== EmailCreationSource::MCP) {
+            $this->variables->assertResolved($data['subject'], $data['body_html']);
+        }
 
         $priority = $data['priority'] ?? EmailPriority::BULK;
 
@@ -102,9 +104,6 @@ final readonly class SendEmailAction
         /** @var array<string, string> $attachmentFileNames */
         $attachmentFileNames = $embedded['attachment_file_names'];
 
-        $hasDownloadableAttachments = collect($attachmentPaths)
-            ->contains(fn (string $path): bool => ($attachmentAttributes[$path]['is_inline'] ?? false) !== true);
-
         $disk = Storage::disk(EmailAttachment::DISK);
         $this->attachments->assertFitsProvider(
             $account->provider,
@@ -118,7 +117,7 @@ final readonly class SendEmailAction
             strlen((string) $data['body_html']),
         );
 
-        return DB::transaction(function () use ($user, $account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
+        return DB::transaction(function () use ($user, $account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames): Email {
             $inReplyTo = $this->lockedParent($account, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
@@ -144,7 +143,7 @@ final readonly class SendEmailAction
                 'folder' => EmailFolder::Sent,
                 'status' => EmailStatus::QUEUED,
                 'priority' => $priority,
-                'has_attachments' => $hasDownloadableAttachments,
+                'has_attachments' => collect($attachmentPaths)->contains(fn (string $path): bool => ($attachmentAttributes[$path]['is_inline'] ?? false) !== true),
                 'is_internal' => false,
                 'creation_source' => $data['creation_source'],
                 'batch_id' => $data['batch_id'] ?? null,

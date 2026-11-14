@@ -355,7 +355,7 @@ final class Email extends Model
     public static function listColumns(): array
     {
         $email = new self;
-        $columns = [$email->getKeyName(), ...$email->getFillable(), 'created_at', 'updated_at', 'deleted_at'];
+        $columns = [$email->getKeyName(), ...$email->getFillable(), 'oauth_client_id', 'personal_access_token_id', 'created_at', 'updated_at', 'deleted_at'];
 
         return array_values(array_map($email->qualifyColumn(...), $columns));
     }

@@ -57,7 +57,7 @@ return [
                 'Relaticle\EmailIntegration\Actions\LinkEmailAction::link' => 108,
                 'Relaticle\EmailIntegration\Actions\LinkMeetingAction::link' => 77,
                 'Relaticle\EmailIntegration\Actions\RetryMailboxHistoryImportFailuresAction::execute' => 78,
-                'Relaticle\EmailIntegration\Actions\SendEmailAction::execute' => 107,
+                'Relaticle\EmailIntegration\Actions\SendEmailAction::execute' => 106,
                 'Relaticle\EmailIntegration\Actions\StoreEmailAction::storeForAccount' => 98,
                 'Relaticle\EmailIntegration\Actions\StoreMeetingAction::store' => 68,
                 'Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand::dispatchForAccount' => 64,

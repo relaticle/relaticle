@@ -172,7 +172,7 @@ trait RunsMailboxSteps
         $mailbox = $this->connectedMailbox();
 
         $effective = $mailbox instanceof ConnectedAccount
-            ? resolve(PrivacyService::class)->tierForMailbox($mailbox)
+            ? ($mailbox->sharing_tier ?? resolve(PrivacyService::class)->workspaceSharingTier($this->workspace))
             : EmailPrivacyTier::METADATA_ONLY;
 
         return in_array($effective, EmailPrivacyTier::offeredAtConnect(), true) ? $effective->value : EmailPrivacyTier::METADATA_ONLY->value;

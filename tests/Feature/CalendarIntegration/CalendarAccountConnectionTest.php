@@ -171,7 +171,7 @@ it('turns send back on after reconnecting with gmail.send', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
         ->assertSee(__('filament/emails/composer.grant_send.description'))
-        ->assertDontSee(__('filament/emails/composer.actions.send'));
+        ->assertDontSeeHtml('wire:click="send"');
 
     expect($connect([
         'https://www.googleapis.com/auth/gmail.readonly',
@@ -180,6 +180,6 @@ it('turns send back on after reconnecting with gmail.send', function (): void {
 
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
-        ->assertSee(__('filament/emails/composer.actions.send'))
+        ->assertSeeHtml('wire:click="send"')
         ->assertDontSee(__('filament/emails/composer.grant_send.description'));
 });

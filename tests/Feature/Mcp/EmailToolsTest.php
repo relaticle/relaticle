@@ -1475,7 +1475,7 @@ it('shows a held email in the default view of its owner outbox', function (): vo
 
     livewire(OutboxTable::class)
         ->assertCanSeeTableRecords([$held])
-        ->call('setStatusTab', 'scheduled')
+        ->filterTable('status_tab', 'scheduled')
         ->assertCanNotSeeTableRecords([$held]);
 });
 
@@ -1506,7 +1506,7 @@ it('schedules email sent through rela like composer mail in the owner outbox', f
     livewire(OutboxTable::class)
         ->assertCanSeeTableRecords([$inUndoWindow])
         ->assertCanNotSeeTableRecords([$scheduled])
-        ->call('setStatusTab', 'scheduled')
+        ->filterTable('status_tab', 'scheduled')
         ->assertCanSeeTableRecords([$scheduled])
         ->assertCanNotSeeTableRecords([$inUndoWindow]);
 });
@@ -1666,7 +1666,7 @@ it('cancels a held email from the notification', function (): void {
     Filament::setTenant($this->workspace);
 
     livewire(EmailAccessNotificationHandler::class)
-        ->dispatch('undo-queued-send', emailId: $data['id']);
+        ->dispatch('cancel-held-send', emailId: $data['id']);
 
     expect(Email::query()->findOrFail($data['id'])->status)->toBe(EmailStatus::CANCELLED);
 });
@@ -1893,7 +1893,7 @@ it('cancels a held email from another workspace of the same user', function (): 
     Filament::setTenant($elsewhere);
 
     livewire(EmailAccessNotificationHandler::class)
-        ->dispatch('undo-queued-send', emailId: $data['id']);
+        ->dispatch('cancel-held-send', emailId: $data['id']);
 
     expect(Email::query()->findOrFail($data['id'])->status)->toBe(EmailStatus::CANCELLED);
 });

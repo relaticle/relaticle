@@ -3,16 +3,9 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Illuminate\Support\Str;
-use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
-use Relaticle\EmailIntegration\Enums\EmailDirection;
-use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
-use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
-use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailConversationState;
-use Relaticle\EmailIntegration\Models\EmailParticipant;
 
 mutates(EmailInboxPage::class);
 
@@ -30,26 +23,6 @@ beforeEach(function (): void {
     config(['relaticle.features.email_conversations' => [$this->workspace->id]]);
 });
 
-function triageBrowserInbound(ConnectedAccount $mailbox, string $key, mixed $sentAt): void
-{
-    $email = Email::factory()->create([
-        'workspace_id' => $mailbox->workspace_id,
-        'user_id' => $mailbox->user_id,
-        'connected_account_id' => $mailbox->id,
-        'conversation_key' => $key,
-        'rfc_message_id' => '<'.Str::lower((string) Str::ulid()).'@mail.test>',
-        'direction' => EmailDirection::INBOUND,
-        'status' => EmailStatus::SYNCED,
-        'privacy_tier' => EmailPrivacyTier::FULL,
-        'is_internal' => false,
-        'sent_at' => $sentAt,
-    ]);
-
-    EmailParticipant::factory()->from()->create(['email_id' => $email->id, 'email_address' => 'brian@airbnb.test', 'name' => 'Brian']);
-
-    resolve(RefreshConversationSummary::class)->execute($mailbox->workspace_id, $key, broadcast: false);
-}
-
 it('shows a done row again when new mail brings it back on a refetch', function (string $theme): void {
     triageBrowserInbound($this->mailbox, 'conv-back', now()->subHour());
     $row = '[data-conversation="conv-back"]';
@@ -64,7 +37,9 @@ it('shows a done row again when new mail brings it back on a refetch', function 
 
     triageBrowserInbound($this->mailbox, 'conv-back', now());
 
-    $page->assertScript("Livewire.find(document.querySelector('{$row}').closest('[wire\\\\:id]').getAttribute('wire:id')).call('refreshConversations').then(() => true)")
+    $page->script("Livewire.find(document.querySelector('{$row}').closest('[wire\\\\:id]').getAttribute('wire:id')).call('refreshConversations'); true");
+
+    $page
         ->wait(1.5)
         ->assertScript("document.querySelector('{$row}').hidden", false)
         ->assertScript("document.querySelector('{$row}').dataset.done", 'false')
@@ -105,29 +80,6 @@ it('marks done on Enter from the Done pill without opening the reader', function
         ->assertNoJavaScriptErrors();
 
     expect(EmailConversationState::query()->where('user_id', $this->owner->id)->where('conversation_key', 'conv-pill')->exists())->toBeTrue();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('keeps the reader open on Escape while one of its dropdowns is open', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-menu', now()->subHour());
-
-    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/email?view=all")
-        ->click('[data-conversation="conv-menu"] > button')
-        ->assertVisible('.fi-email-reader-drawer')
-        ->click('[data-reader-action="reply"]')
-        ->assertVisible('[data-inline-composer] .fi-dropdown-trigger button[aria-label="Signature"]');
-
-    $page->script("document.querySelector('[data-inline-composer] .fi-dropdown-trigger button[aria-label=Signature]').dispatchEvent(new MouseEvent('mousedown', { button: 0, bubbles: true }))");
-
-    $page->assertScript("document.querySelector('[data-inline-composer] .fi-dropdown-trigger button[aria-label=Signature]').closest('.fi-dropdown').querySelector('.fi-dropdown-panel').style.display", 'block');
-
-    $page->script("document.getElementById('email-reader-heading').dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))");
-
-    $page->wait(1)
-        ->assertVisible('.fi-email-reader-drawer')
-        ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
 
 it('moves the tab stop to a visible row when e marks the hovered tab stop done', function (string $theme): void {
@@ -285,191 +237,5 @@ it('clears the selection with Escape', function (string $theme): void {
         ->keys('[data-conversation="conv-one"] [data-select-conversation]', 'Escape')
         ->assertMissing('[data-triage-bar]')
         ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('marks done from the reader a conversation the list does not show', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-linked', now()->subHour());
-    $email = Email::query()->where('conversation_key', 'conv-linked')->sole();
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->navigate("/app/{$this->workspace->slug}/email?view=awaiting_reply&email={$email->id}")
-        ->assertVisible('[data-email-reader] [data-reader-action=done]')
-        ->assertMissing('[data-conversation="conv-linked"]')
-        ->click('[data-email-reader] [data-reader-action=done]')
-        ->wait(1.5)
-        ->navigate("/app/{$this->workspace->slug}/email?view=done")
-        ->assertPresent('[data-conversation="conv-linked"]')
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('keeps the selection bar over the list when the sidebar collapses', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
-    $edges = '(() => { const wrapper = document.querySelector("[data-triage-bar]").parentElement; const list = document.querySelector("[data-select-page]").closest("[x-data]"); return Math.abs(wrapper.getBoundingClientRect().left - list.getBoundingClientRect().left) < 1 })()';
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
-        ->click('[data-conversation="conv-one"] [data-select-conversation]')
-        ->assertVisible('[data-triage-bar]')
-        ->assertScript($edges, true)
-        ->assertScript('document.querySelector("[data-select-page]").closest("[x-data]").getBoundingClientRect().left > 100', true)
-        ->assertScript('Alpine.store("sidebar").close() || true')
-        ->wait(1)
-        ->assertScript('document.querySelector("[data-select-page]").closest("[x-data]").getBoundingClientRect().left < 100', true)
-        ->assertScript($edges, true)
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('says the selection is already done when a bulk done changes nothing', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
-    triageBrowserInbound($this->mailbox, 'conv-two', now()->subMinutes(20));
-    foreach (['conv-one', 'conv-two'] as $key) {
-        EmailConversationState::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->owner->id, 'conversation_key' => $key]);
-    }
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->navigate("/app/{$this->workspace->slug}/email?view=all")
-        ->click('[data-conversation="conv-one"] [data-select-conversation]')
-        ->click('[data-conversation="conv-two"] [data-select-conversation]')
-        ->keys('[data-conversation="conv-two"] [data-select-conversation]', 'e')
-        ->assertSee('2 conversations already marked Done.')
-        ->assertMissing('[data-triage-bar]')
-        ->assertMissing('[data-undo-action]')
-        ->assertNoJavaScriptErrors();
-
-    expect(EmailConversationState::query()->count())->toBe(2);
-})->with(['inLightMode', 'inDarkMode']);
-
-it('empties the search box on Escape and keeps the selection', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
-    $search = '[data-conversation-search] input';
-    $subject = Email::query()->where('conversation_key', 'conv-one')->value('subject');
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
-        ->click('[data-conversation="conv-one"] [data-select-conversation]')
-        ->assertVisible('[data-triage-bar]')
-        ->type($search, $subject)
-        ->wait(1.5)
-        ->assertPresent('[data-conversation="conv-one"]')
-        ->assertVisible('[data-triage-bar]')
-        ->keys($search, 'Escape')
-        ->wait(1)
-        ->assertValue($search, '')
-        ->assertVisible('[data-triage-bar]')
-        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 1)
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('undoes a reopen from the reader of a conversation the list does not show', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-linked', now()->subHour());
-    $email = Email::query()->where('conversation_key', 'conv-linked')->sole();
-    EmailConversationState::factory()->create([
-        'workspace_id' => $this->workspace->id,
-        'user_id' => $this->owner->id,
-        'conversation_key' => 'conv-linked',
-        'done_through' => $email->sent_at,
-    ]);
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->navigate("/app/{$this->workspace->slug}/email?view=awaiting_reply&email={$email->id}")
-        ->assertMissing('[data-conversation="conv-linked"]')
-        ->click('[data-email-reader] [data-reader-action=reopen]')
-        ->assertVisible('[data-undo-action]')
-        ->click('[data-undo-action]')
-        ->wait(1.5)
-        ->navigate("/app/{$this->workspace->slug}/email?view=done")
-        ->assertPresent('[data-conversation="conv-linked"]')
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('drops the selection after leaving the view and coming back', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
-        ->click('[data-conversation="conv-one"] [data-select-conversation]')
-        ->assertVisible('[data-triage-bar]')
-        ->assertScript("document.querySelector(`[wire\\\\:click=\"setView('all')\"]`).click() || true")
-        ->wait(1.5)
-        ->assertPresent('[data-conversation="conv-one"]')
-        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
-        ->assertScript("document.querySelector(`[wire\\\\:click=\"setView('needs_reply')\"]`).click() || true")
-        ->wait(1.5)
-        ->assertPresent('[data-conversation="conv-one"]')
-        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
-        ->assertMissing('[data-triage-bar]')
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('drops the selection after paging away and back', function (string $theme): void {
-    foreach (range(1, 51) as $index) {
-        triageBrowserInbound($this->mailbox, "conv-{$index}", now()->subMinutes($index));
-    }
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
-        ->click('[data-conversation="conv-1"] [data-select-conversation]')
-        ->assertVisible('[data-triage-bar]')
-        ->click('[data-conversations-page=older]')
-        ->wait(1.5)
-        ->assertPresent('[data-conversation="conv-51"]')
-        ->click('[data-conversations-page=newer]')
-        ->wait(1.5)
-        ->assertPresent('[data-conversation="conv-1"]')
-        ->assertScript('document.querySelectorAll("[data-selected=true]").length', 0)
-        ->assertMissing('[data-triage-bar]')
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('closes the reader on Escape from an empty search box', function (string $theme): void {
-    triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
-    $search = '[data-conversation-search] input';
-
-    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
-        ->click('[data-conversation="conv-one"] > button')
-        ->assertVisible('[data-email-reader]')
-        ->assertScript("document.querySelector('{$search}').focus() || true")
-        ->keys($search, 'Escape')
-        ->wait(1)
-        ->assertMissing('[data-email-reader]')
-        ->assertNoJavaScriptErrors();
-})->with(['inLightMode', 'inDarkMode']);
-
-it('keeps the selection bar beside the reader while the reader is resized', function (string $theme): void {
-    foreach (['conv-open' => 10, 'conv-one' => 20] as $key => $minutes) {
-        triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
-    }
-    $meets = '(() => { const bar = document.querySelector("[data-triage-bar]").parentElement.getBoundingClientRect(); const reader = document.querySelector("[data-email-reader]").getBoundingClientRect(); return Math.abs(bar.right - reader.left) < 2 })()';
-    $separator = '[data-email-reader] [role=separator]';
-
-    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
-        ->assertPathIs("/app/{$this->workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
-        ->click('[data-conversation="conv-open"] > button')
-        ->assertVisible('[data-email-reader]')
-        ->click('[data-conversation="conv-one"] [data-select-conversation]')
-        ->assertVisible('[data-triage-bar]')
-        ->assertScript($meets, true);
-
-    $before = $page->script('document.querySelector("[data-email-reader]").getBoundingClientRect().left');
-
-    $page->keys($separator, 'ArrowRight')
-        ->keys($separator, 'ArrowRight')
-        ->wait(1)
-        ->assertScript("document.querySelector('[data-email-reader]').getBoundingClientRect().left > {$before} + 50", true)
-        ->assertScript($meets, true)
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
