@@ -68,13 +68,21 @@ final readonly class SentryEventScrubber
 
             $route = Arr::first(
                 Router::getRoutes()->get('GET'),
-                fn (Route $candidate): bool => $candidate->matches($request),
+                fn (Route $candidate): bool => self::hasSecretParameter($candidate) && $candidate->matches($request),
             );
         } catch (RequestExceptionInterface) {
             return self::FILTERED;
         }
 
         return $route instanceof Route ? self::mask($url, $route) : $url;
+    }
+
+    private static function hasSecretParameter(Route $route): bool
+    {
+        return array_any(
+            self::SECRET_PARAMETERS,
+            fn (string $parameter): bool => str_contains($route->uri(), '{'.$parameter),
+        );
     }
 
     private static function mask(string $url, Route $route): string
