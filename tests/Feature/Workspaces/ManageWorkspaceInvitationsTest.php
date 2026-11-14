@@ -139,7 +139,7 @@ test('resending re-issues the token and extends expiry', function (): void {
     $invitation->refresh();
 
     expect($invitation->token)->not->toBeNull()
-        ->and($invitation->expires_at->isAfter(now()->addDays(6)))->toBeTrue();
+        ->and($invitation->expires_at->isAfter(now()->addHours(47)))->toBeTrue();
 });
 
 test('resending delivers the new invitation mailable with a working raw token', function (): void {

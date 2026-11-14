@@ -146,7 +146,7 @@ final readonly class MailPreview
             'workspace_id' => $workspace->id,
             'email' => 'sam@acme-robotics.example',
             'role' => 'member',
-            'expires_at' => now()->addDays(7),
+            'expires_at' => now()->addDays(2),
         ]);
 
         $invitation->setRelation('workspace', $workspace);
