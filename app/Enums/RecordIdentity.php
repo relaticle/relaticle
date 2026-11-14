@@ -7,10 +7,10 @@ namespace App\Enums;
 use App\Enums\CustomFields\CompanyField;
 use App\Enums\CustomFields\PeopleField;
 
-enum RecordIdentity: string
+enum RecordIdentity
 {
-    case Domains = 'domains';
-    case Emails = 'emails';
+    case Domains;
+    case Emails;
 
     public function fieldCode(): string
     {
