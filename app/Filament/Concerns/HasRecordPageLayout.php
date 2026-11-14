@@ -320,6 +320,7 @@ trait HasRecordPageLayout
                 }),
             ActionGroup::make([
                 ActionGroup::make([
+                    MergeRecordAction::make(),
                     CopyToClipboardAction::make('copyPageUrl')
                         ->label(__('filament/record-page.actions.copy_page_url'))
                         ->copies(
@@ -329,7 +330,6 @@ trait HasRecordPageLayout
                     CopyToClipboardAction::make('copyRecordId')
                         ->label(__('filament/record-page.actions.copy_record_id'))
                         ->copies((string) $this->getRecord()->getKey(), __('filament/record-page.notifications.id_copied')),
-                    MergeRecordAction::make(),
                 ])->dropdown(false),
                 DeleteAction::make(),
             ])
