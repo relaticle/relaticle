@@ -807,6 +807,27 @@ it('collapses a stage on a double-click in its empty space, flat and with lanes'
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
 ]);
 
+it('opens one column out of collapse all on a double-click and switches the bar to expanded', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+
+    $page = openBoard($user, $path);
+    pressLayout($page, 'columns', 'collapsed', 'boardColumns');
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === ".count($ids)), true);
+
+    $page->page()->locator("[data-column-root=\"{$ids[1]}\"][data-collapsed]")->dblclick();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->columnsCollapsed === false);
+
+    $page->assertScript(boardWaitFor("document.querySelector('[data-column-root=\"{$ids[1]}\"]').hasAttribute('data-collapsed') === false"), true)
+        ->assertScript('document.querySelectorAll(".ff-column[data-collapsed]").length', count($ids) - 1)
+        ->assertScript('document.querySelector(\'[data-board-columns-option="expanded"]\').getAttribute("aria-pressed")', 'true');
+
+    expect(storedBoardState($user, $entity)->collapsedColumns)->toEqualCanonicalizing(array_values(array_diff($ids, [$ids[1]])));
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
 it('lets a phone expand the columns that collapse all folded', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
     $this->withVite();
 

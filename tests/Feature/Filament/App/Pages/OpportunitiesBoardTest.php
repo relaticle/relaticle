@@ -1443,6 +1443,20 @@ it('collapses a stage for the member and expands it again', function (): void {
         ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
 });
 
+it('opens one stage out of collapse all and keeps the others collapsed', function (): void {
+    $ids = stageIds($this->stageField);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnsCollapsed', true)
+        ->call('toggleBoardColumnCollapse', $ids[2]);
+
+    $state = TablePreference::query()->sole()->board_state;
+
+    expect($state->columnsCollapsed)->toBeFalse()
+        ->and($state->collapsedColumns)->toEqualCanonicalizing(array_values(array_diff($ids, [$ids[2]])))
+        ->and($state->collapsedNoValueColumns)->toBe([$this->stageField->code]);
+});
+
 it('toggles a stage through the rail collapse callback', function (): void {
     $ids = stageIds($this->stageField);
     $component = livewire(OpportunitiesBoard::class)->call('toggleBoardColumnCollapse', $ids[2]);
