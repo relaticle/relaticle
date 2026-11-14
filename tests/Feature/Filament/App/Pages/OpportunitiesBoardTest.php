@@ -1575,10 +1575,39 @@ it('keeps the collapsed stages of other attributes when one attribute collapses'
 
 it('reads a stored board state that still carries the retired column width', function (): void {
     $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData);
-    DB::table('table_preferences')->where('id', $preference->getKey())->update(['board_state' => json_encode(['column_width' => 'narrow', 'card_size' => 'compact', 'collapsed_columns' => [], 'columns_collapsed' => false])]);
+    DB::table('table_preferences')->where('id', $preference->getKey())->update(['board_state' => json_encode(['column_width' => 'narrow', 'card_size' => 'compact'])]);
 
     $component = freshOpportunitiesBoard()->assertOk();
 
     expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse()
         ->and($preference->refresh()->board_state->cardSize)->toBe(BoardCardSize::Compact);
+});
+
+it('keeps the no-value collapse with the attribute it was set on', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+
+    $component->call('setBoardColumnField', $tier->code)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnField', $this->stageField->code);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
+
+it('opens a new attribute with its no-value column expanded', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true);
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->callAction('createColumnAttribute', data: ['name' => 'Lead tier', 'options' => [['name' => 'Hot']]]);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
 });

@@ -30,14 +30,19 @@ final readonly class SetBoardColumnCollapsed
             $user,
             $workspace,
             $entity,
-            function (BoardStateData $stored) use ($optionIds, $optionId, $collapsed): array {
-                $owned = [...$optionIds, BoardStateData::NO_VALUE_COLUMN];
-                $current = array_values(array_intersect($stored->collapsedColumns, $owned));
+            function (BoardStateData $stored) use ($fieldCode, $optionIds, $optionId, $collapsed): array {
+                if ($optionId === BoardStateData::NO_VALUE_COLUMN) {
+                    $codes = array_values(array_diff($stored->collapsedNoValueColumns, [$fieldCode]));
+
+                    return ['collapsed_no_value_columns' => $collapsed ? [...$codes, $fieldCode] : $codes];
+                }
+
+                $current = array_values(array_intersect($stored->collapsedColumns, $optionIds));
                 $next = $collapsed
                     ? array_values(array_unique([...$current, $optionId]))
                     : array_values(array_diff($current, [$optionId]));
 
-                return ['collapsed_columns' => BoardStateData::withColumnIds($stored->collapsedColumns, $owned, $next)];
+                return ['collapsed_columns' => BoardStateData::withColumnIds($stored->collapsedColumns, $optionIds, $next)];
             },
             $view,
         );

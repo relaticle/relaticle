@@ -2,23 +2,21 @@
 @use('Illuminate\Support\Js')
 
 <div class="fi-board-layout-toggles">
-    <div class="max-sm:hidden">
-        <div class="fi-board-layout-group" role="group" aria-label="{{ __('filament/pages/boards.layout.columns') }}">
-            @foreach (['collapsed' => 'lucide-fold-horizontal', 'expanded' => 'lucide-unfold-horizontal'] as $option => $icon)
-                @php($label = __("filament/pages/boards.layout.columns_{$option}"))
-                <button
-                    type="button"
-                    class="fi-board-layout-option"
-                    data-board-columns-option="{{ $option }}"
-                    aria-pressed="{{ $columnsCollapsed === ($option === 'collapsed') ? 'true' : 'false' }}"
-                    aria-label="{{ $label }}"
-                    x-tooltip="{ content: {{ Js::from($label) }}, theme: $store.theme }"
-                    wire:click="setBoardColumnsCollapsed({{ $option === 'collapsed' ? 'true' : 'false' }})"
-                >
-                    <x-filament::icon :icon="$icon" class="size-menu-icon" />
-                </button>
-            @endforeach
-        </div>
+    <div class="fi-board-layout-group" role="group" aria-label="{{ __('filament/pages/boards.layout.columns') }}">
+        @foreach (['collapsed' => 'lucide-fold-horizontal', 'expanded' => 'lucide-unfold-horizontal'] as $option => $icon)
+            @php($label = __("filament/pages/boards.layout.columns_{$option}"))
+            <button
+                type="button"
+                class="fi-board-layout-option"
+                data-board-columns-option="{{ $option }}"
+                aria-pressed="{{ $columnsCollapsed === ($option === 'collapsed') ? 'true' : 'false' }}"
+                aria-label="{{ $label }}"
+                x-tooltip="{ content: {{ Js::from($label) }}, theme: $store.theme }"
+                wire:click="setBoardColumnsCollapsed({{ $option === 'collapsed' ? 'true' : 'false' }})"
+            >
+                <x-filament::icon :icon="$icon" class="size-menu-icon" />
+            </button>
+        @endforeach
     </div>
 
     <div class="fi-board-layout-group" role="group" aria-label="{{ __('filament/pages/boards.layout.card_size') }}">

@@ -157,13 +157,12 @@ trait HasBoardStageOrder
      */
     protected function collapsedBoardColumnIds(): array
     {
-        $existing = $this->boardColumnOptions()->pluck('id')->all();
+        $state = $this->storedBoardState();
+        $collapsed = array_values(array_intersect($state->collapsedColumns, $this->boardColumnOptions()->pluck('id')->all()));
 
-        if ($this->showsNoValueColumn()) {
-            $existing[] = BoardStateData::NO_VALUE_COLUMN;
-        }
-
-        return array_values(array_intersect($this->storedBoardState()->collapsedColumns, $existing));
+        return $this->showsNoValueColumn() && in_array($this->boardColumnField()->code, $state->collapsedNoValueColumns, true)
+            ? [BoardStateData::NO_VALUE_COLUMN, ...$collapsed]
+            : $collapsed;
     }
 
     private function ownsCollapsibleColumn(string $optionId): bool

@@ -20,6 +20,7 @@ final class BoardStateData extends Data
      * @param  list<string>  $hiddenColumns
      * @param  list<string>  $noValueColumns
      * @param  list<string>  $collapsedColumns
+     * @param  list<string>  $collapsedNoValueColumns
      * @param  list<string>|null  $cardAttributes
      */
     public function __construct(
@@ -34,6 +35,7 @@ final class BoardStateData extends Data
         public readonly bool $showLabels = false,
         public readonly bool $hideEmpty = true,
         public readonly array $collapsedColumns = [],
+        public readonly array $collapsedNoValueColumns = [],
         public readonly bool $columnsCollapsed = false,
         public readonly BoardCardSize $cardSize = BoardCardSize::Full,
     ) {}

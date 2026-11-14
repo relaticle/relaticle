@@ -762,3 +762,66 @@ it('collapses a stage by double-clicking its header and expands it by clicking i
     'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
 ]);
+
+it('lets a phone expand the columns that collapse all folded', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $columns = $field->options->count();
+    TenantContextService::setTenantId(null);
+
+    $page = openBoard($user, $path);
+    pressLayout($page, 'columns', 'collapsed', 'boardColumns');
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === {$columns}"), true);
+
+    $page->resize(390, 844)->navigate("/app/{$workspace->slug}/{$path}")->assertVisible('.ff-column >> nth=0');
+    $page->assertVisible('[data-board-columns-option="expanded"]')
+        ->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === {$columns}"), true);
+
+    $page->click('[data-board-columns-option="expanded"]');
+    $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-column[data-collapsed]").length === 0'), true);
+    expect(storedBoardState($user, $entity)?->columnsCollapsed)->toBeFalse();
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity],
+]);
+
+it('collapses one stage after collapse all and expand all on one page load, and its rail expands only itself', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $first = (string) $field->options->first()->getKey();
+    $columns = $field->options->count();
+    TenantContextService::setTenantId(null);
+
+    $page = openBoard($user, $path);
+
+    pressLayout($page, 'columns', 'collapsed', 'boardColumns');
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === {$columns}"), true);
+    pressLayout($page, 'columns', 'expanded', 'boardColumns');
+    $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-column[data-collapsed]").length === 0'), true);
+
+    $page->page()->locator(boardHeaderTitle($first))->dblclick();
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === 1"), true);
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$first]);
+
+    $page->page()->locator("[data-column-root=\"{$first}\"][data-collapsed]")->click();
+    $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-column[data-collapsed]").length === 0'), true);
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === []);
+
+    expect(storedBoardState($user, $entity)->collapsedColumns)->toBe([])
+        ->and(storedBoardState($user, $entity)->columnsCollapsed)->toBeFalse();
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity],
+]);

@@ -2095,3 +2095,17 @@ it('reads a stored task board state that still carries the retired column width'
 
     expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse();
 });
+
+it('keeps the task no-value collapse with the attribute it was set on', function (): void {
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnField', 'priority')
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnField', $this->statusField->code);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
