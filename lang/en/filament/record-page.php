@@ -56,7 +56,10 @@ return [
         'over_limit' => ':field can hold :max values. Together these records have more. Remove some first.',
         'pick' => 'Choose a record',
         'clear' => 'Choose a different record',
-        'search_placeholder' => 'Search by name',
+        'search_placeholder' => [
+            'company' => 'Search by name or domain',
+            'people' => 'Search by name or email',
+        ],
         'no_results' => 'No records found',
         'no_domains' => 'No domains',
         'no_emails' => 'No emails',

@@ -22,6 +22,7 @@ use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\TransactionBeginning;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -123,6 +124,45 @@ it('fills the company from the duplicate only when the kept person has none', fu
     expect($withoutCompany->refresh()->company_id)->toBe($globex->getKey())
         ->and($withCompany->refresh()->company_id)->toBe($acme->getKey());
 });
+
+it('treats the kept person\'s soft-deleted company as empty and takes the duplicate\'s live company', function (bool $duplicateHasCompany): void {
+    $gone = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $live = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $kept = mergePerson($this->workspace, $this->user, ['company_id' => $gone->getKey()]);
+    $duplicate = mergePerson($this->workspace, $this->user, ['company_id' => $duplicateHasCompany ? $live->getKey() : null]);
+    $gone->delete();
+
+    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect($kept->refresh()->company_id)->toBe($duplicateHasCompany ? $live->getKey() : null)
+        ->and(People::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+})->with([true, false]);
+
+function mergePersonDialog(People $kept, string $search): string
+{
+    $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
+        ->mountAction(mergePersonAction())
+        ->setActionData(['search' => $search]);
+
+    return implode('', Arr::where($page->effects['partials'], fn (string $html, string $key): bool => str_starts_with($key, 'action-modals')));
+}
+
+it('finds a person by name or by any of their emails', function (string $term, array $found): void {
+    $kept = mergePerson($this->workspace, $this->user, ['name' => 'Kept']);
+    mergePerson($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'whitfield@outlook.com']]);
+    mergePerson($this->workspace, $this->user, ['name' => 'Sam Rivera'], ['emails' => ['sam@northwind.com']]);
+
+    $dialog = mergePersonDialog($kept, $term);
+
+    foreach (['Dana Whitfield', 'Sam Rivera'] as $name) {
+        in_array($name, $found, true) ? expect($dialog)->toContain($name) : expect($dialog)->not->toContain($name);
+    }
+})->with([
+    'name' => ['Dana', ['Dana Whitfield']],
+    'second email' => ['outlook', ['Dana Whitfield']],
+    'email fragment' => ['sam@north', ['Sam Rivera']],
+    'nothing' => ['zzz', []],
+]);
 
 it('keeps the other person when the member swaps the two', function (): void {
     $current = mergePerson($this->workspace, $this->user, ['name' => 'Sam'], ['emails' => ['sam@one.com']]);

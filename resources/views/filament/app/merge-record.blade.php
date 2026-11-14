@@ -2,7 +2,9 @@
     class="grid gap-4"
     data-merge-dialog
     x-on:keydown.enter.window="
-        if ($el.offsetParent === null || $event.target.closest('input, textarea, select, button, a, [contenteditable]')) {
+        const openModals = document.querySelectorAll('.fi-modal-open')
+
+        if ($el.offsetParent === null || openModals[openModals.length - 1] !== $el.closest('.fi-modal') || $event.target.closest('input, textarea, select, button, a, [contenteditable]')) {
             return
         }
 
