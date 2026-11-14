@@ -422,7 +422,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     {
         $user = $this->authUser();
 
-        return resolve(VisibleEmailsQuery::class)->replyableEmail($user, (string) $user->current_workspace_id, $emailId);
+        return resolve(VisibleEmailsQuery::class)->replyableEmail($user, (string) $user->current_workspace_id, $emailId, ['participants', 'shares', 'body', 'attachments']);
     }
 
     public function send(): void
