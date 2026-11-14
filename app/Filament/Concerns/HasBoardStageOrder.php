@@ -129,11 +129,17 @@ trait HasBoardStageOrder
         });
     }
 
-    public function setBoardColumnCollapsed(mixed $optionId = null, mixed $collapsed = true): void
+    public function setBoardColumnCollapsed(mixed $optionId = null, mixed $collapsed = true, mixed $alone = false): void
     {
         $collapsed = filter_var($collapsed, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
 
         if (! is_string($optionId) || $collapsed === null || ! $this->ownsCollapsibleColumn($optionId)) {
+            return;
+        }
+
+        if (! $collapsed && $alone !== true && $this->storedBoardState()->columnsCollapsed) {
+            $this->setBoardColumnsCollapsed(false);
+
             return;
         }
 

@@ -1448,13 +1448,26 @@ it('opens one stage out of collapse all and keeps the others collapsed', functio
 
     livewire(OpportunitiesBoard::class)
         ->call('setBoardColumnsCollapsed', true)
-        ->call('toggleBoardColumnCollapse', $ids[2]);
+        ->call('toggleBoardColumnCollapse', $ids[2], true);
 
     $state = TablePreference::query()->sole()->board_state;
 
     expect($state->columnsCollapsed)->toBeFalse()
         ->and($state->collapsedColumns)->toEqualCanonicalizing(array_values(array_diff($ids, [$ids[2]])))
         ->and($state->collapsedNoValueColumns)->toBe([$this->stageField->code]);
+});
+
+it('opens every stage on a single click out of collapse all', function (): void {
+    $ids = stageIds($this->stageField);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnsCollapsed', true)
+        ->call('toggleBoardColumnCollapse', $ids[2]);
+
+    $state = TablePreference::query()->sole()->board_state;
+
+    expect($state->columnsCollapsed)->toBeFalse()
+        ->and($state->collapsedColumns)->toBe([]);
 });
 
 it('toggles a stage through the rail collapse callback', function (): void {

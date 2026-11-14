@@ -87,7 +87,7 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
             ->columns($this->boardColumns())
             ->collapsedColumns(fn (): array => $this->collapsedBoardColumnIds())
             ->collapseAllColumns(fn (): bool => $this->storedBoardState()->columnsCollapsed)
-            ->collapsibleColumns(fn (string $columnId, bool $collapsed) => $this->setBoardColumnCollapsed($columnId, $collapsed))
+            ->collapsibleColumns(fn (string $columnId, bool $collapsed, bool $alone) => $this->setBoardColumnCollapsed($columnId, $collapsed, $alone))
             ->columnActions($this->boardStageActions())
             ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->addColumnUsing($this->addBoardStageUsing())
