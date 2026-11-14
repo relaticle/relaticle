@@ -29,6 +29,7 @@ use Illuminate\Support\Js;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Ai\Contracts\ConversationStore;
 use Laravel\Ai\Events\AgentFailed;
+use Laravel\Ai\Events\InvokingTool;
 use Laravel\Ai\Events\StepFailed;
 use Laravel\Ai\Events\ToolFailed;
 use Livewire\Livewire;
@@ -37,6 +38,7 @@ use Relaticle\Chat\Commands\ExpirePendingActionsCommand;
 use Relaticle\Chat\Commands\PurgeUnsentAttachmentsCommand;
 use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Commands\ResetCreditsCommand;
+use Relaticle\Chat\Listeners\EnsureMemberOnToolCallListener;
 use Relaticle\Chat\Livewire\App\Chat\ChatAllChatsPanel;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidebarNav;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
@@ -109,6 +111,7 @@ final class ChatServiceProvider extends ServiceProvider
             [AgentFailed::class, StepFailed::class, ToolFailed::class],
             AgentRunTelemetry::class,
         );
+        Event::listen(InvokingTool::class, EnsureMemberOnToolCallListener::class);
     }
 
     private function registerCommands(): void
