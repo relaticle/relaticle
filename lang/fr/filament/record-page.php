@@ -59,11 +59,13 @@ return [
         'search_placeholder' => 'Rechercher par nom',
         'no_results' => 'Aucune fiche trouvée',
         'no_domains' => 'Aucun domaine',
+        'no_emails' => 'Aucun e-mail',
         'kept' => 'Conservée',
         'result' => 'Résultat',
         'counts' => [
             'people' => '{0} Aucune personne|{1} :count personne|[2,*] :count personnes',
             'opportunities' => '{0} Aucune opportunité|{1} :count opportunité|[2,*] :count opportunités',
+            'contact_opportunities' => '{0} Aucune opportunité comme point de contact|{1} :count opportunité comme point de contact|[2,*] :count opportunités comme point de contact',
             'notes' => '{0} Aucune note|{1} :count note|[2,*] :count notes',
             'tasks' => '{0} Aucune tâche|{1} :count tâche|[2,*] :count tâches',
         ],

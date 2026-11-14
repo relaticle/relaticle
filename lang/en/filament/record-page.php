@@ -59,11 +59,13 @@ return [
         'search_placeholder' => 'Search by name',
         'no_results' => 'No records found',
         'no_domains' => 'No domains',
+        'no_emails' => 'No emails',
         'kept' => 'Kept',
         'result' => 'Result',
         'counts' => [
             'people' => '{0} No people|{1} :count person|[2,*] :count people',
             'opportunities' => '{0} No opportunities|{1} :count opportunity|[2,*] :count opportunities',
+            'contact_opportunities' => '{0} No opportunities as point of contact|{1} :count opportunity as point of contact|[2,*] :count opportunities as point of contact',
             'notes' => '{0} No notes|{1} :count note|[2,*] :count notes',
             'tasks' => '{0} No tasks|{1} :count task|[2,*] :count tasks',
         ],

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 use App\Actions\Merge\CombineRecordValues;
 use App\Actions\Merge\MergeCompanies;
+use App\Actions\Merge\MergeRecords;
+use App\Actions\Merge\MoveRecordHistory;
 use App\Actions\Merge\MoveRecordLinks;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\Enums\CreationSource;
@@ -12,6 +14,7 @@ use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -23,16 +26,18 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
-use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergeCompanies::class, CombineRecordValues::class, MoveRecordLinks::class, MergeRecordAction::class);
+mutates(MergeCompanies::class, MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, MoveRecordHistory::class, MergeRecordAction::class);
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -233,14 +238,32 @@ it('refuses a duplicate deleted after the page opened', function (): void {
         ->and($kept->refresh()->name)->toBe('Kept');
 });
 
-it('refuses a duplicate deleted between the lookup and the merge', function (): void {
-    $kept = mergeCompany($this->workspace, $this->user);
-    $duplicate = mergeCompany($this->workspace, $this->user);
-    $stale = Company::query()->findOrFail($duplicate->getKey());
-    $duplicate->delete();
+it('shows the unavailable error when the duplicate is deleted after it was picked in the dialog', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user, ['name' => 'Kept'], ['icp' => true]);
+    $duplicate = mergeCompany($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/gone']]);
 
-    expect(fn () => resolve(MergeCompanies::class)->execute($this->user, $kept, $stale))
-        ->toThrow(NotFoundHttpException::class);
+    $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
+        ->mountAction(mergeAction())
+        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+    $duplicate->delete();
+    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+
+    expect(mergeCompanyValue($kept, 'linkedin'))->toBeNull()
+        ->and($kept->refresh()->name)->toBe('Kept');
+});
+
+it('shows the unavailable error when the duplicate disappears while the merge starts', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user, ['name' => 'Kept']);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+
+    $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
+        ->mountAction(mergeAction())
+        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+    Event::listen(TransactionBeginning::class, fn (): int => DB::table('companies')->where('id', $duplicate->getKey())->update(['deleted_at' => now()]));
+    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+
+    expect(Company::query()->whereKey($kept->getKey())->exists())->toBeTrue()
+        ->and(Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->exists())->toBeFalse();
 });
 
 it('leaves the owner empty when the duplicate\'s owner is not a workspace member', function (): void {
@@ -263,7 +286,7 @@ it('takes the duplicate\'s owner when the kept company has none and the owner is
     expect($kept->refresh()->account_owner_id)->toBe($this->user->getKey());
 });
 
-function mergeMedia(Company $company, string $collection, array $attributes = []): Media
+function mergeMedia(Company $company, string $collection): Media
 {
     return $company->addMediaFromString(onePixelPng())
         ->usingFileName('image.png')
@@ -374,3 +397,87 @@ it('takes the duplicate\'s logo only when the kept company has none', function (
     expect($logos->where('model_id', $kept->getKey())->pluck('id')->all())->toBe([($keptLogo ?? $duplicateLogo)->getKey()])
         ->and($logos->where('model_id', $duplicate->getKey())->pluck('id')->all())->toBe($keptHasLogo ? [$duplicateLogo->getKey()] : []);
 })->with([true, false]);
+
+it('moves the duplicate\'s history to the kept company and adds a merged entry', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user, ['name' => 'Brightline Health']);
+    $duplicate = mergeCompany($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
+    $duplicate->update(['name' => 'Brightline Health Inc']);
+    $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->pluck('id');
+    $unrelated = mergeCompany($this->workspace, $this->user);
+    $unrelatedRows = Activity::query()->where('subject_id', $unrelated->getKey())->pluck('id');
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $merged = Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->sole();
+
+    expect($duplicateRows)->not->toBeEmpty()
+        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$kept->getKey()])
+        ->and($merged->properties['duplicate_name'])->toBe('Brightline Health Inc')
+        ->and($merged->causer_id)->toBe($this->user->getKey())
+        ->and($merged->workspace_id)->toBe($this->workspace->getKey())
+        ->and(Activity::query()->whereKey($unrelatedRows)->pluck('subject_id')->unique()->all())->toBe([$unrelated->getKey()])
+        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->pluck('event')->all())->toBe(['deleted']);
+});
+
+it('shows the merge on the kept company\'s timeline', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user, ['name' => 'Brightline Health']);
+    $duplicate = mergeCompany($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => $kept->getKey()])
+        ->assertSee(e('Brightline Health Inc.').' merged into this record', escape: false)
+        ->assertSeeHtml('data-event="record_merged"');
+});
+
+it('keeps the moved history out of the kept company\'s batches but grouped together', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user, ['name' => 'Brightline Health']);
+    $duplicate = mergeCompany($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
+    $duplicate->update(['name' => 'Brightline Health Inc']);
+    $keptBatches = Activity::query()->where('subject_id', $kept->getKey())->pluck('batch_uuid')->unique()->all();
+    $duplicateRows = Activity::query()->where('subject_id', $duplicate->getKey())->pluck('id');
+
+    expect($keptBatches)->toHaveCount(1)
+        ->and(Activity::query()->whereKey($duplicateRows)->pluck('batch_uuid')->unique()->all())->toBe($keptBatches);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $movedBatches = Activity::query()->whereKey($duplicateRows)->pluck('batch_uuid')->unique();
+
+    expect($movedBatches)->toHaveCount(1)
+        ->and($movedBatches->first())->not->toBe($keptBatches[0])
+        ->and(Activity::query()->where('subject_id', $kept->getKey())->where('event', 'created')->pluck('batch_uuid')->unique())->toHaveCount(2);
+});
+
+it('keeps the image of the kept company\'s own rich-text value when it wins the field', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'code' => 'brief',
+        'name' => 'Brief',
+        'type' => 'rich-editor',
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $kept = mergeCompany($this->workspace, $this->user);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+    $keptImage = mergeMedia($kept, MediaCollection::Attachments->value);
+    $duplicateImage = mergeMedia($duplicate, MediaCollection::Attachments->value);
+    $kept->saveCustomFieldValue($field, "<p>Kept</p><p><img data-id=\"{$keptImage->uuid}\" src=\"stale\"></p>");
+    $duplicate->saveCustomFieldValue($field, "<p>Duplicate</p><p><img data-id=\"{$duplicateImage->uuid}\" src=\"stale\"></p>");
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergeCompanyValue($kept, 'brief'))->toContain($keptImage->uuid)
+        ->and(Media::query()->where('uuid', $keptImage->uuid)->value('model_id'))->toBe($kept->getKey());
+});
+
+it('counts domains the way the field stores them before applying the limit', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user, [], ['domains' => ['a1.com', 'a2.com', 'a3.com']]);
+    $duplicate = mergeCompany($this->workspace, $this->user, [], ['domains' => ['A1.com', 'https://www.a2.com/about', 'a3.com', 'b1.com', 'b2.com']]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergeCompanyValue($kept, 'domains'))->toBe(['a1.com', 'a2.com', 'a3.com', 'b1.com', 'b2.com']);
+});
