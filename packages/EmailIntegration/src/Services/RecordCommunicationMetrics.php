@@ -10,6 +10,7 @@ use App\Models\People;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
@@ -59,6 +60,40 @@ final readonly class RecordCommunicationMetrics
         }
 
         $this->advanceMeetingMetrics($record->getTable(), $record->getKey(), $meeting->starts_at);
+    }
+
+    /**
+     * @param  Collection<int, Email>  $sharedEmails
+     */
+    public function combineMergedRecords(Company|People $kept, Company|People $duplicate, Collection $sharedEmails, int $sharedMeetings): void
+    {
+        $sharedInbound = $sharedEmails->where('direction', EmailDirection::INBOUND)->count();
+        $table = $kept->getTable();
+
+        $summed = fn (string $column): string => "GREATEST(0, {$column} + (select {$column} from {$table} where id = ?) - ?)";
+        $latest = fn (string $column): string => "GREATEST({$column}, (select {$column} from {$table} where id = ?))";
+
+        DB::update(
+            "update {$table} set "
+            .'email_count = '.$summed('email_count').', '
+            .'inbound_email_count = '.$summed('inbound_email_count').', '
+            .'outbound_email_count = '.$summed('outbound_email_count').', '
+            .'meeting_count = '.$summed('meeting_count').', '
+            .'last_email_at = '.$latest('last_email_at').', '
+            .'last_interaction_at = '.$latest('last_interaction_at').', '
+            .'last_meeting_at = '.$latest('last_meeting_at').' '
+            .'where id = ?',
+            [
+                $duplicate->getKey(), $sharedEmails->count(),
+                $duplicate->getKey(), $sharedInbound,
+                $duplicate->getKey(), $sharedEmails->count() - $sharedInbound,
+                $duplicate->getKey(), $sharedMeetings,
+                $duplicate->getKey(),
+                $duplicate->getKey(),
+                $duplicate->getKey(),
+                $kept->getKey(),
+            ],
+        );
     }
 
     /**
