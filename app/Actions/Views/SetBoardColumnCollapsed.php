@@ -18,7 +18,7 @@ final readonly class SetBoardColumnCollapsed
         private BoardColumnFieldsQuery $columnFields,
     ) {}
 
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $fieldCode, string $optionId, bool $collapsed, ?SavedView $view = null): BoardStateData
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $fieldCode, string $optionId, bool $collapsed, ?SavedView $view = null, bool $alone = false): BoardStateData
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
 
@@ -30,9 +30,9 @@ final readonly class SetBoardColumnCollapsed
             $user,
             $workspace,
             $entity,
-            function (BoardStateData $stored) use ($fieldCode, $optionIds, $optionId, $collapsed): array {
+            function (BoardStateData $stored) use ($fieldCode, $optionIds, $optionId, $collapsed, $alone): array {
                 if (! $collapsed && $stored->columnsCollapsed) {
-                    return $this->expandOneOfAll($stored, $fieldCode, $optionIds, $optionId);
+                    return $this->expandOutOfAll($stored, $fieldCode, $optionIds, $alone ? $optionId : null);
                 }
 
                 if ($optionId === BoardStateData::NO_VALUE_COLUMN) {
@@ -56,14 +56,15 @@ final readonly class SetBoardColumnCollapsed
      * @param  list<string>  $optionIds
      * @return array<string, mixed>
      */
-    private function expandOneOfAll(BoardStateData $stored, string $fieldCode, array $optionIds, string $optionId): array
+    private function expandOutOfAll(BoardStateData $stored, string $fieldCode, array $optionIds, ?string $openOnly): array
     {
         $noValue = array_values(array_diff($stored->collapsedNoValueColumns, [$fieldCode]));
+        $collapsed = $openOnly === null ? [] : array_values(array_diff($optionIds, [$openOnly]));
 
         return [
             'columns_collapsed' => false,
-            'collapsed_columns' => BoardStateData::withColumnIds($stored->collapsedColumns, $optionIds, array_values(array_diff($optionIds, [$optionId]))),
-            'collapsed_no_value_columns' => $optionId === BoardStateData::NO_VALUE_COLUMN ? $noValue : [...$noValue, $fieldCode],
+            'collapsed_columns' => BoardStateData::withColumnIds($stored->collapsedColumns, $optionIds, $collapsed),
+            'collapsed_no_value_columns' => $openOnly === null || $openOnly === BoardStateData::NO_VALUE_COLUMN ? $noValue : [...$noValue, $fieldCode],
         ];
     }
 }

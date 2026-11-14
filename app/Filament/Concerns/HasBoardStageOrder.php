@@ -137,14 +137,8 @@ trait HasBoardStageOrder
             return;
         }
 
-        if (! $collapsed && $alone !== true && $this->storedBoardState()->columnsCollapsed) {
-            $this->setBoardColumnsCollapsed(false);
-
-            return;
-        }
-
         $fieldCode = $this->boardColumnField()->code;
-        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnCollapsed::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $collapsed, $view));
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnCollapsed::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $collapsed, $view, $alone === true));
 
         if ($saved instanceof BoardStateData) {
             $this->boardStateWritten($saved);

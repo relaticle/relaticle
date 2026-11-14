@@ -2425,12 +2425,12 @@ html.fi-record-stacked .fi-record-layout {
     height: 0.75rem;
 }
 
-.ff-board .ff-column-header .ff-count {
+.ff-board .ff-column:not([data-collapsed]) > .ff-column-header .ff-count {
     @apply rounded-md bg-gray-200/70 px-1.5 text-xs/5 font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300;
 }
 
 /* Every column but the no-value one drags by its header (board-stage-order.js). Lucide grip-vertical, drawn as a mask. */
-.ff-board .ff-column:not([data-column-root='__none__']) > .ff-column-header::after {
+.ff-board .ff-column:not([data-collapsed], [data-column-root='__none__']) > .ff-column-header::after {
     content: '';
     flex-shrink: 0;
     width: 1rem;
@@ -2440,7 +2440,7 @@ html.fi-record-stacked .fi-record-layout {
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='9' cy='5' r='1.9'/%3E%3Ccircle cx='9' cy='12' r='1.9'/%3E%3Ccircle cx='9' cy='19' r='1.9'/%3E%3Ccircle cx='15' cy='5' r='1.9'/%3E%3Ccircle cx='15' cy='12' r='1.9'/%3E%3Ccircle cx='15' cy='19' r='1.9'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 
-.dark .ff-board .ff-column:not([data-column-root='__none__']) > .ff-column-header::after {
+.dark .ff-board .ff-column:not([data-collapsed], [data-column-root='__none__']) > .ff-column-header::after {
     background-color: var(--gray-500);
 }
 
