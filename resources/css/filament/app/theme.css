@@ -2066,6 +2066,27 @@ html.fi-record-stacked .fi-record-layout {
     @apply px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400;
 }
 
+/* The stage menu on a board header: a name block over the actions, rules running edge to edge. */
+.ff-column-menu .fi-dropdown-panel {
+    @apply sm:w-72 sm:min-w-72 sm:p-0;
+
+    & .fi-dropdown-list {
+        @apply sm:p-1;
+    }
+
+    & .fi-dropdown-list-item:not(.fi-color-danger) {
+        @apply text-gray-950 dark:text-white;
+
+        & .fi-icon {
+            @apply text-gray-600 dark:text-gray-300;
+        }
+    }
+}
+
+.ff-column-menu-block {
+    @apply p-3;
+}
+
 .fi-dropdown-list-item-label {
     @apply min-w-0 flex-1 text-start;
 }

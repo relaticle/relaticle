@@ -977,7 +977,7 @@ it('draws the swatches as rounded tiles on the dropdown surface in light and dar
     $page->assertVisible("{$menu} [data-stage-swatches]");
 
     $geometry = "(() => { const swatch = document.querySelector('{$menu} [data-stage-swatch]'); const box = swatch.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height), parseFloat(getComputedStyle(swatch).borderTopLeftRadius)]; })()";
-    $page->assertScript($geometry, [32, 32, 8]);
+    $page->assertScript($geometry, [28, 28, 8]);
 
     $surface = "(() => { const grid = document.querySelector('{$menu} [data-stage-swatches]'); return getComputedStyle(grid).backgroundColor === getComputedStyle(grid.closest('.fi-dropdown-panel')).backgroundColor; })()";
     $page->assertScript($surface, true);
