@@ -18,6 +18,10 @@ return [
         'task_created' => [
             'label' => 'Task',
         ],
+        'record_merged' => [
+            'label' => 'Merged',
+            'description' => ':name merged into this record',
+        ],
         'meeting.created' => [
             'label' => 'Meeting scheduled',
         ],

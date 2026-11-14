@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration;
 
 use App\Contracts\Inbox\RequestSource;
+use App\Events\RecordMerged;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
 use App\Models\CustomFieldValue;
@@ -35,6 +36,7 @@ use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand
 use Relaticle\EmailIntegration\Inbox\EmailAccessRequestSource;
 use Relaticle\EmailIntegration\Listeners\CancelRemovedMemberAccessRequestsListener;
 use Relaticle\EmailIntegration\Listeners\DisconnectRemovedMemberMailboxesListener;
+use Relaticle\EmailIntegration\Listeners\MoveMergedRecordCommunicationListener;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
@@ -200,6 +202,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         Event::listen(TeamMemberRemoved::class, DisconnectRemovedMemberMailboxesListener::class);
         Event::listen(TeamMemberRemoved::class, CancelRemovedMemberAccessRequestsListener::class);
+        Event::listen(RecordMerged::class, MoveMergedRecordCommunicationListener::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
