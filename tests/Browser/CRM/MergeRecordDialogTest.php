@@ -118,7 +118,8 @@ it('shows domains as links that open a new tab and a logo in the list and the ca
         ->assertPresent('[data-merge-left] img');
 
     expect($page->script($links))->toContain(['https://globex.eu', '_blank', 'noopener noreferrer'])
-        ->and($page->script($visibleInResultTile))->toBe(['img']);
+        ->and($page->script($visibleInResultTile))->toHaveCount(1)
+        ->and($page->script('document.querySelectorAll(\'[data-merge-result] span[aria-hidden="true"] img\').length'))->toBe(1);
     $page->assertNoJavaScriptErrors();
 });
 
