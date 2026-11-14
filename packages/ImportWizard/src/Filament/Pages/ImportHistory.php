@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Filament\Pages;
 
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
+use App\Models\User;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Pages\Page;
@@ -14,6 +15,7 @@ use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\URL;
+use Relaticle\ImportWizard\Actions\MarkImportFailed;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Models\Import;
@@ -25,13 +27,6 @@ final class ImportHistory extends Page implements HasTable
 
     protected string $view = 'import-wizard-new::filament.pages.import-history';
 
-    /**
-     * How long an import may sit untouched before the recovery action appears. Comfortably
-     * longer than the job's own timeout plus its retries, so a run that is merely slow is
-     * never offered up as stalled.
-     */
-    private const int STALLED_AFTER_MINUTES = 30;
-
     protected static string|null|BackedEnum $navigationIcon = 'lucide-clock';
 
     protected static ?string $navigationLabel = 'Import History';
@@ -41,6 +36,20 @@ final class ImportHistory extends Page implements HasTable
     protected static ?int $navigationSort = 100;
 
     protected static bool $shouldRegisterNavigation = false;
+
+    public static function canAccess(): bool
+    {
+        return ImportPage::canAccess();
+    }
+
+    private function actingUser(): User
+    {
+        $user = auth()->user();
+
+        abort_unless($user instanceof User, 403);
+
+        return $user;
+    }
 
     public function table(Table $table): Table
     {
@@ -138,9 +147,8 @@ final class ImportHistory extends Page implements HasTable
                     ->color('danger')
                     ->requiresConfirmation()
                     ->modalDescription('This import stopped responding. Marking it failed lets you start a new one from the same file.')
-                    ->action(fn (Import $record) => $record->update(['status' => ImportStatus::Failed]))
-                    ->visible(fn (Import $record): bool => $record->status === ImportStatus::Importing
-                        && $record->updated_at?->lt(now()->subMinutes(self::STALLED_AFTER_MINUTES)) === true),
+                    ->action(fn (Import $record): Import => resolve(MarkImportFailed::class)->execute($this->actingUser(), $record))
+                    ->visible(fn (Import $record): bool => $record->isStalled()),
             ])
             ->defaultSort('created_at', 'desc')
             ->poll('10s');
