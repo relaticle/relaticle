@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationReason;
+use App\Features\EmailConversations;
 use App\Livewire\App\AppDatabaseNotifications;
 use App\Models\User;
 use App\Models\Workspace;
@@ -12,6 +13,8 @@ use Filament\Facades\Filament;
 use Illuminate\Notifications\SendQueuedNotifications;
 use Illuminate\Support\Facades\Notification as NotificationFacade;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
+use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
@@ -289,7 +292,7 @@ describe('EmailAccessNotificationHandler', function (): void {
 });
 
 describe('undo queued send', function (): void {
-    it('cancels the sender\'s queued email from the undo toast', function (): void {
+    it('restores the sender\'s queued email as a draft from the undo toast', function (): void {
         $email = Email::factory()->outbound()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $this->owner->id,
@@ -303,7 +306,7 @@ describe('undo queued send', function (): void {
             ->assertNotified(__('filament/concerns/email-compose.notifications.cancelled.title'))
             ->assertDispatched('outbox:changed');
 
-        expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+        expect($email->refresh()->status)->toBe(EmailStatus::DRAFT);
     });
 
     it('does not cancel another user\'s queued email from the undo toast', function (): void {
@@ -327,7 +330,7 @@ describe('undo queued send', function (): void {
         expect($theirs->refresh()->status)->toBe(EmailStatus::QUEUED);
     });
 
-    it('says the email is already cancelled when undo is pressed twice', function (): void {
+    it('keeps the restored draft when undo is pressed twice', function (): void {
         $email = Email::factory()->outbound()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $this->owner->id,
@@ -338,11 +341,11 @@ describe('undo queued send', function (): void {
 
         Livewire::test(EmailAccessNotificationHandler::class)
             ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
-            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
             ->assertNotified(__('filament/concerns/email-compose.notifications.cancelled.title'))
-            ->assertNotNotified(__('filament/concerns/email-compose.notifications.too_late.title'));
+            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
+            ->assertNotified(__('filament/concerns/email-compose.notifications.too_late.title'));
 
-        expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+        expect($email->refresh()->status)->toBe(EmailStatus::DRAFT);
     });
 
     it('notifies too late when the queued email has already been sent', function (): void {
@@ -462,7 +465,7 @@ describe('EmailSendHeldNotification', function (): void {
         resolve(QueuedSendNotifier::class)->sendHeld($this->held, $this->owner, 'Claude', 300);
 
         Livewire::test(EmailAccessNotificationHandler::class)
-            ->dispatch('undo-queued-send', emailId: (string) $this->held->getKey());
+            ->dispatch('cancel-held-send', emailId: (string) $this->held->getKey());
 
         $this->travelTo(now()->addSeconds(301));
 
@@ -543,4 +546,77 @@ describe('EmailSendHeldNotification', function (): void {
         expect($this->owner->notifications()->count())->toBe(1);
         Queue::assertNotPushed(SendQueuedNotifications::class);
     });
+});
+
+it('hands the bell to the page reader instead of opening a second one', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+
+    Livewire::withQueryParams(['email' => $email->getKey()])
+        ->test(EmailAccessNotificationHandler::class, ['hostsReader' => true])
+        ->assertDontSeeHtml('fi-email-reader-drawer')
+        ->call('selectEmail', $email->getKey())
+        ->assertDispatched('email:open', emailId: $email->getKey())
+        ->assertSet('hostsReader', true)
+        ->assertDontSeeHtml('fi-email-reader-drawer')
+        ->assertDontSeeHtml('fi-email-reader-panel');
+});
+
+it('opens the bell email in the drawer on a page without a reader', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+
+    Livewire::test(EmailAccessNotificationHandler::class)
+        ->call('selectEmail', $email->getKey())
+        ->assertNotDispatched('email:open')
+        ->assertSet('selectedEmailId', $email->getKey())
+        ->assertSeeHtml('fi-email-reader-drawer')
+        ->assertDontSeeHtml('fi-email-reader-panel')
+        ->assertSee('Kickoff agenda');
+});
+
+it('shows the not available line when a link names mail the viewer cannot see on a page without a reader', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+
+    Livewire::withQueryParams(['email' => (string) Str::ulid()])
+        ->test(EmailAccessNotificationHandler::class)
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->call('deselectEmail')
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+function handlerConversationEmail(object $test): Email
+{
+    return Email::factory()->create([
+        'workspace_id' => $test->workspace->id,
+        'user_id' => $test->owner->id,
+        'connected_account_id' => $test->account->getKey(),
+        'conversation_key' => 'conv-bell',
+        'status' => EmailStatus::SYNCED,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'subject' => 'Kickoff agenda',
+        'sent_at' => now(),
+    ]);
+}
+
+it('reloads a record page through the resolver when the bell opens an email there', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+
+    Livewire::test(EmailAccessNotificationHandler::class, ['hostsReader' => true, 'readerOnRecordPage' => true])
+        ->call('selectEmail', $email->getKey())
+        ->assertNotDispatched('email:open')
+        ->assertRedirect(route('email.open', $email->getKey()))
+        ->assertDontSeeHtml('fi-email-reader-drawer');
+});
+
+it('shows the not available line in the bell drawer for mail no conversation holds yet', function (): void {
+    Feature::for($this->workspace)->activate(EmailConversations::class);
+    $email = handlerConversationEmail($this);
+    $email->forceFill(['conversation_key' => null])->saveQuietly();
+
+    Livewire::test(EmailAccessNotificationHandler::class)
+        ->call('selectEmail', $email->getKey())
+        ->assertSee(__('filament/pages/email-inbox.drawer.not_available'))
+        ->assertDontSee('Kickoff agenda');
 });

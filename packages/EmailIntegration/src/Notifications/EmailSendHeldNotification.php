@@ -118,7 +118,7 @@ final class EmailSendHeldNotification extends InboxNotification
             ->markAsRead()
             ->dispatchTo(
                 EmailAccessNotificationHandler::LIVEWIRE_ALIAS,
-                'undo-queued-send',
+                'cancel-held-send',
             )
             ->eventData(['emailId' => (string) $row->subject_id]);
     }

@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Models;
 
+use App\Enums\CrmEntity;
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use Carbon\CarbonImmutable;
@@ -21,6 +26,9 @@ use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 /**
  * @property EmailAccessRequestStatus $status
+ * @property string|null $note
+ * @property string|null $emailable_type
+ * @property string|null $emailable_id
  * @property CarbonImmutable|null $expires_at
  */
 #[Fillable([
@@ -30,6 +38,7 @@ use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
     'emailable_type',
     'emailable_id',
     'tier_requested',
+    'note',
     'status',
     'workspace_id',
     'decided_at',
@@ -44,6 +53,8 @@ final class EmailAccessRequest extends Model
     use HasFactory, HasUlids;
 
     public const int EXPIRES_AFTER_DAYS = 30;
+
+    public const int NOTE_MAX_LENGTH = 500;
 
     protected static function newFactory(): EmailAccessRequestFactory
     {
@@ -102,7 +113,24 @@ final class EmailAccessRequest extends Model
             ->where('owner_id', $owner->getKey())
             ->where('workspace_id', $workspace->getKey())
             ->open()
-            ->whereHas('email');
+            ->answerable();
+    }
+
+    /**
+     * A request for one email whose copy is still listed, or a request for a record's mail.
+     *
+     * @param  Builder<self>  $query
+     * @return Builder<self>
+     */
+    #[Scope]
+    protected function answerable(Builder $query): Builder
+    {
+        return $query->where(fn (Builder $answerable): Builder => $answerable
+            ->whereHas('email')
+            ->orWhere(fn (Builder $forRecord): Builder => $forRecord
+                ->whereNull('email_id')
+                ->whereNotNull('emailable_type')
+                ->whereNotNull('emailable_id')));
     }
 
     public static function countPendingIncomingFor(User $owner, ?Workspace $workspace): int
@@ -117,6 +145,28 @@ final class EmailAccessRequest extends Model
     public function deadline(): ?CarbonImmutable
     {
         return $this->expires_at ?? $this->created_at?->addDays(self::EXPIRES_AFTER_DAYS);
+    }
+
+    public function isForRecord(): bool
+    {
+        return $this->email_id === null && $this->emailable_type !== null && $this->emailable_id !== null;
+    }
+
+    // Read with the request's own workspace, so a queued notice finds the record with no workspace bound.
+    public function record(): Company|People|Opportunity|null
+    {
+        $query = match (CrmEntity::tryFrom((string) $this->emailable_type)) {
+            CrmEntity::Company => Company::query(),
+            CrmEntity::People => People::query(),
+            CrmEntity::Opportunity => Opportunity::query(),
+            default => null,
+        };
+
+        if ($query === null || $this->emailable_id === null || $this->workspace_id === null) {
+            return null;
+        }
+
+        return $query->withoutGlobalScope(WorkspaceScope::class)->where('workspace_id', $this->workspace_id)->find($this->emailable_id);
     }
 
     public function isOpen(): bool

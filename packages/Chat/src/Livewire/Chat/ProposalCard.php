@@ -1749,6 +1749,11 @@ final class ProposalCard extends BaseLivewireComponent
         if ($decision === 'approved') {
             $step = $step->refresh();
             $record = $this->recordReferenceFor($step);
+            if ($this->context === 'email-reader' && $step->entity_type === ProposalEntity::EmailDraft && is_string($step->result_data['id'] ?? null)) {
+                $payload = ProposalPayload::from($step);
+                $data = $payload->isBatch ? $payload->batchRecords()[0] : $step->action_data;
+                $this->dispatch('composer:resume-draft', emailId: $data['in_reply_to_email_id']);
+            }
         }
 
         // A step cancelled because the step it depended on was rejected has to say
@@ -1809,6 +1814,9 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function resumeAssistant(PendingAction $resolved): void
     {
+        if ($this->context === 'email-reader') {
+            return;
+        }
         $conversationId = $resolved->conversation_id;
         $turnId = $resolved->turn_id;
 

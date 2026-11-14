@@ -26,6 +26,7 @@ return [
         'email' => 'Email',
         'access' => 'Access',
         'requested' => 'Requested',
+        'all_on_record' => 'All emails on :record',
     ],
     'search' => [
         'placeholder' => 'Search by name or subject…',
@@ -51,7 +52,15 @@ return [
             'label' => 'Approve',
             'modal_heading' => 'Approve access request',
             'modal_description' => 'Grant :name access to this email?',
+            'modal_description_record' => 'Grant :name access to every email of yours on :record? Mail that arrives later stays as it is.',
             'modal_submit_label' => 'Approve',
+        ],
+        'share_record' => [
+            'label' => 'Share all my mail on :record',
+            'label_many' => 'Share all my mail on a record',
+            'modal_heading' => 'Share all your mail on a record',
+            'modal_description' => ':name gets every email of yours on the record you pick, at the access they asked for. Mail that arrives later stays as it is.',
+            'modal_submit_label' => 'Share',
         ],
         'deny' => [
             'label' => 'Deny',

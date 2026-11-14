@@ -40,6 +40,7 @@ use App\Support\CurrentWorkspace;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Actions\GrantWebAccess;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -57,11 +58,17 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\CustomFields\Models\Scopes\CustomFieldsActivableScope;
 use Relaticle\EmailIntegration\Actions\CancelAssistantEmail;
 use Relaticle\EmailIntegration\Actions\DeleteAssistantEmailDraft;
+use Relaticle\EmailIntegration\Actions\LinkAssistantEmail;
+use Relaticle\EmailIntegration\Actions\RequestAssistantEmailAccess;
 use Relaticle\EmailIntegration\Actions\RescheduleAssistantEmail;
 use Relaticle\EmailIntegration\Actions\RetryAssistantEmail;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmailDraft;
+use Relaticle\EmailIntegration\Actions\UnlinkAssistantEmail;
+use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Queries\ConversationFactsQuery;
+use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 use RuntimeException;
 use Throwable;
 
@@ -107,6 +114,9 @@ final readonly class PendingActionService
         CancelAssistantEmail::class,
         RescheduleAssistantEmail::class,
         RetryAssistantEmail::class,
+        LinkAssistantEmail::class,
+        UnlinkAssistantEmail::class,
+        RequestAssistantEmailAccess::class,
         GrantWebAccess::class,
     ];
 
@@ -377,6 +387,7 @@ final readonly class PendingActionService
                 return [$progress->isComplete(), null, $progress->statusOf($index, 'approved')];
             }
 
+            $this->validateEmailReview($locked, $user);
             $model = CurrentSource::during(CreationSource::CHAT, fn (): Model => $this->executeBatchItem($locked, $user, $this->withoutExcludedFields($records[$index], $excludedFields, $locked->entity_type)));
 
             // A failure remembered from an earlier attempt is history the
@@ -947,6 +958,7 @@ final readonly class PendingActionService
      */
     private function executeAction(PendingAction $pendingAction, User $user, array $excludedFields = []): mixed
     {
+        $this->validateEmailReview($pendingAction, $user);
         $actionClass = $pendingAction->action_class;
 
         throw_unless(
@@ -968,6 +980,40 @@ final readonly class PendingActionService
             PendingActionOperation::Update => $this->executeUpdate($action, $user, $pendingAction, $excludedFields),
             PendingActionOperation::Delete => $this->executeDelete($action, $user, $pendingAction),
         };
+    }
+
+    private function validateEmailReview(PendingAction $pendingAction, User $user): void
+    {
+        $conversation = AgentConversation::query()->ownedBy($user)->whereKey($pendingAction->conversation_id)->where('purpose', AgentConversation::PURPOSE_EMAIL)->first();
+        if ($conversation === null) {
+            return;
+        }
+        if ($pendingAction->operation === PendingActionOperation::Delete || in_array($pendingAction->action_class, [
+            SendAssistantEmail::class, SendAssistantEmailDraft::class, CancelAssistantEmail::class,
+            RescheduleAssistantEmail::class, RetryAssistantEmail::class, CreateWorkspaceInvitation::class, RemoveSampleData::class,
+        ], true)) {
+            throw ValidationException::withMessages(['proposal' => __('filament/emails/composer.rela.reply_blocked')]);
+        }
+        $key = $conversation->email_conversation_key;
+        $hash = hash('sha256', resolve(EmailThreadSummaryService::class)->prompt($user, $key));
+        if ($hash !== $conversation->email_input_hash) {
+            throw ValidationException::withMessages(['proposal' => __('filament/emails/composer.rela.stale_review')]);
+        }
+        if ($pendingAction->entity_type === ProposalEntity::EmailDraft) {
+            $payload = ProposalPayload::from($pendingAction);
+            $items = $payload->isBatch ? $payload->batchRecords() : [$pendingAction->action_data];
+            if (count($items) !== 1 || PendingAction::query()->where('conversation_id', $conversation->id)->where('turn_id', $pendingAction->turn_id)
+                ->where('entity_type', ProposalEntity::EmailDraft)->where('status', PendingActionStatus::Approved)->whereKeyNot($pendingAction->id)->exists()) {
+                throw ValidationException::withMessages(['proposal' => __('filament/emails/composer.rela.reply_blocked')]);
+            }
+            foreach ($items as $item) {
+                $source = Email::query()->forWorkspace($user->current_workspace_id)->whereKey($item['in_reply_to_email_id'] ?? '')->first();
+                if (! $source instanceof Email || $source->conversation_key !== $key || ! $user->can('viewBody', $source)
+                    || resolve(ConversationFactsQuery::class)->replyDraftBlocker($user, $key) !== null) {
+                    throw ValidationException::withMessages(['proposal' => __('filament/emails/composer.rela.reply_blocked')]);
+                }
+            }
+        }
     }
 
     /**

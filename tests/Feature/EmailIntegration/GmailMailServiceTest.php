@@ -22,9 +22,13 @@ use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\GmailService;
 use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
+use Relaticle\EmailIntegration\Support\MessageIdList;
+use Relaticle\EmailIntegration\Support\RelayedSender;
 
 mutates(GmailService::class);
 mutates(EmailAddressHeaderParser::class);
+mutates(MessageIdList::class);
+mutates(RelayedSender::class);
 
 /**
  * @param  Closure(Message): void  $capture
@@ -1068,3 +1072,56 @@ it('flags a newsletter with a List-Unsubscribe header even when it replies to an
 
     expect($data->isBulkMail)->toBeTrue();
 });
+
+it('reads In-Reply-To and References from Gmail headers', function (array $headers, ?string $inReplyTo, ?string $references): void {
+    $data = fetchGmailMessageFromHeader('Ana <ana@acme.example>', extraHeaders: $headers);
+
+    expect($data->inReplyTo)->toBe($inReplyTo)
+        ->and($data->references)->toBe($references);
+})->with([
+    'folded and padded' => [
+        ['In-Reply-To' => ' <parent@acme.example> ', 'References' => "<root@acme.example>\r\n <parent@acme.example>"],
+        '<parent@acme.example>',
+        '<root@acme.example> <parent@acme.example>',
+    ],
+    'several ids with duplicates' => [
+        ['In-Reply-To' => '<a@x.example> <b@x.example>', 'References' => '<r@x.example> <a@x.example> <r@x.example>'],
+        '<a@x.example>',
+        '<r@x.example> <a@x.example>',
+    ],
+    'a phrase with no id' => [['In-Reply-To' => 'Your message of Mon, 3 Jan'], null, null],
+    'a bare id' => [['In-Reply-To' => 'abc@host.example', 'References' => 'Re: <abc@host.example'], '<abc@host.example>', '<abc@host.example>'],
+    'an id over 998 bytes' => [
+        ['In-Reply-To' => '<'.str_repeat('a', 1000).'@x.example>', 'References' => '<'.str_repeat('a', 1000).'@x.example> <r@x.example>'],
+        null,
+        '<r@x.example>',
+    ],
+]);
+
+it('keeps the root Message-ID when References holds more than fifty ids', function (): void {
+    $ids = array_map(fn (int $i): string => "<m{$i}@acme.example>", range(1, 60));
+
+    $kept = explode(' ', (string) fetchGmailMessageFromHeader('Ana <ana@acme.example>', extraHeaders: [
+        'References' => implode(' ', $ids),
+    ])->references);
+
+    expect($kept)->toHaveCount(50)
+        ->and($kept[0])->toBe('<m1@acme.example>')
+        ->and($kept[1])->toBe('<m12@acme.example>')
+        ->and(end($kept))->toBe('<m60@acme.example>');
+});
+
+it('keeps the headers that mark automated mail', function (array $extraHeaders, array $kept): void {
+    $data = fetchGmailMessageFromHeader('Ana <ana@acme.example>', extraHeaders: $extraHeaders);
+
+    expect($data->headers)->toBe($kept);
+})->with([
+    'kept and dropped headers' => [
+        ['List-Id' => '<sales.acme.example>', 'Auto-Submitted' => 'auto-replied', 'X-Mailer' => 'Outlook'],
+        ['list-id' => '<sales.acme.example>', 'auto-submitted' => 'auto-replied'],
+    ],
+    'a repeated header and an empty one' => [
+        ['Precedence' => 'bulk', 'precedence' => 'list', 'List-Unsubscribe' => ''],
+        ['precedence' => 'list', 'list-unsubscribe' => ''],
+    ],
+]);

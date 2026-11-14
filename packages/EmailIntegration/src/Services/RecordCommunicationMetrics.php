@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Meeting;
+use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 
 final readonly class RecordCommunicationMetrics
 {
@@ -49,6 +50,43 @@ final readonly class RecordCommunicationMetrics
         DB::update(
             'update '.$record->getTable().' set '.implode(', ', $sets).' where '.$record->getKeyName().' = ?',
             $bindings,
+        );
+    }
+
+    public function recomputeEmailMetrics(People|Company|Opportunity $record): void
+    {
+        $inbound = 0;
+        $outbound = 0;
+        $lastEmailAt = null;
+
+        // The increments counted every linked email whatever later happened to it, so the recount does too.
+        $linked = $record->emails()
+            ->withoutGlobalScope(ActiveAccountScope::class)
+            ->withTrashed()
+            ->whereNotNull('emails.linked_at')
+            ->reorder()
+            ->select(Email::listColumns())
+            ->with('participants:id,email_id,email_address');
+
+        foreach ($linked->lazyById(500, 'emails.id', 'id') as $email) {
+            if (! $this->visibility->countsTowardCommunicationIntelligence($email)) {
+                continue;
+            }
+
+            if ($email->direction === EmailDirection::INBOUND) {
+                $inbound++;
+            } else {
+                $outbound++;
+            }
+
+            if ($email->sent_at !== null && ($lastEmailAt === null || $email->sent_at->greaterThan($lastEmailAt))) {
+                $lastEmailAt = $email->sent_at;
+            }
+        }
+
+        DB::update(
+            'update '.$record->getTable().' set email_count = ?, inbound_email_count = ?, outbound_email_count = ?, last_email_at = ?, last_interaction_at = GREATEST(last_meeting_at, ?), updated_at = ? where '.$record->getKeyName().' = ?',
+            [$inbound + $outbound, $inbound, $outbound, $lastEmailAt, $lastEmailAt, now(), $record->getKey()],
         );
     }
 

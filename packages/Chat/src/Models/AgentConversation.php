@@ -46,6 +46,8 @@ final class AgentConversation extends Model implements HasMedia
 
     public const string PURPOSE_SETUP = 'setup';
 
+    public const string PURPOSE_EMAIL = 'email';
+
     public const string ATTACHMENTS_MEDIA_COLLECTION = MediaCollection::ChatAttachments->value;
 
     /** @var list<string> */
@@ -81,6 +83,12 @@ final class AgentConversation extends Model implements HasMedia
     public function messages(): HasMany
     {
         return $this->hasMany(AgentConversationMessage::class, 'conversation_id');
+    }
+
+    /** @return HasMany<PendingAction, $this> */
+    public function pendingActions(): HasMany
+    {
+        return $this->hasMany(PendingAction::class, 'conversation_id');
     }
 
     /**
@@ -123,5 +131,19 @@ final class AgentConversation extends Model implements HasMedia
     protected function setup(Builder $query): void
     {
         $query->where('purpose', self::PURPOSE_SETUP);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function listable(Builder $query): void
+    {
+        $query->where(fn (Builder $query): Builder => $query->whereNull('purpose')->orWhere('purpose', '!=', self::PURPOSE_EMAIL));
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function forEmailConversation(Builder $query, string $key): void
+    {
+        $query->where('purpose', self::PURPOSE_EMAIL)->where('email_conversation_key', $key);
     }
 }

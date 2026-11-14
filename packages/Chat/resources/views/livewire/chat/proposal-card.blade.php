@@ -49,6 +49,9 @@
 @endphp
 
 <div class="flex min-h-0 flex-col">
+    @if ($context === 'email-reader' && $proposal?->entity_type === \Relaticle\Chat\Enums\ProposalEntity::EmailDraft)
+        <p class="pb-2 text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('filament/emails/composer.rela.draft_not_sent') }}</p>
+    @endif
     @if ($proposal)
         {{-- Surface: the solid data-block tier (crisp hairline card, no shadow)
              shared with the read-result blocks, plus a soft primary halo unique

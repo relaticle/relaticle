@@ -6,6 +6,9 @@ use App\Enums\CustomFields\PeopleField;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
+use Illuminate\Support\Facades\Queue;
+use Relaticle\Chat\Agents\EmailDrafter;
+use Relaticle\Chat\Jobs\WriteRelaEmailDraft;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
@@ -18,6 +21,38 @@ use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 
 mutates(EmailComposer::class);
+
+it('writes with Rela into a saved draft and leaves sending to the user', function (string $theme): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
+    Queue::fake([WriteRelaEmailDraft::class]);
+    EmailDrafter::fake([['subject' => 'Ignored subject', 'body_markdown' => 'Tuesday at ten works for the renewal review.']]);
+
+    $page = loginViaBrowser($user, $theme)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/email")
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->type('[role="combobox"]', 'ana@globex.example')
+        ->keys('[role="combobox"]', ['Enter'])
+        ->type('#email-composer-subject', 'Renewal next steps')
+        ->click(__('filament/emails/composer.rela.title'))
+        ->type('[x-ref="instruction"]', 'Accept Tuesday at ten')
+        ->click(__('filament/emails/composer.rela.write'))
+        ->assertSee(__('filament/emails/composer.rela.working'))
+        ->assertScript('document.querySelector(".email-composer-body-ctn").inert', true);
+
+    app()->call(Queue::pushed(WriteRelaEmailDraft::class)->sole()->handle(...));
+
+    $page->assertSee('Tuesday at ten works for the renewal review.')
+        ->assertSee(__('filament/emails/composer.rela.done'))
+        ->assertValue('#email-composer-subject', 'Renewal next steps')
+        ->assertScript('document.querySelector(".email-composer-body-ctn").inert', false)
+        ->assertNoJavaScriptErrors();
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->sole()->subject)->toBe('Renewal next steps')
+        ->and(Email::query()->whereIn('status', [EmailStatus::QUEUED, EmailStatus::SENDING, EmailStatus::SENT])->exists())->toBeFalse();
+})->with(['inLightMode', 'inDarkMode']);
 
 it('turns any typed email address into a recipient chip and keeps invalid text editable', function (string $theme): void {
     $user = User::factory()->withWorkspace()->create();
@@ -300,6 +335,7 @@ it('fits a shrunk composer onto a phone screen with every field on it', function
     visitAs($user, "/app/{$workspace->slug}/email")
         ->click(__('filament/concerns/email-compose.actions.compose.label'))
         ->waitForText(__('filament/emails/composer.title'))
+        ->click('[aria-label="'.__('filament/emails/composer.actions.expand').'"]')
         ->click('[aria-label="'.__('filament/emails/composer.actions.shrink').'"]')
         ->assertVisible('[aria-label="'.__('filament/emails/composer.actions.expand').'"]')
         ->resize(393, 852)
@@ -379,3 +415,40 @@ it('keeps the recipient suggestions under the field while a forwarded email scro
         ->assertScript($suggestionsUnderField, 6)
         ->assertNoJavaScriptErrors();
 });
+
+it('sends from the editor with a modified key and restores the draft with z', function (string $theme): void {
+    $singleKeys = $theme === 'inLightMode';
+    $user = User::factory()->withWorkspace()->create(['single_key_shortcuts' => $singleKeys, 'email_undo_seconds' => 30]);
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
+    $editor = '.email-composer-body-ctn [contenteditable="true"]';
+
+    $page = loginViaBrowser($user, $theme)
+        ->assertPathIs("/app/{$workspace->slug}")
+        ->navigate("/app/{$workspace->slug}/email")
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->type('[role="combobox"]', 'ana@globex.example')
+        ->keys('[role="combobox"]', ['Enter'])
+        ->type('#email-composer-subject', 'Renewal next steps')
+        ->type($editor, 'Let us review the renewal on Tuesday.')
+        ->keys($editor, 'Control+Shift+Enter')
+        ->assertVisible('[role="menuitem"][wire\\:click="sendLater(\'tomorrow\')"]')
+        ->keys(':focus', 'Escape')
+        ->assertMissing('[role="menuitem"][wire\\:click="sendLater(\'tomorrow\')"]')
+        ->keys($editor, 'Control+Enter')
+        ->assertVisible('[data-email-send-undo]');
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->sole()->body->body_html)
+        ->toContain('Let us review the renewal on Tuesday.');
+
+    $page->keys('body.fi-body', 'z');
+    if (! $singleKeys) {
+        $page->assertMissing('.email-composer-body-ctn')->click('[data-email-send-undo]');
+    }
+    $page->assertVisible($editor)
+        ->assertSeeIn($editor, 'Let us review the renewal on Tuesday.')
+        ->assertNoJavaScriptErrors();
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(1)
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->exists())->toBeFalse();
+})->with(['inLightMode', 'inDarkMode']);

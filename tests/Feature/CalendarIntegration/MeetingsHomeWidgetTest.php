@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
+use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
@@ -968,6 +969,7 @@ it('names a slideover guest from a teammate workspace-visible email', function (
         'email_address' => 'shared.guest@acme.test',
         'name' => 'Shared Guest',
     ]);
+    Company::factory()->create(['workspace_id' => $this->workspace->id])->emails()->attach($mail->id);
 
     MeetingAttendee::factory()->create([
         'meeting_id' => $meeting->id,

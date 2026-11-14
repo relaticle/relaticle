@@ -10,11 +10,14 @@ use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
@@ -47,7 +50,7 @@ final readonly class VisibleEmailsQuery
     public static function filterRules(): array
     {
         return [
-            'search' => ['sometimes', 'string', 'min:2', 'max:200'],
+            'search' => ['sometimes', 'string', 'min:'.EmailSearchService::MIN_TEXT_LENGTH, 'max:'.EmailSearchService::MAX_LENGTH],
             'record_type' => ['required_with:record_id', 'string', Rule::in(self::recordTypes())],
             'record_id' => ['required_with:record_type', 'string', 'max:64'],
             'direction' => ['sometimes', 'string', Rule::enum(EmailDirection::class)],
@@ -83,6 +86,7 @@ final readonly class VisibleEmailsQuery
 
         return $this->preferredCopies
             ->restrictToVisiblePreferredCopies($query, $viewer)
+            ->withRecordLinkState()
             ->with(['participants', 'shares'])
             ->latest('sent_at')
             ->orderByDesc('id')
@@ -92,6 +96,20 @@ final readonly class VisibleEmailsQuery
     public function find(User $viewer, string $id): ?Email
     {
         return $this->withDetail($this->visibleTo($viewer), $viewer, $id);
+    }
+
+    /**
+     * @param  list<string>  $recipients
+     * @return Collection<int, Email>
+     */
+    public function recentSentTo(User $viewer, array $recipients): Collection
+    {
+        return $this->deliveredTo($viewer)->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->where('workspace_id', $viewer->current_workspace_id)->where('user_id', $viewer->getKey())
+            ->where('direction', EmailDirection::OUTBOUND)
+            ->whereHas('participants', fn (Builder $query): Builder => $query->where('role', EmailParticipantRole::TO)
+                ->whereIn(DB::raw('lower(email_address)'), array_map(strtolower(...), $recipients)))
+            ->with('body')->latest('sent_at')->limit(5)->get();
     }
 
     /** @throws ValidationException */
@@ -117,6 +135,7 @@ final readonly class VisibleEmailsQuery
     {
         return $query
             ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->withRecordLinkState()
             ->with(['participants', 'shares', 'body', 'attachments'])
             ->whereKey($id)
             ->first();

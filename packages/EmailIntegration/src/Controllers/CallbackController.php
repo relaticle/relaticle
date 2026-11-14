@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Controllers;
 
+use App\Enums\WorkspaceSetupStep;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Notifications\Notification;
@@ -16,6 +17,7 @@ use Laravel\Socialite\Two\User as TwoUser;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Filament\Pages\MailboxSharingPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use RuntimeException;
@@ -117,7 +119,7 @@ final readonly class CallbackController
             return $this->redirectWithError($request, $user, $workspace->mailboxLimitMessage(), $workspace);
         }
 
-        $this->connect($user, $workspace, $provider, $socialUser);
+        $mailbox = $this->connect($user, $workspace, $provider, $socialUser);
 
         Notification::make()
             ->title(__('filament/pages/email-accounts.notifications.connected.title'))
@@ -125,19 +127,27 @@ final readonly class CallbackController
             ->success()
             ->send();
 
-        $returnUrl = $request->session()->pull(RedirectController::RETURN_URL_SESSION_KEY);
-
-        return redirect(is_string($returnUrl) ? $returnUrl : EmailAccountsPage::getUrl([
-            'tenant' => $workspace->slug,
-        ]));
+        return $this->redirectAfterConnect($request, $mailbox, $workspace);
     }
 
-    private function connect(User $user, Workspace $workspace, string $provider, TwoUser $socialUser): void
+    private function redirectAfterConnect(Request $request, ConnectedAccount $mailbox, Workspace $workspace): RedirectResponse
+    {
+        $returnUrl = $request->session()->pull(RedirectController::RETURN_URL_SESSION_KEY);
+        $returnUrl = is_string($returnUrl) ? $returnUrl : EmailAccountsPage::getUrl(['tenant' => $workspace->slug]);
+
+        if (! $mailbox->hasAnsweredSharing() && ! in_array($workspace->onboarding_step, [WorkspaceSetupStep::Email, WorkspaceSetupStep::Sharing], true)) {
+            return redirect(MailboxSharingPage::getUrl(['mailbox' => $mailbox->getKey(), 'return' => $returnUrl, 'tenant' => $workspace->slug]));
+        }
+
+        return redirect($returnUrl);
+    }
+
+    private function connect(User $user, Workspace $workspace, string $provider, TwoUser $socialUser): ConnectedAccount
     {
         /** @var array<int, string> $grantedScopes */
         $grantedScopes = $socialUser->approvedScopes;
 
-        resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
+        return resolve(ConnectAccountAction::class)->execute(new ConnectAccountData(
             userId: $user->getKey(),
             workspaceId: $workspace->getKey(),
             provider: $provider,

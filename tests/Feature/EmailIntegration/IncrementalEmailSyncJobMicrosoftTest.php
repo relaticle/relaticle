@@ -107,9 +107,11 @@ it('batches StoreEmailJob for new Microsoft messages and defers the cursor to th
 });
 
 it('advances the cursor after the store batch completes', function (): void {
+    $this->travelTo(now()->startOfSecond());
     Bus::fake();
 
     $account = syncableAccount();
+    $account->forceFill(['last_synced_at' => now()->subDay()])->save();
 
     $service = Mockery::mock(MailServiceInterface::class);
     $service->shouldReceive('fetchDelta')->with('old-cursor')->andReturn(new MailDeltaResult(
@@ -142,13 +144,16 @@ it('advances the cursor after the store batch completes', function (): void {
         return true;
     });
 
-    expect($account->refresh()->sync_cursor)->toBe('new-cursor');
+    expect($account->refresh()->sync_cursor)->toBe('new-cursor')
+        ->and($account->last_synced_at->equalTo(now()))->toBeTrue();
 });
 
 it('does not advance the cursor when the store batch fails', function (): void {
+    $this->travelTo(now()->startOfSecond());
     Bus::fake();
 
     $account = syncableAccount();
+    $account->forceFill(['last_synced_at' => now()->subDay()])->save();
 
     $service = Mockery::mock(MailServiceInterface::class);
     $service->shouldReceive('fetchDelta')->with('old-cursor')->andReturn(new MailDeltaResult(
@@ -183,7 +188,8 @@ it('does not advance the cursor when the store batch fails', function (): void {
 
     expect($account->refresh()->sync_cursor)->toBe('old-cursor')
         ->and($account->status)->toBe(EmailAccountStatus::ACTIVE)
-        ->and($account->last_error)->toContain('1 email(s)');
+        ->and($account->last_error)->toContain('1 email(s)')
+        ->and($account->last_synced_at->equalTo(now()->subDay()))->toBeTrue();
 });
 
 it('keeps a mailbox that failed to store messages eligible for the scheduled sync', function (): void {
@@ -201,9 +207,11 @@ it('keeps a mailbox that failed to store messages eligible for the scheduled syn
 });
 
 it('advances the cursor inline when the delta has no new messages', function (): void {
+    $this->travelTo(now()->startOfSecond());
     Bus::fake();
 
     $account = syncableAccount();
+    $account->forceFill(['last_synced_at' => now()->subDay()])->save();
 
     $service = Mockery::mock(MailServiceInterface::class);
     $service->shouldReceive('fetchDelta')->andReturn(new MailDeltaResult(
@@ -219,7 +227,8 @@ it('advances the cursor inline when the delta has no new messages', function ():
     (new IncrementalEmailSyncJob($account))->handle($factory);
 
     Bus::assertNothingBatched();
-    expect($account->refresh()->sync_cursor)->toBe('fresh-cursor');
+    expect($account->refresh()->sync_cursor)->toBe('fresh-cursor')
+        ->and($account->last_synced_at->equalTo(now()))->toBeTrue();
 });
 
 it('records the owner read state when the provider marks a message read', function (): void {

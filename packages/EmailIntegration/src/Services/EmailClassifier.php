@@ -9,8 +9,8 @@ use Relaticle\EmailIntegration\Enums\EmailCategory;
 
 /**
  * Derives a coarse {@see EmailCategory} from cheap, high-signal heuristics:
- * the provider's own native category, calendar (.ics) parts, role-addressed
- * senders (billing@, support@, no-reply@) and subject keywords.
+ * calendar (.ics) parts, role-addressed senders (billing@, support@, no-reply@)
+ * and subject keywords, then the provider's own native category.
  *
  * Deliberately rule-based, not LLM-backed: the buckets are coarse enough that
  * deterministic rules give good precision with zero per-email cost, no latency,
@@ -42,11 +42,6 @@ final readonly class EmailClassifier
 
     public function classify(FetchedEmailData $data, bool $isInternal): EmailCategory
     {
-        // The provider already classified it natively (e.g. Gmail CATEGORY_*).
-        if ($data->providerCategory instanceof EmailCategory) {
-            return $data->providerCategory;
-        }
-
         $subject = mb_strtolower(trim($data->subject ?? ''));
         $sender = $this->senderAddress($data);
         $localPart = str_contains($sender, '@') ? (string) strstr($sender, '@', true) : $sender;
@@ -57,6 +52,7 @@ final readonly class EmailClassifier
             $this->containsAny($localPart, self::SUPPORT_SENDERS) || $this->containsAny($subject, self::SUPPORT_SUBJECTS) => EmailCategory::Support,
             $this->containsAny($subject, self::SALES_SUBJECTS) => EmailCategory::Sales,
             $this->containsAny($localPart, self::MARKETING_SENDERS) => EmailCategory::Marketing,
+            $data->providerCategory instanceof EmailCategory => $data->providerCategory,
             $isInternal => EmailCategory::Personal,
             default => EmailCategory::Other,
         };

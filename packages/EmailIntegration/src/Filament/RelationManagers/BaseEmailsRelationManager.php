@@ -8,33 +8,58 @@ use App\Models\Company;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Resources\Resource as FilamentResource;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphPivot;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Relaticle\EmailIntegration\Actions\RequestRecordEmailAccess;
+use Relaticle\EmailIntegration\Data\ConversationFilters;
+use Relaticle\EmailIntegration\Data\ConversationPage;
+use Relaticle\EmailIntegration\Data\ConversationRow;
+use Relaticle\EmailIntegration\Enums\ConversationView;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\MailboxConnectState;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
+use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailComposeActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
+use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
+use Relaticle\EmailIntegration\Queries\RecordEmailAccessQuery;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 
 /**
  * @property-read LengthAwarePaginator<int, Email&object{pivot: MorphPivot}> $emails
+ * @property-read ConversationPage $conversations
+ * @property-read int $automatedCount
+ * @property-read bool $showsConversations
  * @property-read Email|null $selectedEmail
  * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
+ * @property-read Collection<int, array{owner: User, count: int, pending: bool}> $recordAccessOwners
  */
 abstract class BaseEmailsRelationManager extends RelationManager
 {
+    use HasConversationReader;
+    use HasConversationsFlag;
     use HasEmailComposeActions;
     use HasEmailReaderActions;
 
@@ -52,6 +77,24 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public string $search = '';
 
+    public bool $showAutomated = false;
+
+    public ?string $conversationsCursor = null;
+
+    /**
+     * @param  class-string<FilamentResource>  $resource
+     */
+    public static function relationKeyOn(string $resource): ?string
+    {
+        foreach ($resource::getRelations() as $key => $manager) {
+            if (is_string($manager) && is_a($manager, self::class, true)) {
+                return (string) $key;
+            }
+        }
+
+        return null;
+    }
+
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
         if (! $ownerRecord instanceof Company && ! $ownerRecord instanceof Opportunity && ! $ownerRecord instanceof People) {
@@ -65,6 +108,24 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         return once(fn (): ?string => resolve(EmailVisibilityService::class)->visibleEmailCountBadge($ownerRecord, $user));
+    }
+
+    public function mount(): void
+    {
+        parent::mount();
+
+        if ($this->selectedEmailId !== null && $this->showsConversations()) {
+            $this->openLinkedEmail($this->selectedEmailId);
+        }
+    }
+
+    // The flag-off tab keeps today's URL, where the panel's own reader opens `?email=`.
+    /**
+     * @return array<string, array{as: string, history: bool}>
+     */
+    protected function queryString(): array
+    {
+        return $this->showsConversations() ? ['selectedEmailId' => ['as' => 'email', 'history' => false]] : [];
     }
 
     public function table(Table $table): Table
@@ -81,9 +142,73 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
         if (filled($emailId)) {
             $this->selectedEmailId = $emailId;
+            unset($this->selectedEmail);
+            $this->selectedEmailId = $this->selectedEmail() instanceof Email ? $emailId : null;
         }
 
-        unset($this->emails);
+        $this->conversationsCursor = null;
+        $this->expandedEmailIds = [];
+        unset($this->emails, $this->conversations, $this->automatedCount, $this->selectedEmail, $this->thread, $this->expandedBodies, $this->selectedConversationRow, $this->adjacentConversations);
+    }
+
+    #[Computed]
+    public function showsConversations(): bool
+    {
+        $workspace = filament()->getTenant();
+
+        return $this->conversationsEnabled($workspace instanceof Workspace ? $workspace : null);
+    }
+
+    #[Computed]
+    public function conversations(): ConversationPage
+    {
+        if ($this->hidesRecordMailbox()) {
+            return new ConversationPage([], null, null);
+        }
+
+        return resolve(ConversationsQuery::class)->paginate(
+            $this->authUser(),
+            $this->showAutomated ? ConversationView::Automated : ConversationView::All,
+            ConversationFilters::forRecord($this->ownerRecordWithEmails(), EmailSearchService::clean($this->search)),
+            20,
+            $this->conversationsCursor,
+        );
+    }
+
+    #[Computed]
+    public function automatedCount(): int
+    {
+        if ($this->hidesRecordMailbox()) {
+            return 0;
+        }
+
+        return resolve(ConversationsQuery::class)
+            ->count($this->authUser(), ConversationView::Automated, ConversationFilters::forRecord($this->ownerRecordWithEmails()));
+    }
+
+    public function refreshConversations(): void
+    {
+        if (! $this->showsConversations()) {
+            return;
+        }
+
+        unset($this->conversations, $this->automatedCount, $this->selectedEmail);
+    }
+
+    public function updatedShowAutomated(): void
+    {
+        $this->conversationsCursor = null;
+        unset($this->conversations);
+    }
+
+    public function nextConversationsPage(): void
+    {
+        $this->moveConversationsCursor($this->conversations->nextCursor);
+    }
+
+    public function previousConversationsPage(): void
+    {
+        $this->moveConversationsCursor($this->conversations->previousCursor);
     }
 
     /**
@@ -100,6 +225,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
         $query = $this->ownerRecordWithEmails()
             ->emails()
+            ->select(Email::listColumns())
             // participants + shares are read per row by the privacy policy; eager-load to avoid N+1.
             ->with(['from', 'labels', 'participants', 'shares', 'user', 'connectedAccount.user'])
             ->withReadStateFor($user->getKey())
@@ -109,13 +235,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
                     ->scopes(['open']),
             ]);
 
-        if (filled($this->search)) {
-            resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
-        }
+        resolve(EmailSearchService::class)->applyToQuery($query, $user, $this->search);
 
         resolve(PreferredEmailCopyService::class)->restrictToVisiblePreferredCopies($query->getQuery(), $user);
 
-        $paginator = $query->latest('sent_at')->paginate(20, pageName: $this->getTablePaginationPageName());
+        // The select above names the email columns, so paginate adds only the pivot's.
+        $paginator = $query->latest('sent_at')->paginate(20, [], $this->getTablePaginationPageName());
 
         resolve(PreferredEmailCopyService::class)->hydrateMailboxAccess($paginator->getCollection(), $user, $this->ownerRecordWithEmails());
 
@@ -151,6 +276,28 @@ abstract class BaseEmailsRelationManager extends RelationManager
     }
 
     #[Computed]
+    public function connectState(): MailboxConnectState
+    {
+        $workspace = filament()->getTenant();
+        $state = MailboxConnectState::for($this->authUser(), $workspace instanceof Workspace ? $workspace : null);
+
+        return $state === MailboxConnectState::NoProvider ? $state : MailboxConnectState::NotConnected;
+    }
+
+    /** @return EloquentCollection<int, ConnectedAccount> */
+    #[Computed]
+    public function unhealthyMailboxes(): EloquentCollection
+    {
+        $workspace = filament()->getTenant();
+
+        if (! $workspace instanceof Workspace) {
+            return new EloquentCollection;
+        }
+
+        return ConnectedAccount::query()->ownedBy($this->authUser(), $workspace)->connected()->unhealthy()->with('workspace')->get();
+    }
+
+    #[Computed]
     public function hidesRecordMailbox(): bool
     {
         return resolve(EmailVisibilityService::class)->hidesRecordMailbox($this->getOwnerRecord());
@@ -178,19 +325,116 @@ abstract class BaseEmailsRelationManager extends RelationManager
             return null;
         }
 
-        /** @var Email|null $email */
-        $email = $this->ownerRecordWithEmails()
-            ->emails()
-            ->with(['body', 'participants', 'labels', 'attachments', 'from'])
-            ->withGlobalScope('visible', new VisibleEmailScope($this->authUser()))
-            ->whereKey($this->selectedEmailId)
-            ->first();
+        if ($this->showsConversations()) {
+            return $this->recordConversationCopy($this->selectedEmailId) ?? $this->recordEmail($this->selectedEmailId, undeliveredOwnOnly: true);
+        }
 
-        if (! $email instanceof Email || $this->authUser()->cannot('viewBody', $email)) {
+        return $this->recordEmail($this->selectedEmailId);
+    }
+
+    private function recordConversationCopy(string $emailId): ?Email
+    {
+        $email = $this->conversationCopy($emailId);
+
+        if (! $email instanceof Email || ! resolve(ConversationsQuery::class)->contains($this->authUser(), (string) $email->conversation_key, ConversationFilters::forRecord($this->ownerRecordWithEmails()))) {
             return null;
         }
 
         return $email;
+    }
+
+    // A send just queued from this tab is not delivered yet, so no conversation holds it.
+    private function recordEmail(string $emailId, bool $undeliveredOwnOnly = false): ?Email
+    {
+        $user = $this->authUser();
+
+        /** @var Email|null $email */
+        $email = $this->ownerRecordWithEmails()
+            ->emails()
+            ->with(['body', 'participants', 'labels', 'attachments', 'from'])
+            ->withGlobalScope('visible', new VisibleEmailScope($user))
+            ->when($undeliveredOwnOnly, fn (EloquentBuilder $own): EloquentBuilder => $own
+                ->where('emails.user_id', $user->getKey())
+                ->whereNotIn('emails.status', [EmailStatus::SYNCED, EmailStatus::SENT]))
+            ->whereKey($emailId)
+            ->first();
+
+        if (! $email instanceof Email || $user->cannot('viewBody', $email)) {
+            return null;
+        }
+
+        return $email;
+    }
+
+    /** @return Collection<int, array{owner: User, count: int, pending: bool}> */
+    #[Computed]
+    public function recordAccessOwners(): Collection
+    {
+        $viewer = $this->authUser();
+        $record = $this->ownerRecordWithEmails();
+
+        if ($this->hidesRecordMailbox()) {
+            return new Collection;
+        }
+
+        $counts = resolve(RecordEmailAccessQuery::class)->lockedCountsByOwner($viewer, $record)
+            ->filter(fn (int $count): bool => $count >= 2)->all();
+        $owners = User::query()->inWorkspace((string) $record->workspace_id)->whereKey(array_keys($counts))->get();
+        $pending = EmailAccessRequest::query()->open()
+            ->where('workspace_id', $record->workspace_id)
+            ->whereNull('email_id')
+            ->where('emailable_type', $record->getMorphClass())
+            ->where('emailable_id', $record->getKey())
+            ->where('requester_id', $viewer->getKey())
+            ->pluck('owner_id')->all();
+
+        return $owners
+            ->map(fn (User $owner): array => [
+                'owner' => $owner,
+                'count' => $counts[$owner->getKey()],
+                'pending' => in_array($owner->getKey(), $pending, true),
+            ])->sortByDesc('count')->values();
+    }
+
+    public function requestRecordAccessAction(): Action
+    {
+        return Action::make('requestRecordAccess')
+            ->label(__('filament/pages/record-emails.actions.request_access.label'))
+            ->modalHeading(fn (array $arguments): string => __('filament/pages/record-emails.actions.request_record_access.modal_heading', [
+                'name' => $this->recordAccessOwner($arguments)?->name,
+                'record' => $this->ownerRecordWithEmails()->name,
+            ]))
+            ->modalWidth(Width::Large)
+            ->schema($this->requestAccessSchema())
+            ->action(function (array $data, array $arguments): void {
+                $owner = $this->recordAccessOwner($arguments);
+                abort_unless($owner instanceof User, 403);
+
+                $request = resolve(RequestRecordEmailAccess::class)->execute(
+                    $this->authUser(), $this->ownerRecordWithEmails(), $owner,
+                    $data['tier_requested'] instanceof EmailPrivacyTier ? $data['tier_requested'] : EmailPrivacyTier::from($data['tier_requested']),
+                    is_string($data['note'] ?? null) ? $data['note'] : null,
+                );
+                unset($this->recordAccessOwners);
+
+                if (! $request instanceof EmailAccessRequest) {
+                    Notification::make()->warning()->title(__('filament/pages/record-emails.notifications.pending_record_request.title'))->send();
+
+                    return;
+                }
+
+                Notification::make()->success()->title(__('filament/pages/record-emails.notifications.access_request_sent.title'))->send();
+            });
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function recordAccessOwner(array $arguments): ?User
+    {
+        $ownerId = $arguments['ownerId'] ?? null;
+
+        return is_string($ownerId)
+            ? ($this->recordAccessOwners->first(fn (array $bar): bool => (string) $bar['owner']->getKey() === $ownerId)['owner'] ?? null)
+            : null;
     }
 
     /**
@@ -199,7 +443,7 @@ abstract class BaseEmailsRelationManager extends RelationManager
     #[Computed]
     public function pendingAccessRequests(): Collection
     {
-        $email = $this->selectedEmail();
+        $email = $this->selectedEmail;
 
         if (! $email instanceof Email) {
             return collect();
@@ -210,6 +454,12 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public function selectEmail(string $id): void
     {
+        if ($this->showsConversations()) {
+            $this->openConversationReader($id);
+
+            return;
+        }
+
         $this->openEmailReader($id);
     }
 
@@ -226,7 +476,24 @@ abstract class BaseEmailsRelationManager extends RelationManager
     public function updatedSearch(): void
     {
         $this->resetPage();
-        unset($this->emails);
+        $this->conversationsCursor = null;
+        unset($this->emails, $this->conversations);
+    }
+
+    /** @return list<ConversationRow> */
+    protected function conversationRows(): array
+    {
+        return $this->conversations->rows;
+    }
+
+    private function moveConversationsCursor(?string $cursor): void
+    {
+        if ($cursor === null) {
+            return;
+        }
+
+        $this->conversationsCursor = $cursor;
+        unset($this->conversations);
     }
 
     private function ownerRecordWithEmails(): Company|Opportunity|People

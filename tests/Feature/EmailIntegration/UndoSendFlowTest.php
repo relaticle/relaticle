@@ -3,21 +3,29 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Filament\Facades\Filament;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\SendEmailAction;
 use Relaticle\EmailIntegration\Actions\SyncEmailBatchCountersAction;
+use Relaticle\EmailIntegration\Actions\UndoQueuedSend;
 use Relaticle\EmailIntegration\Enums\EmailBatchStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
+use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBatch;
 
-mutates(CancelQueuedEmailAction::class, SyncEmailBatchCountersAction::class);
+mutates(CancelQueuedEmailAction::class, SyncEmailBatchCountersAction::class, UndoQueuedSend::class);
 
-it('cancels a single send within the 5s undo window', function (): void {
+it('cancels a single send within the default undo window', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->for($user)->create([
@@ -39,12 +47,54 @@ it('cancels a single send within the 5s undo window', function (): void {
         'in_reply_to_email_id' => null,
     ]);
 
-    expect((int) round(abs($email->scheduled_for?->diffInSeconds(now()) ?? 0.0)))->toBe(5);
+    expect((int) round(abs($email->scheduled_for?->diffInSeconds(now()) ?? 0.0)))->toBe(10);
 
     resolve(CancelQueuedEmailAction::class)->execute($email->refresh());
 
     expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
 });
+
+it('restores the same queued email as a private draft only before its deadline', function (int $seconds, bool $allowed): void {
+    Storage::fake(EmailAttachment::DISK);
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->for($user)->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'is_default' => true,
+    ]));
+    $original = Email::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'connected_account_id' => $account->getKey(),
+    ]);
+    $original->body()->updateOrCreate([], ['body_html' => '<p>Earlier message</p>']);
+    $this->travelTo(now()->startOfSecond());
+    Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $original->getKey())
+        ->set('to', ['ana@example.com'])
+        ->set('subject', 'Renewal next steps')
+        ->set('bodyHtml', '<p>My reply</p>')
+        ->set('attachments', [UploadedFile::fake()->create('renewal.pdf', 12)])
+        ->call('send');
+    $email = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+
+    $this->travel($seconds)->seconds();
+    $handler = Livewire::test(EmailAccessNotificationHandler::class)->dispatch('undo-queued-send', emailId: $email->getKey());
+
+    expect($email->refresh()->status)->toBe($allowed ? EmailStatus::DRAFT : EmailStatus::QUEUED);
+    if ($allowed) {
+        $handler->assertDispatched('composer:open', draftId: $email->getKey());
+        expect($email->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
+            ->and($email->scheduled_for)->toBeNull()
+            ->and($email->body->body_html)->toContain('My reply')->not->toContain('Earlier message')
+            ->and($email->participants()->where('role', 'to')->sole()->email_address)->toBe('ana@example.com')
+            ->and($email->attachments()->sole()->filename)->toBe('renewal.pdf');
+        Storage::disk(EmailAttachment::DISK)->assertExists($email->attachments()->sole()->storage_path);
+    } else {
+        $handler->assertNotDispatched('composer:open');
+    }
+})->with([[9, true], [10, false], [11, false]]);
 
 it('rejects undo once the email is claimed for sending', function (): void {
     // SENDING means a worker is actively delivering. send() calls the provider

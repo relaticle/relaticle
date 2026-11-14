@@ -423,13 +423,19 @@ function loginViaBrowser(User $user, ?string $theme = null, ?AwaitableWebpage $p
         ->click('button[type="submit"]');
 }
 
-function visitAs(User $user, string $path, ?int $width = null, ?int $height = null): AwaitableWebpage
+function visitAs(User $user, string $path, ?int $width = null, ?int $height = null, ?string $theme = null): AwaitableWebpage
 {
     test()->actingAs($user);
 
     $viewport = $width === null || $height === null ? [] : ['viewport' => ['width' => $width, 'height' => $height]];
 
-    return test()->visit($path, $viewport)->assertPathIsNot('/app/login');
+    $page = test()->visit($path, $viewport);
+
+    if ($theme !== null) {
+        $page = $page->{$theme}();
+    }
+
+    return $page->assertPathIsNot('/app/login');
 }
 
 function asyncAlpineComponentsLoaded(): string

@@ -4,14 +4,19 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Livewire\Concerns;
 
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use App\Support\LikePattern;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Radio;
 use Filament\Notifications\Notification;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
@@ -20,11 +25,15 @@ use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Queries\RecordEmailAccessQuery;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 
 trait InteractsWithEmailAccessRequests
 {
     public string $tab = 'incoming';
+
+    /** @var array<string, Collection<int, Company|People|Opportunity>> */
+    private array $recordAnswersByEmail = [];
 
     public function setTab(string $tab): void
     {
@@ -86,6 +95,7 @@ trait InteractsWithEmailAccessRequests
             ->recordActions([
                 $this->openEmailAction(),
                 $this->approveAccessRequestAction(),
+                $this->shareRecordMailAction(),
                 $this->denyAccessRequestAction(),
                 $this->cancelAccessRequestAction(),
             ]);
@@ -126,7 +136,8 @@ trait InteractsWithEmailAccessRequests
 
         return EmailAccessRequest::query()
             ->with(['email.shares', 'requester', 'owner'])
-            ->whereHas('email', fn (Builder $query): Builder => $query->where('workspace_id', $user->current_workspace_id))
+            ->where('workspace_id', $user->current_workspace_id)
+            ->answerable()
             ->where(fn (Builder $listed): Builder => $listed
                 ->open()
                 ->orWhere('status', '!=', EmailAccessRequestStatus::PENDING))
@@ -140,6 +151,16 @@ trait InteractsWithEmailAccessRequests
     private function visibleEmailSubject(EmailAccessRequest $request): ?string
     {
         $email = $request->email;
+
+        if ($request->isForRecord()) {
+            $record = $request->record();
+
+            if ($record === null) {
+                return null;
+            }
+
+            return __('filament/pages/email-access-requests.columns.all_on_record', ['record' => $record->name]);
+        }
 
         if (! $email instanceof Email) {
             return null;
@@ -164,7 +185,7 @@ trait InteractsWithEmailAccessRequests
         return $query->whereHas('email', function (Builder $emailQuery) use ($term, $viewer): void {
             /** @var Builder<Email> $emailQuery */
             $emailQuery->where('subject', 'ilike', $term);
-            resolve(EmailSearchService::class)->whereSubjectVisibleTo($emailQuery, $viewer);
+            resolve(EmailSearchService::class)->whereVisibleAtTier($emailQuery, $viewer, EmailPrivacyTier::SUBJECT);
         });
     }
 
@@ -197,7 +218,9 @@ trait InteractsWithEmailAccessRequests
             ->modalIcon('lucide-circle-check')
             ->modalIconColor('success')
             ->modalHeading(__('filament/pages/email-access-requests.actions.approve.modal_heading'))
-            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.approve.modal_description', ['name' => $request->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
+            ->modalDescription(fn (EmailAccessRequest $request): string => $request->isForRecord()
+                ? __('filament/pages/email-access-requests.actions.approve.modal_description_record', ['name' => $request->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user'), 'record' => $request->record()->name ?? ''])
+                : __('filament/pages/email-access-requests.actions.approve.modal_description', ['name' => $request->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
             ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.approve.modal_submit_label'))
             ->action(function (EmailAccessRequest $request): void {
                 $accessRequest = EmailAccessRequest::query()->with(['email', 'owner', 'requester'])->whereKey($request->getKey())->where('owner_id', $this->authUser()->getKey())->first();
@@ -208,6 +231,54 @@ trait InteractsWithEmailAccessRequests
 
                 $this->afterDecision(resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser()), 'approved');
             });
+    }
+
+    private function shareRecordMailAction(): Action
+    {
+        return Action::make('shareRecordMail')
+            ->label(fn (EmailAccessRequest $request): string => $this->recordAnswers($request)->count() === 1
+                ? __('filament/pages/email-access-requests.actions.share_record.label', ['record' => $this->recordAnswers($request)->first()?->name])
+                : __('filament/pages/email-access-requests.actions.share_record.label_many'))
+            ->icon('lucide-layers')
+            ->link()
+            ->color('gray')
+            ->visible(fn (EmailAccessRequest $request): bool => $this->tab === 'incoming'
+                && $request->isOpen()
+                && $request->email_id !== null
+                && $this->recordAnswers($request)->isNotEmpty())
+            ->modalHeading(__('filament/pages/email-access-requests.actions.share_record.modal_heading'))
+            ->modalDescription(fn (EmailAccessRequest $request): string => __('filament/pages/email-access-requests.actions.share_record.modal_description', ['name' => $request->requester->name ?? __('filament/pages/email-access-requests.actions.fallback_user')]))
+            ->modalSubmitActionLabel(__('filament/pages/email-access-requests.actions.share_record.modal_submit_label'))
+            ->schema(fn (EmailAccessRequest $request): array => [
+                Radio::make('record')
+                    ->hiddenLabel()
+                    ->options($this->recordAnswers($request)->mapWithKeys(fn (Company|People|Opportunity $record): array => [$record->getMorphClass().':'.$record->getKey() => $record->name])->all())
+                    ->default($this->recordAnswers($request)->map(fn (Company|People|Opportunity $record): string => $record->getMorphClass().':'.$record->getKey())->first())
+                    ->required(),
+            ])
+            ->action(function (array $data, EmailAccessRequest $request): void {
+                $accessRequest = EmailAccessRequest::query()->with(['email', 'owner', 'requester'])->whereKey($request->getKey())->where('owner_id', $this->authUser()->getKey())->first();
+                $record = $accessRequest === null ? null : $this->recordAnswers($accessRequest)
+                    ->first(fn (Company|People|Opportunity $answer): bool => $answer->getMorphClass().':'.$answer->getKey() === ($data['record'] ?? null));
+
+                if ($accessRequest === null || $record === null) {
+                    return;
+                }
+
+                $this->afterDecision(resolve(ApproveEmailAccessRequestAction::class)->execute($accessRequest, $this->authUser(), $record), 'approved');
+            });
+    }
+
+    /** @return Collection<int, Company|People|Opportunity> */
+    private function recordAnswers(EmailAccessRequest $request): Collection
+    {
+        $email = $request->email;
+
+        if (! $email instanceof Email || $email->user_id !== $this->authUser()->getKey()) {
+            return new Collection;
+        }
+
+        return $this->recordAnswersByEmail[$email->getKey()] ??= resolve(RecordEmailAccessQuery::class)->recordsOf($email);
     }
 
     private function denyAccessRequestAction(): Action

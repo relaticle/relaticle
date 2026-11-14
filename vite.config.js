@@ -98,6 +98,7 @@ export default defineConfig(({mode}) => {
                     'resources/css/filament/app/theme.css',
                     'resources/css/filament/admin/theme.css',
                     'resources/js/filament/rich-content-plugins/checklist.js',
+                    'resources/js/filament/rich-content-plugins/email-composer.js',
                     // The cloud package is absent from self-hosted builds
                     ...(cloud ? cloudInputs : []),
                 ],

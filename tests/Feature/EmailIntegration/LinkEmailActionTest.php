@@ -21,11 +21,14 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\Actions\AutoCreateCompanyAction;
 use Relaticle\EmailIntegration\Actions\AutoCreatePersonAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
+use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
+use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailBlocklist;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\PublicEmailDomain;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
@@ -35,6 +38,8 @@ mutates(LinkEmailAction::class);
 mutates(AutoCreatePersonAction::class);
 mutates(AutoCreateCompanyAction::class);
 mutates(PersonEmailMatcher::class);
+mutates(UnlinkEmailFromRecord::class);
+mutates(EmailLinkSuppression::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1475,18 +1480,108 @@ it('also links email to opportunity via person relationship', function (): void 
     expect($email->opportunities()->where('opportunities.id', $opportunity->getKey())->exists())->toBeTrue();
 });
 
-function makeAcmeCompanyWithDomain(): ?Company
+it('does not link a company again after a user unlinked it, on sync or history import', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+    $email = makeLinkEmail();
+    EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($email);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($this->user, $email, $company);
+    resolve(LinkEmailAction::class)->reapply($email->fresh());
+
+    expect($email->companies()->whereKey($company->getKey())->exists())->toBeFalse()
+        ->and(EmailLinkSuppression::query()->where('email_id', $email->getKey())->count())->toBe(1);
+});
+
+it('does not link a later reply in the same conversation to the record a user unlinked', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+    $first = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    EmailParticipant::factory()->from()->create(['email_id' => $first->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($first);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->user, $first, $company);
+
+    $reply = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    $elsewhere = makeLinkEmail(['conversation_key' => 'acme-onboarding']);
+
+    foreach ([$reply, $elsewhere] as $email) {
+        EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
+        resolve(LinkEmailAction::class)->execute($email);
+    }
+
+    expect($reply->companies()->whereKey($company->getKey())->exists())->toBeFalse()
+        ->and($elsewhere->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and($company->fresh()->email_count)->toBe(1);
+});
+
+it('links a later reply when a teammate unlinked their copy and the user pinned theirs', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+    $bob = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($bob, ['role' => 'member']);
+    $bobsAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $bob->id]));
+    $alices = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    $bobs = makeLinkEmail(['conversation_key' => 'acme-renewal', 'user_id' => $bob->id, 'connected_account_id' => $bobsAccount->getKey()]);
+
+    foreach ([$alices, $bobs] as $copy) {
+        EmailParticipant::factory()->from()->create(['email_id' => $copy->getKey(), 'email_address' => 'ceo@acme.com']);
+        resolve(LinkEmailAction::class)->execute($copy);
+    }
+
+    resolve(UnlinkEmailFromRecord::class)->execute($bob, $bobs, $company);
+    resolve(LinkEmailToRecord::class)->execute($this->user, $alices, $company);
+
+    $reply = makeLinkEmail(['conversation_key' => 'acme-renewal']);
+    EmailParticipant::factory()->from()->create(['email_id' => $reply->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($reply);
+
+    expect($reply->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and($bobs->companies()->whereKey($company->getKey())->exists())->toBeFalse()
+        ->and(Email::query()->onRecord($company)->pluck('id')->all())->toContain($alices->getKey(), $reply->getKey());
+});
+
+it('keeps an unlink to its conversation when another conversation holds the same message id', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+    $unlinked = makeLinkEmail(['conversation_key' => 'acme-renewal', 'rfc_message_id' => '<deal@acme.com>']);
+    $secondMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->user->id]));
+    $elsewhere = makeLinkEmail(['conversation_key' => 'acme-forward', 'rfc_message_id' => '<deal@acme.com>', 'connected_account_id' => $secondMailbox->getKey()]);
+    EmailParticipant::factory()->from()->create(['email_id' => $unlinked->getKey(), 'email_address' => 'ceo@acme.com']);
+    EmailParticipant::factory()->from()->create(['email_id' => $elsewhere->getKey(), 'email_address' => 'ceo@acme.com']);
+    resolve(LinkEmailAction::class)->execute($unlinked);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->user, $unlinked, $company);
+
+    resolve(LinkEmailAction::class)->execute($elsewhere);
+
+    expect($elsewhere->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and(Email::query()->onRecord($company)->pluck('id')->all())->toBe([$elsewhere->getKey()]);
+});
+
+it('keeps a teammate\'s unlink to their own mailbox when later replies sync', function (): void {
+    $company = makeAcmeCompanyWithDomain();
+    $bob = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($bob, ['role' => 'member']);
+    $bobsAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $bob->id]));
+    $reply = fn (array $attributes = []): Email => tap(makeLinkEmail(['conversation_key' => 'acme-renewal', ...$attributes]), function (Email $email): void {
+        EmailParticipant::factory()->from()->create(['email_id' => $email->getKey(), 'email_address' => 'ceo@acme.com']);
+        resolve(LinkEmailAction::class)->execute($email);
+    });
+    $bobs = $reply(['user_id' => $bob->id, 'connected_account_id' => $bobsAccount->getKey()]);
+
+    resolve(UnlinkEmailFromRecord::class)->execute($bob, $bobs, $company);
+
+    $alicesReply = $reply();
+    $bobsReply = $reply(['user_id' => $bob->id, 'connected_account_id' => $bobsAccount->getKey()]);
+
+    expect($alicesReply->companies()->whereKey($company->getKey())->exists())->toBeTrue()
+        ->and($bobsReply->companies()->whereKey($company->getKey())->exists())->toBeFalse();
+});
+
+function makeAcmeCompanyWithDomain(): Company
 {
     $domainsField = CustomField::query()
         ->withoutGlobalScopes()
         ->where('tenant_id', test()->workspace->getKey())
         ->where('entity_type', 'company')
         ->where('code', 'domains')
-        ->first();
-
-    if (! $domainsField) {
-        return null;
-    }
+        ->firstOrFail();
 
     $company = Company::create([
         'workspace_id' => test()->workspace->id,
@@ -1501,10 +1596,6 @@ function makeAcmeCompanyWithDomain(): ?Company
 
 it('counts company email metrics once per email despite multiple participants at the same domain', function (): void {
     $company = makeAcmeCompanyWithDomain();
-
-    if (! $company) {
-        $this->markTestSkipped('No domains custom field seeded for this team.');
-    }
 
     $email = makeLinkEmail(['direction' => EmailDirection::INBOUND, 'sent_at' => now()]);
 
@@ -1525,10 +1616,6 @@ it('counts company email metrics once per email despite multiple participants at
 
 it('does not move last_email_at backwards when an older email is linked after a newer one', function (): void {
     $company = makeAcmeCompanyWithDomain();
-
-    if (! $company) {
-        $this->markTestSkipped('No domains custom field seeded for this team.');
-    }
 
     $newerSentAt = now();
     $newer = makeLinkEmail(['direction' => EmailDirection::INBOUND, 'sent_at' => $newerSentAt]);

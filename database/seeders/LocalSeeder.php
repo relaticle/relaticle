@@ -40,6 +40,8 @@ final class LocalSeeder extends Seeder
         $this->call(BlogSeeder::class);
 
         $this->seedPersonas(PersonaCatalog::only($this->slugs()));
+
+        $this->call(EmailConversationsSeeder::class);
     }
 
     /**

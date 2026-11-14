@@ -259,3 +259,22 @@ it('renders empty string when People record has no company', function (): void {
     expect($result['subject'])->toBe('Hi Solo Person')
         ->and($result['body_html'])->toBe('<p>You work at .</p>');
 });
+
+it('renders active custom fields by code and escapes fallbacks without resolving inactive fields', function (): void {
+    $person = People::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Ana Patel']);
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->id, 'entity_type' => 'people',
+        'code' => 'renewal_segment', 'type' => 'text',
+    ]);
+    $person->saveCustomFieldValue($field, 'Enterprise & partners', $this->workspace);
+
+    $renderer = resolve(EmailTemplateRenderService::class);
+    $body = '<p>{{ person.first_name }}: {{ person.renewal_segment }}; {{ person.job_title | <team> }}; {{ person.unknown | hidden }}</p>';
+
+    expect($renderer->renderContent($body, $person))
+        ->toBe('<p>Ana: Enterprise &amp; partners; &lt;team&gt;; {{ person.unknown | hidden }}</p>');
+
+    $field->update(['active' => false]);
+    expect($renderer->renderContent('{{ person.renewal_segment }}', $person))
+        ->toBe('{{ person.renewal_segment }}');
+});

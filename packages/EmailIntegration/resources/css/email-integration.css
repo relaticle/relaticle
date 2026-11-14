@@ -5,6 +5,32 @@
    =================================== */
 
 /* Segmented pill-style tabs (opt-in via .ei-tabs-segmented on the <x-filament::tabs>) */
+.ei-variable {
+    @apply inline-flex cursor-pointer items-center rounded px-1 text-sm font-medium ring-1 ring-inset;
+}
+
+.ei-variable-empty {
+    @apply bg-warning-50 text-warning-800 ring-warning-300 dark:bg-warning-950 dark:text-warning-200 dark:ring-warning-700;
+}
+
+.ei-variable-fallback {
+    @apply bg-info-50 text-info-800 ring-info-300 dark:bg-info-950 dark:text-info-200 dark:ring-info-700;
+}
+
+.ei-variable-unknown {
+    @apply bg-danger-50 text-danger-800 ring-danger-300 dark:bg-danger-950 dark:text-danger-200 dark:ring-danger-700;
+}
+
+.ei-command-panel {
+    @apply fixed m-0 max-h-64 w-64 max-w-full overflow-y-auto p-2;
+
+    &:popover-open { display: block; }
+    &:not(:popover-open) { display: none; }
+
+    & form, & label { @apply grid gap-2; }
+    & input { @apply min-w-0 rounded border border-gray-400 bg-white px-2 py-1 text-sm text-gray-950 dark:border-gray-500 dark:bg-gray-900 dark:text-white; }
+}
+
 .fi-tabs.ei-tabs-segmented {
     @apply !mx-0 !w-fit !max-w-full !gap-x-0 !rounded-lg !bg-gray-100 !p-1 !shadow-none !ring-0 dark:!bg-gray-800;
 

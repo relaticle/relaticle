@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
@@ -33,12 +34,16 @@ beforeEach(function (): void {
 
 function makePrivacyEmail(array $overrides = []): Email
 {
-    return Email::factory()->create(array_merge([
+    $email = Email::factory()->create(array_merge([
         'workspace_id' => test()->workspace->id,
         'user_id' => test()->owner->id,
         'connected_account_id' => test()->account->getKey(),
         'is_internal' => false,
     ], $overrides));
+
+    Company::factory()->create(['workspace_id' => $email->workspace_id])->emails()->attach($email->id);
+
+    return $email;
 }
 
 it('effectiveTier returns FULL when viewer is the email owner', function (): void {

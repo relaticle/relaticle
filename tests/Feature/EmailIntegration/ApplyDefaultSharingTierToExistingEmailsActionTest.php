@@ -8,6 +8,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Arr;
 use Relaticle\EmailIntegration\Actions\ApplyDefaultSharingTierToExistingEmailsAction;
 use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
+use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -96,3 +97,14 @@ it('refuses to set the level of a mailbox someone else owns', function (): void 
 
     resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::FULL);
 })->throws(HttpException::class);
+
+it('never widens automated mail but still narrows it when its owner lowers the mailbox level', function (): void {
+    $mailbox = sharingMailbox($this->owner, $this->workspace);
+    $closed = sharingEmail($mailbox, EmailPrivacyTier::PRIVATE, ['automated_reason' => AutomatedReason::cases()[0]]);
+    $open = sharingEmail($mailbox, EmailPrivacyTier::FULL, ['automated_reason' => AutomatedReason::cases()[0]]);
+
+    resolve(SaveMailboxSharingTier::class)->execute($this->owner, $mailbox, EmailPrivacyTier::SUBJECT);
+
+    expect($closed->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE)
+        ->and($open->fresh()->privacy_tier)->toBe(EmailPrivacyTier::SUBJECT);
+});

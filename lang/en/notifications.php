@@ -83,6 +83,7 @@ return [
             'view' => 'View',
             'approve' => 'Approve',
             'deny' => 'Deny',
+            'confirm_approval' => ':action? This shares your current emails on this record, not future mail.',
             'approved' => 'Approved',
             'denied' => 'Denied',
             'already_decided' => 'This request was already decided.',

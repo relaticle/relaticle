@@ -27,13 +27,14 @@ beforeEach(function (): void {
     ]));
 });
 
-it('shows only the gmail connect prompt when no account is connected', function (): void {
+it('shows the gmail connect prompt above the tabs when no account is connected', function (): void {
     $this->account->forceDelete();
 
     livewire(EmailInboxPage::class)
-        ->assertDontSee(__('filament/pages/email-inbox.tabs.drafts'))
-        ->assertDontSee(__('filament/pages/email-inbox.tabs.outbox'))
-        ->assertDontSee(__('filament/pages/email-inbox.tabs.templates'))
+        ->assertSee(__('filament/pages/email-inbox.tabs.drafts'))
+        ->assertSee(__('filament/pages/email-inbox.tabs.outbox'))
+        ->assertDontSee(__('filament/pages/email-inbox.tabs.failed'))
+        ->assertSee(__('filament/pages/email-inbox.tabs.templates'))
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'))
         ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
         ->tap(fn ($component) => assertActionHasMailboxOAuthUrl($component, 'connectMailbox', 'gmail', $this->account->workspace));
@@ -137,4 +138,7 @@ it('hides the compose action when the mailbox is disconnected', function (): voi
     livewire(DraftsTable::class)
         ->assertDontSee(__('filament/concerns/email-compose.actions.compose.label'))
         ->assertSee(__('filament/pages/email-accounts.not_connected.inbox.heading'));
+
+    livewire(EmailInboxPage::class)
+        ->assertSeeHtml('data-connect-card');
 });

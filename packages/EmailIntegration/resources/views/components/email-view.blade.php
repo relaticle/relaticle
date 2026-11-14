@@ -1,4 +1,4 @@
-@props(['record'])
+@props(['record', 'threaded' => false, 'shortcuts' => false])
 
 @php
     use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -11,7 +11,7 @@
     $from    = $record->fromParticipant();
     $toList  = $record->toParticipants();
     $ccList  = $record->ccParticipants();
-    $categoryLabel = $record->categoryLabel();
+    $category = $record->systemCategory();
 
     $canViewSubject = $authUser->can('viewSubject', $record);
     $canViewBody    = $authUser->can('viewBody', $record);
@@ -60,8 +60,6 @@
     $decode = fn (?string $text): string => html_entity_decode((string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
     $subject = $decode($record->subject);
-    $snippet = trim(preg_replace('/^\s*\S+@\S+\.\S+\s*/u', '', $decode($record->snippet)) ?? '');
-    $isReply = filled($record->in_reply_to);
 
     // Hoisted so the reader knows up front whether there is a frame to wait for: a
     // text-only body or a privacy gate has nothing to load and must not sit behind
@@ -76,7 +74,7 @@
      not be held back behind it. --}}
 <div
     x-data="{ ready: @js($safeHtml === null) }"
-    class="flex min-h-0 flex-1 flex-col"
+    @class(['flex flex-col', 'min-h-0 flex-1' => ! $threaded])
 >
 
     {{-- ── Internal email banner ──────────────────────────────────────────── --}}
@@ -91,8 +89,8 @@
          Two quiet rows, subject then who and when, instead of one block that
          crams sender, address, date, badges and every recipient together. --}}
 
-    {{-- Subject row: title, category pill, and sharing actions. Snippet sits on
-         the line below so the headline stays scannable. --}}
+    {{-- Subject row: title, category pill, and sharing actions. A thread shows them once, in the drawer header. --}}
+    @unless ($threaded)
     <div class="flex shrink-0 items-start gap-3 border-b border-gray-100 dark:border-gray-800 px-4 py-3 pr-12 sm:px-6 sm:pr-14">
         {{-- Back to the list on narrow viewports, where the two panes alternate.
              The relation-manager ViewAction has no selectedEmailId; hide the control there. --}}
@@ -118,8 +116,8 @@
                         <p class="min-w-0 text-sm italic text-gray-400 dark:text-gray-500">{{ __('filament/pages/email-inbox.subject.hidden') }}</p>
                     @endif
 
-                    @if ($categoryLabel)
-                        <x-email-integration::category-badge :label="$categoryLabel->label" />
+                    @if ($category)
+                        <x-email-integration::category-badge :category="$category" />
                     @endif
                 </div>
 
@@ -129,19 +127,9 @@
                     <x-email-integration::detail-action-bar :email="$record" />
                 </div>
             </div>
-
-            @if ($canViewSubject && filled($snippet))
-                <p class="mt-1.5 flex items-start gap-1.5 text-sm leading-snug text-gray-500 dark:text-gray-400">
-                    @if ($isReply)
-                        <x-lucide-reply class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
-                    @else
-                        <x-lucide-file-text class="mt-0.5 h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true" />
-                    @endif
-                    <span>{{ $snippet }}</span>
-                </p>
-            @endif
         </div>
     </div>
+    @endunless
 
     {{-- Sender, recipients and the reply actions --}}
     <div
@@ -287,7 +275,12 @@
                             "
                             type="button"
                             aria-label="{{ $label }}"
-                            x-tooltip="{ content: @js($label), theme: $store.theme }"
+                            @if ($shortcuts)
+                                x-tooltip="{ content: $store.shortcuts?.hint(@js(\Illuminate\Support\Str::camel($replyMode)), @js($label)) ?? @js($label), theme: $store.theme }"
+                                x-bind:aria-keyshortcuts="$store.shortcuts?.keysFor(@js(\Illuminate\Support\Str::camel($replyMode)))"
+                            @else
+                                x-tooltip="{ content: @js($label), theme: $store.theme }"
+                            @endif
                             class="flex h-7 w-7 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-gray-800 dark:hover:text-gray-300"
                         >
                             <x-filament::icon :icon="$icon" class="h-4 w-4" />
@@ -310,7 +303,7 @@
     {{-- `motion-safe:scroll-smooth` is what animates the jump to a new draft: the
          scroll is a plain scrollTop assignment, which the browser eases when the
          element opts in, and the variant drops it for reduced-motion users. --}}
-    <div class="flex min-h-0 flex-1 flex-col overflow-y-auto motion-safe:scroll-smooth" data-email-scroll-region>
+    <div @class(['flex flex-col', 'min-h-0 flex-1 overflow-y-auto motion-safe:scroll-smooth' => ! $threaded]) @unless ($threaded) data-email-scroll-region @endunless>
 
     {{-- ── Attachments ─────────────────────────────────────────────────────── --}}
     @if ($canViewBody && $downloadAttachments->isNotEmpty())
@@ -369,10 +362,21 @@
                         $refs.body.style.height = '1px'
                         $refs.body.style.height = Math.max(doc.documentElement.scrollHeight, 160) + 'px'
                     },
+                    theme() {
+                        const doc = $refs.body?.contentDocument
+
+                        if (doc?.documentElement) doc.documentElement.dataset.theme = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
+                    },
+                    themeObserver: null,
                     init() {
                         this.fit()
+                        this.theme()
+
+                        this.themeObserver = new MutationObserver(() => this.theme())
+                        this.themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
 
                         $refs.body.addEventListener('load', () => {
+                            this.theme()
                             this.fit()
                             this.ready = true
 
@@ -385,12 +389,15 @@
                         // A frame that never fires load must not leave a spinner forever.
                         setTimeout(() => { this.ready = true }, 5000)
                     },
+                    destroy() {
+                        this.themeObserver?.disconnect()
+                    },
                 }"
                 x-bind:class="ready ? 'shrink-0' : 'flex min-h-0 flex-1 flex-col'"
             >
                 <div
                     x-bind:class="ready ? '' : 'min-h-0 flex-1'"
-                    class="relative w-full overflow-hidden bg-white px-6 py-6 sm:px-8 lg:px-10 dark:bg-gray-900"
+                    class="relative w-full overflow-hidden bg-white px-2 sm:px-4 dark:bg-gray-900"
                 >
                     <div
                         x-show="! ready"
@@ -407,7 +414,7 @@
                         sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
                         referrerpolicy="no-referrer"
                         scrolling="no"
-                        class="block w-full border-0 bg-white transition-opacity duration-150 [color-scheme:light] dark:bg-gray-900 dark:[color-scheme:dark]"
+                        class="block w-full rounded-lg border-0 bg-white transition-opacity duration-150 [color-scheme:light] dark:bg-gray-900 dark:[color-scheme:dark]"
                         {{-- A placeholder tall enough to centre the spinner in; replaced by
                              the measured content height the moment the frame loads. --}}
                         style="height: 24rem"
@@ -417,7 +424,7 @@
         @else
             <div class="shrink-0 px-6 py-6 sm:px-8 lg:px-10">
                 @if ($record->body?->body_text)
-                    <pre class="max-w-prose whitespace-pre-wrap font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $record->body->body_text }}</pre>
+                    <pre class="max-w-prose whitespace-pre-wrap [overflow-wrap:anywhere] font-sans text-sm leading-relaxed text-gray-700 dark:text-gray-300">{{ $record->body->body_text }}</pre>
                 @else
                     <p class="text-sm italic text-gray-400 dark:text-gray-500">{{ __('filament/pages/email-inbox.reader.no_body') }}</p>
                 @endif
@@ -474,7 +481,7 @@
          The real composer, docked under the message it answers rather than
          floating over it: same fields, toolbar, attachments, templates and
          signatures as Compose. The reply icons above open it. --}}
-    @if ($canViewBody)
+    @if ($canViewBody && ! $threaded)
         @livewire('email-integration.composer', ['dock' => 'inline'], key('inline-reply-composer'))
     @endif
 

@@ -40,7 +40,7 @@ it('wraps the template body toolbar onto a phone screen', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('starts the merge tags panel closed and opens it from the toolbar', function (): void {
+it('opens the variable picker while typing and inserts a variable on a phone', function (): void {
     $this->withVite();
 
     $user = userWithMailbox();
@@ -49,8 +49,10 @@ it('starts the merge tags panel closed and opens it from the toolbar', function 
     visitAs($user, templatesTabPath($workspace), 393, 852)
         ->click(__('filament/resources/email-template.actions.create.label'))
         ->assertVisible('.fi-modal-open .fi-fo-rich-editor-toolbar')
-        ->assertMissing('.fi-modal-open .fi-fo-rich-editor-panels')
-        ->click('.fi-modal-open [data-rich-editor-tool="mergeTags"]')
-        ->assertVisible('.fi-modal-open .fi-fo-rich-editor-panels')
+        ->assertMissing('.ei-command-panel')
+        ->type('.fi-modal-open [contenteditable="true"]', '{person.first_name')
+        ->assertVisible('.ei-command-panel')
+        ->click('.ei-command-panel [role="option"]')
+        ->assertVisible('.fi-modal-open [data-type="emailVariable"][data-code="person.first_name"]')
         ->assertNoJavaScriptErrors();
 });

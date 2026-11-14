@@ -143,11 +143,7 @@ final class EmailVisibilityService
             return 0;
         }
 
-        $query = $record->emails();
-
-        $this->preferredCopies->restrictToVisiblePreferredCopies($query->getQuery(), $viewer);
-
-        return $query->count();
+        return $this->preferredCopies->restrictToVisiblePreferredCopies(Email::query()->onRecord($record), $viewer)->count();
     }
 
     public function visibleEmailCountBadge(Company|Opportunity|People $record, User $viewer): ?string

@@ -14,7 +14,9 @@ use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
+use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\LinkMeetingAction;
+use Relaticle\EmailIntegration\Actions\UnlinkEmailFromRecord;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Jobs\RelinkRecordHistoryJob;
@@ -29,7 +31,7 @@ use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Tests\Helpers\ImportExecutionFixture;
 
-mutates(RelinkRecordHistoryJob::class, QueueRecordHistoryRelink::class, LinkEmailAction::class, LinkMeetingAction::class);
+mutates(RelinkRecordHistoryJob::class, QueueRecordHistoryRelink::class, LinkEmailAction::class, LinkMeetingAction::class, UnlinkEmailFromRecord::class);
 
 afterEach(function (): void {
     if (isset($this->import)) {
@@ -272,4 +274,20 @@ it('does not touch a participant already linked to another person', function ():
     ]);
 
     expect($email->people()->count())->toBe(0);
+});
+
+it('keeps an unlinked company off the mail when a new person of that company relinks it', function (): void {
+    $email = ($this->linkedEmailFrom)('ana@airbnb.com');
+    $company = resolve(CreateCompany::class)->execute($this->user, ['name' => 'Airbnb']);
+    resolve(LinkEmailToRecord::class)->execute($this->user, $email, $company);
+    resolve(UnlinkEmailFromRecord::class)->execute($this->user, $email, $company);
+
+    resolve(CreatePeople::class)->execute($this->user, [
+        'name' => 'Ana Ruiz',
+        'company_id' => $company->getKey(),
+        'custom_fields' => ['emails' => ['ana@airbnb.com']],
+    ]);
+
+    expect($email->people()->count())->toBe(1)
+        ->and($email->companies()->whereKey($company->getKey())->exists())->toBeFalse();
 });

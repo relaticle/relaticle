@@ -123,6 +123,7 @@ final readonly class EmailForAgent
      *     subject: ?string,
      *     snippet: ?string,
      *     has_attachments: bool,
+     *     url: string,
      *     participants: list<array{role: string, name: ?string, email: string}>
      * }
      */
@@ -141,6 +142,7 @@ final readonly class EmailForAgent
             'subject' => $tier->showsSubject() ? $email->subject : null,
             'snippet' => $tier->showsBody() ? $email->snippet : null,
             'has_attachments' => (bool) $email->has_attachments,
+            'url' => $email->appUrl(),
             'participants' => array_values($email->participants
                 ->filter(fn (EmailParticipant $participant): bool => $this->isListed($participant->role, $tier, $ownsMailbox))
                 ->map(fn (EmailParticipant $participant): array => [

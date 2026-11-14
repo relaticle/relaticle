@@ -111,9 +111,9 @@ final class AppDatabaseNotifications extends DatabaseNotifications
         $this->decidedRequests = [];
     }
 
-    public function approveRequest(string $kind, string $id): void
+    public function approveRequest(string $kind, string $id, ?string $option = null): void
     {
-        $this->decideRequest($kind, $id, RequestOutcome::Approved);
+        $this->decideRequest($kind, $id, RequestOutcome::Approved, $option);
     }
 
     public function denyRequest(string $kind, string $id): void
@@ -145,7 +145,7 @@ final class AppDatabaseNotifications extends DatabaseNotifications
         ]);
     }
 
-    private function decideRequest(string $kind, string $id, RequestOutcome $outcome): void
+    private function decideRequest(string $kind, string $id, RequestOutcome $outcome, ?string $option = null): void
     {
         $user = $this->requireUser();
         $workspace = resolve(CurrentWorkspace::class)->get();
@@ -156,7 +156,7 @@ final class AppDatabaseNotifications extends DatabaseNotifications
         $request = $requests->find($user, $workspace, $kind, $id);
 
         $decided = $outcome === RequestOutcome::Approved
-            ? $requests->approve($user, $workspace, $kind, $id)
+            ? $requests->approve($user, $workspace, $kind, $id, $option)
             : $requests->deny($user, $workspace, $kind, $id);
 
         if (! $request instanceof InboxRequest) {
@@ -271,6 +271,7 @@ final class AppDatabaseNotifications extends DatabaseNotifications
      *     createdAt: CarbonImmutable,
      *     expiresAt: ?CarbonImmutable,
      *     url: ?string,
+     *     approvalOptions: array<string, string>,
      *     outcome: ?RequestOutcome
      * }>
      */
@@ -286,6 +287,7 @@ final class AppDatabaseNotifications extends DatabaseNotifications
                 'createdAt' => $request->createdAt,
                 'expiresAt' => $request->expiresAt,
                 'url' => $request->url,
+                'approvalOptions' => $request->approvalOptions,
                 'outcome' => null,
             ]);
 
@@ -300,6 +302,7 @@ final class AppDatabaseNotifications extends DatabaseNotifications
                 'createdAt' => CarbonImmutable::parse($row['created_at']),
                 'expiresAt' => null,
                 'url' => null,
+                'approvalOptions' => [],
                 'outcome' => RequestOutcome::tryFrom($row['outcome']),
             ]);
 

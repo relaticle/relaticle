@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationReason;
-use App\Filament\Pages\Dashboard;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\Notification as NotificationRow;
@@ -227,7 +226,7 @@ it('gives a Full share a reader link in the bell and the mail', function (): voi
 
     $this->actingAs($this->alice);
     $presented = EmailSharedNotification::present($row);
-    $link = Dashboard::getUrl(['email' => $this->email->getKey()], panel: 'app', tenant: $this->workspace);
+    $link = route('email.open', $this->email);
 
     expect($presented->getBody())->toBe('Renewal terms')
         ->and($presented->getActions())->toHaveCount(1)

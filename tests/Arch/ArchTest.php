@@ -369,6 +369,11 @@ arch('email integration owns its controllers, jobs, policies and timeline entrie
     ->not
     ->toUse(['App\Http\Controllers', 'App\Jobs', 'App\Policies', 'App\ActivityLog']);
 
+arch('the email package never reaches into chat')
+    ->expect('Relaticle\EmailIntegration')
+    ->not
+    ->toUse('Relaticle\Chat');
+
 arch('query filters implement the query builder filter contract')
     ->expect('App\Queries\Filters')
     ->toImplement(Filter::class);

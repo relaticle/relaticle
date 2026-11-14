@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\Plan;
+use App\Enums\WorkspaceSetupStep;
 use App\Features\Billing;
 use App\Models\User;
 use Filament\Facades\Filament;
@@ -16,6 +17,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 use Relaticle\EmailIntegration\Controllers\CallbackController;
 use Relaticle\EmailIntegration\Controllers\RedirectController;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Filament\Pages\MailboxSharingPage;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 mutates(CallbackController::class);
@@ -91,15 +93,19 @@ it('tells an owner who cancels at the provider that nothing was connected', func
     Log::shouldNotHaveReceived('error');
 });
 
-it('returns to the page that started the connect with a success notification', function (): void {
+it('asks a first connect for sharing while keeping its return page and success notification', function (): void {
     Bus::fake();
 
     Socialite::fake('gmail', connectedGmailUser());
     bindMailboxOAuthWorkspace($this->user);
     session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/email');
 
-    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
-        ->assertRedirect('https://relaticle.test/app/acme/email');
+    $response = $this->get(route('email-accounts.callback', ['provider' => 'gmail']));
+
+    $response->assertRedirect(MailboxSharingPage::getUrl([
+        'mailbox' => ConnectedAccount::query()->where('email_address', 'connected@example.com')->sole()->getKey(),
+        'return' => 'https://relaticle.test/app/acme/email',
+    ]));
 
     Notification::assertNotified(__('filament/pages/email-accounts.notifications.connected.title'));
 
@@ -145,16 +151,18 @@ it('returns to the page that started the connect when the mail read permission w
     expect(session()->has(RedirectController::RETURN_URL_SESSION_KEY))->toBeFalse();
 });
 
-it('lands on the account settings after a connect with no return page', function (): void {
+it('keeps the account settings as the destination after a first sharing answer with no return page', function (): void {
     Bus::fake();
 
     Socialite::fake('gmail', connectedGmailUser());
     bindMailboxOAuthWorkspace($this->user);
 
-    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
-        ->assertRedirect(EmailAccountsPage::getUrl([
-            'tenant' => $this->user->currentWorkspace->slug,
-        ], panel: 'app'));
+    $response = $this->get(route('email-accounts.callback', ['provider' => 'gmail']));
+
+    $response->assertRedirect(MailboxSharingPage::getUrl([
+        'mailbox' => ConnectedAccount::query()->where('email_address', 'connected@example.com')->sole()->getKey(),
+        'return' => EmailAccountsPage::getUrl(tenant: $this->user->currentWorkspace),
+    ]));
 
     Notification::assertNotified(__('filament/pages/email-accounts.notifications.connected.title'));
 });
@@ -224,9 +232,12 @@ it('connects a mailbox past every plan limit on a self-hosted install', function
     Socialite::fake('gmail', connectedGmailUser());
     bindMailboxOAuthWorkspace($this->user);
 
-    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
-        ->assertRedirect(EmailAccountsPage::getUrl(['tenant' => $workspace->slug], panel: 'app'))
-        ->assertSessionMissing('error');
+    $response = $this->get(route('email-accounts.callback', ['provider' => 'gmail']));
+
+    $response->assertRedirect(MailboxSharingPage::getUrl([
+        'mailbox' => ConnectedAccount::query()->where('email_address', 'connected@example.com')->sole()->getKey(),
+        'return' => EmailAccountsPage::getUrl(tenant: $workspace),
+    ]))->assertSessionMissing('error');
 
     $this->assertDatabaseHas(ConnectedAccount::class, [
         'workspace_id' => $workspace->getKey(),
@@ -244,12 +255,13 @@ it('reconnects an existing mailbox when the workspace has reached its limit', fu
         'workspace_id' => $workspace->getKey(),
         'user_id' => $this->user->getKey(),
     ]));
-    ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
+    $account = ConnectedAccount::withoutEvents(fn () => ConnectedAccount::factory()->create([
         'workspace_id' => $workspace->getKey(),
         'user_id' => $this->user->getKey(),
         'email_address' => 'connected@example.com',
         'access_token' => 'stale-token',
     ]));
+    $account->forceFill(['sharing_confirmed_at' => now()])->save();
 
     Socialite::fake('gmail', connectedGmailUser());
     bindMailboxOAuthWorkspace($this->user);
@@ -262,6 +274,17 @@ it('reconnects an existing mailbox when the workspace has reached its limit', fu
 
     expect(ConnectedAccount::query()->where('email_address', 'connected@example.com')->count())->toBe(1)
         ->and(ConnectedAccount::query()->where('email_address', 'connected@example.com')->sole()->access_token)->toBe('access-token');
+});
+
+it('leaves the onboarding wizard to ask sharing itself', function (): void {
+    Bus::fake();
+    $this->user->currentWorkspace->forceFill(['onboarding_step' => WorkspaceSetupStep::Email])->save();
+    Socialite::fake('gmail', connectedGmailUser());
+    bindMailboxOAuthWorkspace($this->user);
+    session()->put(RedirectController::RETURN_URL_SESSION_KEY, 'https://relaticle.test/app/acme/setup');
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
+        ->assertRedirect('https://relaticle.test/app/acme/setup');
 });
 
 function connectedGmailUser(): SocialiteUser

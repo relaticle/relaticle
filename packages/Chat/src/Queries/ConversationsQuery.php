@@ -30,7 +30,7 @@ final readonly class ConversationsQuery
     /** @return Collection<int, stdClass> */
     public function recent(User $user, int $limit = self::LIMIT): Collection
     {
-        return $this->newest(AgentConversation::query()->ownedBy($user), $limit);
+        return $this->newest(AgentConversation::query()->ownedBy($user)->listable(), $limit);
     }
 
     /** @return Collection<int, stdClass> */
@@ -47,6 +47,7 @@ final readonly class ConversationsQuery
         return $this->newest(
             AgentConversation::query()
                 ->ownedBy($user)
+                ->listable()
                 ->where(function (Builder $conversation) use ($needle): void {
                     $conversation->where('title', 'ilike', $needle)
                         ->orWhereHas('messages', fn (Builder $message): Builder => $message->withoutSynthetic()->where('content', 'ilike', $needle));

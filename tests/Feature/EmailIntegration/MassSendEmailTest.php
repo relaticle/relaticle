@@ -933,3 +933,31 @@ it('queues an email at the level of the mailbox the sender switched to', functio
         ->and($queued->privacy_tier)->toBe(EmailPrivacyTier::FULL)
         ->and($queued->privacy_tier_customized)->toBeFalse();
 });
+
+it('previews each mass recipient with the same values their queued copy receives', function (): void {
+    $ana = People::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Ana Patel']);
+    $ben = People::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Ben Carter']);
+    setPersonEmail($ana, 'ana@example.test');
+    setPersonEmail($ben, 'ben@example.test');
+
+    $composer = livewire(EmailComposer::class)
+        ->dispatch('composer:open', payload: [
+            'massSend' => true,
+            'recipients' => [
+                ...massRecipientPayload($ana, 'ana@example.test'),
+                ...massRecipientPayload($ben, 'ben@example.test'),
+            ],
+        ])
+        ->set('subject', 'For {{ person.first_name }}')
+        ->set('bodyHtml', '<p>Hi {{ person.first_name }}, let us renew.</p>')
+        ->set('showVariablePreview', true)
+        ->assertSee('For Ana')
+        ->set('previewIndex', 1)
+        ->assertSee('For Ben')
+        ->assertSee('2 of 2');
+
+    $composer->call('send')->assertHasNoErrors();
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->orderBy('subject')->pluck('subject')->all())
+        ->toBe(['For Ana', 'For Ben']);
+    expect(Email::query()->where('subject', 'For Ben')->sole()->body->body_html)->toContain('Hi Ben, let us renew.');
+});

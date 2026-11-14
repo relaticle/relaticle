@@ -872,6 +872,7 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('board-stage-order', resource_path('js/filament/board-stage-order.js')),
             Js::make('filter-bar', resource_path('js/filament/filter-bar.js')),
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
+            Js::make('shortcuts', resource_path('js/filament/shortcuts.js')),
         ]);
 
         FilamentAsset::registerScriptData([

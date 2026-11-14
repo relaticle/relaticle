@@ -165,7 +165,7 @@ final class ProblemsStats extends StatsOverviewWidget
         $connected = (int) $cache->remember('problems.mailboxes.connected', fn (): int => ConnectedAccount::query()->connected()->count());
         $count = $failing + $stale;
 
-        return Stat::make(HelpLabel::make('Mailboxes needing attention', 'Connected mailboxes that stopped syncing: the provider returned an error, the owner has to sign in again, or an active mailbox has not synced for over an hour. Red when any has an error or needs sign-in, amber when the only problem is a late sync.'), number_format($count))
+        return Stat::make(HelpLabel::make('Mailboxes needing attention', 'Connected mailboxes that stopped syncing: the provider returned an error, the owner has to sign in again, or a mailbox has not synced for a day. Red when any has an error or needs sign-in, amber when the only problem is a late sync.'), number_format($count))
             ->description(match (true) {
                 $connected === 0 => 'No mailboxes connected yet',
                 $count === 0 => 'Every connected mailbox is syncing',

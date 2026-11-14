@@ -11,19 +11,18 @@ use Google\Service\Gmail\Message;
 use Google\Service\Gmail\MessagePart;
 use Google\Service\Gmail\MessagePartHeader;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Data\FetchedEmailData;
 use Relaticle\EmailIntegration\Data\MailBackfillPage;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
 use Relaticle\EmailIntegration\Enums\EmailCategory;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
-use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
 use Relaticle\EmailIntegration\Support\EmailAddressHeaderParser;
-use Relaticle\EmailIntegration\Support\PublicSuffixList;
+use Relaticle\EmailIntegration\Support\MessageIdList;
+use Relaticle\EmailIntegration\Support\RelayedSender;
 use Symfony\Component\Mime\Encoder\QpContentEncoder;
 
 final readonly class GmailService implements MailServiceInterface
@@ -148,7 +147,7 @@ final readonly class GmailService implements MailServiceInterface
             providerMessageId: $message->getId(),
             rfcMessageId: $headers->get('message-id')?->getValue(),
             threadId: $message->getThreadId(),
-            inReplyTo: $headers->get('in-reply-to')?->getValue(),
+            inReplyTo: MessageIdList::first($headers->get('in-reply-to')?->getValue()),
             subject: $headers->get('subject')?->getValue(),
             snippet: mb_substr(PlainText::fromHtml((string) $message->getSnippet()), 0, 255),
             sentAt: now()->setTimestamp((int) ($message->getInternalDate() / 1000)),
@@ -161,7 +160,11 @@ final readonly class GmailService implements MailServiceInterface
             participants: $participants,
             attachments: $attachments,
             providerCategory: in_array('CATEGORY_PERSONAL', $labelIds, true) ? EmailCategory::Personal : null,
-            isBulkMail: $this->isBulkCategory($labelIds) && ! $this->isRelayedForAnotherSender($participants, $headers),
+            isBulkMail: $this->isBulkCategory($labelIds) && ! resolve(RelayedSender::class)->matches($participants, $headers->has('list-unsubscribe')),
+            references: MessageIdList::references($headers->get('references')?->getValue()),
+            headers: $headers->only(FetchedEmailData::KEPT_HEADERS)
+                ->map(fn (MessagePartHeader $header): string => (string) $header->getValue())
+                ->all(),
         );
     }
 
@@ -479,43 +482,6 @@ final readonly class GmailService implements MailServiceInterface
     private function isBulkCategory(array $labelIds): bool
     {
         return array_any(self::BULK_CATEGORIES, fn (string $category): bool => in_array('CATEGORY_'.strtoupper($category), $labelIds, true));
-    }
-
-    /**
-     * @param  array<int, array{email_address: string, name: string|null, role: string}>  $participants
-     * @param  Collection<string, MessagePartHeader>  $headers
-     */
-    private function isRelayedForAnotherSender(array $participants, Collection $headers): bool
-    {
-        // A form notification names the visitor in Reply-To and has no List-Unsubscribe.
-        // A newsletter that replies to another domain still carries one.
-        if ($headers->has('list-unsubscribe')) {
-            return false;
-        }
-
-        $participants = collect($participants);
-        $senderDomain = $this->registrableDomainOf($participants->firstWhere('role', EmailParticipantRole::FROM->value)['email_address'] ?? null);
-
-        if ($senderDomain === null) {
-            return false;
-        }
-
-        return $participants
-            ->where('role', EmailParticipantRole::REPLY_TO->value)
-            ->contains(function (array $participant) use ($senderDomain): bool {
-                $replyDomain = $this->registrableDomainOf($participant['email_address']);
-
-                return $replyDomain !== null && $replyDomain !== $senderDomain;
-            });
-    }
-
-    private function registrableDomainOf(?string $address): ?string
-    {
-        if ($address === null || ! str_contains($address, '@')) {
-            return null;
-        }
-
-        return resolve(PublicSuffixList::class)->registrableDomain(Str::afterLast($address, '@'));
     }
 
     /**

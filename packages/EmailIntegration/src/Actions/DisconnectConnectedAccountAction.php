@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\ProviderGrantRevoker;
@@ -53,5 +54,9 @@ final readonly class DisconnectConnectedAccountAction
         });
 
         $this->grantRevoker->revoke($account, $grant);
+
+        Artisan::queue('email:backfill-conversations', ['--force' => true, '--workspace' => $account->workspace_id])
+            ->onQueue('imports')
+            ->afterCommit();
     }
 }

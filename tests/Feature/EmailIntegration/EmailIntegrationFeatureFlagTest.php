@@ -2,12 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailConversations;
 use App\Features\EmailIntegration;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
@@ -17,7 +19,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Policies\EmailPolicy;
 use Relaticle\EmailIntegration\Policies\MeetingPolicy;
 
-mutates(EmailIntegration::class, EmailPolicy::class, MeetingPolicy::class);
+mutates(EmailIntegration::class, EmailConversations::class, EmailPolicy::class, MeetingPolicy::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -46,6 +48,35 @@ it('defaults to inactive when no config or env override is set', function (): vo
     // Production ships flag-OFF; the test env opts in via RELATICLE_FEATURE_EMAIL_INTEGRATION=true.
     expect(Feature::active(EmailIntegration::class))
         ->toBe((bool) env('RELATICLE_FEATURE_EMAIL_INTEGRATION', false));
+});
+
+it('turns conversations on only for the listed workspaces', function (): void {
+    $listed = Workspace::factory()->create();
+    $other = Workspace::factory()->create();
+
+    config()->set('relaticle.features.email_integration', true);
+    config()->set('relaticle.features.email_conversations', [$listed->id]);
+
+    expect(Feature::for($listed)->active(EmailConversations::class))->toBeTrue()
+        ->and(Feature::for($other)->active(EmailConversations::class))->toBeFalse();
+});
+
+it('turns conversations on for every workspace with a wildcard', function (): void {
+    $workspace = Workspace::factory()->create();
+
+    config()->set('relaticle.features.email_integration', true);
+    config()->set('relaticle.features.email_conversations', ['*']);
+
+    expect(Feature::for($workspace)->active(EmailConversations::class))->toBeTrue();
+});
+
+it('keeps conversations off while email integration is off', function (): void {
+    $workspace = Workspace::factory()->create();
+
+    config()->set('relaticle.features.email_integration', false);
+    config()->set('relaticle.features.email_conversations', ['*']);
+
+    expect(Feature::for($workspace)->active(EmailConversations::class))->toBeFalse();
 });
 
 it('allows access to email pages and resources when active', function (): void {

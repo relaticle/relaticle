@@ -48,7 +48,7 @@ final readonly class ListEmailsTool implements Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'search' => $schema->string()->description('Match sender or recipient name and address, plus subject and snippet where the user has access to them.'),
+            'search' => $schema->string()->description('Match the subject and body text the user has access to, by whole words with the last word as a prefix, and sender or recipient names and addresses by any fragment.'),
             'record_type' => $schema->string()->enum(VisibleEmailsQuery::recordTypes())->description('With record_id: only emails linked to that record.'),
             'record_id' => $schema->string()->description('ID of the person, company or opportunity named by record_type.'),
             'direction' => $schema->string()->enum(array_column(EmailDirection::cases(), 'value'))->description('inbound or outbound.'),

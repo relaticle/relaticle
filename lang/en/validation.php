@@ -77,6 +77,7 @@ return [
         'too_deep' => '$and, $or and $not nest at most :max levels.',
         'too_many_hops' => 'Relations nest at most :max levels.',
         'phone_invalid' => ':name: :value is not a valid phone number.',
+        'email_record' => 'record takes one of :types, with $in record IDs or $starts_with the start of a name.',
         'phone_country_code' => ':name needs a country code, for example +1 415 555 0100.',
         'expected' => [
             'string' => 'a non-empty string, or use $is_empty for records without a value',

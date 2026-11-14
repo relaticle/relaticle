@@ -21,9 +21,11 @@ use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceInterface;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\EmailSendingService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
@@ -175,6 +177,82 @@ it('ignores an in_reply_to_email_id that belongs to another team', function (): 
     // The foreign thread_id / rfc_message_id must not leak into this tenant's email.
     expect($email->thread_id)->toBeNull()
         ->and($email->in_reply_to)->toBeNull();
+});
+
+it('does not thread onto a private teammate email', function (): void {
+    $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    $hidden = Email::query()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->getKey(),
+        'rfc_message_id' => '<private@example.com>',
+        'provider_message_id' => 'provider-private',
+        'thread_id' => 'private-thread',
+        'subject' => 'Private',
+        'snippet' => 'private',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::INBOUND,
+        'privacy_tier' => EmailPrivacyTier::PRIVATE,
+        'status' => EmailStatus::SENT,
+    ]);
+
+    $email = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: nothing',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'in_reply_to_email_id' => $hidden->getKey(),
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'batch_id' => null,
+    ]);
+
+    expect($email->thread_id)->toBeNull()
+        ->and($email->in_reply_to)->toBeNull();
+});
+
+it('threads onto a teammate email the sender may view', function (): void {
+    $teammate = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($teammate, ['role' => 'member']);
+    $teammateAccount = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    $visible = Email::query()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateAccount->getKey(),
+        'rfc_message_id' => '<shared-with-team@example.com>',
+        'provider_message_id' => 'provider-team',
+        'thread_id' => 'team-thread',
+        'subject' => 'Shared',
+        'snippet' => 'shared',
+        'sent_at' => now()->subHour(),
+        'direction' => EmailDirection::INBOUND,
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'status' => EmailStatus::SENT,
+    ]);
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $visible->getKey(),
+        'shared_with' => $this->user->getKey(),
+        'shared_by' => $teammate->getKey(),
+    ]);
+
+    $email = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: Shared',
+        'body_html' => '<p>Reply</p>',
+        'to' => [['email' => 'recipient@example.com', 'name' => 'Recipient']],
+        'in_reply_to_email_id' => $visible->getKey(),
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'batch_id' => null,
+    ]);
+
+    expect($email->in_reply_to)->toBe('<shared-with-team@example.com>');
 });
 
 it('ignores a link_to record that belongs to another team', function (): void {
@@ -805,3 +883,97 @@ it('queues from the mailbox of the user it is given, not the signed-in one', fun
     expect($email->user_id)->toBe($this->user->id)
         ->and($email->connected_account_id)->toBe($this->account->id);
 });
+
+it('gives a queued reply the conversation key of the email it answers', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => 'admin']);
+    $teammateMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    $original = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateMailbox->id,
+        'thread_id' => null,
+        'conversation_key' => str_repeat('a', 64),
+    ]);
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $original->getKey(),
+        'shared_with' => $this->user->getKey(),
+        'shared_by' => $teammate->getKey(),
+    ]);
+
+    $reply = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: Pricing',
+        'body_html' => '<p>Thanks</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'in_reply_to_email_id' => $original->id,
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    expect($reply->thread_id)->toBeNull()
+        ->and($reply->conversation_key)->toBe(str_repeat('a', 64));
+});
+
+it('keeps a reply from another mailbox in the conversation of a parent with no Message-ID', function (): void {
+    $teammate = User::factory()->create();
+    $this->workspace->users()->attach($teammate, ['role' => 'admin']);
+    $teammateMailbox = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+    ]));
+    $original = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $teammate->id,
+        'connected_account_id' => $teammateMailbox->id,
+        'rfc_message_id' => null,
+        'thread_id' => 'teammate-thread',
+        'conversation_key' => str_repeat('c', 64),
+    ]);
+    EmailShare::factory()->tier(EmailPrivacyTier::FULL)->create([
+        'email_id' => $original->getKey(),
+        'shared_with' => $this->user->getKey(),
+        'shared_by' => $teammate->getKey(),
+    ]);
+
+    $reply = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Re: Pricing',
+        'body_html' => '<p>Thanks</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'in_reply_to_email_id' => $original->id,
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    expect($reply->in_reply_to)->toBeNull()
+        ->and($reply->conversation_key)->toBe(str_repeat('c', 64));
+});
+
+it('starts a new conversation for a new queued email', function (): void {
+    $email = app(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Intro',
+        'body_html' => '<p>Hi</p>',
+        'to' => [['email' => 'ana@acme.example', 'name' => null]],
+        'creation_source' => EmailCreationSource::COMPOSE,
+    ]);
+
+    expect($email->conversation_key)->toBe(ConversationKeyResolver::keyFor($this->workspace->id, $email->rfc_message_id));
+});
+
+it('refuses unresolved variables before queuing mail from any caller', function (string $field): void {
+    $data = [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Renewal',
+        'body_html' => '<p>Tuesday works.</p>',
+        'to' => [['email' => 'ana@example.test', 'name' => 'Ana']],
+        'creation_source' => EmailCreationSource::CHAT,
+    ];
+    $data[$field] = '{{ person.unknown | fallback }}';
+
+    expect(fn (): Email => resolve(SendEmailAction::class)->execute($this->user, $data))
+        ->toThrow(ValidationException::class);
+    expect(Email::query()->count())->toBe(0);
+})->with(['subject', 'body_html']);
