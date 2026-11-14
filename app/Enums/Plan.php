@@ -141,6 +141,11 @@ enum Plan: string implements HasColor, HasLabel
         };
     }
 
+    public static function trialCredits(): int
+    {
+        return 300;
+    }
+
     public function rateLimit(): int
     {
         return match ($this) {

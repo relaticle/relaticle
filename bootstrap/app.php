@@ -19,6 +19,7 @@ use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\SuperviseImpersonation;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
+use App\Models\ActivityLog\Activity;
 use App\Models\Notification;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\SetUpPanel;
@@ -359,7 +360,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('app:purge-pending-uploads')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('queue:prune-batches --hours=24')->daily()->onOneServer();
         $schedule->command('invitations:cleanup')->daily()->onOneServer();
+        $schedule->command('users:prune-unclaimed')->daily()->onOneServer();
         $schedule->command('activitylog:clean --force')->daily()->onOneServer();
+        $schedule->command('activitylog:clean '.Activity::SIGNUP_LOG.' --days=90 --force')->daily()->onOneServer();
         $schedule->command('model:prune', ['--model' => [Notification::class]])->daily()->onOneServer();
         $schedule->command('chat:expire-pending-actions')->everyFiveMinutes()->onOneServer();
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();

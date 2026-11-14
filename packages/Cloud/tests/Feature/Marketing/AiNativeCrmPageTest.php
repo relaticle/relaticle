@@ -54,7 +54,7 @@ it('describes the Cloud Pro trial when billing is on', function (): void {
 
     $html = $this->get('/ai-native-crm')->assertOk()->getContent();
 
-    expect($html)->toContain('14-day Cloud Pro trial')
+    expect($html)->toContain('14-day Cloud Pro trial with 300 credits')
         ->and($html)->toContain('2,000-credit monthly allowance');
 });
 

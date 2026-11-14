@@ -28,11 +28,24 @@ final readonly class PlanEntitlements implements Entitlements
             return Plan::Free->credits();
         }
 
-        if ($workspace->billingStatus() === BillingStatus::TrialEnded || $workspace->onExtendedTrial()) {
+        $status = $workspace->billingStatus();
+
+        if ($status === BillingStatus::TrialEnded || $workspace->onExtendedTrial()) {
             return Plan::Free->credits();
         }
 
+        if ($status === BillingStatus::Trialing && $this->onAutomaticTrial($workspace)) {
+            return Plan::trialCredits();
+        }
+
         return $workspace->plan->credits();
+    }
+
+    // An administrator's restart or extension ends later than the automatic span and keeps the plan allowance.
+    private function onAutomaticTrial(Workspace $workspace): bool
+    {
+        return $workspace->pro_trial_used_at !== null
+            && $workspace->trial_ends_at?->lessThanOrEqualTo($workspace->pro_trial_used_at->addDays(Workspace::PRO_TRIAL_DAYS)) === true;
     }
 
     public function allowsModel(?Workspace $workspace, ModelDescriptor $model): bool

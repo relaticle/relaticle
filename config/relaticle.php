@@ -57,6 +57,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Sign-up Ceilings
+    |--------------------------------------------------------------------------
+    |
+    | How many accounts email sign-up may create: from one IP address in a
+    | day, and across the whole install in an hour. They apply only while the
+    | sign-up challenge feature is on. Google and Microsoft sign-in never
+    | count. Zero turns a ceiling off.
+    |
+    */
+
+    'signup' => [
+        'max_per_ip_per_day' => (int) env('RELATICLE_SIGNUP_MAX_PER_IP_PER_DAY', 3),
+        'max_per_hour' => (int) env('RELATICLE_SIGNUP_MAX_PER_HOUR', 5),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Horizon Access
     |--------------------------------------------------------------------------
     |

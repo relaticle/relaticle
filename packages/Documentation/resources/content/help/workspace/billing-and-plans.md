@@ -31,10 +31,12 @@ Billing page; Stripe prorates the change.
 
 ## The trial
 
-Every new Cloud workspace starts a **14-day Pro trial automatically, with no
-card**. The trial includes everything in Cloud Pro, with 2,000 AI credits and
+Your first Cloud workspace starts a **14-day Pro trial automatically, with no
+card**. A workspace you add later starts its own trial only while you
+subscribe on another one. Otherwise it opens on the plan choice. The trial includes everything in Cloud Pro, with 300 AI credits and
 one connected mailbox. Premium AI models unlock once the workspace holds a
-record of its own.
+record of its own. Subscribe during the trial and the full plan allowance
+starts right away.
 When it ends, subscribe from the Billing page to keep Cloud access; without
 a subscription the workspace pauses. If you need more time, the owner can
 extend the trial by 7 days once from the Billing page. AI credits do not

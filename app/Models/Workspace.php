@@ -472,6 +472,37 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             && $this->billingStatus() === BillingStatus::Trialing;
     }
 
+    public function canStartTrial(): bool
+    {
+        return $this->plan === Plan::Free
+            && $this->pro_trial_used_at === null
+            && ! $this->subscriptions()->exists()
+            && (! $this->ownerHasTrialedElsewhere() || $this->ownerPaysElsewhere());
+    }
+
+    private function ownerHasTrialedElsewhere(): bool
+    {
+        return $this->otherWorkspacesOfOwner()->whereNotNull('pro_trial_used_at')->exists();
+    }
+
+    private function ownerPaysElsewhere(): bool
+    {
+        $charged = fn (Builder $subscription): Builder => $subscription->where('stripe_status', StripeSubscriptionStatus::Active->value);
+
+        return $this->otherWorkspacesOfOwner()
+            ->where(fn (Builder $paying): Builder => $paying
+                ->where('plan', Plan::Enterprise)
+                ->orWhereHas('latestDefaultSubscription', $charged)
+                ->orWhereHas('managedSubscriptions', $charged))
+            ->exists();
+    }
+
+    /** @return Builder<self> */
+    private function otherWorkspacesOfOwner(): Builder
+    {
+        return self::query()->where('user_id', $this->user_id)->whereKeyNot($this->getKey());
+    }
+
     public function canExtendTrial(): bool
     {
         return $this->trial_ends_at === null

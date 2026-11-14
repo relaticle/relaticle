@@ -98,6 +98,30 @@ it('names the source on the list and view pages', function (): void {
         ->assertSee(CreationSource::SYSTEM->getLabel());
 });
 
+it('shows an administrator where a signup came from', function (): void {
+    $signup = Activity::withoutGlobalScope(WorkspaceScope::class)->create([
+        'log_name' => Activity::SIGNUP_LOG,
+        'description' => 'registered',
+        'event' => 'registered',
+        'subject_type' => 'user',
+        'subject_id' => $this->ownerA->id,
+        'causer_type' => 'user',
+        'causer_id' => $this->ownerA->id,
+        'properties' => ['method' => 'password', 'ip' => '203.0.113.9', 'user_agent' => 'Mozilla/5.0', 'challenged' => true],
+    ]);
+    $other = seedActivity($this->workspaceA, $this->ownerA);
+
+    livewire(ListActivities::class)
+        ->filterTable('event', 'registered')
+        ->assertCanSeeTableRecords([$signup])
+        ->assertCanNotSeeTableRecords([$other]);
+
+    livewire(ViewActivity::class, ['record' => $signup->getKey()])
+        ->assertOk()
+        ->assertSee('Ip: 203.0.113.9')
+        ->assertSee('Method: password');
+});
+
 it('charts activity by source for the rows the table filters keep', function (): void {
     seedActivity($this->workspaceA, $this->ownerA, ['properties' => ['source' => 'api']]);
     seedActivity($this->workspaceA, $this->ownerA, ['properties' => ['source' => 'api']]);
