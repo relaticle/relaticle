@@ -6,6 +6,7 @@ namespace App\Mcp\Tools\Concerns;
 
 use App\Http\Resources\V1\NoteResource;
 use App\Http\Resources\V1\TaskResource;
+use App\Support\CustomFields\IncludedCustomFields;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -78,6 +79,8 @@ trait SerializesRelatedModels
         string $relation,
         array $relationshipMap,
     ): ?array {
+        IncludedCustomFields::load($parentModel, [$relation]);
+
         $relatedData = $parentModel->getRelation($relation);
 
         if ($relatedData instanceof EloquentCollection) {

@@ -5,18 +5,23 @@ declare(strict_types=1);
 use App\Actions\Company\CreateCompany;
 use App\Actions\Company\DeleteCompany;
 use App\Actions\Company\UpdateCompany;
+use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CreationSource;
 use App\Http\Controllers\Api\V1\CompaniesController;
 use App\Http\Resources\V1\CompanyResource;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
+use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Companies\CompaniesQuery;
 use App\Queries\Concerns\ListsEntity;
+use App\Support\CustomFields\IncludedCustomFields;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -33,6 +38,7 @@ mutates(
     CompaniesQuery::class,
     ListsEntity::class,
     CompanyResource::class,
+    IncludedCustomFields::class,
 );
 
 beforeEach(function () {
@@ -205,6 +211,60 @@ describe('includes', function (): void {
                 ->has('included')
                 ->etc()
             );
+    });
+
+    it('returns the custom fields of people included on show endpoint', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id]);
+        $this->putJson("/api/v1/people/{$person->id}", ['custom_fields' => ['job_title' => 'VP Sales']])->assertOk();
+
+        $this->getJson("/api/v1/companies/{$company->id}?include=people")
+            ->assertOk()
+            ->assertJsonPath('included.0.attributes.custom_fields.job_title', 'VP Sales');
+    });
+
+    it('loads the custom fields of nested includes once for every included record', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        People::factory(3)->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id])
+            ->each(fn (People $person) => Opportunity::factory()->recycle([$this->user, $this->workspace])->create([
+                'company_id' => $company->id,
+                'contact_id' => $person->id,
+            ]));
+
+        $valueQueries = 0;
+        DB::listen(function (QueryExecuted $query) use (&$valueQueries): void {
+            $valueQueries += (int) str_contains($query->sql, 'from "custom_field_values"');
+        });
+
+        $this->getJson("/api/v1/companies/{$company->id}?include=opportunities.contact")
+            ->assertOk()
+            ->assertJsonCount(6, 'included');
+
+        expect($valueQueries)->toBe(3);
+    });
+
+    it('resolves the record links of included people in one lookup', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $field = resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'people', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+        $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+        People::factory(3)->recycle([$this->user, $this->workspace])->create(['company_id' => $company->id])
+            ->each(fn (People $person) => $person->saveCustomFieldValue($field, [Company::factory()->recycle([$this->user, $this->workspace])->create()->id]));
+
+        $nameLookups = 0;
+        DB::listen(function (QueryExecuted $query) use (&$nameLookups): void {
+            $nameLookups += (int) str_starts_with($query->sql, 'select "name", "id" from "companies"');
+        });
+
+        $this->getJson("/api/v1/companies/{$company->id}?include=people")
+            ->assertOk()
+            ->assertJsonCount(3, 'included');
+
+        expect($nameLookups)->toBe(1);
     });
 
     it('expands an include sent as a list', function (): void {
