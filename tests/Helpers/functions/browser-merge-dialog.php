@@ -81,6 +81,24 @@ const MERGE_LAYOUT = <<<'JS'
     })();
 JS;
 
+const MERGE_RECORD_FRAMES = <<<'JS'
+    (() => {
+        const popover = document.querySelector('.fi-merge-pop');
+        window.paintedFrames = [];
+        const record = () => {
+            const style = getComputedStyle(popover);
+            const box = popover.getBoundingClientRect();
+
+            if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
+                window.paintedFrames.push({ top: box.top, left: box.left, width: box.width, height: box.height });
+            }
+
+            requestAnimationFrame(record);
+        };
+        record();
+    })()
+JS;
+
 const MERGE_POPOVER_RECT = <<<'JS'
     (() => {
         const box = document.querySelector('.fi-merge-pop').getBoundingClientRect();
@@ -95,6 +113,8 @@ const MERGE_POPOVER_RECT = <<<'JS'
             height: box.height,
             above: box.bottom <= anchor.top,
             anchorLeft: anchor.left,
+            anchorTop: anchor.top,
+            anchorBottom: anchor.bottom,
             modalLeft: modal.left,
             modalRight: modal.right,
             windowWidth: window.innerWidth,

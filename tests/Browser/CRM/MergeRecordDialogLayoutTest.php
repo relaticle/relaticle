@@ -82,23 +82,7 @@ it('caps the open search list inside the window and scrolls it to the last row',
 
     $page = openMergeDialog($this->user, $this->workspace, $current, $width, $height);
 
-    $page->script(<<<'JS'
-        (() => {
-            const popover = document.querySelector('.fi-merge-pop');
-            window.paintedFrames = [];
-            const record = () => {
-                const style = getComputedStyle(popover);
-                const box = popover.getBoundingClientRect();
-
-                if (style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0') {
-                    window.paintedFrames.push({ top: box.top, left: box.left, width: box.width, height: box.height });
-                }
-
-                requestAnimationFrame(record);
-            };
-            record();
-        })()
-        JS);
+    $page->script(MERGE_RECORD_FRAMES);
 
     $page->click('[data-merge-picker]')
         ->assertVisible('.fi-merge-pop')
@@ -190,3 +174,64 @@ it('keeps the open picker anchored under its button while the member types', fun
     'short window' => [1440, 560],
     'phone' => [390, 844],
 ]);
+
+it('anchors the picker to its button when the button is pressed while the phone sheet is still rising', function (): void {
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Harborline');
+
+    foreach (range(1, 30) as $index) {
+        mergeDialogCompany($this->workspace, $this->user, sprintf('Branch %02d', $index));
+    }
+
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$current->getKey()}", 390, 844)
+        ->click('.fi-record-rail-actions .fi-dropdown-trigger button')
+        ->click('.fi-dropdown-list-item:has-text("Merge record")');
+
+    $page->script(<<<'JS'
+        new Promise((resolve) => {
+            const press = () => {
+                const sheet = document.querySelector('.fi-modal-window.fi-transition-enter');
+                const button = document.querySelector('[data-merge-picker]');
+
+                if (! sheet || ! button || button.getBoundingClientRect().width === 0) {
+                    return requestAnimationFrame(press);
+                }
+
+                window.paintedFrames = [];
+                const popover = document.querySelector('.fi-merge-pop');
+                const record = () => {
+                    const style = getComputedStyle(popover);
+                    const box = popover.getBoundingClientRect();
+
+                    if (style.visibility !== 'hidden') {
+                        window.paintedFrames.push({ top: box.top, left: box.left });
+                    }
+
+                    requestAnimationFrame(record);
+                };
+                record();
+                button.click();
+                resolve(true);
+            };
+            press();
+        })
+        JS);
+
+    $page->assertVisible('.fi-merge-pop')->wait(1.2);
+
+    $frames = $page->script('window.paintedFrames');
+    $settled = $page->script(MERGE_POPOVER_RECT);
+    $gap = $settled['above']
+        ? $settled['anchorTop'] - $settled['bottom']
+        : $settled['top'] - $settled['anchorBottom'];
+
+    expect($frames)->not->toBeEmpty()
+        ->and($gap)->toBeGreaterThanOrEqual(0)
+        ->and($gap)->toBeLessThan(16);
+
+    foreach ($frames as $frame) {
+        expect(abs($frame['top'] - $settled['top']))->toBeLessThan(1)
+            ->and(abs($frame['left'] - $settled['left']))->toBeLessThan(1);
+    }
+
+    $page->assertNoJavaScriptErrors();
+});

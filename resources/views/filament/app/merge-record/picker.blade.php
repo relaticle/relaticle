@@ -42,8 +42,15 @@
 
             document.querySelector('[data-merge-dialog] [data-merge-clear]')?.focus()
         },
-        show() {
+        async show() {
             this.active = 0
+
+            const sheet = $refs.trigger.closest('.fi-modal-window')
+
+            while (sheet?.classList.contains('fi-transition-enter')) {
+                await new Promise(requestAnimationFrame)
+            }
+
             this.place()
             this.open = true
             this.$nextTick(() => this.$refs.search.focus({ preventScroll: true }))
