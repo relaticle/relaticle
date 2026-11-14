@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 
 final readonly class SentryEventScrubber
 {
-    private const array SECRET_PARAMETERS = ['token', 'email'];
+    private const array SECRET_PARAMETERS = ['token', 'email', 'hash'];
 
     private const string FILTERED = '[Filtered]';
 
