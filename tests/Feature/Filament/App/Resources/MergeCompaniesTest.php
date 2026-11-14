@@ -337,6 +337,16 @@ it('finds a company by name or by any of its domains', function (string $term, a
     'nothing' => ['zzz', []],
 ]);
 
+it('leaves the current company, a trashed company and another workspace\'s company out of the search', function (): void {
+    $foreignOwner = User::factory()->withWorkspace()->create();
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Current']);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Live']);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Trashed'])->delete();
+    mergeCompanyRecord($foreignOwner->currentWorkspace, $foreignOwner, ['name' => 'Brightline Foreign']);
+
+    expect(mergeSearchNames(ViewCompany::class, $kept, 'Brightline'))->toBe(['Brightline Live']);
+});
+
 it('finds a company by domain while the domains column is hidden from the list', function (): void {
     $domains = WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains');
     $settings = $domains->settings;

@@ -130,6 +130,16 @@ it('finds a person by name or by any of their emails', function (string $term, a
     'nothing' => ['zzz', []],
 ]);
 
+it('leaves the current person, a trashed person and another workspace\'s person out of the search', function (): void {
+    $foreignOwner = User::factory()->withWorkspace()->create();
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Current']);
+    mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Live']);
+    mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Trashed'])->delete();
+    mergePersonRecord($foreignOwner->currentWorkspace, $foreignOwner, ['name' => 'Dana Foreign']);
+
+    expect(mergeSearchNames(ViewPeople::class, $kept, 'Dana'))->toBe(['Dana Live']);
+});
+
 it('keeps the other person when the member swaps the two', function (): void {
     $current = mergePersonRecord($this->workspace, $this->user, ['name' => 'Sam'], ['emails' => ['sam@one.com']]);
     $other = mergePersonRecord($this->workspace, $this->user, ['name' => 'Samuel'], ['emails' => ['samuel@two.com']]);
