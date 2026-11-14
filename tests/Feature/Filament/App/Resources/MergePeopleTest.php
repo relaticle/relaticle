@@ -20,6 +20,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -288,4 +289,26 @@ it('counts emails case-insensitively before applying the limit', function (): vo
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
     expect(mergePersonValue($kept, 'emails'))->toBe(['a1@x.com', 'a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com']);
+});
+
+it('locks both people with one select in id order, whichever one is kept', function (): void {
+    $locks = [];
+    DB::listen(function (QueryExecuted $query) use (&$locks): void {
+        if (str_contains($query->sql, 'for update') && str_contains($query->sql, ' in (')) {
+            $locks[] = $query;
+        }
+    });
+
+    foreach (['current', 'other'] as $keep) {
+        $locks = [];
+        $current = mergePersonRecord($this->workspace, $this->user);
+        $other = mergePersonRecord($this->workspace, $this->user);
+
+        mergePeopleWith($current, $other, $keep)->assertHasNoActionErrors();
+
+        expect($locks)->toHaveCount(1, $keep)
+            ->and($locks[0]->sql)->toContain('from "people"')
+            ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
+            ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());
+    }
 });

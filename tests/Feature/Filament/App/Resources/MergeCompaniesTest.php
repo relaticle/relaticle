@@ -27,6 +27,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -583,4 +584,26 @@ it('counts domains the way the field stores them before applying the limit', fun
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
     expect(mergeCompanyValue($kept, 'domains'))->toBe(['a1.com', 'a2.com', 'a3.com', 'b1.com', 'b2.com']);
+});
+
+it('locks both companies with one select in id order, whichever one is kept', function (): void {
+    $locks = [];
+    DB::listen(function (QueryExecuted $query) use (&$locks): void {
+        if (str_contains($query->sql, 'for update') && str_contains($query->sql, ' in (')) {
+            $locks[] = $query;
+        }
+    });
+
+    foreach (['current', 'other'] as $keep) {
+        $locks = [];
+        $current = mergeCompanyRecord($this->workspace, $this->user);
+        $other = mergeCompanyRecord($this->workspace, $this->user);
+
+        mergeWith($current, $other, $keep)->assertHasNoActionErrors();
+
+        expect($locks)->toHaveCount(1, $keep)
+            ->and($locks[0]->sql)->toContain('from "companies"')
+            ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
+            ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());
+    }
 });
