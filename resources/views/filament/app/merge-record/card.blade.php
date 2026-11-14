@@ -5,10 +5,7 @@
     @if ($isClearable)
         <button
             type="button"
-            x-on:click="
-                $wire.set(@js($statePath.'.keep'), 'current', false)
-                $wire.set(@js($statePath.'.duplicate_id'), null).then(() => document.querySelector('[data-merge-dialog] [data-merge-picker]')?.focus())
-            "
+            x-on:click="$wire.set(@js($getStatePath()), null).then(() => document.querySelector('[data-merge-dialog] [data-merge-picker]')?.focus())"
             aria-label="{{ __('filament/record-page.merge.clear') }}"
             title="{{ __('filament/record-page.merge.clear') }}"
             class="absolute end-2 top-2 flex size-7 items-center justify-center rounded-md text-gray-400 outline-none transition hover:bg-gray-950/5 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-primary-500 dark:hover:bg-white/10 dark:hover:text-gray-200"

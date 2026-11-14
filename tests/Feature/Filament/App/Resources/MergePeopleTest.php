@@ -8,6 +8,7 @@ use App\Actions\Onboarding\RemoveSampleData;
 use App\Enums\CreationSource;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MergeRecordAction;
+use App\Filament\Components\Forms\MergeRecordPicker;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
 use App\Filament\Resources\PeopleResource;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
@@ -20,14 +21,13 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\TransactionBeginning;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergePeople::class, MergeRecords::class, MergeRecordAction::class);
+mutates(MergePeople::class, MergeRecords::class, MergeRecordAction::class, MergeRecordPicker::class);
 
 beforeEach(function (): void {
     Queue::fake();
@@ -115,25 +115,12 @@ it('treats the kept person\'s soft-deleted company as empty and takes the duplic
         ->and(People::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
 })->with([true, false]);
 
-function mergePersonDialog(People $kept, string $search): string
-{
-    $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
-        ->mountAction(mergeRecordAction())
-        ->setActionData(['search' => $search]);
-
-    return implode('', Arr::where($page->effects['partials'], fn (string $html, string $key): bool => str_starts_with($key, 'action-modals')));
-}
-
 it('finds a person by name or by any of their emails', function (string $term, array $found): void {
     $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Kept']);
     mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'whitfield@outlook.com']]);
     mergePersonRecord($this->workspace, $this->user, ['name' => 'Sam Rivera'], ['emails' => ['sam@northwind.com']]);
 
-    $dialog = mergePersonDialog($kept, $term);
-
-    foreach (['Dana Whitfield', 'Sam Rivera'] as $name) {
-        in_array($name, $found, true) ? expect($dialog)->toContain($name) : expect($dialog)->not->toContain($name);
-    }
+    expect(mergeSearchNames(ViewPeople::class, $kept, $term))->toBe($found);
 })->with([
     'name' => ['Dana', ['Dana Whitfield']],
     'second email' => ['outlook', ['Dana Whitfield']],
