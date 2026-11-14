@@ -220,7 +220,7 @@ it('gives cards the same inset and gap in a flat column and in a lane cell', fun
             const tray = rect(column.querySelector('.ff-tray'));
             const [first, second] = [...column.querySelectorAll('.ff-card')].map(rect);
             const heading = rect(column.querySelector('.ff-column-heading').firstElementChild);
-            const actions = rect(column.querySelector('.ff-column-actions'));
+            const header = column.querySelector('.ff-column-header');
             const addIcon = rect(column.querySelector('.ff-add-row-icon'));
             const cardPadding = parseFloat(getComputedStyle(column.querySelector('.ff-card-body')).paddingLeft);
 
@@ -230,7 +230,7 @@ it('gives cards the same inset and gap in a flat column and in a lane cell', fun
                 top: round(first.top - tray.top),
                 gap: round(second.top - first.bottom),
                 headerLeft: round(heading.left - first.left),
-                headerRight: round(actions.right - first.right),
+                headerRight: round(rect(header).right - parseFloat(getComputedStyle(header).paddingRight) - first.right),
                 addIcon: round(addIcon.left - first.left - cardPadding),
             };
         })();
