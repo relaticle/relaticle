@@ -38,7 +38,7 @@
         async choose(id) {
             this.open = false
 
-            await $wire.set(@js($getStatePath()), id)
+            await $set($statePath, id, true, true)
 
             document.querySelector('[data-merge-dialog] [data-merge-clear]')?.focus()
         },
