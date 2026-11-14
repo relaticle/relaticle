@@ -9,7 +9,7 @@ use Illuminate\Routing\Route;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Route as Router;
 use Sentry\Event;
-use Symfony\Component\HttpFoundation\Exception\BadRequestException;
+use Symfony\Component\HttpFoundation\Exception\RequestExceptionInterface;
 
 final readonly class SentryEventScrubber
 {
@@ -57,16 +57,22 @@ final readonly class SentryEventScrubber
 
     private static function maskReferer(string $url): string
     {
-        try {
-            $request = Request::create($url);
-        } catch (BadRequestException) {
-            return self::FILTERED;
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (is_string($host) && strcasecmp($host, request()->getHost()) !== 0) {
+            return $url;
         }
 
-        $route = Arr::first(
-            Router::getRoutes()->get('GET'),
-            fn (Route $candidate): bool => $candidate->matches($request),
-        );
+        try {
+            $request = Request::create($url);
+
+            $route = Arr::first(
+                Router::getRoutes()->get('GET'),
+                fn (Route $candidate): bool => $candidate->matches($request),
+            );
+        } catch (RequestExceptionInterface) {
+            return self::FILTERED;
+        }
 
         return $route instanceof Route ? self::mask($url, $route) : $url;
     }

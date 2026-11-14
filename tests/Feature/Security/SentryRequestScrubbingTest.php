@@ -161,6 +161,19 @@ it('masks the path token of a referer and filters its query', function (string $
     'other host' => ['https://example.org/join/not-ours', 'https://example.org/join/not-ours'],
 ]);
 
+it('still sends the report when the referer host is not trusted and a route is bound to a domain', function (): void {
+    Route::domain('docs.relaticle.test')->get('/join/{token}', fn (): string => 'ok');
+    Request::setTrustedHosts(['^relaticle\.test$']);
+
+    try {
+        $event = sentryReport('POST', '/livewire/update', tweak: fn (ServerRequest $request): ServerRequest => $request->withHeader('Referer', 'https://example.org/join/not-ours'));
+    } finally {
+        Request::setTrustedHosts([]);
+    }
+
+    expect($event->getRequest()['headers']['Referer'])->toBe(['https://example.org/join/not-ours']);
+});
+
 it('masks the url and referer carried in the trace context', function (): void {
     $transport = new SentryTransportSpy;
     $hub = sentryHubSending($transport, sentryRequest('GET', '/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj'));
