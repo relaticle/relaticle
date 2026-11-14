@@ -45,6 +45,53 @@ beforeEach(function (): void {
     Filament::setTenant($this->workspace);
 });
 
+describe('record request bar', function (): void {
+    it('requests the owner mail on the record once and shows the pending state', function (): void {
+        $this->actingAs($this->viewer);
+        Notification::fake();
+        $this->person->update(['name' => 'Ana Ortiz']);
+        foreach (range(1, 3) as $number) {
+            $this->person->emails()->attach(Email::factory()->create([
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->owner->id,
+                'connected_account_id' => $this->account->getKey(),
+                'privacy_tier' => EmailPrivacyTier::METADATA_ONLY,
+            ])->getKey());
+        }
+
+        livewire(EmailsRelationManager::class, ['ownerRecord' => $this->person, 'pageClass' => ViewPeople::class])
+            ->assertSee("Request {$this->owner->name}'s 3 emails on Ana Ortiz")
+            ->callAction(TestAction::make('requestRecordAccess')->arguments(['ownerId' => $this->owner->getKey()]), data: [
+                'tier_requested' => EmailPrivacyTier::FULL->value,
+                'note' => 'For the renewal',
+            ])
+            ->assertHasNoActionErrors()
+            ->assertNotified('Access request sent.')
+            ->assertSee("Requested from {$this->owner->name}")
+            ->assertDontSee("Request {$this->owner->name}'s 3 emails on Ana Ortiz");
+
+        expect(EmailAccessRequest::query()->sole())
+            ->email_id->toBeNull()
+            ->emailable_id->toBe($this->person->getKey())
+            ->note->toBe('For the renewal');
+    });
+
+    it('does not count fully readable or private mail toward the request bar', function (): void {
+        $this->actingAs($this->viewer);
+        foreach ([EmailPrivacyTier::METADATA_ONLY, EmailPrivacyTier::FULL, EmailPrivacyTier::FULL, EmailPrivacyTier::PRIVATE, EmailPrivacyTier::PRIVATE] as $tier) {
+            $this->person->emails()->attach(Email::factory()->create([
+                'workspace_id' => $this->workspace->id,
+                'user_id' => $this->owner->id,
+                'connected_account_id' => $this->account->getKey(),
+                'privacy_tier' => $tier,
+            ])->getKey());
+        }
+
+        livewire(EmailsRelationManager::class, ['ownerRecord' => $this->person, 'pageClass' => ViewPeople::class])
+            ->assertDontSee("Request {$this->owner->name}'s");
+    });
+});
+
 describe('requestAccess action', function (): void {
     it('creates an EmailAccessRequest and notifies the owner', function (): void {
         $this->actingAs($this->viewer);

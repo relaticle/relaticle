@@ -10,12 +10,15 @@ use App\Models\People;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Illuminate\Contracts\Database\Query\Builder;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Jobs\RecomputeRecordEmailMetricsJob;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\Scopes\ActiveAccountScope;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
@@ -70,6 +73,8 @@ final readonly class LinkEmailAction
     private function claimAndLinkInTransaction(Email $email, bool $reapply): void
     {
         DB::transaction(function () use ($email, $reapply): void {
+            $email->lockConversation();
+
             /** @var Email|null $locked */
             $locked = Email::query()
                 ->withoutGlobalScopes()
@@ -87,7 +92,8 @@ final readonly class LinkEmailAction
 
             $applyMetricsForPrelinkedRecords = $locked->linked_at === null;
 
-            $this->link($email, $applyMetricsForPrelinkedRecords);
+            $this->detachSuppressed($email, $this->suppressedPairs($email, onThisCopyOnly: true));
+            $this->link($email, $applyMetricsForPrelinkedRecords, $this->suppressedPairs($email, onThisCopyOnly: false));
 
             if ($locked->linked_at === null) {
                 $locked->updateQuietly(['linked_at' => now()]);
@@ -95,13 +101,13 @@ final readonly class LinkEmailAction
         });
     }
 
-    private function link(Email $email, bool $applyMetricsForPrelinkedRecords): void
+    /** @param  array<string, true>  $suppressed */
+    private function link(Email $email, bool $applyMetricsForPrelinkedRecords, array $suppressed): void
     {
         $participants = $email->participants()->with('contact', 'company')->get();
         $workspaceId = $email->workspace_id;
         $connectedAccount = $email->connectedAccount;
         $skippedDomains = $this->domainMatcher->skippedHosts($workspaceId);
-
         $workspace = $email->workspace;
 
         // A single email can resolve to the same company/person/opportunity through
@@ -150,7 +156,7 @@ final readonly class LinkEmailAction
                 if ($company instanceof Company) {
                     $participant->update(['company_id' => $company->getKey()]);
 
-                    if ($this->autoAttach($email->companies(), $company->getKey()) && ! isset($countedCompanies[$company->getKey()])) {
+                    if ($this->autoAttach($email->companies(), $company->getKey(), $suppressed) && ! isset($countedCompanies[$company->getKey()])) {
                         $countedCompanies[$company->getKey()] = true;
                         $counted[] = $company;
                     }
@@ -171,7 +177,7 @@ final readonly class LinkEmailAction
             if ($person instanceof People) {
                 $participant->update(['contact_id' => $person->getKey()]);
 
-                if ($this->autoAttach($email->people(), $person->getKey()) && ! isset($countedPeople[$person->getKey()])) {
+                if ($this->autoAttach($email->people(), $person->getKey(), $suppressed) && ! isset($countedPeople[$person->getKey()])) {
                     $countedPeople[$person->getKey()] = true;
                     $counted[] = $person;
                 }
@@ -179,7 +185,7 @@ final readonly class LinkEmailAction
                 $personCompany = $person->company;
 
                 if ($personCompany instanceof Company
-                    && $this->autoAttach($email->companies(), $personCompany->getKey())
+                    && $this->autoAttach($email->companies(), $personCompany->getKey(), $suppressed)
                     && ! isset($countedCompanies[$personCompany->getKey()])) {
                     $countedCompanies[$personCompany->getKey()] = true;
                     $counted[] = $personCompany;
@@ -190,7 +196,7 @@ final readonly class LinkEmailAction
                     ->get();
 
                 foreach ($opportunities as $opportunity) {
-                    if ($this->autoAttach($email->opportunities(), $opportunity->getKey()) && ! isset($countedOpportunities[$opportunity->getKey()])) {
+                    if ($this->autoAttach($email->opportunities(), $opportunity->getKey(), $suppressed) && ! isset($countedOpportunities[$opportunity->getKey()])) {
                         $countedOpportunities[$opportunity->getKey()] = true;
                         $counted[] = $opportunity;
                     }
@@ -261,6 +267,43 @@ final readonly class LinkEmailAction
     }
 
     /**
+     * A suppression on this copy always holds; one on the holder's other copies of the conversation holds until a pin overrides it.
+     *
+     * @return array<string, true> keyed "type:id"
+     */
+    private function suppressedPairs(Email $email, bool $onThisCopyOnly): array
+    {
+        return array_fill_keys(EmailLinkSuppression::query()
+            ->when(
+                $onThisCopyOnly,
+                fn (EloquentBuilder $own): EloquentBuilder => $own->where('email_id', $email->getKey()),
+                fn (EloquentBuilder $conversation): EloquentBuilder => $conversation
+                    ->heldAlongside($email)
+                    ->where(fn (EloquentBuilder $holding): EloquentBuilder => $holding->where('email_id', $email->getKey())->orWhere(fn (EloquentBuilder $elsewhere): EloquentBuilder => $elsewhere->inForce())),
+            )
+            ->get(['emailable_type', 'emailable_id'])
+            ->map(fn (EmailLinkSuppression $suppression): string => "{$suppression->emailable_type}:{$suppression->emailable_id}")
+            ->all(), true);
+    }
+
+    /** @param  array<string, true>  $suppressed */
+    private function detachSuppressed(Email $email, array $suppressed): void
+    {
+        if ($suppressed === []) {
+            return;
+        }
+
+        foreach ([$email->companies(), $email->people(), $email->opportunities()] as $relation) {
+            foreach ($relation->get() as $record) {
+                if (isset($suppressed["{$record->getMorphClass()}:{$record->getKey()}"])) {
+                    $relation->detach($record->getKey());
+                    dispatch(new RecomputeRecordEmailMetricsJob($record))->afterCommit();
+                }
+            }
+        }
+    }
+
+    /**
      * Attaches a record to the email via the given morph relation if not already linked.
      * Returns true only when a new pivot row was created, so metric increments stay
      * one-shot across history re-import of the same message.
@@ -268,10 +311,11 @@ final readonly class LinkEmailAction
      * @template TRelated of Model
      *
      * @param  MorphToMany<TRelated, Email>  $relation
+     * @param  array<string, true>  $suppressed
      */
-    private function autoAttach(MorphToMany $relation, string $relatedId): bool
+    private function autoAttach(MorphToMany $relation, string $relatedId, array $suppressed): bool
     {
-        if ($relation->whereKey($relatedId)->exists()) {
+        if (isset($suppressed["{$relation->getRelated()->getMorphClass()}:{$relatedId}"]) || $relation->whereKey($relatedId)->exists()) {
             return false;
         }
 

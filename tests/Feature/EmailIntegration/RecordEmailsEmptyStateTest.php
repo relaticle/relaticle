@@ -85,7 +85,7 @@ it('keeps the connect prompt instead of compose when no mailbox is linked', func
         'ownerRecord' => $this->person,
         'pageClass' => ViewPeople::class,
     ])
-        ->assertSee(__('filament/pages/email-accounts.not_connected.record.heading'))
+        ->assertSee(__('filament/pages/email-accounts.connect_card.not_connected.heading'))
         ->assertSee(__('filament/pages/email-accounts.actions.connect_gmail'))
         ->tap(fn ($component) => assertActionHasMailboxOAuthUrl($component, 'connectMailbox', 'gmail', $this->workspace))
         ->assertDontSee(__('filament/pages/record-emails.empty.description'))

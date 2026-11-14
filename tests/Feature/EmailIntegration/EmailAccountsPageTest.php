@@ -8,16 +8,19 @@ use App\Enums\WorkspaceRole;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Queue;
 use Relaticle\EmailIntegration\Actions\ConnectAccountAction;
 use Relaticle\EmailIntegration\Actions\DisconnectConnectedAccountAction;
 use Relaticle\EmailIntegration\Data\ConnectAccountData;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Enums\SyncErrorReason;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
@@ -25,6 +28,7 @@ use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountSettingsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
 use Relaticle\EmailIntegration\Filament\Pages\EmailSignaturesPage;
+use Relaticle\EmailIntegration\Filament\Pages\MailboxSharingPage;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource;
 use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
@@ -47,6 +51,19 @@ beforeEach(function (): void {
         'workspace_id' => $this->workspace->id,
         'user_id' => $this->user->id,
     ]));
+});
+
+it('saves the personal undo window and rejects unsupported values', function (): void {
+    $page = livewire(EmailAccountsPage::class)
+        ->assertSet('undoSendSeconds', 10)
+        ->set('undoSendSeconds', 20)
+        ->assertHasNoErrors();
+
+    expect($this->user->fresh()->email_undo_seconds)->toBe(20);
+
+    $page->set('undoSendSeconds', 15)->assertHasErrors(['undoSendSeconds']);
+
+    expect($this->user->fresh()->email_undo_seconds)->toBe(20);
 });
 
 it('replaces the connect buttons with an upgrade banner once the workspace reaches its mailbox limit', function (): void {
@@ -248,6 +265,19 @@ it('clears microsoft tokens on disconnect without calling a revoke endpoint', fu
 
     Http::assertNothingSent();
     expect(ConnectedAccount::withTrashed()->findOrFail($this->account->id)->refresh_token)->toBeNull();
+});
+
+it('queues a conversation rebuild for the workspace on disconnect', function (): void {
+    Http::fake(['https://oauth2.googleapis.com/revoke' => Http::response()]);
+    Queue::fake();
+
+    livewire(EmailAccountsPage::class)
+        ->callAction('disconnect', arguments: ['account_id' => $this->account->id]);
+
+    Queue::assertPushedOn('imports', QueuedCommand::class, fn (QueuedCommand $job): bool => (fn (): array => $this->data)->call($job) === [
+        'email:backfill-conversations',
+        ['--force' => true, '--workspace' => $this->workspace->id],
+    ]);
 });
 
 it('deletes dependent signatures and refreshes the listing on disconnect', function (): void {
@@ -584,3 +614,40 @@ it('keeps email settings out of the sidebar', function (): void {
         ->assertDontSee(__('filament/pages/email-access-requests.navigation_label'), false)
         ->assertDontSee(__('filament/pages/email-privacy-settings.navigation_label'), false);
 });
+
+it('confirms the mailbox sharing choice without a workspace setting', function (): void {
+    livewire(MailboxSharingPage::class, ['mailbox' => $this->account->id])
+        ->assertSet('sharingTier', EmailPrivacyTier::METADATA_ONLY->value)
+        ->assertSee(__('filament/pages/email-accounts.sharing_step.preview.empty'))
+        ->set('sharingTier', EmailPrivacyTier::SUBJECT->value)
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertRedirect(EmailAccountsPage::getUrl());
+
+    expect($this->account->fresh()->sharing_tier)->toBe(EmailPrivacyTier::SUBJECT)
+        ->and($this->account->fresh()->sharing_confirmed_at)->not->toBeNull();
+});
+
+it('rejects full access as a connect answer', function (): void {
+    livewire(MailboxSharingPage::class, ['mailbox' => $this->account->id])
+        ->set('sharingTier', EmailPrivacyTier::FULL->value)
+        ->call('save')
+        ->assertHasErrors(['sharingTier']);
+
+    expect($this->account->fresh()->sharing_confirmed_at)->toBeNull();
+});
+
+it('does not open another member mailbox sharing step', function (): void {
+    $other = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+    $this->workspace->users()->attach($other, ['role' => 'member']);
+    $this->account->forceFill(['user_id' => $other->id])->save();
+
+    livewire(MailboxSharingPage::class, ['mailbox' => $this->account->id])->assertNotFound();
+});
+
+it('rejects unsafe sharing return destinations', function (string $destination): void {
+    livewire(MailboxSharingPage::class, ['mailbox' => $this->account->id, 'return' => $destination])
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertRedirect(EmailAccountsPage::getUrl());
+})->with(['https://outside.test/path', '//outside.test', '/\\outside.test', "/\t/outside.test", 'javascript:alert(1)']);

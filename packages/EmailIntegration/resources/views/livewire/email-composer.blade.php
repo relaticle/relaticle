@@ -13,29 +13,29 @@
              trigger fires composer:open and stays until this component answers. --}}
         x-data="{
             opening: false,
+            openingExpanded: false,
+            shortcut: null,
             init() {
                 $wire.$interceptMessage(({ onFinish }) => onFinish(() => this.opening = false))
+                this.shortcut = this.$store.shortcuts?.register('email-compose', {
+                    scope: 'global',
+                    entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
+                    handlers: { compose: () => $wire.dispatch('composer:open') },
+                })
+            },
+            destroy() {
+                this.$store.shortcuts?.unregister('email-compose', this.shortcut)
             },
         }"
-        x-on:composer:open.window="opening = ! $wire.isOpen"
-        x-on:keydown.window="(() => {
-            if ($event.key === 'c'
-                && ! $event.metaKey && ! $event.ctrlKey && ! $event.altKey
-                && ! ['INPUT', 'TEXTAREA', 'SELECT'].includes($event.target.tagName)
-                && ! $event.target.isContentEditable
-            ) { $event.preventDefault(); $wire.dispatch('composer:open') }
-        })()"
+        x-on:composer:open.window="opening = ! $wire.isOpen; openingExpanded = Boolean($event.detail?.payload?.massSend)"
     @endif
 >
     @php
-        // Composing and editing a saved draft both open fitted to the screen, so a
-        // draft looks the same wherever it came from, and the same as the reader it
-        // sits alongside. Shrinking drops back to the corner window.
         $isModal = $dock === 'floating' && $isExpanded && ! $isMinimized;
         $isFloating = $dock === 'floating';
         $isFloatingExpanded = $isFloating && $isExpanded && ! $isMinimized;
         $isMassSendLayout = $isFloatingExpanded && $isMassSend;
-        $showMassSendToggle = $isFloatingExpanded;
+        $showMassSendToggle = $isFloating && ! $isMinimized && $this->sourceEmail === null;
         $gutter = $isFloating ? 'px-4' : 'px-4 sm:px-6';
         $chromeButton = 'rounded-lg p-1.5 text-gray-400 transition hover:bg-gray-200/70 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-gray-200';
         $minimizeLabel = $isMinimized ? __('filament/emails/composer.actions.restore') : __('filament/emails/composer.actions.minimize');
@@ -45,9 +45,12 @@
 
     @if ($dock === 'floating' && ! $isOpen)
         <div x-cloak x-show="opening" role="status" aria-label="{{ __('filament/emails/composer.opening') }}">
-            <div class="ei-composer-opening-backdrop fixed inset-0 z-40 bg-gray-950/50"></div>
+            <div x-show="openingExpanded" class="ei-composer-opening-backdrop fixed inset-0 z-40 bg-gray-950/50"></div>
 
-            <div class="ei-composer-opening-panel fixed left-1/2 top-1/2 z-50 flex h-[85vh] w-[calc(100%-2rem)] max-w-5xl -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-xl max-sm:inset-0 max-sm:h-dvh max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:pt-[env(safe-area-inset-top)] bg-white shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:shadow-black/50 dark:ring-white/10">
+            <div
+                :class="openingExpanded ? 'left-1/2 top-1/2 h-[85vh] w-[calc(100%-2rem)] max-w-6xl -translate-x-1/2 -translate-y-1/2' : 'bottom-4 right-4 h-[36rem] w-[38rem]'"
+                class="ei-composer-opening-panel fixed z-50 flex flex-col overflow-hidden rounded-xl max-sm:inset-0 max-sm:h-dvh max-sm:w-full max-sm:translate-x-0 max-sm:translate-y-0 max-sm:rounded-none max-sm:pt-[env(safe-area-inset-top)] bg-white shadow-2xl shadow-gray-950/20 ring-1 ring-gray-950/10 dark:bg-gray-900 dark:shadow-black/50 dark:ring-white/10"
+            >
                 <div class="flex h-12 shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-gray-50 pl-4 pr-4 dark:border-white/10 dark:bg-white/5">
                     <span class="flex items-center gap-2">
                         <x-lucide-mail class="h-4 w-4 shrink-0 text-primary-500" />
@@ -83,8 +86,48 @@
         <div
             x-data="{
                 closing: false,
+                autosaveTimer: null,
+                shortcut: null,
                 init() {
                     this.$nextTick(() => this.focusFirstEmptyField())
+                    this.shortcut = this.$store.shortcuts?.register('email-composer-{{ $dock }}', {
+                        scope: 'composer',
+                        entries: @js(\Relaticle\EmailIntegration\Enums\EmailShortcut::forStore()),
+                        handlers: {
+                            send: () => this.send(),
+                            sendLater: () => this.showSendLater(),
+                            draftWithRela: () => $wire.dispatch('rela:focus', { composerId: $wire.$id }),
+                        },
+                        isActive: () => ! this.closing && ! this.$wire.isMinimized && this.$el.contains(document.activeElement),
+                    })
+                    for (const field of ['to', 'cc', 'bcc', 'accountId']) {
+                        this.$watch('$wire.' + field, () => this.queueAutosave())
+                    }
+                },
+                destroy() {
+                    clearTimeout(this.autosaveTimer)
+                    this.$store.shortcuts?.unregister('email-composer-{{ $dock }}', this.shortcut)
+                },
+                send() {
+                    clearTimeout(this.autosaveTimer)
+                    this.autosaveTimer = null
+                    this.$wire.send()
+                },
+                showSendLater() {
+                    const trigger = this.$el.querySelector('[data-send-later-trigger]')
+                    if (! trigger) return false
+                    Alpine.$data(trigger.closest('.fi-dropdown')).open(trigger)
+                },
+                queueAutosave() {
+                    clearTimeout(this.autosaveTimer)
+                    if (this.$wire.relaWriting) return
+                    this.autosaveTimer = setTimeout(() => this.flushAutosave(), 2000)
+                },
+                async flushAutosave() {
+                    if (! this.autosaveTimer || this.closing || ['stale', 'gone'].includes(this.$wire.autosaveState)) return
+                    clearTimeout(this.autosaveTimer)
+                    this.autosaveTimer = null
+                    await this.$wire.autosave()
                 },
                 focusFirstEmptyField() {
                     const recipient = this.$el.querySelector('[data-composer-to] input')
@@ -119,16 +162,21 @@
 
                     observer.observe(body, { childList: true, subtree: true, attributes: true, attributeFilter: ['contenteditable'] })
                 },
-                closeOnEscape(event) {
+                async closeOnEscape(event) {
                     if (event.defaultPrevented || document.querySelector('.fi-modal-open, .fi-dropdown-panel[style*=\'display: block\']')) {
                         return
                     }
 
                     event.preventDefault()
                     this.closing = true
-                    this.$wire.close()
+                    clearTimeout(this.autosaveTimer)
+                    await this.$wire.close()
+                    this.closing = false
                 },
             }"
+            x-on:input="queueAutosave()"
+            x-on:blur.window="flushAutosave()"
+            x-on:visibilitychange.document="if (document.hidden) flushAutosave()"
             x-show="! closing"
             @if ($isModal)
                 x-on:keydown.escape.document="closeOnEscape($event)"
@@ -165,7 +213,7 @@
                 {{-- Title bar. The inline dock sits inside the message it answers, so it
                      needs no window chrome, just the Draft bar, whose × discards. --}}
                 @if ($dock === 'inline')
-                    <x-email-integration::composer-draft-bar class="sticky top-0 z-10 h-10 border-t-2 border-dashed border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-900 sm:px-6" />
+                    <x-email-integration::composer-draft-bar :autosave-state="$autosaveState" class="sticky top-0 z-10 h-10 border-t-2 border-dashed border-gray-200 bg-white px-4 dark:border-gray-700 dark:bg-gray-900 sm:px-6" />
                 @else
                     <div @class([
                         'flex h-12 shrink-0 items-center justify-between gap-2 bg-gray-50 pl-4 pr-2 dark:bg-white/5',
@@ -181,6 +229,10 @@
                         </button>
 
                         <div class="flex shrink-0 items-center gap-0.5">
+                            <span wire:loading wire:target="autosave" class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('filament/emails/composer.autosave.saving') }}</span>
+                            @if ($autosaveState === 'saved')
+                                <span wire:loading.remove wire:target="autosave" class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('filament/emails/composer.autosave.saved') }}</span>
+                            @endif
                             <button
                                 type="button"
                                 wire:click="{{ $isMinimized ? 'restore' : 'minimize' }}"
@@ -228,6 +280,15 @@
                 @endif
 
                 @unless ($isMinimized)
+                    @if (in_array($autosaveState, ['stale', 'gone'], true))
+                        <div role="alert" class="flex flex-wrap items-center gap-2 border-b border-warning-200 bg-warning-50 px-4 py-3 text-sm text-warning-900 dark:border-warning-800 dark:bg-warning-950 dark:text-warning-200">
+                            <span>{{ __('filament/emails/composer.autosave.'.$autosaveState) }}</span>
+                            @if ($autosaveState === 'stale')
+                                <x-filament::button size="xs" color="gray" wire:click="reloadDraft">{{ __('filament/emails/composer.autosave.reload') }}</x-filament::button>
+                            @endif
+                            <x-filament::button size="xs" color="gray" wire:click="saveAsNewDraft">{{ __('filament/emails/composer.autosave.save_as_new') }}</x-filament::button>
+                        </div>
+                    @endif
                     @if (! $this->canSendFromSelectedAccount())
                         <x-email-integration::composer-send-missing :email="$this->fromAccount?->email_address">
                             {{ $this->grantSendPermissionAction }}
@@ -243,7 +304,7 @@
                             <x-email-integration::quoted-message :record="$this->sourceEmail" />
                         </div>
 
-                        <x-email-integration::composer-draft-bar class="h-10 px-4" />
+                        <x-email-integration::composer-draft-bar :autosave-state="$autosaveState" class="h-10 px-4" />
                     @endif
 
                     @if ($isFloatingExpanded)
@@ -256,6 +317,7 @@
 
                     {{-- Field rows --}}
                     <x-email-integration::composer-header
+                        x-bind:inert="$wire.relaWriting"
                         class="{{ $gutter }}"
                         :is-mass-send="$isMassSend"
                         :mass-recipients="$massRecipients"
@@ -268,17 +330,38 @@
                         :recipient-options="$this->recipientOptions"
                     />
 
+                    @if (! $isMassSend)
+                        <livewire:chat.email-rela-draft :composer-id="$this->getId()" :current-draft-id="$draftId" :key="'rela-'.$this->getId()" />
+                    @endif
+
                     {{-- Body: Filament RichEditor with floating toolbar only --}}
                     <div @class([
                         'email-composer-body-ctn px-4',
                         'min-h-0 flex-1 overflow-y-auto pb-3' => $isFloating,
                         'shrink-0 pb-2 sm:px-6' => ! $isFloating,
-                    ]) @if ($dock === 'inline') data-composer-dock="inline" @endif wire:ignore>
+                    ]) x-bind:inert="$wire.relaWriting" x-bind:aria-busy="$wire.relaWriting" @if ($dock === 'inline') data-composer-dock="inline" @endif wire:ignore>
                         {{ $this->getSchema('bodySchema') }}
                     </div>
                     @error('bodyHtml')
                         <p class="px-4 pb-1 text-xs text-danger-600 dark:text-danger-400">{{ $message }}</p>
                     @enderror
+
+                    @if ($this->variablePreview)
+                        @php($preview = $this->variablePreview)
+                        <section aria-label="{{ __('filament/emails/composer.variables.preview') }}" class="space-y-2 border-t border-gray-200 p-4 dark:border-white/10">
+                            <div class="flex items-center justify-between gap-2 text-sm">
+                                <span>{{ __('filament/emails/composer.variables.preview_position', ['index' => $preview['index'] + 1, 'count' => $preview['count']]) }}</span>
+                                <div class="flex gap-2">
+                                    <x-filament::icon-button icon="lucide-chevron-left" :label="__('pagination.previous')" wire:click="$set('previewIndex', {{ max(0, $preview['index'] - 1) }})" :disabled="$preview['index'] === 0" />
+                                    <x-filament::icon-button icon="lucide-chevron-right" :label="__('pagination.next')" wire:click="$set('previewIndex', {{ min($preview['count'] - 1, $preview['index'] + 1) }})" :disabled="$preview['index'] + 1 === $preview['count']" />
+                                    <x-filament::icon-button icon="lucide-x" :label="__('filament/emails/composer.actions.close')" wire:click="$set('showVariablePreview', false)" />
+                                </div>
+                            </div>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ $preview['email'] }}</p>
+                            <p class="text-sm font-medium">{{ $preview['subject'] }}</p>
+                            <iframe title="{{ __('filament/emails/composer.variables.preview') }}" srcdoc="{{ $preview['html'] }}" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" class="h-64 w-full rounded border border-gray-200 bg-white dark:border-white/10"></iframe>
+                        </section>
+                    @endif
 
                     <x-email-integration::composer-attachments :saved="$savedAttachments" :pending="$attachments" />
 
@@ -305,8 +388,9 @@
                         {{-- A phone has no room for one row, so Send takes a full-width row of its own under the tools. --}}
                         <div class="flex items-center justify-between gap-3 max-sm:flex-wrap max-sm:gap-y-3">
                         <div class="flex items-center gap-1">
-                            <x-email-integration::composer-icon-button icon="lucide-paperclip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
+                            <x-email-integration::composer-icon-button icon="lucide-paperclip" :label="__('filament/emails/composer.actions.attach_file')" x-on:click="$refs.attachments.click()" />
                             <input type="file" x-ref="attachments" wire:model="attachments" multiple class="hidden" />
+                            <x-email-integration::composer-icon-button icon="lucide-eye" :label="__('filament/emails/composer.variables.preview')" wire:click="$toggle('showVariablePreview')" />
 
                             <x-email-integration::composer-picker-menu
                                 icon="lucide-square-pen"
@@ -333,18 +417,26 @@
                         </div>
 
                         <div class="flex items-center gap-3 max-sm:contents">
+                            @if (! $isMassSend)
+                                <label class="flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+                                    <x-filament::input.checkbox wire:model="followUp" />
+                                    {{ __('filament/emails/composer.follow_up.toggle') }}
+                                </label>
+                            @endif
                             <x-email-integration::composer-mass-send-footer-actions
                                 :show-toggle="$showMassSendToggle"
                                 :is-mass-send="$isMassSend"
                                 :recipient-count="count($massRecipients)"
                             />
 
+                        <div class="flex items-stretch max-sm:basis-full">
                         <x-filament::button
                             wire:click="send"
+                            x-on:click="clearTimeout(autosaveTimer); autosaveTimer = null"
                             wire:loading.attr="disabled"
                             wire:target="send, attachments"
                             icon="lucide-send"
-                            class="max-sm:basis-full"
+                            @class(['max-sm:flex-1', 'rounded-r-none' => ! $isMassSend])
                         >
                             @if ($isMassSend)
                                 {{ __('filament/emails/composer.mass_send.send_button', ['count' => count($massRecipients)]) }}
@@ -352,6 +444,37 @@
                                 {{ __('filament/emails/composer.actions.send') }}
                             @endif
                         </x-filament::button>
+                        @unless ($isMassSend)
+                            <x-filament::dropdown placement="top-end">
+                                <x-slot name="trigger">
+                                    <x-filament::button
+                                        data-send-later-trigger
+                                        aria-label="{{ __('filament/emails/composer.send_later.title') }}"
+                                        class="h-full rounded-l-none border-l border-white/20"
+                                    >
+                                        <x-lucide-chevron-down class="size-4" />
+                                    </x-filament::button>
+                                </x-slot>
+                                <x-filament::dropdown.list>
+                                    @foreach ($this->sendLaterOptions as $preset => $label)
+                                        <x-filament::dropdown.list.item wire:click="sendLater('{{ $preset }}')" x-on:click="clearTimeout(autosaveTimer); autosaveTimer = null" icon="lucide-clock">
+                                            {{ $label }}
+                                        </x-filament::dropdown.list.item>
+                                    @endforeach
+                                    <x-filament::dropdown.list.item wire:click="mountAction('sendLater')" icon="lucide-calendar-days">
+                                        {{ __('filament/emails/composer.send_later.custom') }}
+                                    </x-filament::dropdown.list.item>
+                                </x-filament::dropdown.list>
+                                <p class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">
+                                    @if (auth()->user()->timezone)
+                                        {{ __('filament/emails/composer.send_later.timezone', ['timezone' => auth()->user()->timezone]) }}
+                                    @else
+                                        <a href="{{ \App\Filament\Pages\EditProfile::getUrl() }}" class="text-primary-600 dark:text-primary-400">{{ __('filament/emails/composer.send_later.utc_notice') }}</a>
+                                    @endif
+                                </p>
+                            </x-filament::dropdown>
+                        @endunless
+                        </div>
                         </div>
                         </div>
                     </div>

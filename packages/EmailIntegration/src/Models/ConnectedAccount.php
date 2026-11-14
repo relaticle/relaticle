@@ -24,6 +24,7 @@ use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Enums\SyncErrorReason;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
@@ -61,6 +62,11 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property string|null $history_import_batch_id
  * @property string|null $history_import_notified_batch_id
  * @property EmailPrivacyTier|null $sharing_tier
+ * @property CarbonInterface|null $sharing_confirmed_at
+ * @property MailboxHealth $health
+ * @property string|null $health_reason
+ * @property CarbonInterface|null $health_changed_at
+ * @property CarbonInterface|null $health_notified_at
  */
 #[Fillable([
     'workspace_id',
@@ -93,6 +99,10 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
     'sync_sent',
     'daily_send_limit',
     'hourly_send_limit',
+    'health',
+    'health_reason',
+    'health_changed_at',
+    'health_notified_at',
 ])]
 final class ConnectedAccount extends Model
 {
@@ -101,8 +111,7 @@ final class ConnectedAccount extends Model
      */
     use HasFactory, HasUlids, HasWorkspace, SoftDeletes;
 
-    // The scheduler dispatches an incremental sync every 5 minutes.
-    private const int STALE_AFTER_MINUTES = 60;
+    private const int STALE_AFTER_HOURS = 24;
 
     protected static function newFactory(): ConnectedAccountFactory
     {
@@ -209,12 +218,17 @@ final class ConnectedAccount extends Model
     #[Scope]
     protected function stale(Builder $query): Builder
     {
-        return $query
-            ->active()
-            ->whereNotNull('sync_cursor')
-            ->where(fn (Builder $overdue): Builder => $overdue
-                ->whereNull('last_synced_at')
-                ->orWhere('last_synced_at', '<', now()->subMinutes(self::STALE_AFTER_MINUTES)));
+        return $query->where('health', MailboxHealth::Stale);
+    }
+
+    /**
+     * @param  Builder<ConnectedAccount>  $query
+     * @return Builder<ConnectedAccount>
+     */
+    #[Scope]
+    protected function unhealthy(Builder $query): Builder
+    {
+        return $query->whereNot('health', MailboxHealth::Healthy);
     }
 
     /**
@@ -345,6 +359,11 @@ final class ConnectedAccount extends Model
             ->contains(fn (ConnectedAccount $account): bool => $account->isSendable());
     }
 
+    public function hasAnsweredSharing(): bool
+    {
+        return $this->sharing_confirmed_at !== null;
+    }
+
     public function isTokenExpired(): bool
     {
         return $this->token_expires_at !== null && $this->token_expires_at->isPast();
@@ -357,12 +376,37 @@ final class ConnectedAccount extends Model
 
     public function isStale(): bool
     {
-        if (! $this->isActive() || $this->sync_cursor === null) {
-            return false;
-        }
+        return $this->health === MailboxHealth::Stale;
+    }
 
-        return $this->last_synced_at === null
-            || $this->last_synced_at->lt(now()->subMinutes(self::STALE_AFTER_MINUTES));
+    public function assessedHealth(bool $workspaceHasHostedAccess): MailboxHealth
+    {
+        return match (true) {
+            ! $workspaceHasHostedAccess => MailboxHealth::PausedBilling,
+            $this->status === EmailAccountStatus::REAUTH_REQUIRED => MailboxHealth::ReauthRequired,
+            $this->status === EmailAccountStatus::ERROR => MailboxHealth::Error,
+            $this->health === MailboxHealth::PausedBilling => MailboxHealth::Healthy,
+            $this->sync_cursor !== null && $this->hasNotSyncedSince(now()->subHours(self::STALE_AFTER_HOURS)) => MailboxHealth::Stale,
+            default => MailboxHealth::Healthy,
+        };
+    }
+
+    // A mailbox that just turned healthy, as one leaving a billing pause does, gets a full day from then.
+    private function hasNotSyncedSince(CarbonInterface $since): bool
+    {
+        $healthySince = $this->health === MailboxHealth::Healthy ? $this->health_changed_at : null;
+        $lastGoodAt = collect([$this->last_synced_at, $healthySince])->filter()->max();
+
+        return $lastGoodAt === null || $lastGoodAt->lt($since);
+    }
+
+    public function healthReason(MailboxHealth $health): ?string
+    {
+        return match ($health) {
+            MailboxHealth::Stale => 'no_sync_24h',
+            MailboxHealth::Error, MailboxHealth::ReauthRequired => $this->syncError()?->value,
+            MailboxHealth::Healthy, MailboxHealth::PausedBilling => null,
+        };
     }
 
     /**
@@ -377,7 +421,12 @@ final class ConnectedAccount extends Model
 
     public function syncErrorReason(): ?string
     {
-        return SyncErrorReason::tryFrom((string) $this->last_error)?->getLabel();
+        return $this->syncError()?->getLabel();
+    }
+
+    public function syncError(): ?SyncErrorReason
+    {
+        return SyncErrorReason::tryFrom((string) $this->last_error);
     }
 
     /**
@@ -711,7 +760,11 @@ final class ConnectedAccount extends Model
         return [
             'provider' => EmailProvider::class,
             'status' => EmailAccountStatus::class,
+            'health' => MailboxHealth::class,
+            'health_changed_at' => 'datetime',
+            'health_notified_at' => 'datetime',
             'sharing_tier' => EmailPrivacyTier::class,
+            'sharing_confirmed_at' => 'datetime',
             'token_expires_at' => 'datetime',
             'last_synced_at' => 'datetime',
             'last_calendar_synced_at' => 'datetime',

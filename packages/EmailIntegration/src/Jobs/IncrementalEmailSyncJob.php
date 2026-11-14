@@ -168,12 +168,10 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
                     return;
                 }
 
-                // Keep the mailbox ACTIVE: email:incremental-sync dispatches for active
-                // accounts only, and the cursor stays put here, so the next run refetches
-                // exactly what failed. Parking it would end all future mail for this mailbox.
+                // The cursor and the sync time stay put, so the next run refetches what failed
+                // and the watchdog can see the stall. The mailbox stays ACTIVE to keep syncing.
                 if ($batch->failedJobs > 0) {
                     $account->update([
-                        'last_synced_at' => now(),
                         'last_error' => "{$batch->failedJobs} email(s) could not be stored during sync.",
                     ]);
 

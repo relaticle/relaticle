@@ -5,8 +5,12 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration;
 
 use App\Contracts\Inbox\RequestSource;
+use App\Features\EmailConversations;
 use App\Features\EmailIntegration;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
+use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\CustomFieldValue;
 use App\Models\User;
 use App\Models\Workspace;
@@ -24,7 +28,11 @@ use Laravel\Socialite\Two\AbstractProvider;
 use Laravel\Socialite\Two\GoogleProvider;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\PurgeStoredMailboxData;
+use Relaticle\EmailIntegration\Console\Commands\BackfillAutomatedReasonsCommand;
+use Relaticle\EmailIntegration\Console\Commands\BackfillConversationsCommand;
+use Relaticle\EmailIntegration\Console\Commands\BackfillEmailSearchVectorsCommand;
 use Relaticle\EmailIntegration\Console\Commands\BackfillEmailThreadsCommand;
+use Relaticle\EmailIntegration\Console\Commands\CheckMailboxHealthCommand;
 use Relaticle\EmailIntegration\Console\Commands\DisconnectFormerMemberMailboxesCommand;
 use Relaticle\EmailIntegration\Console\Commands\DispatchOutboxCommand;
 use Relaticle\EmailIntegration\Console\Commands\ExpireEmailAccessRequestsCommand;
@@ -32,9 +40,12 @@ use Relaticle\EmailIntegration\Console\Commands\IncrementalCalendarSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\IncrementalEmailSyncCommand;
 use Relaticle\EmailIntegration\Console\Commands\RemoveOwnDomainRecordsCommand;
 use Relaticle\EmailIntegration\Console\Commands\RenewCalendarPushChannelsCommand;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
+use Relaticle\EmailIntegration\Filament\Pages\EmailInboxPage;
 use Relaticle\EmailIntegration\Inbox\EmailAccessRequestSource;
 use Relaticle\EmailIntegration\Listeners\CancelRemovedMemberAccessRequestsListener;
 use Relaticle\EmailIntegration\Listeners\DisconnectRemovedMemberMailboxesListener;
+use Relaticle\EmailIntegration\Listeners\ForgetConversationCountsListener;
 use Relaticle\EmailIntegration\Livewire\AccessRequestsTable;
 use Relaticle\EmailIntegration\Livewire\DraftsTable;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
@@ -46,6 +57,7 @@ use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Meeting;
@@ -89,14 +101,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Relation::morphMap([
-            'email' => Email::class,
-            'connected_account' => ConnectedAccount::class,
-            'email_thread' => EmailThread::class,
-            'email_access_request' => EmailAccessRequest::class,
-            'meeting' => Meeting::class,
-        ]);
-
+        $this->registerMorphMap();
         $this->registerCleanupThatIgnoresTheFeatureFlag();
 
         if (! self::enabled()) {
@@ -143,24 +148,62 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         // active panel, an authenticated user, and a resolved tenant.
         FilamentView::registerRenderHook(
             PanelsRenderHook::BODY_END,
-            function (): string {
-                if (filament()->getId() !== 'app' || ! auth()->check() || ! filament()->getTenant() instanceof Model) {
-                    return '';
-                }
-
-                $pageTo = ComposerPageTo::email();
-                $pageRecordId = ComposerPageTo::recordId();
-
-                return Blade::render('@livewire(\'email-integration.composer\', [\'pageTo\' => $pageTo, \'pageRecordType\' => $pageRecordType, \'pageRecordId\' => $pageRecordId], key($composerKey))', [
-                    'pageTo' => $pageTo,
-                    'pageRecordType' => ComposerPageTo::recordType(),
-                    'pageRecordId' => $pageRecordId,
-                    'composerKey' => 'email-composer-'.($pageRecordId ?? '').'-'.($pageTo ?? ''),
-                ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\')');
-            },
+            fn (array $scopes): string => $this->renderBodyEnd($scopes),
         );
 
         $this->registerCommands();
+    }
+
+    private function registerMorphMap(): void
+    {
+        Relation::morphMap([
+            'email' => Email::class,
+            'connected_account' => ConnectedAccount::class,
+            'email_thread' => EmailThread::class,
+            'email_conversation' => EmailConversation::class,
+            'email_access_request' => EmailAccessRequest::class,
+            'meeting' => Meeting::class,
+        ]);
+    }
+
+    /**
+     * @param  array<string>  $scopes
+     */
+    private function renderBodyEnd(array $scopes): string
+    {
+        if (filament()->getId() !== 'app' || ! auth()->check() || ! filament()->getTenant() instanceof Model) {
+            return '';
+        }
+
+        $pageTo = ComposerPageTo::email();
+        $pageRecordId = ComposerPageTo::recordId();
+
+        return Blade::render('@livewire(\'email-integration.composer\', [\'pageTo\' => $pageTo, \'pageRecordType\' => $pageRecordType, \'pageRecordId\' => $pageRecordId], key($composerKey))', [
+            'pageTo' => $pageTo,
+            'pageRecordType' => ComposerPageTo::recordType(),
+            'pageRecordId' => $pageRecordId,
+            'composerKey' => 'email-composer-'.($pageRecordId ?? '').'-'.($pageTo ?? ''),
+        ]).Blade::render('@livewire(\''.EmailAccessNotificationHandler::LIVEWIRE_ALIAS.'\', [\'hostsReader\' => $hostsReader, \'readerOnRecordPage\' => $readerOnRecordPage])', [
+            'hostsReader' => $this->conversationsOn() && (in_array(EmailInboxPage::class, $scopes, true) || $this->isRecordPage($scopes)),
+            'readerOnRecordPage' => $this->conversationsOn() && $this->isRecordPage($scopes),
+        ]).view('email-integration::components.shortcut-sheet')->render();
+    }
+
+    private function conversationsOn(): bool
+    {
+        $workspace = filament()->getTenant();
+
+        return $workspace instanceof Workspace && Feature::for($workspace)->active(EmailConversations::class);
+    }
+
+    // Filament mounts only the active relation tab and switches tabs over Livewire, so a record
+    // page hosts the reader on every tab: its Emails tab opens `?email=` whenever it mounts.
+    /**
+     * @param  array<string>  $scopes
+     */
+    private function isRecordPage(array $scopes): bool
+    {
+        return array_intersect([ViewCompany::class, ViewPeople::class, ViewOpportunity::class], $scopes) !== [];
     }
 
     public static function enabled(): bool
@@ -176,6 +219,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         $this->commands([
             BackfillEmailThreadsCommand::class,
+            CheckMailboxHealthCommand::class,
             DispatchOutboxCommand::class,
             ExpireEmailAccessRequestsCommand::class,
             IncrementalCalendarSyncCommand::class,
@@ -200,9 +244,13 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
         Event::listen(TeamMemberRemoved::class, DisconnectRemovedMemberMailboxesListener::class);
         Event::listen(TeamMemberRemoved::class, CancelRemovedMemberAccessRequestsListener::class);
+        Event::listen(ConversationChanged::class, ForgetConversationCountsListener::class);
 
         if ($this->app->runningInConsole()) {
             $this->commands([
+                BackfillAutomatedReasonsCommand::class,
+                BackfillConversationsCommand::class,
+                BackfillEmailSearchVectorsCommand::class,
                 DisconnectFormerMemberMailboxesCommand::class,
                 RemoveOwnDomainRecordsCommand::class,
             ]);

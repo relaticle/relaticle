@@ -4,12 +4,13 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas;
 
+use App\Models\User;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Schema;
+use Relaticle\EmailIntegration\Filament\RichContent\ComposerCommandsPlugin;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
-use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 
 final class EmailTemplateForm
 {
@@ -30,11 +31,16 @@ final class EmailTemplateForm
                 RichEditor::make('body_html')
                     ->label(__('filament/resources/email-template.fields.body_html.label'))
                     ->required()
-                    ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
+                    ->plugins([new ComposerCommandsPlugin])
+                    ->extraAttributes(function (): array {
+                        $user = auth()->user();
+
+                        return $user instanceof User ? ComposerCommandsPlugin::attributes($user) : [];
+                    })
                     ->toolbarButtons([
                         'bold', 'italic', 'underline', 'strike',
                         'link', 'bulletList', 'orderedList',
-                        'blockquote', 'h2', 'h3', 'undo', 'redo', 'mergeTags',
+                        'blockquote', 'h2', 'h3', 'undo', 'redo',
                     ])
                     ->columnSpanFull(),
 

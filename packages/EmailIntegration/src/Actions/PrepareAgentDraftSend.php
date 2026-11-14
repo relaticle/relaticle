@@ -77,11 +77,11 @@ final readonly class PrepareAgentDraftSend
         $isForward = $draft->creation_source === EmailCreationSource::FORWARD;
         $person = $this->people->first($recipients['to'][0]['email'], (string) $user->current_workspace_id);
         $person?->loadMissing('company');
-        $bodyHtml = $this->renderer->renderForSending((string) $draft->body?->body_html, $person);
+        $bodyHtml = $this->renderer->renderForSending((string) $draft->body?->body_html, $person, $user);
 
         return [
             'connected_account_id' => $draft->connected_account_id,
-            'subject' => $this->renderer->renderPlainText((string) $draft->subject, $person),
+            'subject' => $this->renderer->renderPlainText((string) $draft->subject, $person, $user),
             'body_html' => $original instanceof Email && $user->can('viewBody', $original) ? $original->quotedBelow($bodyHtml, $isForward) : $bodyHtml,
             ...$recipients,
             'in_reply_to_email_id' => $original instanceof Email && ! $isForward ? $original->getKey() : null,

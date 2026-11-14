@@ -13,8 +13,10 @@ use App\Notifications\InboxNotification;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Notifications\Messages\MailMessage;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Queries\RecordEmailAccessQuery;
 use Relaticle\EmailIntegration\Support\MarkdownText;
 
 final class EmailAccessRequestedNotification extends InboxNotification
@@ -26,6 +28,30 @@ final class EmailAccessRequestedNotification extends InboxNotification
     public function workspace(): Workspace
     {
         return $this->request->workspace ?? $this->request->emailIncludingHidden->workspace;
+    }
+
+    public static function titleFor(EmailAccessRequest $request): string
+    {
+        $requester = $request->requester;
+
+        if ($requester === null) {
+            return __(self::LANG.'.title_without_requester');
+        }
+
+        $record = $request->isForRecord() ? $request->record() : null;
+
+        if ($record === null || $request->owner === null) {
+            return __(self::LANG.'.title', ['name' => $requester->name]);
+        }
+
+        $count = resolve(RecordEmailAccessQuery::class)->shareableCount(
+            $request->owner,
+            $requester,
+            $record,
+            EmailPrivacyTier::from($request->tier_requested),
+        );
+
+        return trans_choice(self::LANG.'.record_title', $count, ['name' => $requester->name, 'count' => $count, 'record' => $record->name]);
     }
 
     public function subject(): EmailAccessRequest
@@ -61,7 +87,7 @@ final class EmailAccessRequestedNotification extends InboxNotification
     public function facts(): array
     {
         return [
-            'email_subject' => $this->request->emailIncludingHidden->subject,
+            'email_subject' => $this->request->emailIncludingHidden?->subject,
             'email_id' => $this->request->email_id,
         ];
     }
@@ -77,15 +103,23 @@ final class EmailAccessRequestedNotification extends InboxNotification
         $email = $this->request->emailIncludingHidden;
         $requesterName = $this->request->requester->name;
 
-        return (new MailMessage)
-            ->subject(__(self::LANG.'.mail.subject', ['name' => $requesterName]))
-            ->line(__(self::LANG.'.mail.line', ['name' => MarkdownText::escape($requesterName)]))
-            ->line(__(self::LANG.'.mail.subject_line', [
-                'subject' => MarkdownText::escape($email->displaySubject()),
-            ]))
+        $mail = (new MailMessage)->subject(__(self::LANG.'.mail.subject', ['name' => $requesterName]));
+
+        if ($email === null) {
+            $mail->line(MarkdownText::escape(self::titleFor($this->request)).'.');
+        } else {
+            $mail->line(__(self::LANG.'.mail.line', ['name' => MarkdownText::escape($requesterName)]))
+                ->line(__(self::LANG.'.mail.subject_line', ['subject' => MarkdownText::escape($email->displaySubject())]));
+        }
+
+        if (filled($this->request->note)) {
+            $mail->line(__(self::LANG.'.mail.note_line', ['note' => MarkdownText::escape((string) $this->request->note)]));
+        }
+
+        return $mail
             ->action(
                 __(self::LANG.'.mail.action'),
-                EmailAccessRequestsPage::getUrl(panel: 'app', tenant: $email->workspace),
+                EmailAccessRequestsPage::getUrl(panel: 'app', tenant: $this->workspace()),
             );
     }
 

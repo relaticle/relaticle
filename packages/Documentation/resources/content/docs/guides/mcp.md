@@ -156,7 +156,7 @@ Add this to your VS Code settings (`.vscode/mcp.json`):
 
 ## Available Tools
 
-The server provides 50 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, file uploads, reading synced email, managing email drafts, and sending and scheduling email. A connection without email access sees 39 tools.
+The server provides 52 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, file uploads, reading synced email, managing email drafts, sending and scheduling email, and linking email to records. A connection without email access sees 39 tools.
 
 ### Cross-entity discovery
 
@@ -239,7 +239,7 @@ The server provides 50 tools. They cover account context, cross-entity discovery
 
 These tools appear only for a connection that was given email access. The reading tools show the synced email its user may see, at the sharing level the mailbox owner chose, plus the user's own drafts and outbox. The mailbox, draft, send and outbox tools work on the user's own mailboxes and emails.
 
-The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
+The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. The two link tools need the draft permission and a role that may edit the record. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
 
 A queued email stays tied to the connection that queued it. It is not sent if that connection is revoked, deleted or expired by its send time. The same happens if its user's role no longer allows sending through an assistant. It then waits in the outbox under **Failed** with the reason.
 
@@ -256,6 +256,8 @@ A queued email stays tied to the connection that queued it. It is not sent if th
 | `cancel-email-tool` | Cancel a queued email before it leaves. |
 | `reschedule-email-tool` | Change when a queued email leaves. The user gets a new notice they can cancel from. |
 | `retry-email-tool` | Queue a failed email again, held like a new send. It is then tied to the connection that retried it. |
+| `link-emails-tool` | Put emails on a company, person or opportunity. The user's copies of the conversation move, and the link stays through every sync. |
+| `unlink-emails-tool` | Take emails off a company, person or opportunity. No later sync puts the conversation back on that record. |
 
 ### Files
 

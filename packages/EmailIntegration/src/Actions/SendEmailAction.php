@@ -21,13 +21,16 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\UndoSendWindow;
 use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
+use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
+use Relaticle\EmailIntegration\Services\EmailVariableCatalogue;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 
 final readonly class SendEmailAction
@@ -35,6 +38,9 @@ final readonly class SendEmailAction
     public function __construct(
         private EmailInlineImageEmbedder $inlineImageEmbedder,
         private ForwardAttachmentCopyService $attachments,
+        private ConversationKeyResolver $resolver,
+        private EmailVariableCatalogue $variables,
+        private CreateEmailFollowUp $followUps,
     ) {}
 
     /**
@@ -50,6 +56,7 @@ final readonly class SendEmailAction
      *     in_reply_to_email_id?: ?string,
      *     creation_source: EmailCreationSource,
      *     batch_id?: ?string,
+     *     follow_up?: bool,
      *     scheduled_for?: ?DateTimeInterface,
      *     priority?: EmailPriority,
      *     attachments?: array<int, string>,
@@ -68,11 +75,15 @@ final readonly class SendEmailAction
 
         abort_unless($account->isSendable(), 403);
 
+        if ($data['creation_source'] !== EmailCreationSource::MCP) {
+            $this->variables->assertResolved($data['subject'], $data['body_html']);
+        }
+
         $priority = $data['priority'] ?? EmailPriority::BULK;
 
         $this->assertUnderMaxQueued((string) $account->user_id);
 
-        $scheduledFor = $this->resolveScheduledFor($data, $priority);
+        $scheduledFor = $this->resolveScheduledFor($user, $data, $priority);
 
         $embedded = $this->inlineImageEmbedder->embed(
             $user,
@@ -93,9 +104,6 @@ final readonly class SendEmailAction
         /** @var array<string, string> $attachmentFileNames */
         $attachmentFileNames = $embedded['attachment_file_names'];
 
-        $hasDownloadableAttachments = collect($attachmentPaths)
-            ->contains(fn (string $path): bool => ($attachmentAttributes[$path]['is_inline'] ?? false) !== true);
-
         $disk = Storage::disk(EmailAttachment::DISK);
         $this->attachments->assertFitsProvider(
             $account->provider,
@@ -109,34 +117,21 @@ final readonly class SendEmailAction
             strlen((string) $data['body_html']),
         );
 
-        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
-            // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
-            // from a client-controlled hidden field and Email has no workspace global scope,
-            // so an unscoped lookup would let a user thread their outbound mail onto
-            // another tenant's email and leak its thread_id / rfc_message_id.
-            /** @var Email|null $inReplyTo */
-            $inReplyTo = isset($data['in_reply_to_email_id'])
-                ? Email::query()
-                    ->where('workspace_id', $account->workspace_id)
-                    ->whereKey($data['in_reply_to_email_id'])
-                    ->first()
-                : null;
+        return DB::transaction(function () use ($user, $account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames): Email {
+            $inReplyTo = $this->lockedParent($account, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
             $email = $account->emails()->chaperone()->create([
                 'workspace_id' => $account->workspace_id,
                 'user_id' => $account->user_id,
-                // Stamp a stable RFC Message-ID now (used as the outgoing Message-ID
-                // header) so a retry that re-enters after the provider already
-                // delivered can find the sent message and adopt it instead of
-                // double-sending. See EmailSendingService::send().
+                // Stable across retries, so provider reconciliation adopts a delivered message rather than sending twice.
                 'rfc_message_id' => $this->generateRfcMessageId($account),
                 'provider_message_id' => null,
                 // Gmail threadId / Graph conversationId exist only inside the
                 // mailbox that received the original. A reply from a shared
                 // inbox or a different connected account must not pass that
                 // foreign id to the sending mailbox.
-                'thread_id' => $inReplyTo !== null && $inReplyTo->connected_account_id === $account->getKey()
+                'thread_id' => $inReplyTo instanceof Email && $inReplyTo->connected_account_id === $account->getKey()
                     ? $inReplyTo->thread_id
                     : null,
                 'in_reply_to' => $inReplyTo?->rfc_message_id,
@@ -148,12 +143,14 @@ final readonly class SendEmailAction
                 'folder' => EmailFolder::Sent,
                 'status' => EmailStatus::QUEUED,
                 'priority' => $priority,
-                'has_attachments' => $hasDownloadableAttachments,
+                'has_attachments' => collect($attachmentPaths)->contains(fn (string $path): bool => ($attachmentAttributes[$path]['is_inline'] ?? false) !== true),
                 'is_internal' => false,
                 'creation_source' => $data['creation_source'],
                 'batch_id' => $data['batch_id'] ?? null,
                 'attempts' => 0,
             ]);
+
+            $email->updateQuietly(['conversation_key' => $inReplyTo->conversation_key ?? $this->resolver->resolveStored($email)]);
 
             EmailBody::query()->create([
                 'email_id' => $email->getKey(),
@@ -161,42 +158,74 @@ final readonly class SendEmailAction
                 'body_text' => PlainText::paragraphsFromHtml((string) $data['body_html']),
             ]);
 
-            EmailParticipant::query()->create([
-                'email_id' => $email->getKey(),
-                'email_address' => $account->email_address,
-                'name' => $account->display_name,
-                'role' => 'from',
-            ]);
-
-            foreach (['to', 'cc', 'bcc'] as $role) {
-                foreach ($data[$role] ?? [] as $recipient) {
-                    EmailParticipant::query()->create([
-                        'email_id' => $email->getKey(),
-                        'email_address' => $recipient['email'],
-                        'name' => $recipient['name'] ?? null,
-                        'role' => $role,
-                    ]);
-                }
-            }
+            $this->storeParticipants($email, $account, $data);
 
             $this->storeAttachments($email, $attachmentPaths, $attachmentFileNames, $attachmentAttributes);
 
-            if ($linkToType !== null && $linkToId !== null && in_array($linkToType, [Company::class, Opportunity::class, People::class], true)) {
-                $linked = $linkToType::query()
-                    ->where('workspace_id', $account->workspace_id)
-                    ->whereKey($linkToId)
-                    ->first();
+            $this->linkToRecord($email, $linkToType, $linkToId);
 
-                if ($linked instanceof Company || $linked instanceof Opportunity || $linked instanceof People) {
-                    // Attach through the record relation so emailable_type is the
-                    // morph alias (`people`), not the class name. Relation::enforceMorphMap
-                    // means `$person->emails()` would miss a fully-qualified class name.
-                    $linked->emails()->attach($email->getKey(), ['link_source' => 'manual']);
-                }
+            if ($data['follow_up'] ?? false) {
+                $this->followUps->execute($user, $email);
             }
 
             return $email;
         });
+    }
+
+    /** @param class-string|null $type */
+    private function linkToRecord(Email $email, ?string $type, ?string $id): void
+    {
+        if ($id === null || ! in_array($type, [Company::class, Opportunity::class, People::class], true)) {
+            return;
+        }
+
+        $record = $type::query()->where('workspace_id', $email->workspace_id)->whereKey($id)->first();
+        if ($record instanceof Company || $record instanceof Opportunity || $record instanceof People) {
+            $record->emails()->attach($email->getKey(), ['link_source' => 'manual']);
+        }
+    }
+
+    private function lockedParent(ConnectedAccount $account, ?string $parentId): ?Email
+    {
+        // Shared with other writers, exclusive in MergeConversations, so the parent's key is never absorbed mid-merge.
+        DB::select('select pg_advisory_xact_lock_shared(hashtext(?))', [$account->workspace_id]);
+
+        if ($parentId === null) {
+            return null;
+        }
+
+        // Scope the reply lookup to the sender's workspace. in_reply_to_email_id arrives
+        // from a client-controlled hidden field and Email has no workspace global scope,
+        // so an unscoped lookup would let a user thread their outbound mail onto
+        // another tenant's email and leak its thread_id / rfc_message_id.
+        return Email::query()
+            ->where('workspace_id', $account->workspace_id)
+            ->whereKey($parentId)
+            ->first();
+    }
+
+    /**
+     * @param  array{to: array<array{email: string, name: ?string}>, cc?: array<array{email: string, name: ?string}>, bcc?: array<array{email: string, name: ?string}>}  $data
+     */
+    private function storeParticipants(Email $email, ConnectedAccount $account, array $data): void
+    {
+        EmailParticipant::query()->create([
+            'email_id' => $email->getKey(),
+            'email_address' => $account->email_address,
+            'name' => $account->display_name,
+            'role' => 'from',
+        ]);
+
+        foreach (['to', 'cc', 'bcc'] as $role) {
+            foreach ($data[$role] ?? [] as $recipient) {
+                EmailParticipant::query()->create([
+                    'email_id' => $email->getKey(),
+                    'email_address' => $recipient['email'],
+                    'name' => $recipient['name'] ?? null,
+                    'role' => $role,
+                ]);
+            }
+        }
     }
 
     /**
@@ -254,16 +283,14 @@ final readonly class SendEmailAction
     /**
      * @param  array<string, mixed>  $data
      */
-    private function resolveScheduledFor(array $data, EmailPriority $priority): ?CarbonInterface
+    private function resolveScheduledFor(User $user, array $data, EmailPriority $priority): ?CarbonInterface
     {
         if (isset($data['scheduled_for']) && $data['scheduled_for'] instanceof DateTimeInterface) {
             return Date::instance($data['scheduled_for']);
         }
 
         if ($priority === EmailPriority::PRIORITY) {
-            $undoWindow = Config::integer('email-integration.outbox.undo_send_window_seconds');
-
-            return now()->addSeconds($undoWindow);
+            return now()->addSeconds(UndoSendWindow::forUser($user)->value);
         }
 
         return null;

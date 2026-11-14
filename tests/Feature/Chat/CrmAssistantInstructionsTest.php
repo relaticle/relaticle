@@ -1230,6 +1230,7 @@ it('tells the model with a ready mailbox that it can read, draft and propose a s
         ->toContain('save, update and delete the user\'s drafts')
         ->toContain('propose a send that the user approves: a new email or a saved draft')
         ->toContain('cancelling or rescheduling a queued email and sending a failed one again')
+        ->toContain('linking an email\'s conversation to a company, person or opportunity, or unlinking it')
         ->toContain('One email per send call')
         ->toContain('each email is approved on its own')
         ->toContain('save a draft instead of proposing a send')

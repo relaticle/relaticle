@@ -115,6 +115,20 @@
                 @endif
             </div>
         </x-filament::section>
+        <x-filament::section :contained="false" :heading="__('filament/pages/email-accounts.undo_send.heading')">
+            <div class="max-w-xs space-y-2">
+                <label for="undo-send-seconds" class="text-sm font-medium text-gray-950 dark:text-white">{{ __('filament/pages/email-accounts.undo_send.label') }}</label>
+                <x-filament::input.wrapper>
+                    <x-filament::input.select id="undo-send-seconds" wire:model.live="undoSendSeconds">
+                        @foreach (\Relaticle\EmailIntegration\Enums\UndoSendWindow::cases() as $window)
+                            <option value="{{ $window->value }}">{{ $window->getLabel() }}</option>
+                        @endforeach
+                    </x-filament::input.select>
+                </x-filament::input.wrapper>
+                <p class="text-sm text-gray-500 dark:text-gray-400">{{ __('filament/pages/email-accounts.undo_send.help') }}</p>
+                @error('undoSendSeconds') <p class="text-sm text-danger-600">{{ $message }}</p> @enderror
+            </div>
+        </x-filament::section>
     </x-email-integration::settings-layout>
 
     <x-filament-actions::modals />

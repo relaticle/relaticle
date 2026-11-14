@@ -6,6 +6,7 @@ use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Providers\AppServiceProvider;
+use Illuminate\Foundation\Console\QueuedCommand;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -21,6 +22,7 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Filament\Pages\MailboxSharingPage;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
@@ -314,6 +316,37 @@ it('dispatches history import when a disconnected account is reconnected', funct
     Bus::assertDispatched(RelinkMailboxHistoryJob::class, fn (RelinkMailboxHistoryJob $job): bool => $job->connectedAccount->is($account));
 });
 
+it('queues a conversation rebuild for the workspace when a disconnected account is reconnected', function (): void {
+    Bus::fake();
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->trashed()->create([
+        'user_id' => $user->getKey(),
+        'workspace_id' => $user->current_workspace_id,
+        'email_address' => 'again@example.com',
+        'provider' => EmailProvider::GMAIL,
+        'provider_account_id' => 'gmail-reconnect-rebuild',
+    ]));
+    $social = new SocialiteUser;
+    $social->id = 'gmail-reconnect-rebuild';
+    $social->email = 'again@example.com';
+    $social->name = 'Demo';
+    $social->token = 'access-token';
+    $social->refreshToken = 'refresh-token';
+    $social->expiresIn = 3600;
+    $social->approvedScopes = ['https://www.googleapis.com/auth/gmail.readonly'];
+    Socialite::fake('gmail', $social);
+    bindMailboxOAuthWorkspace($user);
+
+    $this->get(route('email-accounts.callback', ['provider' => 'gmail']))->assertRedirect();
+
+    Bus::assertDispatched(QueuedCommand::class, fn (QueuedCommand $job): bool => $job->queue === 'imports'
+        && (fn (): array => $this->data)->call($job) === [
+            'email:backfill-conversations',
+            ['--force' => true, '--workspace' => $user->current_workspace_id],
+        ]);
+});
+
 it('dispatches history import when reconnecting a mailbox whose listing stopped', function (): void {
     Http::fake(['https://oauth2.googleapis.com/revoke' => Http::response()]);
     $user = User::factory()->withWorkspace()->create();
@@ -601,7 +634,9 @@ it('connects the mailbox to the workspace where authorization started after the 
     Socialite::fake('gmail', $social);
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
-        ->assertRedirect(EmailAccountsPage::getUrl([
+        ->assertRedirect(MailboxSharingPage::getUrl([
+            'mailbox' => ConnectedAccount::query()->where('workspace_id', $initiatingTeam->id)->where('email_address', 'bind@example.com')->sole()->id,
+            'return' => EmailAccountsPage::getUrl(['tenant' => $initiatingTeam->slug], panel: 'app'),
             'tenant' => $initiatingTeam->slug,
         ], panel: 'app'));
 

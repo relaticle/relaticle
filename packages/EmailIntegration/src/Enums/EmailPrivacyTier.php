@@ -35,6 +35,12 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
         };
     }
 
+    /** @return list<self> */
+    public function moreOpenTiers(): array
+    {
+        return array_values(array_filter(self::cases(), fn (self $tier): bool => $tier->openness() > $this->openness()));
+    }
+
     public static function opennessRanking(): string
     {
         $tiers = self::cases();
@@ -42,6 +48,12 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
         usort($tiers, fn (self $a, self $b): int => $a->openness() <=> $b->openness());
 
         return '{'.implode(',', array_map(fn (self $tier): string => $tier->value, $tiers)).'}';
+    }
+
+    /** @return list<self> */
+    public static function offeredAtConnect(): array
+    {
+        return [self::METADATA_ONLY, self::SUBJECT];
     }
 
     public function getLabel(): string

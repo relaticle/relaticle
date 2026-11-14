@@ -13,6 +13,9 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Session;
+use Livewire\Attributes\Validate;
+use Relaticle\EmailIntegration\Actions\UpdateEmailPreferences;
+use Relaticle\EmailIntegration\Enums\UndoSendWindow;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectedAccountActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConnectMailboxActions;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailFeatureFlag;
@@ -46,10 +49,26 @@ final class EmailAccountsPage extends Page
      */
     public Collection $connectedAccounts;
 
+    #[Validate('required|integer|in:5,10,20,30')]
+    public int $undoSendSeconds = 10;
+
     public function mount(): void
     {
         $this->sendErrorNotification();
         $this->connectedAccounts = $this->getAccounts();
+        $this->undoSendSeconds = UndoSendWindow::forUser($this->signedInUser())->value;
+    }
+
+    public function updatedUndoSendSeconds(): void
+    {
+        $this->validateOnly('undoSendSeconds');
+        resolve(UpdateEmailPreferences::class)->execute($this->signedInUser(), UndoSendWindow::from($this->undoSendSeconds));
+    }
+
+    private function signedInUser(): User
+    {
+        /** @var User */
+        return auth()->user();
     }
 
     /**

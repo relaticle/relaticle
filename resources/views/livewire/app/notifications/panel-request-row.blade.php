@@ -67,6 +67,20 @@
                     {{ __('notifications.panel.requests.deny') }}
                 </x-filament::button>
 
+                @foreach ($request['approvalOptions'] as $option => $label)
+                    <span x-data="{ option: @js($option), confirmation: @js(__('notifications.panel.requests.confirm_approval', ['action' => $label])) }">
+                        <x-filament::button
+                            size="xs"
+                            color="gray"
+                            x-on:click="if (confirm(confirmation)) act(() => $wire.approveRequest(kind, requestId, option), $el, '[data-inbox-approve]')"
+                            wire:loading.attr="disabled"
+                            wire:target="approveRequest, denyRequest"
+                        >
+                            {{ $label }}
+                        </x-filament::button>
+                    </span>
+                @endforeach
+
                 @if ($request['url'])
                     <a
                         {{ \Filament\Support\generate_href_html($request['url']) }}

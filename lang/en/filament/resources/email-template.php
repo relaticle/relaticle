@@ -20,7 +20,11 @@ return [
     ],
 
     'columns' => [
+        'name' => [
+            'label' => 'Name',
+        ],
         'subject' => [
+            'label' => 'Subject',
             'placeholder' => '—',
         ],
         'is_shared' => [
@@ -49,6 +53,9 @@ return [
         ],
         'delete' => [
             'label' => 'Delete',
+        ],
+        'bulk_delete' => [
+            'label' => 'Delete selected',
         ],
     ],
 ];

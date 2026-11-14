@@ -426,7 +426,7 @@ it('keeps reusable query predicates on their model as scopes', function (): void
         'Relaticle\SystemAdmin\Filament\Support\PivotSafeTableQuery::apply',
         'Relaticle\EmailIntegration\Services\PreferredEmailCopyService::restrictToVisiblePreferredCopies',
         'Relaticle\EmailIntegration\Services\EmailSearchService::applyToQuery',
-        'Relaticle\EmailIntegration\Services\EmailSearchService::whereSubjectVisibleTo',
+        'Relaticle\EmailIntegration\Services\EmailSearchService::whereVisibleAtTier',
         'Relaticle\EmailIntegration\Support\BlocklistDomainMatcher::constrainWhereExistsDomainMatch',
     ];
 

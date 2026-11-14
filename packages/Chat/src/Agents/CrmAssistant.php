@@ -57,12 +57,15 @@ use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
 use Relaticle\Chat\Tools\Email\GetEmailTool;
+use Relaticle\Chat\Tools\Email\LinkEmailsTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\RequestEmailAccessTool;
 use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
 use Relaticle\Chat\Tools\Email\RetryEmailTool;
 use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
 use Relaticle\Chat\Tools\Email\SendEmailTool;
+use Relaticle\Chat\Tools\Email\UnlinkEmailsTool;
 use Relaticle\Chat\Tools\Email\UpdateEmailDraftTool;
 use Relaticle\Chat\Tools\GetCreditBalanceTool;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
@@ -217,6 +220,8 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      */
     public bool $setupMode = false;
 
+    public bool $emailReviewMode = false;
+
     public bool $opensConversation = false;
 
     public MessageOrigin $origin = MessageOrigin::Typed;
@@ -271,6 +276,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
     public function withSetupMode(bool $setupMode): self
     {
         $this->setupMode = $setupMode;
+
+        return $this;
+    }
+
+    public function withEmailReviewMode(bool $emailReviewMode): self
+    {
+        $this->emailReviewMode = $emailReviewMode;
 
         return $this;
     }
@@ -1099,14 +1111,22 @@ PROMPT;
             DeleteCustomFieldTool::class,
         ];
 
-        if (! $this->setupMode) {
-            return $classes;
+        return array_values(array_filter($classes, $this->allowsTool(...)));
+    }
+
+    /** @param class-string<Tool> $class */
+    private function allowsTool(string $class): bool
+    {
+        if ($this->setupMode && in_array($class, self::SETUP_MODE_EXCLUDED_TOOLS, true)) {
+            return false;
         }
 
-        return array_values(array_filter(
-            $classes,
-            fn (string $class): bool => ! in_array($class, self::SETUP_MODE_EXCLUDED_TOOLS, true),
-        ));
+        return ! $this->emailReviewMode || ! in_array($class, [
+            SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class,
+            RetryEmailTool::class, DeleteEmailDraftTool::class, ChatDeleteCompanyTool::class, DeletePersonTool::class,
+            ChatDeleteOpportunityTool::class, ChatDeleteTaskTool::class, ChatDeleteNoteTool::class,
+            DeleteCustomFieldTool::class, InviteWorkspaceMemberTool::class, RemoveSampleDataTool::class,
+        ], true);
     }
 
     /**
@@ -1142,6 +1162,9 @@ PROMPT;
             CancelEmailTool::class,
             RescheduleEmailTool::class,
             RetryEmailTool::class,
+            LinkEmailsTool::class,
+            UnlinkEmailsTool::class,
+            RequestEmailAccessTool::class,
         ];
     }
 

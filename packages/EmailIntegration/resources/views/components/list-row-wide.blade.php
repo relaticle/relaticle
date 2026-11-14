@@ -9,7 +9,7 @@
     $from       = $email->from->first();
     $senderName = $from?->name ?: $from?->email_address ?: '?';
     $authUser   = auth()->user();
-    $categoryLabel = $email->categoryLabel();
+    $category = $email->systemCategory();
     $isReply    = filled($email->in_reply_to);
     $mailboxViaName = $email->mailboxViaName();
 
@@ -137,7 +137,7 @@
             {{ $participantLine }}
         </span>
 
-        @if ($canViewBody && (filled($snippet) || $categoryLabel !== null))
+        @if ($canViewBody && (filled($snippet) || $category !== null))
             <span class="mt-0.5 flex items-center justify-between gap-3">
                 @if (filled($snippet))
                     <span class="flex min-w-0 items-center gap-1 truncate text-xs leading-5 text-gray-500 dark:text-gray-400">
@@ -152,15 +152,15 @@
                     <span class="min-w-0 flex-1"></span>
                 @endif
 
-                @if ($categoryLabel !== null)
-                    <x-email-integration::category-badge :label="$categoryLabel->label" class="ml-auto" />
+                @if ($category !== null)
+                    <x-email-integration::category-badge :category="$category" class="ml-auto" />
                 @endif
             </span>
         @endif
 
         @if ($canRequestAccess)
             <x-email-integration::request-access-list-pill
-                :email="$email"
+                :email-id="$email->id"
                 :owner-name="$ownerName"
                 :requested="$hasPendingAccessRequest"
             />

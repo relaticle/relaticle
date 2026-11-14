@@ -404,6 +404,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->name('email:expire-access-requests')
                 ->withoutOverlapping()
                 ->onOneServer();
+
+            $schedule->command('email:check-mailbox-health')
+                ->everyFifteenMinutes()
+                ->name('email:check-mailbox-health')
+                ->withoutOverlapping()
+                ->onOneServer();
         }
 
         if (config('app.health_checks_enabled')) {

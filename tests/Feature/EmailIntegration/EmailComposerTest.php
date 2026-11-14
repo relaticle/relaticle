@@ -19,12 +19,14 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Actions\DeleteEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
+use Relaticle\EmailIntegration\Actions\UndoQueuedSend;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
@@ -40,6 +42,7 @@ use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailFollowUp;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
@@ -72,8 +75,106 @@ it('opens via the composer:open event with the default account preselected', fun
         ->assertSet('isOpen', false)
         ->dispatch('composer:open')
         ->assertSet('isOpen', true)
+        ->assertSet('isExpanded', false)
         ->assertSet('accountId', $this->account->id);
 });
+
+it('autosaves text and refuses a stale tab even when it closes', function (): void {
+    $first = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['ana@example.com'])
+        ->set('subject', 'Renewal pricing')
+        ->set('bodyHtml', '<p>First words</p>')
+        ->call('autosave')
+        ->assertSet('autosaveState', 'saved');
+    $id = $first->get('draftId');
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open', draftId: $id)
+        ->set('bodyHtml', '<p>Newer words from tab two</p>')
+        ->call('autosave')
+        ->assertSet('draftVersion', 1);
+
+    $first->set('bodyHtml', '<p>Stale text</p>')
+        ->call('autosave')
+        ->assertSet('autosaveState', 'stale')
+        ->call('close')
+        ->call('send')
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->findOrFail($id)->body->body_html)->toContain('Newer words from tab two')->not->toContain('Stale text');
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->exists())->toBeFalse();
+
+    $first->call('saveAsNewDraft')->assertSet('autosaveState', 'saved');
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->count())->toBe(2);
+    expect(Email::query()->findOrFail($first->get('draftId'))->body->body_html)->toContain('Stale text');
+});
+
+it('keeps blank compose out of drafts and reports a draft discarded elsewhere', function (): void {
+    $composer = Livewire::test(EmailComposer::class)->dispatch('composer:open')->call('autosave')->assertSet('draftId', null);
+    $composer->set('subject', 'Keep this text')->call('autosave');
+    resolve(DeleteEmailDraftAction::class)->execute($this->user, $composer->get('draftId'));
+
+    $composer->set('subject', 'Unsaved text')->call('autosave')->assertSet('autosaveState', 'gone');
+
+    expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
+});
+
+it('autosaves no bytes when only an upload is pending and keeps the file on close', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    $composer = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('attachments', [UploadedFile::fake()->create('pricing.pdf', 12)])
+        ->call('autosave')
+        ->assertSet('draftId', null)
+        ->call('close');
+
+    $draft = Email::query()->where('status', EmailStatus::DRAFT)->sole();
+    expect($draft->attachments()->sole()->filename)->toBe('pricing.pdf');
+});
+
+it('schedules at 8am in the sender zone across the autumn clock change', function (string $preset, string $expected): void {
+    $this->user->forceFill(['timezone' => 'Europe/Berlin'])->save();
+    $this->travelTo(Date::parse('2026-10-24 10:00:00', 'UTC'));
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['ana@example.com'])
+        ->set('subject', 'Berlin renewal')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('sendLater', $preset);
+
+    expect(Email::query()->where('subject', 'Berlin renewal')->sole()->scheduled_for->toIso8601String())->toBe($expected);
+})->with([
+    ['tomorrow', '2026-10-25T07:00:00+00:00'],
+    ['monday', '2026-10-26T07:00:00+00:00'],
+]);
+
+it('rejects a past send time and keeps the composer open', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('subject', 'Not yet')
+        ->call('sendAt', now()->subMinute()->toIso8601String())
+        ->assertHasErrors(['scheduledFor'])
+        ->assertSet('isOpen', true);
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->exists())->toBeFalse();
+});
+
+it('uses the personal undo window for interactive sends', function (int $seconds): void {
+    $this->user->update(['email_undo_seconds' => $seconds]);
+    $this->travelTo(now()->startOfSecond());
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['ana@example.com'])
+        ->set('subject', 'Personal undo window')
+        ->set('bodyHtml', '<p>Hello</p>')
+        ->call('send');
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->sole()->scheduled_for->equalTo(now()->addSeconds($seconds)))->toBeTrue();
+})->with([5, 10, 20, 30]);
 
 it('prefills to from the current page when compose opens without a payload', function (): void {
     Livewire::test(EmailComposer::class, ['pageTo' => 'jane@example.com'])
@@ -107,17 +208,78 @@ it('leaves to blank when the current page has no email', function (): void {
         ->assertSet('to', []);
 });
 
-it('puts merge tags last on the message toolbar instead of the footer', function (): void {
-    $html = Livewire::test(EmailComposer::class)
+it('shows a short toolbar with separate image and file attachment controls', function (): void {
+    Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
-        ->html();
+        ->assertSee(__('filament/emails/composer.actions.insert_image'))
+        ->assertSee(__('filament/emails/composer.actions.attach_file'))
+        ->assertDontSee("togglePanel('mergeTags')");
+});
 
-    expect($html)
-        ->toContain("togglePanel('mergeTags')")
-        ->not->toContain(__('filament/emails/composer.actions.variable'));
+it('blocks unknown variables and asks before sending an empty variable', function (): void {
+    $composer = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['ana@example.test'])
+        ->set('subject', 'Renewal')
+        ->set('bodyHtml', '<p>{{ person.unknown }}</p>')
+        ->call('send')
+        ->assertHasErrors(['bodyHtml']);
 
-    expect(strpos($html, "togglePanel('mergeTags')"))
-        ->toBeGreaterThan(strpos($html, 'redo().run()'));
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->exists())->toBeFalse();
+
+    $composer->set('bodyHtml', '<p>{{ person.job_title }}</p>')
+        ->call('send')
+        ->assertSet('variableWarning', ['person.job_title' => ['ana@example.test']])
+        ->assertActionMounted('confirmEmptyVariables');
+
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->exists())->toBeFalse();
+
+    $composer->callMountedAction()->assertHasNoErrors();
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(1);
+});
+
+it('keeps a variable chip through autosave and resolves its escaped fallback on send', function (): void {
+    $composer = Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['ana@example.test'])
+        ->set('subject', 'Renewal')
+        ->set('bodyHtml', '<p>Hi <span data-type="emailVariable" data-code="person.job_title" data-fallback="team &amp; partners">{{ person.job_title | team &amp; partners }}</span></p>')
+        ->call('autosave')
+        ->call('reloadDraft');
+
+    expect(Email::query()->findOrFail($composer->get('draftId'))->body->body_html)
+        ->toContain('data-type="emailVariable"', 'team &amp; partners');
+
+    $composer->call('send')->assertHasNoErrors();
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->sole()->body->body_html)
+        ->toContain('Hi team &amp; partners')->not->toContain('emailVariable', '{{');
+});
+
+it('creates a follow-up in three business days and removes it when the send is undone', function (): void {
+    $this->travelTo(Date::parse('2026-11-12 18:00:00', 'UTC'));
+    $this->user->update(['timezone' => 'America/Los_Angeles']);
+
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('to', ['ana@example.test'])
+        ->set('subject', 'Renewal')
+        ->set('bodyHtml', '<p>Shall we renew?</p>')
+        ->set('followUp', true)
+        ->call('send')->assertHasNoErrors();
+
+    $email = Email::query()->where('status', EmailStatus::QUEUED)->sole();
+    $followUp = EmailFollowUp::query()->sole();
+    $task = $followUp->task->load('customFieldValues.customField');
+    $due = CustomField::query()->where('entity_type', 'task')->where('code', 'due_date')->sole();
+    expect($task->title)->toBe('Follow up: Renewal');
+    expect($task->getCustomFieldValue($due)->utc()->format('Y-m-d H:i:s'))->toBe('2026-11-17 16:00:00');
+    expect($task->assignees->modelKeys())->toBe([$this->user->getKey()]);
+
+    resolve(UndoQueuedSend::class)->execute($this->user, $email->getKey());
+
+    $this->assertSoftDeleted($task);
+    $this->assertModelMissing($followUp);
+    expect($email->refresh()->status)->toBe(EmailStatus::DRAFT);
 });
 
 it('opens the composer on a grant permission empty state when the mailbox cannot send', function (): void {
@@ -136,7 +298,7 @@ it('opens the composer on a grant permission empty state when the mailbox cannot
         ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
         ->assertSee(__('filament/emails/composer.grant_send.description'))
         ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
-        ->assertDontSee(__('filament/emails/composer.actions.send'))
+        ->assertDontSeeText(__('filament/emails/composer.actions.send'))
         ->assertDontSee(__('filament/emails/composer.fields.subject_placeholder'));
 });
 
@@ -168,7 +330,7 @@ it('opens the grant permission empty state when a sync-error mailbox still has s
         ->assertSet('accountId', $this->account->id)
         ->assertSee(__('filament/emails/composer.grant_send.heading', ['email' => $this->account->email_address]))
         ->assertSee(__('filament/emails/composer.actions.grant_send.label'))
-        ->assertDontSee(__('filament/emails/composer.actions.send'));
+        ->assertDontSeeText(__('filament/emails/composer.actions.send'));
 });
 
 it('redirects to oauth when grant permission is clicked on a mailbox that needs reconnect', function (): void {
@@ -500,7 +662,7 @@ it('offers undo on the queued toast for the undo window', function (): void {
         ->firstWhere('title', __('filament/concerns/email-compose.notifications.queued.title'));
 
     expect($notification)->not->toBeNull()
-        ->and($notification['duration'])->toBe(5_000)
+        ->and($notification['duration'])->toBe(10_000)
         ->and(collect($notification['actions'])->pluck('name')->all())->toContain('undo');
 
     expect(collect($notification['actions'])->firstWhere('name', 'undo'))
@@ -792,9 +954,9 @@ it('notifies when an inline reply draft is saved on dismiss', function (): void 
 
 it('subscribes each dock only to the events it answers', function (): void {
     expect(Livewire::test(EmailComposer::class)->effects['listeners'])
-        ->toBe(['composer:open'])
+        ->toBe(['composer:open', 'composer:flush-autosave', 'composer:rela-started', 'composer:rela-finished'])
         ->and(Livewire::test(EmailComposer::class, ['dock' => 'inline'])->effects['listeners'])
-        ->toBe(['composer:reply', 'composer:dismiss-inline', 'composer:resume-draft']);
+        ->toBe(['composer:reply', 'composer:dismiss-inline', 'composer:resume-draft', 'composer:flush-autosave', 'composer:rela-started', 'composer:rela-finished']);
 });
 
 it('opens a saved draft that has no body', function (): void {
@@ -875,7 +1037,7 @@ it('does not load another user\'s draft into the composer', function (): void {
         ->assertSet('to', []);
 });
 
-it('closes and queues exactly once even when the draft row was already deleted before send completes', function (): void {
+it('keeps the text recoverable without sending a draft already removed elsewhere', function (): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
         ->set('to', ['x@example.com'])
@@ -889,14 +1051,13 @@ it('closes and queues exactly once even when the draft row was already deleted b
         ->dispatch('composer:open', draftId: $draft->id)
         ->assertSet('draftId', $draft->id);
 
-    // Simulate a second tab on the same draft (or a retried request) having
-    // already cleaned it up by the time this instance's send() runs.
     Email::query()->whereKey($draft->id)->forceDelete();
 
     $reopened->call('send')
-        ->assertSet('isOpen', false);
+        ->assertSet('isOpen', true)
+        ->assertSet('autosaveState', 'gone');
 
-    expect(Email::query()->where('status', EmailStatus::QUEUED)->where('subject', 'Racing draft')->count())->toBe(1);
+    expect(Email::query()->where('status', EmailStatus::QUEUED)->where('subject', 'Racing draft')->count())->toBe(0);
 });
 
 it('does not load a draft that belongs to a different team of the same user', function (): void {
@@ -1419,14 +1580,10 @@ it('does not copy another user\'s saved draft attachment from client-controlled 
             'size' => 6,
         ]])
         ->call('send')
-        ->assertHasNoErrors();
+        ->assertSet('autosaveState', 'gone');
 
-    $email = Email::query()
-        ->where('subject', 'Forged saved attachment')
-        ->where('status', EmailStatus::QUEUED)
-        ->sole();
-
-    expect($email->attachments)->toHaveCount(0);
+    expect(Email::query()->where('subject', 'Forged saved attachment')->where('status', EmailStatus::QUEUED)->exists())->toBeFalse();
+    expect($foreignDraft->fresh()->attachments->modelKeys())->toBe([$foreignAttachment->getKey()]);
 });
 
 it('does not copy another email\'s attachments from client-controlled forward state', function (): void {
@@ -2049,7 +2206,7 @@ it('saves a template from the composer with the templates page message editor', 
             ];
 
             return $fromTemplates['panel'] === null
-                && in_array('mergeTags', Arr::flatten($fromTemplates['toolbar']), true);
+                && ! in_array('mergeTags', Arr::flatten($fromTemplates['toolbar']), true);
         });
 
     Livewire::test(EmailComposer::class)
@@ -2260,6 +2417,8 @@ function teammateSentEmailReturningEmail(
         'email_address' => $address,
         'role' => $role,
     ]);
+
+    Company::factory()->create(['workspace_id' => $viewer->current_workspace_id])->emails()->attach($email->id);
 
     return $email;
 }

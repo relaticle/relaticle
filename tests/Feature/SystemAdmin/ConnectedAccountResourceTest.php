@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Laravel\Pennant\Feature;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
+use Relaticle\EmailIntegration\Enums\MailboxHealth;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\SystemAdmin\Filament\Resources\ConnectedAccountResource;
 use Relaticle\SystemAdmin\Filament\Resources\ConnectedAccountResource\Pages\ListConnectedAccounts;
@@ -53,8 +54,8 @@ it('filters to mailboxes that failed, need sign-in or stopped syncing', function
     $disconnected = syncedMailbox(['status' => EmailAccountStatus::DISCONNECTED, 'last_synced_at' => now()->subDays(3)]);
     $failed = syncedMailbox(['status' => EmailAccountStatus::ERROR, 'last_error' => 'Token refresh failed']);
     $needsSignIn = syncedMailbox(['status' => EmailAccountStatus::REAUTH_REQUIRED]);
-    $late = syncedMailbox(['last_synced_at' => now()->subMinutes(61)]);
-    $neverSynced = syncedMailbox(['last_synced_at' => null]);
+    $late = ConnectedAccount::factory()->health(MailboxHealth::Stale)->create(['sync_cursor' => 'cursor', 'last_synced_at' => now()->subDays(2)]);
+    $neverSynced = ConnectedAccount::factory()->health(MailboxHealth::Stale)->create(['sync_cursor' => 'cursor', 'last_synced_at' => null]);
 
     livewire(ListConnectedAccounts::class)
         ->filterTable('needs_attention')
@@ -62,12 +63,15 @@ it('filters to mailboxes that failed, need sign-in or stopped syncing', function
         ->assertCanNotSeeTableRecords([$healthy, $importing, $disconnected]);
 });
 
-it('keeps a mailbox that synced within the hour out of the attention list', function (): void {
-    $onTime = syncedMailbox(['last_synced_at' => now()->subMinutes(59)]);
+it('keeps healthy and billing-paused mailboxes out of the attention list', function (): void {
+    $healthy = syncedMailbox(['last_synced_at' => now()->subDays(3)]);
+    $paused = ConnectedAccount::factory()->health(MailboxHealth::PausedBilling)->create(['sync_cursor' => 'cursor', 'last_synced_at' => now()->subDays(9)]);
+    $stale = ConnectedAccount::factory()->health(MailboxHealth::Stale)->create(['sync_cursor' => 'cursor']);
 
     livewire(ListConnectedAccounts::class)
         ->filterTable('needs_attention')
-        ->assertCanNotSeeTableRecords([$onTime]);
+        ->assertCanSeeTableRecords([$stale])
+        ->assertCanNotSeeTableRecords([$healthy, $paused]);
 });
 
 it('filters mailboxes by status', function (): void {

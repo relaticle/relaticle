@@ -21,6 +21,8 @@ use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\Company\CreateCompanyTool as McpCreateCompany;
 use App\Mcp\Tools\Company\GetCompanyTool as McpGetCompany;
 use App\Mcp\Tools\Company\ListCompaniesTool as McpListCompanies;
+use App\Mcp\Tools\Email\LinkEmailsTool as McpLinkEmails;
+use App\Mcp\Tools\Email\UnlinkEmailsTool as McpUnlinkEmails;
 use App\Mcp\Tools\GetCrmSchemaTool;
 use App\Mcp\Tools\Note\CreateNoteTool as McpCreateNote;
 use App\Mcp\Tools\Note\GetNoteTool as McpGetNote;
@@ -54,6 +56,8 @@ use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompany;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompany;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompanies;
+use Relaticle\Chat\Tools\Email\LinkEmailsTool as ChatLinkEmails;
+use Relaticle\Chat\Tools\Email\UnlinkEmailsTool as ChatUnlinkEmails;
 use Relaticle\Chat\Tools\Note\CreateNoteTool as ChatCreateNote;
 use Relaticle\Chat\Tools\Note\GetNoteTool as ChatGetNote;
 use Relaticle\Chat\Tools\Note\ListNotesTool as ChatListNotes;
@@ -512,3 +516,17 @@ it('describes the real shape of filterable_fields in the mcp list tool', functio
     expect($description)->toContain('filterable_fields.custom_fields', 'filterable_fields.types')
         ->and($description)->not->toContain('with their operators and options');
 })->with(array_map(fn (array $row): array => [$row[8]], crmSurfaces()));
+
+it('accepts the same email link fields on chat and mcp', function (string $chatTool, string $mcpTool): void {
+    $factory = new JsonSchemaTypeFactory;
+    $chatItem = resolve($chatTool)->schema($factory)['records']->toArray()['items'];
+    $mcpItem = resolve($mcpTool)->schema($factory)['links']->toArray()['items'];
+
+    expect(array_keys($chatItem['properties']))->toBe(['email_id', 'record_type', 'record_id'])
+        ->toEqual(array_keys($mcpItem['properties']))
+        ->and($chatItem['properties']['record_type']['enum'])->toEqual($mcpItem['properties']['record_type']['enum'])
+        ->and($chatItem['required'])->toEqualCanonicalizing($mcpItem['required']);
+})->with([
+    'link' => [ChatLinkEmails::class, McpLinkEmails::class],
+    'unlink' => [ChatUnlinkEmails::class, McpUnlinkEmails::class],
+]);

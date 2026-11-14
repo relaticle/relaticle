@@ -24,7 +24,7 @@
     $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
     $maxBatchSize = (int) config('chat.max_batch_size');
     $maxPlanSteps = (int) config('chat.max_plan_steps');
-    $undoSeconds = (int) config('email-integration.outbox.undo_send_window_seconds');
+    $undoSeconds = \Relaticle\EmailIntegration\Enums\UndoSendWindow::Ten->value;
     // Rendered as a human duration so raising the config never leaks "1440 minutes" into the page.
     $pendingActionExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))
         ->cascade()
