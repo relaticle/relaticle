@@ -88,7 +88,8 @@ final readonly class SentryEventScrubber
     private static function mask(string $url, Route $route): string
     {
         $path = (string) parse_url($url, PHP_URL_PATH);
-        $segments = explode('/', $path);
+        $trimmed = rtrim($path, '/');
+        $segments = explode('/', $trimmed);
         $routeSegments = explode('/', '/'.$route->uri());
 
         if (count($segments) !== count($routeSegments)) {
@@ -103,6 +104,6 @@ final readonly class SentryEventScrubber
             }
         }
 
-        return str_replace($path, implode('/', $segments), $url);
+        return str_replace($path, implode('/', $segments).substr($path, strlen($trimmed)), $url);
     }
 }

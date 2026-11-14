@@ -161,6 +161,7 @@ it('masks secret path parameters in the url and keeps other parameters', functio
     'invitation' => ['GET', '/invitations/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii', '/invitations/{token}', 'iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'],
     'invitation account switch' => ['POST', '/invitations/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii/switch-account', '/invitations/{token}/switch-account', 'iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'],
     'join link' => ['GET', '/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj', '/join/{token}', 'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj'],
+    'join link with trailing slash' => ['GET', '/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj/', '/join/{token}/', 'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj'],
     'email change' => ['GET', '/app/email-change-verification/verify/42/new%40example.com', '/app/email-change-verification/verify/42/{email}', 'new%40example.com'],
     'email verification' => ['GET', '/email/verify/42/hash-secret', '/email/verify/42/{hash}', 'hash-secret'],
     'panel email verification' => ['GET', '/app/email-verification/verify/42/hash-secret', '/app/email-verification/verify/42/{hash}', 'hash-secret'],
@@ -176,6 +177,7 @@ it('masks the path token of a referer and filters its query', function (string $
     'join' => ['https://relaticle.test/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj?x=1', 'https://relaticle.test/join/{token}?x=1'],
     'invitation' => ['https://relaticle.test/invitations/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii', 'https://relaticle.test/invitations/{token}'],
     'reset query' => ['https://relaticle.test/app/password-reset/reset?token=reset-secret', 'https://relaticle.test/app/password-reset/reset?token=[Filtered]'],
+    'join with trailing slash' => ['https://relaticle.test/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj/', 'https://relaticle.test/join/{token}/'],
     'other host' => ['https://example.org/join/not-ours', 'https://example.org/join/not-ours'],
 ]);
 
