@@ -20,12 +20,11 @@ use Filament\Schemas\Components\Component;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentView;
-use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ValidationException;
+use Illuminate\View\View;
 
 final class MergeRecordAction extends Action
 {
@@ -43,7 +42,7 @@ final class MergeRecordAction extends Action
             ->authorize(fn (Model $record): bool => ($record instanceof Company || $record instanceof People)
                 && Gate::allows('update', $record)
                 && Gate::allows('delete', $record))
-            ->modalHeading(fn (): Htmlable => $this->heading())
+            ->modalHeading(fn (): View => $this->heading())
             ->modalWidth(Width::FourExtraLarge)
             ->stickyModalFooter()
             ->modalFooterActionsAlignment(Alignment::End)
@@ -70,15 +69,15 @@ final class MergeRecordAction extends Action
             });
     }
 
-    private function heading(): Htmlable
+    private function heading(): View
     {
         $subject = $this->subject();
 
-        return new HtmlString(view('filament.app.merge-record.heading', [
+        return view('filament.app.merge-record.heading', [
             'name' => $subject->name,
             'logo' => $subject instanceof HasAvatar ? $subject->getFilamentAvatarUrl() : null,
             'icon' => CrmEntity::tryFromModel($subject)?->icon(),
-        ])->render());
+        ]);
     }
 
     private function submitButton(Action $action): Action
