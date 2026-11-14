@@ -68,32 +68,19 @@ final readonly class RecordCommunicationMetrics
     public function combineMergedRecords(Company|People $kept, Company|People $duplicate, Collection $sharedEmails, int $sharedMeetings): void
     {
         $sharedInbound = $sharedEmails->where('direction', EmailDirection::INBOUND)->count();
-        $table = $kept->getTable();
 
-        $summed = fn (string $column): string => "GREATEST(0, {$column} + (select {$column} from {$table} where id = ?) - ?)";
-        $latest = fn (string $column): string => "GREATEST({$column}, (select {$column} from {$table} where id = ?))";
+        $summed = fn (string $column, int $shared): int => max(0, (int) $kept->getAttribute($column) + (int) $duplicate->getAttribute($column) - $shared);
+        $latest = fn (string $column): ?CarbonInterface => collect([$kept->getAttribute($column), $duplicate->getAttribute($column)])->filter()->max();
 
-        DB::update(
-            "update {$table} set "
-            .'email_count = '.$summed('email_count').', '
-            .'inbound_email_count = '.$summed('inbound_email_count').', '
-            .'outbound_email_count = '.$summed('outbound_email_count').', '
-            .'meeting_count = '.$summed('meeting_count').', '
-            .'last_email_at = '.$latest('last_email_at').', '
-            .'last_interaction_at = '.$latest('last_interaction_at').', '
-            .'last_meeting_at = '.$latest('last_meeting_at').' '
-            .'where id = ?',
-            [
-                $duplicate->getKey(), $sharedEmails->count(),
-                $duplicate->getKey(), $sharedInbound,
-                $duplicate->getKey(), $sharedEmails->count() - $sharedInbound,
-                $duplicate->getKey(), $sharedMeetings,
-                $duplicate->getKey(),
-                $duplicate->getKey(),
-                $duplicate->getKey(),
-                $kept->getKey(),
-            ],
-        );
+        DB::table($kept->getTable())->where('id', $kept->getKey())->update([
+            'email_count' => $summed('email_count', $sharedEmails->count()),
+            'inbound_email_count' => $summed('inbound_email_count', $sharedInbound),
+            'outbound_email_count' => $summed('outbound_email_count', $sharedEmails->count() - $sharedInbound),
+            'meeting_count' => $summed('meeting_count', $sharedMeetings),
+            'last_email_at' => $latest('last_email_at'),
+            'last_interaction_at' => $latest('last_interaction_at'),
+            'last_meeting_at' => $latest('last_meeting_at'),
+        ]);
     }
 
     /**
