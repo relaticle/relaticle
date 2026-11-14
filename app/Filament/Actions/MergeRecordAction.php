@@ -48,7 +48,6 @@ final class MergeRecordAction extends Action
             ->stickyModalFooter()
             ->modalFooterActionsAlignment(Alignment::End)
             ->modalSubmitAction(fn (Action $action): Action => $this->submitButton($action))
-            ->modalCancelAction(fn (Action $action): Action => $action->label($this->buttonLabel($this->getModalCancelActionLabel(), __('filament/record-page.merge.keys.escape'))))
             ->schema([
                 MergeRecordPicker::make('duplicate_id'),
                 Hidden::make('keep')->default('current'),
@@ -87,16 +86,11 @@ final class MergeRecordAction extends Action
         return $action
             ->disabled($this->picker()->isBlocked())
             ->icon('lucide-merge')
-            ->label($this->buttonLabel(__('filament/record-page.merge.submit'), __('filament/record-page.merge.keys.enter'), onPrimary: true))
+            ->label(__('filament/record-page.merge.submit'))
             ->extraAttributes([
                 'class' => 'aria-disabled:pointer-events-auto aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
                 'x-on:click' => "if (\$el.getAttribute('aria-disabled') === 'true') { \$event.preventDefault(); \$event.stopImmediatePropagation() }",
             ]);
-    }
-
-    private function buttonLabel(string $label, string $key, bool $onPrimary = false): Htmlable
-    {
-        return new HtmlString(view('filament.app.merge-record.button-label', ['label' => $label, 'key' => $key, 'onPrimary' => $onPrimary])->render());
     }
 
     /**
