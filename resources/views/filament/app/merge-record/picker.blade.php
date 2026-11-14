@@ -47,7 +47,9 @@
 
             const sheet = $refs.trigger.closest('.fi-modal-window')
 
-            while (sheet?.classList.contains('fi-transition-enter')) {
+            const giveUp = performance.now() + 600
+
+            while (sheet?.classList.contains('fi-transition-enter') && performance.now() < giveUp) {
                 await new Promise(requestAnimationFrame)
             }
 
