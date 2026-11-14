@@ -18,8 +18,6 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\Workspace;
-use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Arr;
@@ -44,22 +42,6 @@ afterEach(function (): void {
     TenantContextService::setTenantId(null);
 });
 
-function mergePersonAction(): TestAction
-{
-    return TestAction::make('mergeRecord')->schemaComponent('recordActions', schema: 'infolist');
-}
-
-function mergePerson(Workspace $workspace, User $owner, array $attributes = [], array $customFields = []): People
-{
-    $person = People::factory()->recycle([$owner, $workspace])->create($attributes);
-
-    foreach ($customFields as $code => $value) {
-        $person->saveCustomFieldValue(WorkspaceCustomField::byCode($workspace->getKey(), 'people', $code), $value);
-    }
-
-    return $person;
-}
-
 function mergePersonValue(People $person, string $code): mixed
 {
     $person = People::withTrashed()->with('customFieldValues.customField')->findOrFail($person->getKey());
@@ -70,17 +52,12 @@ function mergePersonValue(People $person, string $code): mixed
 function mergePeopleWith(People $kept, People $duplicate, string $keep = 'current'): mixed
 {
     return livewire(ViewPeople::class, ['record' => $kept->getKey()])
-        ->callAction(mergePersonAction(), data: ['duplicate_id' => $duplicate->getKey(), 'keep' => $keep]);
-}
-
-function mergePersonLinkedIds(string $table, string $itemColumn, string $morphColumn, People $person): array
-{
-    return DB::table($table)->where($morphColumn.'_type', 'people')->where($morphColumn.'_id', $person->getKey())->pluck($itemColumn)->sort()->values()->all();
+        ->callAction(mergeRecordAction(), data: ['duplicate_id' => $duplicate->getKey(), 'keep' => $keep]);
 }
 
 it('combines emails with the kept person first and without repeats', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'dana@gmail.com']]);
-    $duplicate = mergePerson($this->workspace, $this->user, ['name' => 'Dana W.'], ['emails' => ['dana@gmail.com', 'whitfield@outlook.com']]);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'dana@gmail.com']]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.'], ['emails' => ['dana@gmail.com', 'whitfield@outlook.com']]);
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
@@ -91,8 +68,8 @@ it('combines emails with the kept person first and without repeats', function ()
 });
 
 it('blocks a merge that would give a person more than five emails', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
-    $duplicate = mergePerson($this->workspace, $this->user, [], ['emails' => ['b1@x.com', 'b2@x.com', 'b3@x.com']]);
+    $kept = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['b1@x.com', 'b2@x.com', 'b3@x.com']]);
 
     mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['duplicate_id']);
 
@@ -101,8 +78,8 @@ it('blocks a merge that would give a person more than five emails', function ():
 });
 
 it('keeps the phone number of the kept person where both hold one', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, [], ['phone_number' => ['+14155550101']]);
-    $duplicate = mergePerson($this->workspace, $this->user, [], ['phone_number' => ['+14155550199'], 'job_title' => 'VP Sales']);
+    $kept = mergePersonRecord($this->workspace, $this->user, [], ['phone_number' => ['+14155550101']]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['phone_number' => ['+14155550199'], 'job_title' => 'VP Sales']);
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
@@ -113,10 +90,10 @@ it('keeps the phone number of the kept person where both hold one', function ():
 it('fills the company from the duplicate only when the kept person has none', function (): void {
     $acme = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
     $globex = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Globex']);
-    $withoutCompany = mergePerson($this->workspace, $this->user);
-    $withCompany = mergePerson($this->workspace, $this->user, ['company_id' => $acme->getKey()]);
-    $duplicateOne = mergePerson($this->workspace, $this->user, ['company_id' => $globex->getKey()]);
-    $duplicateTwo = mergePerson($this->workspace, $this->user, ['company_id' => $globex->getKey()]);
+    $withoutCompany = mergePersonRecord($this->workspace, $this->user);
+    $withCompany = mergePersonRecord($this->workspace, $this->user, ['company_id' => $acme->getKey()]);
+    $duplicateOne = mergePersonRecord($this->workspace, $this->user, ['company_id' => $globex->getKey()]);
+    $duplicateTwo = mergePersonRecord($this->workspace, $this->user, ['company_id' => $globex->getKey()]);
 
     mergePeopleWith($withoutCompany, $duplicateOne)->assertHasNoActionErrors();
     mergePeopleWith($withCompany, $duplicateTwo)->assertHasNoActionErrors();
@@ -128,8 +105,8 @@ it('fills the company from the duplicate only when the kept person has none', fu
 it('treats the kept person\'s soft-deleted company as empty and takes the duplicate\'s live company', function (bool $duplicateHasCompany): void {
     $gone = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $live = Company::factory()->recycle([$this->user, $this->workspace])->create();
-    $kept = mergePerson($this->workspace, $this->user, ['company_id' => $gone->getKey()]);
-    $duplicate = mergePerson($this->workspace, $this->user, ['company_id' => $duplicateHasCompany ? $live->getKey() : null]);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['company_id' => $gone->getKey()]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, ['company_id' => $duplicateHasCompany ? $live->getKey() : null]);
     $gone->delete();
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
@@ -141,16 +118,16 @@ it('treats the kept person\'s soft-deleted company as empty and takes the duplic
 function mergePersonDialog(People $kept, string $search): string
 {
     $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
-        ->mountAction(mergePersonAction())
+        ->mountAction(mergeRecordAction())
         ->setActionData(['search' => $search]);
 
     return implode('', Arr::where($page->effects['partials'], fn (string $html, string $key): bool => str_starts_with($key, 'action-modals')));
 }
 
 it('finds a person by name or by any of their emails', function (string $term, array $found): void {
-    $kept = mergePerson($this->workspace, $this->user, ['name' => 'Kept']);
-    mergePerson($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'whitfield@outlook.com']]);
-    mergePerson($this->workspace, $this->user, ['name' => 'Sam Rivera'], ['emails' => ['sam@northwind.com']]);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'whitfield@outlook.com']]);
+    mergePersonRecord($this->workspace, $this->user, ['name' => 'Sam Rivera'], ['emails' => ['sam@northwind.com']]);
 
     $dialog = mergePersonDialog($kept, $term);
 
@@ -165,8 +142,8 @@ it('finds a person by name or by any of their emails', function (string $term, a
 ]);
 
 it('keeps the other person when the member swaps the two', function (): void {
-    $current = mergePerson($this->workspace, $this->user, ['name' => 'Sam'], ['emails' => ['sam@one.com']]);
-    $other = mergePerson($this->workspace, $this->user, ['name' => 'Samuel'], ['emails' => ['samuel@two.com']]);
+    $current = mergePersonRecord($this->workspace, $this->user, ['name' => 'Sam'], ['emails' => ['sam@one.com']]);
+    $other = mergePersonRecord($this->workspace, $this->user, ['name' => 'Samuel'], ['emails' => ['samuel@two.com']]);
 
     mergePeopleWith($current, $other, 'other')
         ->assertHasNoActionErrors()
@@ -178,8 +155,8 @@ it('keeps the other person when the member swaps the two', function (): void {
 });
 
 it('moves the duplicate\'s notes and tasks and keeps a shared one once', function (): void {
-    $kept = mergePerson($this->workspace, $this->user);
-    $duplicate = mergePerson($this->workspace, $this->user);
+    $kept = mergePersonRecord($this->workspace, $this->user);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
     [$onlyDuplicate, $shared, $onlyKept] = Note::factory()->count(3)->recycle([$this->user, $this->workspace])->create()->all();
     [$taskOnDuplicate, $sharedTask] = Task::factory()->count(2)->recycle([$this->user, $this->workspace])->create()->all();
     $duplicate->notes()->attach([$onlyDuplicate->getKey(), $shared->getKey()]);
@@ -189,16 +166,16 @@ it('moves the duplicate\'s notes and tasks and keeps a shared one once', functio
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergePersonLinkedIds('noteables', 'note_id', 'noteable', $kept))->toBe(collect([$onlyDuplicate, $shared, $onlyKept])->map->getKey()->sort()->values()->all())
-        ->and(mergePersonLinkedIds('taskables', 'task_id', 'taskable', $kept))->toBe(collect([$taskOnDuplicate, $sharedTask])->map->getKey()->sort()->values()->all())
-        ->and(mergePersonLinkedIds('noteables', 'note_id', 'noteable', $duplicate))->toBe([])
-        ->and(mergePersonLinkedIds('taskables', 'task_id', 'taskable', $duplicate))->toBe([]);
+    expect(mergeLinkedIds('noteables', 'note_id', $kept))->toBe(collect([$onlyDuplicate, $shared, $onlyKept])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('taskables', 'task_id', $kept))->toBe(collect([$taskOnDuplicate, $sharedTask])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([])
+        ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([]);
 });
 
 it('moves the opportunities the duplicate is the point of contact for', function (): void {
-    $kept = mergePerson($this->workspace, $this->user);
-    $duplicate = mergePerson($this->workspace, $this->user);
-    $bystander = mergePerson($this->workspace, $this->user);
+    $kept = mergePersonRecord($this->workspace, $this->user);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
+    $bystander = mergePersonRecord($this->workspace, $this->user);
     $theirs = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
     $mine = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $kept->getKey()]);
     $other = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $bystander->getKey()]);
@@ -211,8 +188,8 @@ it('moves the opportunities the duplicate is the point of contact for', function
 });
 
 it('moves the duplicate\'s history to the kept person and adds a merged entry', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
-    $duplicate = mergePerson($this->workspace, $this->user, ['name' => 'Dana W.']);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.']);
     $duplicate->update(['name' => 'Dana W']);
     $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->pluck('id');
 
@@ -228,8 +205,8 @@ it('moves the duplicate\'s history to the kept person and adds a merged entry', 
 });
 
 it('makes the kept person real data when the duplicate was real', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, ['creation_source' => CreationSource::SAMPLE]);
-    $duplicate = mergePerson($this->workspace, $this->user, ['creation_source' => CreationSource::WEB]);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['creation_source' => CreationSource::SAMPLE]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, ['creation_source' => CreationSource::WEB]);
 
     mergePeopleWith($kept, $duplicate);
 
@@ -241,33 +218,33 @@ it('makes the kept person real data when the duplicate was real', function (): v
 });
 
 it('hides merge from a member who cannot update and delete the person', function (): void {
-    $person = mergePerson($this->workspace, $this->user);
+    $person = mergePersonRecord($this->workspace, $this->user);
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
     $viewer->switchWorkspace($this->workspace);
     $this->actingAs($viewer);
 
-    livewire(ViewPeople::class, ['record' => $person->getKey()])->assertActionHidden(mergePersonAction());
+    livewire(ViewPeople::class, ['record' => $person->getKey()])->assertActionHidden(mergeRecordAction());
 });
 
 it('offers merge to a member who can update and delete the person', function (): void {
-    $person = mergePerson($this->workspace, $this->user);
+    $person = mergePersonRecord($this->workspace, $this->user);
 
-    livewire(ViewPeople::class, ['record' => $person->getKey()])->assertActionVisible(mergePersonAction());
+    livewire(ViewPeople::class, ['record' => $person->getKey()])->assertActionVisible(mergeRecordAction());
 });
 
 it('does not offer merge on an opportunity', function (): void {
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
 
-    livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])->assertActionHidden(mergePersonAction());
+    livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])->assertActionHidden(mergeRecordAction());
 });
 
 it('refuses the current person, a trashed person and another workspace\'s person', function (string $case): void {
-    $kept = mergePerson($this->workspace, $this->user, ['name' => 'Kept']);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Kept']);
     $foreignOwner = User::factory()->withWorkspace()->create();
     $forged = match ($case) {
         'itself' => $kept,
-        'trashed' => tap(mergePerson($this->workspace, $this->user), fn (People $person) => $person->delete()),
+        'trashed' => tap(mergePersonRecord($this->workspace, $this->user), fn (People $person) => $person->delete()),
         'other workspace' => People::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create(),
     };
 
@@ -278,11 +255,11 @@ it('refuses the current person, a trashed person and another workspace\'s person
 })->with(['itself', 'trashed', 'other workspace']);
 
 it('shows the unavailable error when the duplicate is deleted after it was picked in the dialog', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, ['name' => 'Kept']);
-    $duplicate = mergePerson($this->workspace, $this->user, [], ['job_title' => 'VP Sales']);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['job_title' => 'VP Sales']);
 
     $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
-        ->mountAction(mergePersonAction())
+        ->mountAction(mergeRecordAction())
         ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
     $duplicate->delete();
     $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
@@ -292,11 +269,11 @@ it('shows the unavailable error when the duplicate is deleted after it was picke
 });
 
 it('shows the unavailable error when the duplicate disappears while the merge starts', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, ['name' => 'Kept']);
-    $duplicate = mergePerson($this->workspace, $this->user);
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
 
     $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
-        ->mountAction(mergePersonAction())
+        ->mountAction(mergeRecordAction())
         ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
     Event::listen(TransactionBeginning::class, fn (): int => DB::table('people')->where('id', $duplicate->getKey())->update(['deleted_at' => now()]));
     $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
@@ -306,8 +283,8 @@ it('shows the unavailable error when the duplicate disappears while the merge st
 });
 
 it('counts emails case-insensitively before applying the limit', function (): void {
-    $kept = mergePerson($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
-    $duplicate = mergePerson($this->workspace, $this->user, [], ['emails' => ['A1@X.com', ' a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com']]);
+    $kept = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['A1@X.com', ' a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com']]);
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 

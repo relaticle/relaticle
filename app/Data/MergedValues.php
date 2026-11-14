@@ -7,9 +7,9 @@ namespace App\Data;
 final readonly class MergedValues
 {
     /**
-     * @param  array<string, mixed>  $attributes  native columns
-     * @param  array<string, mixed>  $customFields  keyed by field code
-     * @param  array<string, array{label: string, limit: int}>  $overLimit  field code to the field's label and limit
+     * @param  array<string, mixed>  $attributes
+     * @param  array<string, mixed>  $customFields
+     * @param  array<string, array{label: string, limit: int}>  $overLimit
      */
     public function __construct(
         public array $attributes,

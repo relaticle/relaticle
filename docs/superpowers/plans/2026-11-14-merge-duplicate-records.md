@@ -1,6 +1,8 @@
 # Merge Duplicate Records (Phase 1) Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `sdd-lean` (this user's replacement for
+> superpowers:subagent-driven-development) or superpowers:executing-plans to implement this plan
+> task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A member merges two duplicate companies, or two duplicate people, from the record page's ⋯ menu. The kept record keeps its ID, takes the other's values and links, and the other is soft-deleted.
 

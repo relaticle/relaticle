@@ -77,16 +77,16 @@
         <x-filament::icon icon="lucide-plus" class="size-menu-icon" />
     </button>
 
+    {{-- Not x-float: it caps the list to the modal's height, and the list must float past the modal edge. --}}
     <div
         x-ref="popover"
         wire:ignore.self
         style="visibility: hidden"
         x-bind:style="{ visibility: open ? 'visible' : 'hidden' }"
-        class="fixed z-50 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-menu bg-white shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10"
-        data-merge-popover
+        class="fi-merge-pop fixed z-50 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-menu bg-white shadow-lg ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10"
     >
-        <div class="flex shrink-0 items-center gap-2 border-b border-gray-950/5 px-3 dark:border-white/10">
-            <x-filament::icon icon="lucide-search" class="size-menu-icon shrink-0 text-gray-400" />
+        <div class="fi-merge-search gap-2 px-3">
+            <x-filament::icon icon="lucide-search" />
             <input
                 type="search"
                 x-ref="search"
@@ -103,12 +103,11 @@
                 placeholder="{{ $searchPlaceholder }}"
                 aria-label="{{ __('filament/record-page.merge.search') }}"
                 autocomplete="off"
-                class="h-10 w-full border-0 bg-transparent p-0 text-sm text-gray-950 outline-none ring-0 placeholder:text-gray-400 focus:ring-0 dark:text-white"
             />
         </div>
 
         @if ($results === [])
-            <p class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{{ __('filament/record-page.merge.no_results') }}</p>
+            <p class="fi-menu-empty">{{ __('filament/record-page.merge.no_results') }}</p>
         @else
             <ul
                 id="merge-listbox"

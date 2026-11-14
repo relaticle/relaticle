@@ -119,7 +119,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'filter group menu' => ['[data-filter-group]', '.fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'tasks'],
     'filter chip kebab' => ['[data-filter-chip] [data-filter-more]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [CHIP_RULES], ['pitch' => []]],
     'filter deleted mode' => ['[data-deleted-mode-trigger]', '[data-filter-deleted] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [DELETED_CHIP]],
-    'merge record picker' => ['[data-merge-picker]', '[data-merge-popover]', '[data-merge-popover] li', '[data-merge-popover] svg', 'companies/%company%', MERGE_PICKER_STEPS],
+    'merge record picker' => ['[data-merge-picker]', '.fi-merge-pop', '.fi-merge-pop li', '.fi-merge-pop svg', 'companies/%company%', MERGE_PICKER_STEPS],
     'views row menu' => ['.fi-ta-views-row[data-view-kind=list] [data-view-actions]', '.fi-ta-views-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-switcher .fi-dropdown-trigger button']],
     'view settings row menu' => ['[data-view-settings-menu] >> nth=0', '.fi-view-settings-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-settings-trigger'], ['pitch' => []]],
     'board stage row menu' => ['[data-stage-actions] >> nth=0', '.fi-board-stages-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger', '[data-board-columns-trigger]']],
@@ -219,7 +219,7 @@ it('keeps a long menu above the window edge and scrolls only its list', function
     'view settings' => ['.fi-view-settings-trigger', '.fi-view-settings-panel', '.fi-view-settings-scroll'],
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '[role=listbox]'],
     'filter chip value checklist' => ['[data-filter-chip] [data-filter-segment="value"]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-options', [REGION_CHIP_RULES], true],
-    'merge record picker' => ['[data-merge-picker]', '[data-merge-popover]', '[data-merge-popover] ul', MERGE_PICKER_STEPS, false, 'companies/%company%'],
+    'merge record picker' => ['[data-merge-picker]', '.fi-merge-pop', '.fi-merge-pop ul', MERGE_PICKER_STEPS, false, 'companies/%company%'],
 ]);
 
 function currentItem(string $current, string $other): string

@@ -44,6 +44,7 @@ return [
     'notifications' => [
         'url_copied' => 'URL copied to clipboard',
         'id_copied' => 'Record ID copied to clipboard',
+        'records_merged' => 'Records merged',
     ],
     'merge' => [
         'heading' => 'Merge',
@@ -51,7 +52,6 @@ return [
         'search' => 'Search',
         'swap' => 'Swap records',
         'submit' => 'Merge records',
-        'merged' => 'Records merged',
         'unavailable' => 'That record is no longer available to merge.',
         'over_limit' => ':field can hold :max values. Together these records have more. Remove some first.',
         'pick' => 'Choose a record',

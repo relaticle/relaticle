@@ -24,34 +24,34 @@ afterEach(function (): void {
 });
 
 it('closes the search with Escape and picks a record with a click', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Globex');
-    dialogCompany($this->workspace, $this->user, 'Globex Europe');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex');
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Europe');
 
     $page = openMergeDialog($this->user, $this->workspace, $current)
         ->click('[data-merge-picker]')
-        ->assertVisible('[data-merge-popover]')
-        ->keys('[data-merge-popover] input', 'Escape')
-        ->assertScript('getComputedStyle(document.querySelector("[data-merge-popover]")).visibility', 'hidden')
+        ->assertVisible('.fi-merge-pop')
+        ->keys('.fi-merge-pop input', 'Escape')
+        ->assertScript('getComputedStyle(document.querySelector(".fi-merge-pop")).visibility', 'hidden')
         ->assertVisible('[data-merge-dialog]');
 
     $page->click('[data-merge-picker]')
-        ->assertVisible('[data-merge-popover]')
-        ->click('[data-merge-popover] li:has-text("Globex Europe")')
+        ->assertVisible('.fi-merge-pop')
+        ->click('.fi-merge-pop li:has-text("Globex Europe")')
         ->wait(1.2)
         ->assertSeeIn('[data-merge-left]', 'Globex Europe')
         ->assertScript(MERGE_SUBMIT_DISABLED, false);
 });
 
 it('picks the first result when Enter is pressed in the search', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Globex');
-    dialogCompany($this->workspace, $this->user, 'Globex Europe');
-    dialogCompany($this->workspace, $this->user, 'Globex Asia');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex');
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Europe');
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Asia');
 
     openMergeDialog($this->user, $this->workspace, $current)
         ->click('[data-merge-picker]')
-        ->type('[data-merge-popover] input', 'Globex')
+        ->type('.fi-merge-pop input', 'Globex')
         ->wait(1.2)
-        ->keys('[data-merge-popover] input', 'Enter')
+        ->keys('.fi-merge-pop input', 'Enter')
         ->wait(1.2)
         ->assertSeeIn('[data-merge-left]', 'Globex Asia')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
@@ -59,25 +59,25 @@ it('picks the first result when Enter is pressed in the search', function (): vo
 });
 
 it('moves the highlighted result with the arrow keys before Enter picks it', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Globex');
-    dialogCompany($this->workspace, $this->user, 'Globex Europe');
-    dialogCompany($this->workspace, $this->user, 'Globex Asia');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex');
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Europe');
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Asia');
 
     openMergeDialog($this->user, $this->workspace, $current)
         ->click('[data-merge-picker]')
-        ->type('[data-merge-popover] input', 'Globex')
+        ->type('.fi-merge-pop input', 'Globex')
         ->wait(1.2)
-        ->keys('[data-merge-popover] input', 'ArrowDown')
-        ->assertAttribute('[data-merge-popover] li:nth-child(2)', 'aria-selected', 'true')
-        ->keys('[data-merge-popover] input', 'Enter')
+        ->keys('.fi-merge-pop input', 'ArrowDown')
+        ->assertAttribute('.fi-merge-pop li:nth-child(2)', 'aria-selected', 'true')
+        ->keys('.fi-merge-pop input', 'Enter')
         ->wait(1.2)
         ->assertSeeIn('[data-merge-left]', 'Globex Europe')
         ->assertNoJavaScriptErrors();
 });
 
 it('moves focus to the clear button once a record is picked and back to the plus when cleared', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Globex');
-    dialogCompany($this->workspace, $this->user, 'Globex Europe');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex');
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Europe');
 
     $page = openMergeDialog($this->user, $this->workspace, $current);
 
@@ -90,21 +90,21 @@ it('moves focus to the clear button once a record is picked and back to the plus
 });
 
 it('closes the search list when focus tabs out of it', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Globex');
-    dialogCompany($this->workspace, $this->user, 'Globex Europe');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex');
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Europe');
 
     openMergeDialog($this->user, $this->workspace, $current)
         ->click('[data-merge-picker]')
-        ->assertVisible('[data-merge-popover]')
-        ->keys('[data-merge-popover] input', 'Tab')
-        ->assertScript('getComputedStyle(document.querySelector("[data-merge-popover]")).visibility', 'hidden')
+        ->assertVisible('.fi-merge-pop')
+        ->keys('.fi-merge-pop input', 'Tab')
+        ->assertScript('getComputedStyle(document.querySelector(".fi-merge-pop")).visibility', 'hidden')
         ->assertVisible('[data-merge-dialog]')
         ->assertNoJavaScriptErrors();
 });
 
 it('previews the current company alone and looks disabled until a record is picked', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Globex', ['globex.com']);
-    dialogCompany($this->workspace, $this->user, 'Globex Europe');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex', ['globex.com']);
+    mergeDialogCompany($this->workspace, $this->user, 'Globex Europe');
 
     $look = <<<'JS'
         (() => {
@@ -132,8 +132,8 @@ it('previews the current company alone and looks disabled until a record is pick
 });
 
 it('merges when Enter is pressed outside the search once a record is picked', function (): void {
-    $kept = dialogCompany($this->workspace, $this->user, 'Globex');
-    $duplicate = dialogCompany($this->workspace, $this->user, 'Globex Europe');
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Globex');
+    $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Globex Europe');
 
     $page = openMergeDialog($this->user, $this->workspace, $kept);
 

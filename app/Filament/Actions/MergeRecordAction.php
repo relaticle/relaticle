@@ -12,18 +12,20 @@ use App\Enums\CrmEntity;
 use App\Enums\CustomFields\CompanyField;
 use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use App\Support\LikePattern;
 use Filament\Actions\Action;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
-use Filament\Notifications\Notification;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Schemas\Components\View;
 use Filament\Support\Enums\Alignment;
 use Filament\Support\Enums\Width;
+use Filament\Support\Facades\FilamentView;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -60,7 +62,7 @@ final class MergeRecordAction extends Action
 
         $this->label(__('filament/record-page.actions.merge_record'))
             ->icon('lucide-merge')
-            ->visible(fn (Model $record): bool => ($record instanceof Company || $record instanceof People)
+            ->authorize(fn (Model $record): bool => ($record instanceof Company || $record instanceof People)
                 && Gate::allows('update', $record)
                 && Gate::allows('delete', $record))
             ->modalHeading(fn (): Htmlable => $this->heading())
@@ -75,6 +77,7 @@ final class MergeRecordAction extends Action
                 Hidden::make('search')->dehydrated(false),
                 View::make('filament.app.merge-record')->viewData(fn (): array => $this->dialog()),
             ])
+            ->successNotificationTitle(__('filament/record-page.notifications.records_merged'))
             ->action(function (array $data, ViewRecord $livewire): void {
                 try {
                     $kept = $this->merge($data);
@@ -86,9 +89,11 @@ final class MergeRecordAction extends Action
                     ]);
                 }
 
-                Notification::make()->title(__('filament/record-page.merge.merged'))->success()->send();
+                $this->success();
 
-                $livewire->redirect($livewire::getResource()::getUrl('view', ['record' => $kept]));
+                $url = $livewire::getResource()::getUrl('view', ['record' => $kept]);
+
+                $livewire->redirect($url, navigate: FilamentView::hasSpaMode($url));
             });
     }
 
@@ -135,8 +140,8 @@ final class MergeRecordAction extends Action
 
         [$kept, $duplicate] = ($data['keep'] ?? 'current') === 'other' ? [$other, $current] : [$current, $other];
 
-        $user = auth()->user();
-        abort_unless($user instanceof User, 403);
+        /** @var User $user */
+        $user = Filament::auth()->user();
 
         return match (true) {
             $kept instanceof People && $duplicate instanceof People => resolve(MergePeople::class)->execute($user, $kept, $duplicate),
@@ -384,7 +389,7 @@ final class MergeRecordAction extends Action
 
         $records = $this->searchQuery()
             ->whereKeyNot($this->subject()->getKey())
-            ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $match): Builder => $this->matching($match, '%'.LikePattern::escape($search).'%')))
+            ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $match): Builder => $this->matching($match, $search)))
             ->orderBy('name')
             ->limit(25)
             ->get();
@@ -402,13 +407,23 @@ final class MergeRecordAction extends Action
      * @param  Builder<Company>|Builder<People>  $query
      * @return Builder<Company>|Builder<People>
      */
-    private function matching(Builder $query, string $pattern): Builder
+    private function matching(Builder $query, string $search): Builder
     {
-        return $query
-            ->where('name', 'ilike', $pattern)
-            ->orWhereHas('customFieldValues', fn (Builder $values): Builder => $values
-                ->whereRelation('customField', 'code', $this->detailCode())
-                ->whereRaw('exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element ilike ?)', [$pattern]));
+        $identity = CustomField::query()
+            ->forMorphEntity($this->subject()->getMorphClass())
+            ->where('code', $this->detailCode())
+            ->first();
+
+        $query->where('name', 'ilike', '%'.LikePattern::escape($search).'%');
+
+        if (! $identity instanceof CustomField) {
+            return $query;
+        }
+
+        return $query->orWhereHas('customFieldValues', static function (Builder $values) use ($identity, $search): void {
+            /** @var Builder<CustomFieldValue> $values */
+            $values->containingText($identity, $search);
+        });
     }
 
     /**

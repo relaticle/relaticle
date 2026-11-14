@@ -23,8 +23,8 @@ afterEach(function (): void {
 });
 
 it('lays the sources and the result in one row on a laptop and a desktop', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Harborline', ['harborline.com']);
-    dialogCompany($this->workspace, $this->user, 'Harborline Logistics', ['harborline-logistics.com']);
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Harborline', ['harborline.com']);
+    mergeDialogCompany($this->workspace, $this->user, 'Harborline Logistics', ['harborline-logistics.com']);
 
     foreach ([[1440, 900], [1280, 800]] as [$width, $height]) {
         $page = openMergeDialog($this->user, $this->workspace, $current, $width, $height);
@@ -56,8 +56,8 @@ it('lays the sources and the result in one row on a laptop and a desktop', funct
 });
 
 it('stacks the cards on a phone with the swap button between the two sources', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Initech', ['initech.com']);
-    dialogCompany($this->workspace, $this->user, 'Initech Ltd', ['initech.co.uk']);
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Initech', ['initech.com']);
+    mergeDialogCompany($this->workspace, $this->user, 'Initech Ltd', ['initech.co.uk']);
 
     $page = openMergeDialog($this->user, $this->workspace, $current, 390, 844);
 
@@ -74,17 +74,17 @@ it('stacks the cards on a phone with the swap button between the two sources', f
 });
 
 it('caps the open search list inside the window and scrolls it to the last row', function (int $width, int $height): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Harborline');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Harborline');
 
     foreach (range(1, 30) as $index) {
-        dialogCompany($this->workspace, $this->user, sprintf('Branch %02d', $index));
+        mergeDialogCompany($this->workspace, $this->user, sprintf('Branch %02d', $index));
     }
 
     $page = openMergeDialog($this->user, $this->workspace, $current, $width, $height);
 
     $page->script(<<<'JS'
         (() => {
-            const popover = document.querySelector('[data-merge-popover]');
+            const popover = document.querySelector('.fi-merge-pop');
             window.paintedFrames = [];
             const record = () => {
                 const style = getComputedStyle(popover);
@@ -101,7 +101,7 @@ it('caps the open search list inside the window and scrolls it to the last row',
         JS);
 
     $page->click('[data-merge-picker]')
-        ->assertVisible('[data-merge-popover]')
+        ->assertVisible('.fi-merge-pop')
         ->wait(1.2);
 
     $frames = $page->script('window.paintedFrames');
@@ -118,7 +118,7 @@ it('caps the open search list inside the window and scrolls it to the last row',
 
     $measure = <<<'JS'
         (() => {
-            const popover = document.querySelector('[data-merge-popover]');
+            const popover = document.querySelector('.fi-merge-pop');
             const list = popover.querySelector('ul');
             const search = popover.querySelector('input').getBoundingClientRect();
             const box = popover.getBoundingClientRect();
@@ -153,20 +153,20 @@ it('caps the open search list inside the window and scrolls it to the last row',
 ]);
 
 it('keeps the open picker anchored under its button while the member types', function (int $width, int $height): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Harborline');
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Harborline');
 
     foreach (range(1, 30) as $index) {
-        dialogCompany($this->workspace, $this->user, sprintf('Branch %02d', $index));
+        mergeDialogCompany($this->workspace, $this->user, sprintf('Branch %02d', $index));
     }
 
     foreach (['Beehive Foods', 'Beeline Freight', 'Beechwood Labs'] as $name) {
-        dialogCompany($this->workspace, $this->user, $name);
+        mergeDialogCompany($this->workspace, $this->user, $name);
     }
 
     $page = openMergeDialog($this->user, $this->workspace, $current, $width, $height);
 
     $page->click('[data-merge-picker]')
-        ->assertVisible('[data-merge-popover]')
+        ->assertVisible('.fi-merge-pop')
         ->wait(1.2);
 
     $opened = $page->script(MERGE_POPOVER_RECT);

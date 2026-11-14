@@ -31,16 +31,16 @@ enum AppEventPalette: string implements HasIcon, HasLabel
     public function title(): ?string
     {
         return match ($this) {
+            self::NoteCreated, self::TaskCreated => null,
             self::RecordMerged => $this->getLabel(),
-            default => null,
         };
     }
 
     public function description(TimelineEntry $entry): ?string
     {
         return match ($this) {
+            self::NoteCreated, self::TaskCreated => null,
             self::RecordMerged => (string) __('activity-log.events.record_merged.description', ['name' => $entry->properties['duplicate_name'] ?? '']),
-            default => null,
         };
     }
 
