@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Data;
 
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\SnakeCaseMapper;
@@ -20,6 +19,7 @@ final class BoardStateData extends Data
      * @param  array<string, mixed>  $filters
      * @param  list<string>  $hiddenColumns
      * @param  list<string>  $noValueColumns
+     * @param  list<string>  $collapsedColumns
      * @param  list<string>|null  $cardAttributes
      */
     public function __construct(
@@ -33,7 +33,8 @@ final class BoardStateData extends Data
         public readonly ?array $cardAttributes = null,
         public readonly bool $showLabels = false,
         public readonly bool $hideEmpty = true,
-        public readonly BoardColumnWidth $columnWidth = BoardColumnWidth::Wide,
+        public readonly array $collapsedColumns = [],
+        public readonly bool $columnsCollapsed = false,
         public readonly BoardCardSize $cardSize = BoardCardSize::Full,
     ) {}
 

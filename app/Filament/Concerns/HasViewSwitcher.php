@@ -7,7 +7,6 @@ namespace App\Filament\Concerns;
 use App\Actions\Views\ReorderViews;
 use App\Contracts\OrdersBoardStages;
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Filament\Resources\NoteResource\Pages\NotesCards;
@@ -67,7 +66,7 @@ trait HasViewSwitcher
             'viewSwitcher' => $this->getViewSwitcher(),
             'viewSettings' => $this->getViewSettings(),
             'layoutToggles' => $hasLayout ? $this->boardLayoutToggles() : null,
-            'columnWidth' => $hasLayout ? $this->storedBoardState()->columnWidth : BoardColumnWidth::Wide,
+            'columnsCollapsed' => $hasLayout && $this->storedBoardState()->columnsCollapsed,
             'cardSize' => $hasLayout ? $this->storedBoardState()->cardSize : BoardCardSize::Full,
             'actions' => $this->getCachedHeaderActions(),
         ]);

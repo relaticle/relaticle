@@ -10,7 +10,6 @@ use App\Actions\Views\SetBoardColumnVisibility;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\SavedViewType;
@@ -661,21 +660,22 @@ it('draws a card with its title only when every attribute is removed', function 
     expect(TablePreference::query()->sole()->board_state->cardAttributes)->toBe([]);
 });
 
-it('marks the board narrow and compact once both toggles are set', function (): void {
+it('marks the board collapsed and compact once both toggles are set', function (): void {
     $component = livewire(OpportunitiesBoard::class)
-        ->call('setBoardColumnWidth', 'narrow')
+        ->call('setBoardColumnsCollapsed', true)
         ->call('setBoardCardSize', 'compact')
-        ->assertSeeHtml('data-board-column-width="narrow"')
+        ->assertSeeHtml('data-board-columns="collapsed"')
         ->assertSeeHtml('data-board-card-size="compact"');
 
     expect($component->html())
-        ->toMatch('/data-board-column-width-option="narrow"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-column-width-option="narrow"/')
+        ->toMatch('/data-board-columns-option="collapsed"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-columns-option="collapsed"/')
         ->toMatch('/data-board-card-size-option="compact"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-card-size-option="compact"/')
-        ->toMatch('/data-board-column-width-option="wide"[^>]*aria-pressed="false"|aria-pressed="false"[^>]*data-board-column-width-option="wide"/');
+        ->toMatch('/data-board-columns-option="expanded"[^>]*aria-pressed="false"|aria-pressed="false"[^>]*data-board-columns-option="expanded"/')
+        ->and($component->instance()->getBoard()->collapsesAllColumns())->toBeTrue();
 
     $state = TablePreference::query()->sole()->board_state;
 
-    expect($state->columnWidth)->toBe(BoardColumnWidth::Narrow)
+    expect($state->columnsCollapsed)->toBeTrue()
         ->and($state->cardSize)->toBe(BoardCardSize::Compact);
 });
 
@@ -690,9 +690,9 @@ it('draws a compact card with its title only', function (): void {
         ->assertDontSee('Mar 4');
 });
 
-it('ignores a width or size the board does not have', function (mixed $value): void {
+it('ignores a collapse flag or size the board does not have', function (mixed $value): void {
     livewire(OpportunitiesBoard::class)
-        ->call('setBoardColumnWidth', $value)
+        ->call('setBoardColumnsCollapsed', $value)
         ->call('setBoardCardSize', $value);
 
     expect(TablePreference::query()->count())->toBe(0);
@@ -700,19 +700,19 @@ it('ignores a width or size the board does not have', function (mixed $value): v
 
 it('writes nothing when a layout toggle is set to the value it already holds', function (): void {
     livewire(OpportunitiesBoard::class)
-        ->call('setBoardColumnWidth', 'wide')
+        ->call('setBoardColumnsCollapsed', false)
         ->call('setBoardCardSize', 'full');
 
     expect(TablePreference::query()->count())->toBe(0);
 });
 
-it('opens wide and full by default', function (): void {
+it('opens expanded and full by default', function (): void {
     $component = livewire(OpportunitiesBoard::class)
-        ->assertSeeHtml('data-board-column-width="wide"')
+        ->assertSeeHtml('data-board-columns="expanded"')
         ->assertSeeHtml('data-board-card-size="full"');
 
     expect($component->html())
-        ->toMatch('/data-board-column-width-option="wide"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-column-width-option="wide"/')
+        ->toMatch('/data-board-columns-option="expanded"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-columns-option="expanded"/')
         ->toMatch('/data-board-card-size-option="full"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-card-size-option="full"/');
 });
 
@@ -724,13 +724,13 @@ it('keeps the layout inside a board view and leaves the plain board alone', func
     ]);
 
     Livewire::withQueryParams(['view' => $view->getKey()])->test(OpportunitiesBoard::class)
-        ->call('setBoardColumnWidth', 'narrow')
+        ->call('setBoardColumnsCollapsed', true)
         ->call('setBoardCardSize', 'compact')
-        ->assertSeeHtml('data-board-column-width="narrow"');
+        ->assertSeeHtml('data-board-columns="collapsed"');
 
     $stored = $view->refresh()->boardState();
 
-    expect($stored->columnWidth)->toBe(BoardColumnWidth::Narrow)
+    expect($stored->columnsCollapsed)->toBeTrue()
         ->and($stored->cardSize)->toBe(BoardCardSize::Compact)
         ->and(TablePreference::query()->count())->toBe(0);
 });

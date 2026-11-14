@@ -2385,13 +2385,6 @@ html.fi-record-stacked .fi-record-layout {
     display: contents;
 }
 
-.fi-page:has(.fi-board-header[data-board-column-width='narrow']) .ff-board {
-    @media (width >= 40rem) {
-        --ff-column-width: 15rem;
-        --ff-card-label: 4.5rem;
-    }
-}
-
 /* Flowforge wraps every card item, so a labelled row takes its own line through that wrapper. */
 .ff-board .ff-card-flex:not(.ff-card-flex--nowrap) > :has(> .fi-board-card-row) {
     flex-basis: 100%;

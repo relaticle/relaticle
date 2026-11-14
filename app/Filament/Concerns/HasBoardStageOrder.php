@@ -8,10 +8,10 @@ use App\Actions\Views\MoveBoardCard;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SaveBoardState;
+use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -121,19 +121,56 @@ trait HasBoardStageOrder
         });
     }
 
-    public function setBoardColumnWidth(mixed $width = null): void
+    public function setBoardColumnCollapsed(mixed $optionId = null, mixed $collapsed = true): void
     {
-        $width = is_string($width) ? BoardColumnWidth::tryFrom($width) : null;
+        $collapsed = filter_var($collapsed, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
 
-        if (! $width instanceof BoardColumnWidth || $width === $this->storedBoardState()->columnWidth) {
+        if (! is_string($optionId) || $collapsed === null || ! $this->ownsCollapsibleColumn($optionId)) {
             return;
         }
 
-        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), ['column_width' => $width->value], $view));
+        $fieldCode = $this->boardColumnField()->code;
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnCollapsed::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $collapsed, $view));
 
         if ($saved instanceof BoardStateData) {
             $this->boardStateWritten($saved);
         }
+    }
+
+    public function setBoardColumnsCollapsed(mixed $collapsed = false): void
+    {
+        $collapsed = filter_var($collapsed, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        if ($collapsed === null || $collapsed === $this->storedBoardState()->columnsCollapsed) {
+            return;
+        }
+
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), ['columns_collapsed' => $collapsed], $view));
+
+        if ($saved instanceof BoardStateData) {
+            $this->boardStateWritten($saved);
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function collapsedBoardColumnIds(): array
+    {
+        $existing = $this->boardColumnOptions()->pluck('id')->all();
+
+        if ($this->showsNoValueColumn()) {
+            $existing[] = BoardStateData::NO_VALUE_COLUMN;
+        }
+
+        return array_values(array_intersect($this->storedBoardState()->collapsedColumns, $existing));
+    }
+
+    private function ownsCollapsibleColumn(string $optionId): bool
+    {
+        return $optionId === BoardStateData::NO_VALUE_COLUMN
+            ? $this->showsNoValueColumn()
+            : $this->boardColumnOptions()->contains('id', $optionId);
     }
 
     public function boardLayoutToggles(): Htmlable
@@ -141,7 +178,7 @@ trait HasBoardStageOrder
         $state = $this->storedBoardState();
 
         return new HtmlString(view('filament.app.board-layout-toggles', [
-            'columnWidth' => $state->columnWidth,
+            'columnsCollapsed' => $state->columnsCollapsed,
             'cardSize' => $state->cardSize,
         ])->render());
     }

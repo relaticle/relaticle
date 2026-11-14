@@ -42,10 +42,10 @@ return [
     ],
 
     'layout' => [
-        'column_width' => 'Column width',
+        'columns' => 'Columns',
         'card_size' => 'Card size',
-        'narrow' => 'Narrow columns',
-        'wide' => 'Wide columns',
+        'columns_collapsed' => 'Collapsed columns',
+        'columns_expanded' => 'Expanded columns',
         'compact' => 'Compact cards',
         'full' => 'Full cards',
     ],

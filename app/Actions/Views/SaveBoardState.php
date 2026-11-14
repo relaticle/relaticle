@@ -20,7 +20,7 @@ final readonly class SaveBoardState
 {
     public const array KEYS = [
         'stage_order', 'filters', 'grouping', 'sort', 'column_field', 'hidden_columns',
-        'no_value_columns', 'card_attributes', 'show_labels', 'hide_empty', 'column_width', 'card_size',
+        'no_value_columns', 'card_attributes', 'show_labels', 'hide_empty', 'collapsed_columns', 'columns_collapsed', 'card_size',
     ];
 
     /**

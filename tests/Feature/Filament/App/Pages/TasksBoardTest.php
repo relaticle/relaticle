@@ -6,12 +6,12 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\DeleteCustomField;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
+use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\SavedViewType;
@@ -55,7 +55,7 @@ use Relaticle\Flowforge\Services\DecimalPosition;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnCollapsed::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1824,19 +1824,19 @@ it('draws a compact task card with its title only', function (): void {
         ->assertDontSee('1/2');
 });
 
-it('marks the task board narrow and compact once both toggles are set', function (): void {
+it('marks the task board collapsed and compact once both toggles are set', function (): void {
     $component = livewire(TasksBoard::class)
-        ->call('setBoardColumnWidth', 'narrow')
+        ->call('setBoardColumnsCollapsed', true)
         ->call('setBoardCardSize', 'compact')
-        ->assertSeeHtml('data-board-column-width="narrow"')
+        ->assertSeeHtml('data-board-columns="collapsed"')
         ->assertSeeHtml('data-board-card-size="compact"');
 
     expect($component->html())
-        ->toMatch('/data-board-column-width-option="narrow"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-column-width-option="narrow"/');
+        ->toMatch('/data-board-columns-option="collapsed"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-columns-option="collapsed"/');
 
     $state = TablePreference::query()->sole()->board_state;
 
-    expect($state->columnWidth)->toBe(BoardColumnWidth::Narrow)
+    expect($state->columnsCollapsed)->toBeTrue()
         ->and($state->cardSize)->toBe(BoardCardSize::Compact);
 });
 
@@ -1980,4 +1980,118 @@ it('says a text attribute was added and a rich text attribute was only created',
         ->assertNotified('Plan notes created. This type of attribute does not show on a card.');
 
     expect(TablePreference::query()->sole()->board_state->cardAttributes)->toContain('custom_fields.effort')->not->toContain('custom_fields.plan_notes');
+});
+
+it('collapses a task stage for the member and expands it again', function (): void {
+    $ids = statusIds($this->statusField);
+    $component = livewire(TasksBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([$ids[1]])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[1]]);
+
+    $component->call('toggleBoardColumnCollapse', $ids[1]);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+});
+
+it('collapses the task no-value column', function (): void {
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
+
+it('keeps another member\'s task board expanded', function (): void {
+    livewire(TasksBoard::class)->call('setBoardColumnCollapsed', statusIds($this->statusField)[1], true);
+
+    $colleague = User::factory()->create();
+    $this->workspace->users()->attach($colleague, ['role' => WorkspaceRole::Member->value]);
+    $colleague->switchWorkspace($this->workspace);
+    $this->actingAs($colleague);
+
+    expect(livewire(TasksBoard::class)->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+});
+
+it('keeps a collapsed task stage across regrouping by another attribute', function (): void {
+    $ids = statusIds($this->statusField);
+    $component = livewire(TasksBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    $component->call('setBoardColumnField', 'priority');
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnField', $this->statusField->code);
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[1]]);
+});
+
+it('stores collapsed task stages inside an open board view only', function (): void {
+    $ids = statusIds($this->statusField);
+    $plain = rememberedTaskBoard($this, new BoardStateData(sort: 'title:asc'));
+    $view = taskBoardView($this);
+    $plainHash = $plain->board_state->hash();
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(TasksBoard::class)
+        ->call('setBoardColumnCollapsed', $ids[0], true);
+
+    expect($view->refresh()->boardState()->collapsedColumns)->toBe([$ids[0]])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]])
+        ->and($plain->refresh()->board_state->hash())->toBe($plainHash);
+});
+
+it('collapses every task column from the bar and keeps it after a reload', function (): void {
+    livewire(TasksBoard::class)->call('setBoardColumnsCollapsed', true);
+
+    expect(TablePreference::query()->sole()->board_state->columnsCollapsed)->toBeTrue()
+        ->and(freshTasksBoard()->instance()->getBoard()->collapsesAllColumns())->toBeTrue();
+
+    $component = freshTasksBoard()->call('setBoardColumnsCollapsed', false);
+
+    expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse();
+});
+
+it('renders a collapsed task stage that was then deleted or hidden without error', function (string $case): void {
+    $ids = statusIds($this->statusField);
+    livewire(TasksBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    if ($case === 'deleted') {
+        CustomFieldOption::query()->withoutGlobalScopes()->whereKey($ids[1])->delete();
+    } else {
+        livewire(TasksBoard::class)->call('setBoardColumnVisible', $ids[1], false);
+    }
+
+    $component = freshTasksBoard()->assertOk();
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([])
+        ->and(taskBoardColumnOrder($component))->not->toContain($ids[1]);
+
+    $component->call('setBoardColumnCollapsed', $ids[0], true)->assertOk();
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]]);
+})->with(['deleted', 'hidden']);
+
+it('refuses a task collapse of an option of another attribute or workspace', function (string $case): void {
+    $foreign = User::factory()->withWorkspace()->create();
+    $priority = taskPriority();
+    $foreignStatus = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $foreign->currentWorkspace->getKey())->where('entity_type', 'task')->where('code', TaskField::STATUS)->firstOrFail();
+
+    $optionId = match ($case) {
+        'another attribute' => (string) $priority->options->first()->getKey(),
+        'another workspace' => statusIds($foreignStatus)[0],
+        'unknown' => 'not-an-option',
+    };
+
+    expect(fn () => resolve(SetBoardColumnCollapsed::class)->execute($this->user, $this->workspace, CrmEntity::Task, TaskField::STATUS->value, $optionId, true))
+        ->toThrow(HttpException::class);
+
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with(['another attribute', 'another workspace', 'unknown']);
+
+it('reads a stored task board state that still carries the retired column width', function (): void {
+    $preference = rememberedTaskBoard($this, new BoardStateData);
+    DB::table('table_preferences')->where('id', $preference->getKey())->update(['board_state' => json_encode(['column_width' => 'narrow', 'card_size' => 'compact'])]);
+
+    $component = freshTasksBoard()->assertOk();
+
+    expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse();
 });

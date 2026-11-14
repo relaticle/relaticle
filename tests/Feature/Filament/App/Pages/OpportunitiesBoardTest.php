@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
+use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\SavedViewType;
@@ -48,7 +48,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnCollapsed::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1038,7 +1038,7 @@ it('keeps the member\'s stored filters and lanes when stages are reordered', fun
 it('keeps every board setting when stages are reordered', function (): void {
     $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
     $tierIds = $tier->options->pluck('id')->map(strval(...))->all();
-    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(stageOrder: array_reverse($tierIds), hiddenColumns: [$tierIds[0]], noValueColumns: ['stage'], cardAttributes: ['company'], showLabels: true, hideEmpty: false, columnWidth: BoardColumnWidth::Narrow, cardSize: BoardCardSize::Compact));
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(stageOrder: array_reverse($tierIds), hiddenColumns: [$tierIds[0]], noValueColumns: ['stage'], cardAttributes: ['company'], showLabels: true, hideEmpty: false, collapsedColumns: [$tierIds[1]], columnsCollapsed: true, cardSize: BoardCardSize::Compact));
     $reversed = array_reverse(stageIds($this->stageField));
 
     livewire(OpportunitiesBoard::class)->call('reorderBoardStages', $reversed);
@@ -1051,7 +1051,8 @@ it('keeps every board setting when stages are reordered', function (): void {
         ->and($stored->cardAttributes)->toBe(['company'])
         ->and($stored->showLabels)->toBeTrue()
         ->and($stored->hideEmpty)->toBeFalse()
-        ->and($stored->columnWidth)->toBe(BoardColumnWidth::Narrow)
+        ->and($stored->collapsedColumns)->toBe([$tierIds[1]])
+        ->and($stored->columnsCollapsed)->toBeTrue()
         ->and($stored->cardSize)->toBe(BoardCardSize::Compact);
 });
 
@@ -1090,7 +1091,7 @@ it('stores a sort change that arrives in the same request as a stage reorder', f
 });
 
 it('writes nothing on arrival when Part 2 settings are stored', function (): void {
-    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company'], showLabels: true, columnWidth: BoardColumnWidth::Narrow));
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company'], showLabels: true, columnsCollapsed: true));
     $updatedAt = $preference->updated_at;
     $this->travelTo(now()->addHour());
 
@@ -1418,4 +1419,166 @@ it('narrows the first render with the open board view\'s filter and keeps its ow
     expect(opportunityStageCardIds($component, 'Prospecting'))->toBe([$keep->id])
         ->and(boardColumnOrder($component))->toBe($reversed)
         ->and(TablePreference::query()->count())->toBe(0);
+});
+
+it('collapses a stage for the member and expands it again', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnCollapsed', $ids[1], true);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([$ids[1]])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[1]])
+        ->and($component->html())->toContain('data-collapsed');
+
+    $component->call('setBoardColumnCollapsed', $ids[1], false);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+});
+
+it('collapses a stage through the header double-click callback', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class)->call('toggleBoardColumnCollapse', $ids[2]);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([$ids[2]]);
+
+    $component->call('toggleBoardColumnCollapse', $ids[2]);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([]);
+});
+
+it('collapses the no-value column', function (): void {
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
+
+it('keeps another member\'s board expanded', function (): void {
+    $ids = stageIds($this->stageField);
+    livewire(OpportunitiesBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    $colleague = User::factory()->create();
+    $this->workspace->users()->attach($colleague, ['role' => WorkspaceRole::Member->value]);
+    $colleague->switchWorkspace($this->workspace);
+    $this->actingAs($colleague);
+
+    expect(livewire(OpportunitiesBoard::class)->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+});
+
+it('keeps a collapsed stage across regrouping by another attribute', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    $component->call('setBoardColumnField', $tier->code);
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnField', $this->stageField->code);
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[1]])
+        ->and(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([$ids[1]]);
+});
+
+it('stores collapsed stages inside an open board view only', function (): void {
+    $ids = stageIds($this->stageField);
+    $plain = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(sort: 'name:asc'));
+    $view = SavedView::factory()->for($this->user)->for($this->workspace)->create([
+        'entity' => CrmEntity::Opportunity,
+        'type' => SavedViewType::Board,
+        'state' => new BoardStateData,
+    ]);
+    $plainHash = $plain->board_state->hash();
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(OpportunitiesBoard::class)
+        ->call('setBoardColumnCollapsed', $ids[0], true);
+
+    expect($view->refresh()->boardState()->collapsedColumns)->toBe([$ids[0]])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]])
+        ->and($plain->refresh()->board_state->hash())->toBe($plainHash);
+});
+
+it('collapses every column from the bar and keeps it after a reload', function (): void {
+    livewire(OpportunitiesBoard::class)->call('setBoardColumnsCollapsed', true);
+
+    expect(TablePreference::query()->sole()->board_state->columnsCollapsed)->toBeTrue()
+        ->and(freshOpportunitiesBoard()->instance()->getBoard()->collapsesAllColumns())->toBeTrue();
+
+    $component = freshOpportunitiesBoard()->call('setBoardColumnsCollapsed', false);
+
+    expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse()
+        ->and(TablePreference::query()->sole()->board_state->columnsCollapsed)->toBeFalse();
+});
+
+it('renders a collapsed stage that was then deleted or hidden without error', function (string $case): void {
+    $ids = stageIds($this->stageField);
+    livewire(OpportunitiesBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    if ($case === 'deleted') {
+        CustomFieldOption::query()->withoutGlobalScopes()->whereKey($ids[1])->delete();
+    } else {
+        livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $ids[1], false);
+    }
+
+    $component = freshOpportunitiesBoard()->assertOk();
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([])
+        ->and(boardColumnOrder($component))->not->toContain($ids[1]);
+
+    $component->call('setBoardColumnCollapsed', $ids[0], true)->assertOk();
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]]);
+})->with(['deleted', 'hidden']);
+
+it('ignores a collapse call for a stage the board does not own', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold']);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnCollapsed', (string) $tier->options->first()->getKey(), true)
+        ->call('setBoardColumnCollapsed', 'nope', true)
+        ->call('setBoardColumnCollapsed', null, true)
+        ->call('setBoardColumnCollapsed', [1], true);
+
+    expect(TablePreference::query()->count())->toBe(0);
+});
+
+it('refuses a collapse of an option of another attribute or workspace', function (string $case): void {
+    $foreign = User::factory()->withWorkspace()->create();
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $foreignStage = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $foreign->currentWorkspace->getKey())->where('entity_type', 'opportunity')->where('code', OpportunityField::STAGE)->firstOrFail();
+
+    $optionId = match ($case) {
+        'another attribute' => (string) $tier->options->first()->getKey(),
+        'another workspace' => stageIds($foreignStage)[0],
+        'unknown' => 'not-an-option',
+    };
+
+    expect(fn () => resolve(SetBoardColumnCollapsed::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, OpportunityField::STAGE->value, $optionId, true))
+        ->toThrow(HttpException::class);
+
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with(['another attribute', 'another workspace', 'unknown']);
+
+it('keeps the collapsed stages of other attributes when one attribute collapses', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $tierId = (string) $tier->options->first()->getKey();
+    $stageId = stageIds($this->stageField)[0];
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(collapsedColumns: [$tierId]));
+
+    $state = resolve(SetBoardColumnCollapsed::class)->execute($this->user, $this->workspace, CrmEntity::Opportunity, OpportunityField::STAGE->value, $stageId, true);
+
+    expect($state->collapsedColumns)->toEqualCanonicalizing([$tierId, $stageId]);
+});
+
+it('reads a stored board state that still carries the retired column width', function (): void {
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData);
+    DB::table('table_preferences')->where('id', $preference->getKey())->update(['board_state' => json_encode(['column_width' => 'narrow', 'card_size' => 'compact', 'collapsed_columns' => [], 'columns_collapsed' => false])]);
+
+    $component = freshOpportunitiesBoard()->assertOk();
+
+    expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse()
+        ->and($preference->refresh()->board_state->cardSize)->toBe(BoardCardSize::Compact);
 });

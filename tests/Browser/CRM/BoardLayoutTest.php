@@ -414,7 +414,6 @@ it('gives an empty attribute its own line and labelled rows one gap, one line an
         ->and(array_unique($rows['gaps']))->toEqual([8]);
 
     $page->click('.fi-topbar-page-title');
-    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
 
     $labelled = $page->script(<<<JS
         (() => {
@@ -663,3 +662,103 @@ it('keeps the board view settings usable on a 390px phone', function (string $mo
     $page->assertScript(BOARD_COLUMN_IDS, [$ids[1], $ids[0], ...array_slice($ids, 2)])
         ->assertNoJavaScriptErrors();
 })->with('stage order boards');
+
+it('collapses every column from the bar and expands them again, flat and with lanes, and keeps it after a reload', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+    $record = $model::factory()->recycle([$user, $workspace])->create($model === Opportunity::class ? ['company_id' => $company->getKey()] : []);
+    $record->saveCustomFieldValue($field, $field->options->first()->getKey());
+
+    if ($record instanceof Task) {
+        $record->assignees()->attach($user);
+    }
+
+    TenantContextService::setTenantId(null);
+
+    $columns = $field->options->count();
+    $page = openBoard($user, $path);
+
+    $page->assertScript('document.querySelectorAll(".ff-column[data-collapsed]").length', 0);
+
+    pressLayout($page, 'columns', 'collapsed', 'boardColumns');
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === {$columns}"), true);
+    expect(storedBoardState($user, $entity)?->columnsCollapsed)->toBeTrue();
+
+    $page->navigate("/app/{$workspace->slug}/{$path}")->assertVisible('.ff-column >> nth=0');
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === {$columns}"), true);
+
+    pressLayout($page, 'columns', 'expanded', 'boardColumns');
+    $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-column[data-collapsed]").length === 0'), true);
+    expect(storedBoardState($user, $entity)?->columnsCollapsed)->toBeFalse();
+
+    openViewSettingsPanel($page, '[data-board-lanes-trigger]');
+    $page->click("[data-board-grouping=\"{$groupBy}\"]")->assertVisible('.ff-lanes-heads');
+    closeViewSettings($page);
+
+    pressLayout($page, 'columns', 'collapsed', 'boardColumns');
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-lanes-heads > .ff-column[data-collapsed]').length === {$columns}"), true);
+
+    pressLayout($page, 'columns', 'expanded', 'boardColumns');
+    $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-lanes-heads > .ff-column[data-collapsed]").length === 0'), true)
+        ->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
+]);
+
+it('collapses a stage by double-clicking its header and expands it by clicking its rail, flat and with lanes', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    $first = (string) $field->options->first()->getKey();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+    $record = $model::factory()->recycle([$user, $workspace])->create($model === Opportunity::class ? ['company_id' => $company->getKey()] : []);
+    $record->saveCustomFieldValue($field, $first);
+
+    if ($record instanceof Task) {
+        $record->assignees()->attach($user);
+    }
+
+    TenantContextService::setTenantId(null);
+
+    $page = openBoard($user, $path);
+
+    $page->page()->locator(boardHeaderTitle($first))->dblclick();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$first]);
+    expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([$first]);
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === 1"), true);
+
+    $page->page()->locator('.ff-column[data-collapsed]')->click();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === []);
+    expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([]);
+    $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-column[data-collapsed]").length === 0'), true);
+
+    openViewSettingsPanel($page, '[data-board-lanes-trigger]');
+    $page->click("[data-board-grouping=\"{$groupBy}\"]")->assertVisible('.ff-lanes-heads');
+    closeViewSettings($page);
+
+    $page->page()->locator(boardHeaderTitle($first, '.ff-lanes-heads'))->dblclick();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$first]);
+    expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([$first]);
+    $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-lanes-heads > .ff-column[data-collapsed]').length === 1"), true);
+
+    $page->page()->locator('.ff-lanes-heads > .ff-column[data-collapsed]')->click();
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === []);
+    expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([]);
+    $page->assertNoJavaScriptErrors();
+})->with([
+    'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
+    'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
+]);
