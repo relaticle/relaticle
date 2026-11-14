@@ -79,6 +79,13 @@ final class MergeRecordPicker extends Field
         return $pairing === null || $pairing['values']->overLimit !== [];
     }
 
+    public function isUnavailable(): bool
+    {
+        $id = $this->getState();
+
+        return is_string($id) && $id !== '' && $this->pairing() === null;
+    }
+
     public function keepsOther(): bool
     {
         return $this->pairing() !== null && $this->keep() === 'other';
