@@ -7,6 +7,7 @@ use App\Actions\Onboarding\ApplyStagePreset;
 use App\Actions\Onboarding\SaveOnboardingUseCase;
 use App\Enums\CustomFields\TaskField;
 use App\Enums\OnboardingUseCase;
+use App\Enums\OptionColor;
 use App\Features\OnboardSeed;
 use App\Filament\Pages\Concerns\RunsInviteStep;
 use App\Filament\Pages\Concerns\RunsUseCaseStep;
@@ -358,7 +359,7 @@ it('colours the preset stages', function (): void {
 
     $hired = $stageField->options()->withoutGlobalScopes()->where('name', 'Hired')->sole();
 
-    expect($hired->settings->color)->toBe('#059669');
+    expect($hired->settings->color)->toBe(OptionColor::Green->value);
 });
 
 it('gives the default options the colours their field defines', function (): void {
