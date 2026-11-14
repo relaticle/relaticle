@@ -106,7 +106,7 @@ it('lists Cloudflare only while the signup challenge is on', function (bool $ena
 
 it('says an error report carries no account identity unless the install sends it', function (bool $sendsIdentity, string $expected): void {
     withHostedBilling();
-    config()->set('sentry.send_default_pii', $sendsIdentity);
+    config()->set('sentry.data_collection.user_info', $sendsIdentity);
 
     $this->get('/security')->assertOk()->assertSee($expected);
 })->with([
