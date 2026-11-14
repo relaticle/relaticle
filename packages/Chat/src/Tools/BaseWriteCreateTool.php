@@ -101,7 +101,7 @@ abstract class BaseWriteCreateTool implements Tool
 
         $customFieldsDescription = $user instanceof User
             ? resolve(CustomFieldsSchemaDescriber::class)->describe($user->currentWorkspace, $this->entityType())
-            : 'Custom field values as key-value pairs.';
+            : 'Custom attribute (custom field) values as key-value pairs.';
 
         $recordProperties = array_merge(
             $this->entitySchema($schema),

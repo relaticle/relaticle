@@ -44,7 +44,7 @@ describe('Home page', function () {
         $response->assertStatus(200);
         $response->assertSee('alt="Relaticle opportunities board grouped into pipeline stages, showing amount and close date"', false);
         $response->assertSee('alt="Relaticle companies list showing account owner, ICP status, and website domain for each company"', false);
-        $response->assertSee('alt="Relaticle custom fields settings showing field name, type, constraints, and properties for Opportunities"', false);
+        $response->assertSee('alt="Relaticle custom attributes settings showing attribute name, type, constraints, and properties for Opportunities"', false);
     });
 
     it('fills the mockup frame with every hero screenshot rather than letting it letterbox', function () {
@@ -159,7 +159,7 @@ describe('Legal pages', function () {
         $response->assertSee('Companies, people, opportunities, tasks, and notes.');
         $response->assertSee('Record identifiers and canonical record URLs.');
         $response->assertSee('Contact details.');
-        $response->assertSee('Custom-field definitions, options, and values.');
+        $response->assertSee('Custom attribute definitions, options, and values.');
         $response->assertSee('Relationships between records.');
         $response->assertSee('Opportunity stages and amounts.');
         $response->assertSee('Activity actors, field changes, and timestamps.');

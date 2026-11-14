@@ -24,9 +24,6 @@ return [
         'creator' => [
             'label' => 'Créé par',
         ],
-        'creation_source' => [
-            'label' => 'Source de création',
-        ],
         'created_at' => [
             'label' => 'Date de création',
         ],

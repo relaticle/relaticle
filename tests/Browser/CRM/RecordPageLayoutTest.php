@@ -20,10 +20,7 @@ it('sets the details rail beside the work pane on desktop and stacks it on a pho
     $workspace = $user->ownedWorkspaces()->first();
     $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Northwind Traders']);
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}", 1440, 900)
         ->assertSeeIn('[data-page-heading]', 'Companies')
         ->assertSeeIn('[data-page-heading] h1', 'Northwind Traders')
         ->assertSeeIn('.fi-record-rail', 'Edit')
@@ -57,9 +54,7 @@ it('keeps the details rail collapsed after a reload', function (): void {
     $company = Company::factory()->recycle([$user, $workspace])->create();
     $isCollapsed = "document.querySelector('#record-details section').classList.contains('fi-collapsed')";
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}")
         ->assertScript($isCollapsed, false)
         ->click('#record-details .fi-section-collapse-btn')
         ->assertScript($isCollapsed, true);
@@ -76,10 +71,7 @@ it('gives a long record name the full width of the header on a phone', function 
     $workspace = $user->ownedWorkspaces()->first();
     $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'MOBILE-AUDIT Long Name Industries International Holdings']);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize($width, 844)
-        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+    visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}", $width, 844)
         ->assertScript("(() => { const name = document.querySelector('.fi-record-title .truncate'); const header = document.querySelector('.fi-record-title').closest('.fi-sc-flex'); return name.scrollHeight <= name.clientHeight && name.getBoundingClientRect().width >= header.getBoundingClientRect().width * 0.8; })()", true)
         ->assertNoJavaScriptErrors();
 })->with([390, 320]);
@@ -107,9 +99,7 @@ it('reveals details past the first eight with view all', function (): void {
 
     $company = Company::factory()->recycle([$user, $workspace])->create();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+    visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}")
         ->assertDontSee('Extra detail 8')
         ->click('View all')
         ->assertSee('Extra detail 8')
@@ -125,9 +115,7 @@ it('raises the notes tab count when a note is added from the tab', function (): 
     $workspace = $user->ownedWorkspaces()->first();
     $company = Company::factory()->recycle([$user, $workspace])->create();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/companies/{$company->getKey()}")
+    $page = visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}")
         ->click('.fi-record-pane .fi-tabs-item:nth-child(5)')
         ->press('New note')
         ->type('[id="mountedActionSchema0.title"]', 'Kickoff notes')
@@ -147,10 +135,7 @@ it('wraps a long rail label and gives the record buttons a 44px target on a phon
     $workspace = $user->ownedWorkspaces()->first();
     $opportunity = Opportunity::factory()->recycle([$user, $workspace])->create();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(390, 844)
-        ->navigate("/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}")
+    $page = visitAs($user, "/app/{$workspace->slug}/opportunities/{$opportunity->getKey()}", 390, 844)
         ->assertVisible('.fi-record-rail')
         ->assertNoJavaScriptErrors();
 
@@ -182,10 +167,7 @@ it('previews a company from its list row, steps to the next one and closes on es
 
     $previewTitle = '(() => document.querySelector(".fi-modal-window.fi-record-preview .fi-record-preview-title")?.innerText.trim())()';
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
         ->hover('.fi-ta-row:first-of-type [class~="fi-ta-cell-name"]')
         ->click('.fi-ta-row:first-of-type .fi-record-preview-trigger')
         ->assertScript($previewTitle, 'Atlas Freight')
@@ -215,10 +197,7 @@ it('keeps the preview open while a tab lists the rest of a task\'s assignees', f
     $task->assignees()->attach([$user->getKey(), $member->getKey()]);
     $company->tasks()->attach($task);
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/companies")
+    visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
         ->hover('.fi-ta-row:first-of-type [class~="fi-ta-cell-name"]')
         ->click('.fi-ta-row:first-of-type .fi-record-preview-trigger')
         ->click('.fi-record-preview .fi-record-pane .fi-tabs-item:nth-child(4)')

@@ -23,7 +23,7 @@ use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 
 #[Title('Get CRM Schema')]
-#[Description('Get the current workspace schema for one CRM entity, including active custom fields, choice options, filters, and relationships.')]
+#[Description('Get the current workspace schema for one CRM entity, including active custom attributes (custom fields), choice options, filters, and relationships.')]
 final class GetCrmSchemaTool extends Tool
 {
     use ChecksTokenAbility;

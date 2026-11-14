@@ -4,20 +4,25 @@ declare(strict_types=1);
 
 use App\Data\TableStateData;
 use App\Enums\CrmEntity;
+use App\Enums\WorkspaceRole;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Filament\Resources\NoteResource\Pages\ManageNotes;
 use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Filament\Resources\TaskResource\Pages\ManageTasks;
+use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\ResizableColumns;
-use App\Models\TableLayout;
+use App\Models\CustomField;
+use App\Models\CustomFieldOption;
+use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
+use Symfony\Component\DomCrawler\Crawler;
 
-mutates(HasColumnMenu::class, ResizableColumns::class);
+mutates(HasColumnMenu::class, ResizableColumns::class, CreatesTableAttribute::class);
 
 dataset('column menu pages', [
     'companies' => [ListCompanies::class, CrmEntity::Company],
@@ -72,7 +77,7 @@ function withTitleLast(Testable $component, CrmEntity $entity): array
 }
 
 it('moves a column before another and keeps the order on a new visit', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $movable = columnsBesideTitle($component, $entity);
     [$first, $last] = [$movable[0], end($movable)];
 
@@ -84,25 +89,25 @@ it('moves a column before another and keeps the order on a new visit', function 
 
     session()->flush();
 
-    expect(columnOrder(livewire($page)))->toBe($order);
+    expect(columnOrder(openList($page)))->toBe($order);
 })->with('column menu pages');
 
-it('puts the columns back in their declared order with the standard layout', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
-    $declared = columnOrder($component);
+it('never writes a custom field\'s sort order or its options\' order when a column moves', function (string $page, CrmEntity $entity): void {
+    $snapshot = fn (): array => [
+        CustomField::query()->withoutGlobalScopes()->orderBy('id')->pluck('sort_order', 'id')->all(),
+        CustomFieldOption::query()->withoutGlobalScopes()->orderBy('id')->pluck('sort_order', 'id')->all(),
+    ];
+    $before = $snapshot();
+
+    $component = openList($page);
     $movable = columnsBesideTitle($component, $entity);
+    $component->call('moveTableColumn', end($movable), $movable[0])->call('moveTableColumn', $movable[0], null);
 
-    $component->call('moveTableColumn', end($movable), $movable[0])->call('useStandardTableLayout');
-
-    expect(columnOrder($component))->toBe($declared);
-
-    session()->flush();
-
-    expect(columnOrder(livewire($page)))->toBe($declared);
+    expect($snapshot())->toBe($before);
 })->with('column menu pages');
 
 it('moves a column to the end when nothing follows it', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $first = columnsBesideTitle($component, $entity)[0];
 
     $component->call('moveTableColumn', $first, null);
@@ -112,7 +117,7 @@ it('moves a column to the end when nothing follows it', function (string $page, 
 })->with('column menu pages');
 
 it('hides a toggleable column and keeps it hidden on a new visit', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $column = toggleableColumn($component, $entity);
 
     $component->call('hideTableColumn', $column);
@@ -121,11 +126,11 @@ it('hides a toggleable column and keeps it hidden on a new visit', function (str
 
     session()->flush();
 
-    expect(collect(livewire($page)->get('tableColumns'))->firstWhere('name', $column)['isToggled'])->toBeFalse();
+    expect(collect(openList($page)->get('tableColumns'))->firstWhere('name', $column)['isToggled'])->toBeFalse();
 })->with('column menu pages');
 
 it('moves the title column and lands another column before it', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $title = $entity->titleColumn();
     $last = last(columnOrder($component));
 
@@ -136,18 +141,18 @@ it('moves the title column and lands another column before it', function (string
 
     session()->flush();
 
-    expect(columnOrder(livewire($page)))->toBe($order);
+    expect(columnOrder(openList($page)))->toBe($order);
 })->with('column menu pages');
 
 it('never hides the title column', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page)->call('hideTableColumn', $entity->titleColumn());
+    $component = openList($page)->call('hideTableColumn', $entity->titleColumn());
 
     expect(collect($component->get('tableColumns'))->firstWhere('name', $entity->titleColumn())['isToggled'])->toBeTrue()
         ->and(columnMenuPreferences())->toBe(0);
 })->with('column menu pages');
 
 it('ignores a column the table does not have', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $order = columnOrder($component);
 
     $component->call('moveTableColumn', 'custom_fields.gone', columnsBesideTitle($component, $entity)[0])
@@ -159,7 +164,7 @@ it('ignores a column the table does not have', function (string $page, CrmEntity
 })->with('column menu pages');
 
 it('opens with the title column where the stored order put it', function (string $page, CrmEntity $entity): void {
-    $columns = collect(withTitleLast(livewire($page), $entity))
+    $columns = collect(withTitleLast(openList($page), $entity))
         ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
         ->all();
 
@@ -168,34 +173,37 @@ it('opens with the title column where the stored order put it', function (string
         'state' => new TableStateData(columns: $columns),
     ]);
 
-    expect(last(columnOrder(livewire($page))))->toBe($entity->titleColumn());
+    expect(last(columnOrder(openList($page))))->toBe($entity->titleColumn());
 })->with('column menu pages');
 
 it('keeps the title column where the column manager puts it', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
 
     $component->call('applyTableColumnManager', withTitleLast($component, $entity), true);
 
     expect(last(columnOrder($component)))->toBe($entity->titleColumn());
 })->with('column menu pages');
 
-it('marks the applied layout modified after a move', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('stores a move on the applied view', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(sort: 'name:desc'),
     ]);
-    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
     $movable = columnsBesideTitle($component, CrmEntity::Company);
 
-    expect($component->instance()->isTableLayoutModified())->toBeFalse();
+    expect($view->refresh()->state->columns)->toBe([]);
 
     $component->call('moveTableColumn', end($movable), $movable[0]);
 
-    expect($component->instance()->isTableLayoutModified())->toBeTrue();
+    $stored = array_column($view->refresh()->state->columns, 'name');
+
+    expect($stored)->toBe(columnOrder($component))
+        ->and($stored)->toContain(end($movable));
 });
 
 it('tells the browser which headers hide', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $table = $component->instance()->getTable();
     $title = $table->getColumn($entity->titleColumn())->getExtraHeaderAttributes();
     $toggleable = $table->getColumn(toggleableColumn($component, $entity))->getExtraHeaderAttributes();
@@ -204,19 +212,19 @@ it('tells the browser which headers hide', function (string $page, CrmEntity $en
         ->and($toggleable)->toMatchArray(['data-column-hideable' => '1']);
 })->with('column menu pages');
 
-it('applies a layout that stored the title column elsewhere as stored and unmodified', function (string $page, CrmEntity $entity): void {
-    $columns = collect(withTitleLast(livewire($page), $entity))
+it('applies a view that stored the title column elsewhere as stored and leaves it as stored', function (string $page, CrmEntity $entity): void {
+    $columns = collect(withTitleLast(openList($page), $entity))
         ->map(fn (array $item): array => ['type' => $item['type'], 'name' => $item['name'], 'isToggled' => $item['isToggled']])
         ->all();
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => $entity,
         'state' => new TableStateData(columns: $columns),
     ]);
 
-    $component = livewire($page)->call('applySavedLayout', $layout->getKey());
+    $component = openList($page)->call('applySavedView', $view->getKey());
 
     expect(last(columnOrder($component)))->toBe($entity->titleColumn())
-        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+        ->and(array_column($view->refresh()->state->columns, 'name'))->toBe(array_column($columns, 'name'));
 })->with('column menu pages');
 
 /**
@@ -250,7 +258,7 @@ function storedColumns(Testable $component): array
 }
 
 it('pins a column and keeps it on a new visit', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $column = shownColumns($component, $entity)[2];
 
     $component->call('pinTableColumn', $column);
@@ -260,14 +268,14 @@ it('pins a column and keeps it on a new visit', function (string $page, CrmEntit
 
     $order = columnOrder($component);
     session()->flush();
-    $fresh = livewire($page);
+    $fresh = openList($page);
 
     expect(pinnedColumns($fresh))->toBe([$column])
         ->and(columnOrder($fresh))->toBe($order);
 })->with('column menu pages');
 
 it('pins columns in the order they were pinned and unpins to the first unpinned position', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     [, $a, $b] = shownColumns($component, $entity);
 
     $component->call('pinTableColumn', $b)->call('pinTableColumn', $a);
@@ -281,7 +289,7 @@ it('pins columns in the order they were pinned and unpins to the first unpinned 
 })->with('column menu pages');
 
 it('pins and unpins the title column like any other column', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $title = $entity->titleColumn();
     $column = shownColumns($component, $entity)[0];
 
@@ -296,7 +304,7 @@ it('pins and unpins the title column like any other column', function (string $p
 })->with('column menu pages');
 
 it('unpins a column when it is hidden', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $column = toggleableColumn($component, $entity);
 
     $component->call('pinTableColumn', $column)->call('hideTableColumn', $column);
@@ -304,7 +312,7 @@ it('unpins a column when it is hidden', function (string $page, CrmEntity $entit
     expect(pinnedColumns($component))->toBe([]);
 
     TablePreference::query()->withoutGlobalScopes()->delete();
-    $component = livewire($page)->call('pinTableColumn', $column);
+    $component = openList($page)->call('pinTableColumn', $column);
 
     $component->call('applyTableColumnManager', array_map(
         fn (array $item): array => $item['name'] === $column ? [...$item, 'isToggled' => false] : $item,
@@ -315,7 +323,7 @@ it('unpins a column when it is hidden', function (string $page, CrmEntity $entit
 })->with('column menu pages');
 
 it('keeps a column on its side of the pins when the column manager moves it', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     [$pinned, $unpinned] = shownColumns($component, $entity);
 
     $component->call('pinTableColumn', $pinned);
@@ -329,7 +337,7 @@ it('keeps a column on its side of the pins when the column manager moves it', fu
 })->with('column menu pages');
 
 it('never moves a pinned column', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     [$first, $second] = shownColumns($component, $entity);
 
     $component->call('pinTableColumn', $first)->call('pinTableColumn', $second);
@@ -342,7 +350,7 @@ it('never moves a pinned column', function (string $page, CrmEntity $entity): vo
 })->with('column menu pages');
 
 it('clears the pins when the column manager resets the columns', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $defaultOrder = columnOrder($component);
     $column = shownColumns($component, $entity)[2];
 
@@ -354,12 +362,12 @@ it('clears the pins when the column manager resets the columns', function (strin
 
     session()->flush();
 
-    expect(pinnedColumns(livewire($page)))->toBe([]);
+    expect(pinnedColumns(openList($page)))->toBe([]);
 })->with('column menu pages');
 
 it('drops a pin for a column the table no longer has', function (string $page, CrmEntity $entity): void {
     $title = $entity->titleColumn();
-    $component = livewire($page);
+    $component = openList($page);
     $column = shownColumns($component, $entity)[0];
 
     TablePreference::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
@@ -367,55 +375,55 @@ it('drops a pin for a column the table no longer has', function (string $page, C
         'state' => new TableStateData(columns: storedColumns($component), pinned: [$title, 'custom_fields.gone', $column]),
     ]);
 
-    $component = livewire($page);
+    $component = openList($page);
 
     expect(pinnedColumns($component))->toBe([$title, $column]);
 
     TablePreference::query()->withoutGlobalScopes()->delete();
-    $component = livewire($page)->call('pinTableColumn', 'custom_fields.gone');
+    $component = openList($page)->call('pinTableColumn', 'custom_fields.gone');
 
     expect(pinnedColumns($component))->toBe([])
         ->and(columnMenuPreferences())->toBe(0);
 })->with('column menu pages');
 
-it('restores the pins a layout was saved with and marks the layout modified when they change', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('restores the pins a view was saved with and stores them when they change', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(pinned: ['name', 'creator.name']),
     ]);
 
-    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
 
     expect(pinnedColumns($component))->toBe(['name', 'creator.name'])
         ->and(array_slice(columnOrder($component), 0, 2))->toBe(['name', 'creator.name'])
-        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+        ->and($view->refresh()->state->pinned)->toBe(['name', 'creator.name']);
 
     $component->call('unpinTableColumn', 'creator.name');
 
-    expect($component->instance()->isTableLayoutModified())->toBeTrue();
+    expect($view->refresh()->state->pinned)->toBe(['name']);
 });
 
-it('marks the pins of a layout in the render that applied it and clears them in the render that left it', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('marks the pins of a view in the render that applied it and clears them in the render that left it', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(pinned: ['name', 'creator.name']),
     ]);
     $component = livewire(ListCompanies::class);
     $pinned = fn (string $column): string => $component->instance()->getTable()->getColumn($column)->getExtraHeaderAttributes()['data-column-pinned'];
 
-    $component->call('applySavedLayout', $layout->getKey());
+    $component->call('applySavedView', $view->getKey());
 
     expect($pinned('name'))->toBe('1')
         ->and($pinned('creator.name'))->toBe('1');
 
-    $component->call('useStandardTableLayout');
+    $component->call('applyOwnTable');
 
     expect($pinned('name'))->toBe('0')
         ->and($pinned('creator.name'))->toBe('0');
 });
 
 it('marks pinned headers and cells in the render that pinned them', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     [$pinned, $unpinned] = shownColumns($component, $entity);
 
     $component->call('pinTableColumn', $pinned);
@@ -439,7 +447,7 @@ function columnManagerLabel(Testable $component, string $column): string
 }
 
 it('renames a column for the member in the header and the column manager, and keeps it on a new visit', function (string $page, CrmEntity $entity): void {
-    $component = livewire($page);
+    $component = openList($page);
     $column = columnsBesideTitle($component, $entity)[0];
 
     $component->callAction('editTableColumnLabel', data: ['label' => '  Owner of record  '], arguments: ['column' => $column])
@@ -449,7 +457,7 @@ it('renames a column for the member in the header and the column manager, and ke
         ->and(columnManagerLabel($component, $column))->toBe('Owner of record');
 
     session()->flush();
-    $revisit = livewire($page);
+    $revisit = openList($page);
 
     expect(columnLabelText($revisit, $column))->toBe('Owner of record')
         ->and(columnManagerLabel($revisit, $column))->toBe('Owner of record');
@@ -487,12 +495,12 @@ it('refuses a label longer than 60 characters', function (): void {
 });
 
 it('renames the title column for the member and keeps it on a new visit', function (string $page, CrmEntity $entity): void {
-    livewire($page)
+    openList($page)
         ->callAction('editTableColumnLabel', data: ['label' => 'Record name'], arguments: ['column' => $entity->titleColumn()])
         ->assertHasNoActionErrors();
 
     session()->flush();
-    $revisit = livewire($page);
+    $revisit = openList($page);
 
     expect(columnLabelText($revisit, $entity->titleColumn()))->toBe('Record name')
         ->and(columnManagerLabel($revisit, $entity->titleColumn()))->toBe('Record name');
@@ -505,24 +513,20 @@ it('never renames a column the table does not have', function (): void {
     expect(columnMenuPreferences())->toBe(0);
 });
 
-it('carries labels in a saved layout and marks the layout modified when one changes', function (): void {
-    $layout = TableLayout::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+it('carries labels in a saved view and stores a changed one', function (): void {
+    $view = SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
         'entity' => CrmEntity::Company,
         'state' => new TableStateData(labels: ['created_at' => 'Added']),
     ]);
 
-    $component = livewire(ListCompanies::class)->call('applySavedLayout', $layout->getKey());
+    $component = livewire(ListCompanies::class)->call('applySavedView', $view->getKey());
 
     expect(columnLabelText($component, 'created_at'))->toBe('Added')
-        ->and($component->instance()->isTableLayoutModified())->toBeFalse();
+        ->and($view->refresh()->state->labels)->toBe(['created_at' => 'Added']);
 
     $component->callAction('editTableColumnLabel', data: ['label' => 'Joined'], arguments: ['column' => 'created_at']);
 
-    expect($component->instance()->isTableLayoutModified())->toBeTrue();
-
-    $component->call('revertTableLayout');
-
-    expect(columnLabelText($component, 'created_at'))->toBe('Added');
+    expect($view->refresh()->state->labels)->toBe(['created_at' => 'Joined']);
 });
 
 it('ignores a saved label for a column the table no longer has', function (): void {
@@ -560,4 +564,341 @@ it('names the column menu for assistive technology', function (): void {
     Filament::bootCurrentPanel();
 
     livewire(ListCompanies::class)->assertSeeHtmlInOrder(['role="menu"', 'aria-label="Column options"']);
+});
+
+function columnIsShown(Testable $component, string $column): bool
+{
+    return collect($component->get('tableColumns'))->firstWhere('name', $column)['isToggled'];
+}
+
+it('hides and shows a column from view settings', function (): void {
+    $component = livewire(ListCompanies::class)->call('toggleTableColumn', 'created_at');
+    $before = columnIsShown($component, 'created_at');
+
+    $component->call('toggleTableColumn', 'created_at');
+
+    expect(columnIsShown($component, 'created_at'))->toBe(! $before);
+});
+
+it('never hides the title column from view settings', function (string $page, CrmEntity $entity): void {
+    $component = openList($page)->call('toggleTableColumn', $entity->titleColumn());
+
+    expect(columnIsShown($component, $entity->titleColumn()))->toBeTrue();
+})->with('column menu pages');
+
+it('ignores a column the table does not have in view settings', function (): void {
+    $component = livewire(ListCompanies::class);
+    $before = $component->get('tableColumns');
+
+    $component->call('toggleTableColumn', 'custom_fields.gone');
+
+    expect($component->get('tableColumns'))->toBe($before);
+});
+
+it('lists a hidden column in the add attribute panel and shows it again at the end', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+    $first = columnsBesideTitle($component, CrmEntity::Company)[0];
+
+    $component->call('toggleTableColumn', $first);
+
+    expect($component->html())->toContain('Show '.columnLabelText($component, $first));
+
+    $component->call('toggleTableColumn', $first);
+
+    expect(columnIsShown($component, $first))->toBeTrue()
+        ->and(last(columnOrder($component)))->toBe($first);
+});
+
+it('draws no column manager trigger in the toolbar', function (): void {
+    expect(livewire(ListCompanies::class)->instance()->getTable()->hasColumnManager())->toBeFalse();
+});
+
+it('shows a renamed column with its new label in view settings', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+    $column = columnsBesideTitle($component, CrmEntity::Company)[0];
+
+    $component->callAction('editTableColumnLabel', data: ['label' => 'Owner of record'], arguments: ['column' => $column]);
+
+    expect($component->html())->toContain('aria-label="Options for Owner of record"');
+});
+
+it('draws every view settings row with its icon and a menu button and no eye button', function (string $page, CrmEntity $entity): void {
+    Filament::bootCurrentPanel();
+    $rows = new Crawler(openList($page)->html())->filter('[data-view-settings] .fi-view-settings-row');
+
+    expect($rows->count())->toBeGreaterThan(1);
+
+    $rows->each(function (Crawler $row) use ($entity): void {
+        expect($row->filter('.fi-view-settings-label .fi-icon')->count())->toBe(1)
+            ->and($row->filter('[data-view-settings-menu]')->count())->toBe(1)
+            ->and($row->filter('[data-view-settings-toggle]')->count())->toBe(0)
+            ->and($row->attr('data-column') !== $entity->titleColumn() || $row->attr('data-column-locked') !== null)->toBeTrue();
+    });
+})->with('column menu pages');
+
+it('words the row menu and the header menu from the same keys', function (): void {
+    Filament::bootCurrentPanel();
+    $html = livewire(ListCompanies::class)->html();
+
+    expect(substr_count($html, 'Edit column label'))->toBe(2)
+        ->and(substr_count($html, 'Hide from view'))->toBe(2)
+        ->and($html)->not->toContain('Change attribute label')->not->toContain('Remove column');
+});
+
+it('escapes markup in a column label in view settings', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+
+    $component->callAction('editTableColumnLabel', data: ['label' => '<img src=x onerror=alert(1)>'], arguments: ['column' => 'created_at']);
+
+    $html = $component->html();
+    $panel = new Crawler($html)->filter('[data-view-settings]');
+
+    expect($panel)->toHaveCount(1)
+        ->and($panel->html())->toContain('&lt;img src=x onerror=alert(1)&gt;')->not->toContain('<img src=x')
+        ->and($html)->not->toContain('<img src=x');
+});
+
+it('lists the pinned columns first in view settings and marks them', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class)->call('pinTableColumn', 'created_at');
+
+    $component->assertSeeHtmlInOrder(['data-column="created_at"', 'data-column-pinned', 'data-column="name"']);
+});
+
+it('words the add attribute search with the list page entity', function (string $page, CrmEntity $entity, string $label): void {
+    Filament::bootCurrentPanel();
+
+    openList($page)->assertSeeHtml('placeholder="Search '.$label.' attributes…"');
+})->with([
+    'companies' => [ListCompanies::class, CrmEntity::Company, 'company'],
+    'people' => [ListPeople::class, CrmEntity::People, 'person'],
+    'opportunities' => [ListOpportunities::class, CrmEntity::Opportunity, 'opportunity'],
+    'tasks' => [ManageTasks::class, CrmEntity::Task, 'task'],
+    'notes' => [ManageNotes::class, CrmEntity::Note, 'note'],
+]);
+
+it('offers every hidden toggleable attribute in the add panel and never a main column', function (string $page, CrmEntity $entity): void {
+    Filament::bootCurrentPanel();
+    $component = openList($page);
+    $hidden = columnsBesideTitle($component, $entity);
+    $toggleable = array_values(array_filter($hidden, fn (string $column): bool => $component->instance()->getTable()->getColumn($column)->isToggleable()));
+
+    foreach ($toggleable as $column) {
+        $component->call('hideTableColumn', $column);
+    }
+
+    $items = new Crawler($component->html())->filter('[data-view-settings-add-panel] [data-view-settings-add-item]');
+
+    expect($items->each(fn (Crawler $item): ?string => $item->attr('data-attribute')))->toEqualCanonicalizing($toggleable)
+        ->and($items->each(fn (Crawler $item): ?string => $item->attr('data-attribute')))->not->toContain($entity->titleColumn());
+})->with('column menu pages');
+
+it('never offers a main column in the add panel even when its state says hidden', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListPeople::class);
+    $table = $component->instance()->getTable();
+    $locked = array_values(array_filter(columnOrder($component), fn (string $column): bool => ! $table->getColumn($column)->isToggleable()));
+
+    expect($locked)->not->toBeEmpty();
+
+    $component->set('tableColumns', array_map(
+        fn (array $item): array => in_array($item['name'], $locked, true) ? [...$item, 'isToggled' => false] : $item,
+        $component->get('tableColumns'),
+    ));
+
+    $items = (new Crawler($component->html()))->filter('[data-view-settings-add-panel] [data-view-settings-add-item]')
+        ->each(fn (Crawler $item): ?string => $item->attr('data-attribute'));
+
+    expect($items)->not->toContain(...$locked);
+});
+
+it('tells the member every attribute is in the view once none is hidden', function (): void {
+    Filament::bootCurrentPanel();
+    $component = livewire(ListCompanies::class);
+
+    foreach (columnsBesideTitle($component, CrmEntity::Company) as $column) {
+        if (! columnIsShown($component, $column) && $component->instance()->getTable()->getColumn($column)->isToggleable()) {
+            $component->call('toggleTableColumn', $column);
+        }
+    }
+
+    $component->assertSeeText('Every attribute is already in this view');
+    $component->call('hideTableColumn', 'created_at')->assertDontSeeText('Every attribute is already in this view');
+});
+
+function newAttributeColumns(Testable $component, array $before): array
+{
+    return array_values(array_diff(columnOrder($component), $before));
+}
+
+function customFieldCount(): int
+{
+    return CustomField::query()->withoutGlobalScopes()->where('system_defined', false)->count();
+}
+
+it('adds a text attribute as a shown column at the end of the view, on the same component and on a fresh mount', function (string $page, CrmEntity $entity): void {
+    $component = openList($page);
+    $before = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text'])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Lead score added to this view');
+
+    $added = newAttributeColumns($component, $before);
+
+    expect($added)->toHaveCount(1)
+        ->and(last(columnOrder($component)))->toBe($added[0])
+        ->and(columnIsShown($component, $added[0]))->toBeTrue()
+        ->and($component->instance()->getTable()->getColumn($added[0]))->not->toBeNull()
+        ->and(CustomField::query()->where('entity_type', $entity->value)->where('name', 'Lead score')->sole()->settings->visible_in_list)->toBeTrue();
+
+    $fresh = openList($page);
+
+    expect(columnOrder($fresh))->toContain($added[0])
+        ->and(columnIsShown($fresh, $added[0]))->toBeTrue();
+})->with('column menu pages');
+
+it('stores an added attribute on the active saved view and leaves another view as it was', function (): void {
+    $stored = storedColumns(livewire(ListCompanies::class));
+    [$viewA, $viewB] = collect(['A view', 'B view'])->map(fn (string $name): SavedView => SavedView::factory()->for($this->user)->for($this->user->currentWorkspace)->create([
+        'name' => $name,
+        'entity' => CrmEntity::Company,
+        'state' => new TableStateData(columns: $stored),
+    ]))->all();
+    $component = livewire(ListCompanies::class)->call('applySavedView', $viewA->getKey());
+
+    expect($viewA->refresh()->state->columns)->toHaveSameSize($stored);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']);
+
+    expect(array_column($viewA->refresh()->state->columns, 'name'))->toHaveCount(count($stored) + 1)
+        ->and($viewB->refresh()->state->columns)->toHaveSameSize($stored);
+
+    $component->call('applySavedView', $viewB->getKey());
+
+    expect($viewA->refresh()->state->columns)->toHaveCount(count($stored) + 1)
+        ->and($viewB->refresh()->state->columns)->toHaveSameSize($stored);
+});
+
+it('adds a select attribute with its three options', function (): void {
+    $component = livewire(ListCompanies::class);
+    $before = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Tier', 'type' => 'select', 'options' => [['name' => 'Gold'], ['name' => 'Silver'], ['name' => 'Bronze']]])
+        ->assertHasNoActionErrors();
+
+    $field = CustomField::query()->where('entity_type', 'company')->where('name', 'Tier')->sole();
+
+    expect($field->options->pluck('name')->all())->toBe(['Gold', 'Silver', 'Bronze'])
+        ->and(newAttributeColumns($component, $before))->toHaveCount(1);
+});
+
+it('adds a record attribute linked to companies', function (): void {
+    $component = livewire(ListPeople::class);
+    $before = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Employer', 'type' => 'record', 'lookup_type' => 'company'])
+        ->assertHasNoActionErrors();
+
+    expect(CustomField::query()->where('entity_type', 'people')->where('name', 'Employer')->sole()->lookup_type)->toBe('company')
+        ->and(newAttributeColumns($component, $before))->toHaveCount(1);
+});
+
+it('takes the entity from the list and never from the form', function (): void {
+    livewire(ListCompanies::class)->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'entity_type' => 'people']);
+
+    expect(CustomField::query()->where('name', 'Lead score')->sole()->entity_type)->toBe('company');
+});
+
+it('shows the validator error on the name and creates nothing for a duplicate', function (): void {
+    $component = livewire(ListCompanies::class)->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text']);
+    $count = customFieldCount();
+    $columns = columnOrder($component);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'lead score', 'type' => 'text'])
+        ->assertHasActionErrors(['name' => 'An attribute named lead score already exists.']);
+
+    expect(customFieldCount())->toBe($count)
+        ->and(columnOrder($component))->toBe($columns);
+});
+
+it('drops options and a linked entity the chosen type does not take', function (): void {
+    livewire(ListCompanies::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'options' => [['name' => 'Gold']], 'lookup_type' => 'company'])
+        ->assertHasNoActionErrors();
+
+    $field = CustomField::query()->where('entity_type', 'company')->where('name', 'Lead score')->sole();
+
+    expect($field->options)->toHaveCount(0)
+        ->and($field->lookup_type)->toBeNull();
+});
+
+it('shows a repeated option on its own row', function (): void {
+    $count = customFieldCount();
+
+    livewire(ListCompanies::class)
+        ->mountAction('createTableAttribute')
+        ->set('mountedActions.0.data', ['name' => 'Tier', 'type' => 'select', 'options' => ['a' => ['name' => 'Gold'], 'b' => ['name' => 'gold']]])
+        ->callMountedAction()
+        ->assertHasActionErrors(['options.b.name' => 'This option is already listed.']);
+
+    expect(customFieldCount())->toBe($count);
+});
+
+it('tells the member the attribute limit is reached on the name', function (): void {
+    $limit = CustomField::query()->where('entity_type', 'company')->count();
+    config(['chat.max_custom_fields_per_entity' => $limit]);
+    $count = customFieldCount();
+
+    livewire(ListCompanies::class)
+        ->callAction('createTableAttribute', data: ['name' => 'Tier', 'type' => 'text'])
+        ->assertHasActionErrors(['name' => "The attribute limit for this list is {$limit}."]);
+
+    expect(customFieldCount())->toBe($count);
+});
+
+function actAsMember(object $test): void
+{
+    $member = User::factory()->create();
+    $test->user->currentWorkspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($test->user->currentWorkspace);
+    $test->actingAs($member->fresh());
+    Filament::setTenant($test->user->currentWorkspace);
+}
+
+it('does not open the create attribute modal for a member who calls the action directly', function (): void {
+    actAsMember($this);
+    $count = customFieldCount();
+
+    $component = livewire(ListCompanies::class)->call('mountAction', 'createTableAttribute');
+
+    expect($component->get('mountedActions'))->toBeEmpty()
+        ->and(customFieldCount())->toBe($count);
+});
+
+it('creates nothing when a member forges a submit of the create attribute action', function (): void {
+    actAsMember($this);
+    $count = customFieldCount();
+
+    livewire(ListCompanies::class)
+        ->set('mountedActions', [['name' => 'createTableAttribute', 'arguments' => [], 'context' => [], 'data' => ['name' => 'Lead score', 'type' => 'text']]])
+        ->call('callMountedAction');
+
+    expect(customFieldCount())->toBe($count);
+});
+
+it('pins the create attribute button below the add panel list for an owner and hides it from a member', function (): void {
+    Filament::bootCurrentPanel();
+    $owner = new Crawler(livewire(ListCompanies::class)->html());
+
+    expect($owner->filter('[data-view-settings-add-panel] > .fi-view-settings-footer [data-view-settings-create]')->count())->toBe(1)
+        ->and($owner->filter('[data-view-settings-add-panel] .fi-view-settings-scroll [data-view-settings-create]')->count())->toBe(0)
+        ->and(trim($owner->filter('[data-view-settings-create]')->text()))->toBe('Create new attribute');
+
+    actAsMember($this);
+
+    expect(new Crawler(livewire(ListCompanies::class)->html())->filter('[data-view-settings-create]')->count())->toBe(0);
 });

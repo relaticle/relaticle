@@ -7,10 +7,14 @@ use App\Data\DigestTaskItem;
 use App\Data\TaskDigest;
 use App\Enums\CrmEntity;
 use App\Filament\Resources\TaskResource;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Mail\TaskDigestMail;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Facades\Filament;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 
 function digestWorkspace(User $user, string $name = 'Acme'): Workspace
 {
@@ -112,7 +116,7 @@ it('shows five cards per column, keeps the full count and links the rest to the 
         overdue: array_map($item, ['o1', 'o2', 'o3', 'o4', 'o5', 'o6', 'o7']),
         upcoming: array_map($item, ['t1', 't2']),
     ));
-    $tasksUrl = TaskResource::getUrl('index', ['tableFilters' => ['assigned_to_me' => ['isActive' => true]], 'tenant' => $workspace], panel: 'app');
+    $tasksUrl = TaskResource::assignedToMeUrl($workspace);
 
     expect(substr_count($mail->render(), 'class="task-card"'))->toBe(7);
     $mail->assertDontSeeInHtml('task=o6');
@@ -206,3 +210,26 @@ it('names the workspace and leads the subject with the overdue and due-today cou
     'due plural' => [0, 3, '[Acme] 3 tasks due today, Nov 5'],
     'owner timezone date' => [1, 1, '[Acme] 1 overdue, 1 due today, Nov 6', 'Pacific/Auckland'],
 ]);
+
+it('links the digest to the task list narrowed to the tasks assigned to the member', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $mine = Task::factory()->for($workspace)->create(['title' => 'Mine']);
+    $mine->assignees()->attach($user);
+    $theirs = Task::factory()->for($workspace)->create(['title' => 'Theirs']);
+    $digest = new TaskDigest([], [new DigestTaskItem('Send proposal', now(), 'https://app.test/tasks?b')]);
+
+    $link = (new TaskDigestMail($user, $workspace, $digest))->content()->with['tasksUrl'];
+    parse_str((string) parse_url($link, PHP_URL_QUERY), $query);
+
+    $this->actingAs($user);
+    Filament::setTenant($workspace);
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+    Filament::bootCurrentPanel();
+
+    expect($query)->toHaveKey('filters')->not->toHaveKey('tableFilters');
+
+    Livewire::withQueryParams($query)->test(ManageTasks::class)
+        ->assertCanSeeTableRecords([$mine])
+        ->assertCanNotSeeTableRecords([$theirs]);
+});

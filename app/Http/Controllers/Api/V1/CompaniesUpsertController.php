@@ -27,7 +27,7 @@ final readonly class CompaniesUpsertController
     #[ResponseFromApiResource(CompanyResource::class, Company::class, status: 201)]
     #[Response(['message' => 'More than one record holds this domains value. Merge the duplicates, then retry.', 'matches' => ['01jz8x0m6v1b4n7q2r5t8w9y3a', '01jz8x0m6v1b4n7q2r5t8w9y3b']], 409, 'More than one company holds the matched value, so nothing was written. `matches` lists up to 25 of their IDs.')]
     #[BodyParam('match', 'object', 'The unique field and value that identify an existing company.', required: true, example: ['field' => 'domains', 'value' => 'acme.com'])]
-    #[BodyParam('match.field', 'string', 'Code of a custom field marked unique, such as `domains`.', required: true, example: 'domains')]
+    #[BodyParam('match.field', 'string', 'Code of a custom attribute (custom field) marked unique, such as `domains`.', required: true, example: 'domains')]
     #[BodyParam('match.value', 'string', 'Value to look for. Matched case-insensitively, and inside multi-value fields.', required: true, example: 'acme.com')]
     #[BodyParam('name', 'string', required: true, example: 'Acme Corp')]
     public function __invoke(

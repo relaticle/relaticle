@@ -65,7 +65,7 @@ trait ResolvesUpsertMatch
     {
         $codes = $this->matchableFields()->keys()->implode(', ') ?: 'none';
 
-        return ['match.field.in' => "The match.field must be a custom field marked unique: {$codes}."];
+        return ['match.field.in' => "The match.field must be a custom attribute (custom field) marked unique: {$codes}."];
     }
 
     /** @return array<string, mixed> */

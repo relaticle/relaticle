@@ -14,12 +14,16 @@ declare(strict_types=1);
  * Conventions: see CLAUDE.md -> Testing section
  */
 
+use App\Enums\CrmEntity;
 use App\Enums\Notifications\NotificationReason;
 use App\Enums\WorkspaceSetupStep;
 use App\Features\Billing;
 use App\Filament\Pages\CreateWorkspace;
 use App\Filament\Pages\SetupWorkspace;
+use App\Filament\Resources\NoteResource\Pages\NotesCards;
 use App\Models\Notification as NotificationRow;
+use App\Models\SavedView;
+use App\Models\TablePreference;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Http\HostResolver;
@@ -121,6 +125,24 @@ if (class_exists(Playwright::class)) {
 function livewire(string $component, array $params = []): Testable
 {
     return Livewire::test($component, $params);
+}
+
+/**
+ * @param  class-string  $page
+ */
+function openList(string $page): Testable
+{
+    return Livewire::withQueryParams(['view' => SavedView::BUILT_IN_LIST_LINK])->test($page);
+}
+
+function openCards(): Testable
+{
+    return Livewire::withQueryParams(['view' => 'cards'])->test(NotesCards::class);
+}
+
+function openOpportunitiesOnTheList(User $user, Workspace $workspace): void
+{
+    TablePreference::factory()->for($user)->for($workspace)->create(['entity' => CrmEntity::Opportunity, 'view_order' => ['list', 'board']]);
 }
 
 /**
@@ -375,6 +397,11 @@ function assertActionHasMailboxOAuthUrl(
     );
 }
 
+function filterRowSaveControlCount(): string
+{
+    return '[...document.querySelectorAll("[data-filter-bar] button, [data-filter-bar] a")].filter((control) => /^(save|save for everyone|discard changes)$/i.test((control.getAttribute("aria-label") ?? control.textContent).trim())).length';
+}
+
 /**
  * Log in through the real two-step login form: type the email and submit to
  * reveal the password field, then type the password and submit again.
@@ -394,6 +421,15 @@ function loginViaBrowser(User $user, ?string $theme = null, ?AwaitableWebpage $p
         ->assertScript(asyncAlpineComponentsLoaded())
         ->type('[id="form.password"]', 'password')
         ->click('button[type="submit"]');
+}
+
+function visitAs(User $user, string $path, ?int $width = null, ?int $height = null): AwaitableWebpage
+{
+    test()->actingAs($user);
+
+    $viewport = $width === null || $height === null ? [] : ['viewport' => ['width' => $width, 'height' => $height]];
+
+    return test()->visit($path, $viewport)->assertPathIsNot('/app/login');
 }
 
 function asyncAlpineComponentsLoaded(): string

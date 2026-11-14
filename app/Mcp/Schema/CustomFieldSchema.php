@@ -35,7 +35,7 @@ final readonly class CustomFieldSchema
     public static function usage(CrmEntity $entity): string
     {
         return implode(' ', [
-            'Pass custom field values in the "custom_fields" object using field codes as keys.',
+            'Pass custom attribute (custom field) values in the "custom_fields" object using field codes as keys.',
             CustomFieldOptionMap::choiceRule(),
             'Filter list tools with the "filter" param. Names, operands and options are listed in filterable_fields.',
             EntityFilters::CUSTOM_FIELDS_RULE,

@@ -16,7 +16,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 
 #[Title('Create Opportunity')]
-#[Description('Create a new opportunity (deal) in the CRM. Use the crm-schema resource to discover available custom fields.')]
+#[Description('Create a new opportunity (deal) in the CRM. Use the crm-schema resource to discover available custom attributes (custom fields).')]
 final class CreateOpportunityTool extends BaseCreateTool
 {
     use OperatesOnCrmEntity;

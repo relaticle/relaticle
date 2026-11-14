@@ -211,7 +211,7 @@
                         <a
                             href="{{ $chatUrl }}"
                             wire:navigate
-                            class="fi-sidebar-item-btn pe-8 group-hover/chat-item:bg-(--surface-sidebar-hover-bg)"
+                            class="fi-sidebar-item-btn pe-8 group-hover/chat-item:bg-(--surface-sidebar-hover-bg) [@media(hover:hover)]:group-has-aria-expanded/chat-item:bg-(--surface-sidebar-hover-bg)"
                         >
                             <x-lucide-message-square class="fi-icon fi-size-lg fi-sidebar-item-icon" />
                             <span
@@ -261,7 +261,7 @@
                                 aria-label="{{ __('Chat actions') }}"
                                 title="{{ __('Chat actions') }}"
                                 x-bind:class="{ 'opacity-100': isOpen }"
-                                class="flex size-6 items-center justify-center rounded-md text-gray-500 opacity-0 max-sm:size-11 transition hover:bg-gray-200/70 hover:text-gray-700 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 pointer-coarse:opacity-100 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200"
+                                class="flex size-6 items-center justify-center rounded-md text-gray-500 opacity-0 max-sm:size-11 transition hover:bg-gray-200/70 hover:text-gray-700 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 group-hover/chat-item:opacity-100 pointer-coarse:opacity-100 [@media(hover:hover)]:aria-expanded:bg-gray-200/70 [@media(hover:hover)]:aria-expanded:text-gray-700 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-gray-200 dark:[@media(hover:hover)]:aria-expanded:bg-white/10 dark:[@media(hover:hover)]:aria-expanded:text-gray-200"
                             >
                                 <x-lucide-ellipsis class="size-4" />
                             </button>

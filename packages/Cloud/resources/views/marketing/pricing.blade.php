@@ -108,7 +108,7 @@
         } else {
             $hostedPriceCell = __('$0/mo per workspace');
             $hostedUpdatesCell = __('Zero-downtime updates and automatic daily backups, handled for you');
-            $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the MCP server, the REST API, custom fields, multiple workspaces, zero-downtime updates, automatic daily backups, and email support. No credit card is required.');
+            $hostedPlanAnswer = __('The hosted Cloud plan is $0/mo and includes unlimited users and data, the MCP server, the REST API, custom attributes, multiple workspaces, zero-downtime updates, automatic daily backups, and email support. No credit card is required.');
             $planLimitAnswer = __(
                 'CRM data itself is never capped on any plan. Every workspace supports unlimited users, companies, people, opportunities, tasks, and notes, whether you\'re self-hosting or on the hosted Cloud plan. :name, the AI assistant, does not meter credits on a self-hosted install, so no credit limit applies. See "Are self-hosted installs exempt from AI credit limits?" below.',
                 ['name' => config('chat.assistant_name')]

@@ -16,7 +16,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 
 #[Title('Update Company')]
-#[Description('Update an existing company in the CRM. Use the crm-schema resource to discover available custom fields.')]
+#[Description('Update an existing company in the CRM. Use the crm-schema resource to discover available custom attributes (custom fields).')]
 final class UpdateCompanyTool extends BaseUpdateTool
 {
     use OperatesOnCrmEntity;

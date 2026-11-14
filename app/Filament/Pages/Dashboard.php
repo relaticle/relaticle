@@ -156,9 +156,7 @@ final class Dashboard extends Page
 
     public function getTasksIndexUrl(): string
     {
-        return TaskResource::getUrl('index', [
-            'tableFilters' => ['assigned_to_me' => ['isActive' => true]],
-        ]);
+        return TaskResource::assignedToMeUrl();
     }
 
     public function editTaskAction(): EditTaskAction

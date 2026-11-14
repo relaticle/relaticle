@@ -41,7 +41,7 @@ it('describes the system-seeded task custom fields with type hints', function ()
         ->describe($user->currentWorkspace, 'task');
 
     expect($description)
-        ->toContain('Available custom fields')
+        ->toContain('Available custom attributes (custom fields)')
         ->toContain('due_date')
         ->toContain('date-time')
         ->toContain('ISO 8601')
@@ -96,7 +96,7 @@ it('returns an empty marker when the entity has no custom fields for the tenant'
     $description = resolve(CustomFieldsSchemaDescriber::class)
         ->describe($user->currentWorkspace, 'task');
 
-    expect($description)->toBe('No custom fields are defined for this entity type.');
+    expect($description)->toBe('No custom attributes (custom fields) are defined for this entity type.');
 });
 
 it('lists a deactivated field separately from the settable codes', function (): void {
@@ -212,12 +212,12 @@ it('shows a field and an option added mid-request on the list tool and on a rela
     ]);
 
     expect($describe(ListCompaniesTool::class))->toContain('- segment (Segment, select')
-        ->and($describe(ListPeopleTool::class))->toContain('nested custom field example {"company":{"custom_fields":{"segment":');
+        ->and($describe(ListPeopleTool::class))->toContain('nested custom attribute (custom field) example {"company":{"custom_fields":{"segment":');
 
     $field->options()->create(['tenant_id' => $workspaceId, 'name' => 'Enterprise', 'sort_order' => 0]);
 
     expect($describe(ListCompaniesTool::class))->toContain('- segment (Segment, select; one of: "Enterprise"')
-        ->and($describe(ListPeopleTool::class))->toContain('nested custom field example {"company":{"custom_fields":{"segment":{"$in":["Enterprise"]}}}}');
+        ->and($describe(ListPeopleTool::class))->toContain('nested custom attribute (custom field) example {"company":{"custom_fields":{"segment":{"$in":["Enterprise"]}}}}');
 });
 
 it('keeps a custom field name and option label on one line of the filter description', function (): void {
@@ -314,8 +314,8 @@ it('names the domain sub-field operators and the matching rule once per email an
     $field = $lines->first(fn (string $line): bool => str_starts_with($line, '- emails ('));
     $filterDescription = (new ListPeopleTool)->schema(new JsonSchemaTypeFactory)['filter']->toArray()['description'];
 
-    expect($email)->toContain('operators $has_any, $has_none, $is_empty;', 'sub-field domain takes $in, $not_in', CustomFieldType::EMAIL->filterMatching())
-        ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching())
+    expect($email)->toContain('operators $has_any, $has_none, $contains, $starts_with, $ends_with, $is_empty;', 'sub-field domain takes $in, $not_in', CustomFieldType::EMAIL->filterMatching(), CustomFieldType::EMAIL->partialMatching())
+        ->and($phone)->toContain(CustomFieldType::PHONE->filterMatching(), CustomFieldType::PHONE->partialMatching())
         ->and($phone)->not->toContain('sub-field')
         ->and($field)->toBe('- emails (Emails, email)')
         ->and($filterDescription)->toStartWith('Names for this entity type:')
@@ -330,7 +330,7 @@ it('renders the related entity and the field type on chat and states emptiness o
     $opportunities = resolve(CustomFieldsFilterDescriber::class)->describe($user, 'opportunity');
 
     expect($opportunities)->toContain('- contact (relation to people;', '- amount (Amount, currency)', '- close_date (Close Date, date)')
-        ->and(resolve(CustomFieldsFilterDescriber::class)->describe($user, 'note'))->toContain('No filterable custom fields are defined');
+        ->and(resolve(CustomFieldsFilterDescriber::class)->describe($user, 'note'))->toContain('No filterable custom attributes (custom fields) are defined');
 });
 
 dataset('chat list tools', [
@@ -382,9 +382,9 @@ it('words each name, type and field as the vocabulary publishes it', function (C
     if ($nestedCustom !== []) {
         $name = array_key_first($nestedCustom);
 
-        expect($lines['rules']['relation'])->toContain('nested custom field example '.CustomFieldFilterSchema::json([$name => $nestedCustom[$name]['nested_custom_field_example']]));
+        expect($lines['rules']['relation'])->toContain('nested custom attribute (custom field) example '.CustomFieldFilterSchema::json([$name => $nestedCustom[$name]['nested_custom_field_example']]));
     } else {
-        expect($chatDescription)->not->toContain('nested custom field example');
+        expect($chatDescription)->not->toContain('nested custom attribute (custom field) example');
     }
 
     foreach ($types as $type => $entry) {
@@ -402,6 +402,10 @@ it('words each name, type and field as the vocabulary publishes it', function (C
 
         if (isset($entry['matching'])) {
             expect($lines['types'][$type])->toContain("values match {$entry['matching']}");
+        }
+
+        if (isset($entry['partial_matching'])) {
+            expect($lines['types'][$type])->toContain("partial matches compare against {$entry['partial_matching']}");
         }
     }
 
@@ -477,5 +481,5 @@ it('names each filter and each rule once in a chat tool description', function (
     expect($chat)->not->toContain('Native fields:')
         ->and(substr_count($chat, FilterDefinition::MEMBER_OPERAND))->toBe(in_array('members', $kinds, true) ? 1 : 0)
         ->and(substr_count($chat, FilterDefinition::RELATION_OPERAND))->toBe(in_array('relation', $kinds, true) ? 1 : 0)
-        ->and(substr_count($chat, 'nested custom field example'))->toBe($hasNestedCustom ? 1 : 0);
+        ->and(substr_count($chat, 'nested custom attribute (custom field) example'))->toBe($hasNestedCustom ? 1 : 0);
 })->with('chat list tools');

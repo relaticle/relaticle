@@ -6,12 +6,20 @@ namespace App\Filament\Components\Tables;
 
 use BackedEnum;
 use Filament\Support\Enums\IconSize;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
 
 use function Filament\Support\generate_icon_html;
 
 final readonly class ColumnHeaderLabel
 {
+    public static function text(string|Htmlable|null $label): string
+    {
+        $text = $label instanceof Htmlable ? html_entity_decode(strip_tags($label->toHtml()), ENT_QUOTES) : (string) $label;
+
+        return trim((string) preg_replace('/\s+/', ' ', $text));
+    }
+
     public static function make(string $label, string|BackedEnum|null $icon): HtmlString
     {
         $icon = generate_icon_html($icon, size: IconSize::Small)?->toHtml();

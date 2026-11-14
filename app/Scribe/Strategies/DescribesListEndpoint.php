@@ -101,7 +101,7 @@ trait DescribesListEndpoint
             'cursor' => [
                 'type' => 'string',
                 'required' => false,
-                'description' => 'Switches to cursor pagination. Send `true` for the first page, then the `meta.next_cursor` value of the previous page. Sorts by a custom field need `page`.',
+                'description' => 'Switches to cursor pagination. Send `true` for the first page, then the `meta.next_cursor` value of the previous page. Sorts by a custom attribute (custom field) need `page`.',
                 'example' => null,
             ],
             'page' => [

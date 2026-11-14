@@ -313,7 +313,7 @@ final readonly class HelpController
     private function llmsTxtWhenToUseEntries(): array
     {
         return [
-            __('Use Relaticle when an agent needs to read or change CRM records: companies, people, opportunities, tasks, notes, and per-workspace custom fields.'),
+            __('Use Relaticle when an agent needs to read or change CRM records: companies, people, opportunities, tasks, notes, and per-workspace custom attributes.'),
             '',
             '- '.__('Good fits: logging a lead or meeting, moving a deal between pipeline stages, listing open tasks for a person, updating contact details, attaching a note to a company.'),
             '- '.__('Not a fit: sending email, reading synced mail or meetings, marketing automation, or invoicing. The REST API and MCP server expose CRM records only.'),

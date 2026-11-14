@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace App\Filament\Resources;
 
-use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Forms\WorkspaceMemberSelect;
 use App\Filament\Components\RecordChip;
 use App\Filament\Components\Tables\EmptyListDescription;
+use App\Filament\Components\Tables\FilteredEmptyState;
 use App\Filament\Components\Tables\RecordChipColumn;
 use App\Filament\Exports\PeopleExporter;
 use App\Filament\Resources\PeopleResource\Pages\ListPeople;
@@ -19,20 +19,15 @@ use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager
 use App\Filament\Resources\PeopleResource\RelationManagers\MeetingsRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\NotesRelationManager;
 use App\Filament\Resources\PeopleResource\RelationManagers\TasksRelationManager;
+use App\Filament\Tables\BulkBar;
+use App\Filament\Tables\RowActions;
 use App\Models\Company;
 use App\Models\People;
 use Filament\Actions\Action;
-use Filament\Actions\ActionGroup;
-use Filament\Actions\BulkActionGroup;
-use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
-use Filament\Actions\EditAction;
 use Filament\Actions\ExportBulkAction;
-use Filament\Actions\ForceDeleteAction;
 use Filament\Actions\ForceDeleteBulkAction;
-use Filament\Actions\RestoreAction;
 use Filament\Actions\RestoreBulkAction;
-use Filament\Actions\ViewAction;
 use Filament\Forms\Components\TextInput;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Grid;
@@ -41,8 +36,6 @@ use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Filament\Tables\Columns\Column;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\SelectFilter;
-use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
@@ -51,6 +44,7 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Relaticle\ActivityLog\Filament\RelationManagers\ActivityLogRelationManager;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\EmailIntegration\Filament\Actions\MassSendBulkAction;
+use Relaticle\ImportWizard\Filament\Pages\ImportPeople;
 
 final class PeopleResource extends Resource
 {
@@ -111,34 +105,25 @@ final class PeopleResource extends Resource
     {
         return $table
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/person.empty_state.description')))
+            ->emptyStateHeading(FilteredEmptyState::heading())
+            ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
-            ->filters([
-                SelectFilter::make('creation_source')
-                    ->label(__('filament/resources/person.fields.creation_source.label'))
-                    ->options(CreationSource::class)
-                    ->multiple(),
-                TrashedFilter::make(),
-            ])
             ->recordActions([
-                ActionGroup::make([
+                RowActions::withoutMenu([
                     PreviewRecordAction::make()->page(ViewPeople::class),
-                    ViewAction::make(),
-                    EditAction::make(),
-                    RestoreAction::make(),
-                    DeleteAction::make(),
-                    ForceDeleteAction::make(),
                 ]),
             ])
             ->toolbarActions([
-                BulkActionGroup::make([
+                BulkBar::make([
                     MassSendBulkAction::make(),
                     ExportBulkAction::make()
                         ->authorize('exportAny', People::class)
                         ->exporter(PeopleExporter::class),
+                    RestoreBulkAction::make(),
+                ], more: [
                     DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
                 ]),
             ]);
     }
@@ -152,16 +137,13 @@ final class PeopleResource extends Resource
             RecordChipColumn::make('name')
                 ->previewable()
                 ->label(__('filament/resources/person.fields.name.label'))
-                ->searchable()
                 ->sortable(),
             RecordChipColumn::make('company.name')
                 ->label(__('filament/resources/person.fields.company.label'))
                 ->url(fn (People $record): ?string => $record->company_id ? CompanyResource::getUrl('view', [$record->company_id]) : null)
-                ->searchable()
                 ->sortable(),
             TextColumn::make('creator.name')
                 ->label(__('filament/resources/person.fields.creator.label'))
-                ->searchable()
                 ->sortable()
                 ->toggleable()
                 ->visibleFrom('sm')
@@ -192,6 +174,14 @@ final class PeopleResource extends Resource
             EmailsRelationManager::class,
             MeetingsRelationManager::class,
         ];
+    }
+
+    /**
+     * @return array<string>
+     */
+    public static function getNavigationItemActiveRoutePattern(): array
+    {
+        return [self::getRouteBaseName().'.*', ImportPeople::getRouteName()];
     }
 
     public static function getPages(): array

@@ -21,7 +21,7 @@
             ]),
         ],
         ['How do I deploy Relaticle?', 'The quickest way is the hosted version at app.relaticle.com: sign up and start. To run it yourself, deploy with Docker Compose on your own server. Your CRM database stays there, and AI requests go only to the provider you configure.'],
-        ['Can I customize the data model?', 'Yes. Add custom fields to any record: text, email, phone, currency, date, select, multi-select, and links to other records. You can encrypt sensitive fields. No code changes needed.'],
+        ['Can I customize the data model?', 'Yes. Add custom attributes to any record: text, email, phone, currency, date, select, multi-select, and links to other records. You can encrypt sensitive attributes. No code changes needed.'],
         ['Is Relaticle production-ready?', 'Yes. Relaticle Cloud runs in production today. Every change passes an automated test suite before it ships. Each workspace\'s data stays separate behind role-based permissions.'],
         $emailIntegrationActive
             ? ['Does Relaticle sync my email and calendar?', 'Yes. Connect a Google or Microsoft account and your email and meetings appear on the people, companies, and opportunities they involve. You can reply and send from the record, and you choose how much of each email your workspace can see.']
@@ -67,7 +67,7 @@
                 ->applicationCategory('BusinessApplication')
                 ->applicationSubCategory('CRM')
                 ->operatingSystem('Linux, macOS, Windows')
-                ->description("The open-source AI CRM for selling without a sales team. Self-hosted with {$assistantName}, a built-in AI assistant (with @-mentions, approval before every write, voice, and persistent history), plus an MCP server, REST API, and custom fields. Connect any external agent: Claude, ChatGPT, Gemini, or open-source models.")
+                ->description("The open-source AI CRM for selling without a sales team. Self-hosted with {$assistantName}, a built-in AI assistant (with @-mentions, approval before every write, voice, and persistent history), plus an MCP server, REST API, and custom attributes. Connect any external agent: Claude, ChatGPT, Gemini, or open-source models.")
                 ->url(url('/'))
                 ->offers(\Spatie\SchemaOrg\Schema::offer()->name('Self-hosted')->description('Free to self-host under the AGPL-3.0 license.')->price('0')->priceCurrency('USD'))
                 ->setProperty('featureList', array_values(array_filter([
@@ -76,7 +76,7 @@
                     'MCP server for external AI agents',
                     'REST API with full CRUD operations',
                     $emailIntegrationActive ? 'Gmail and Outlook email and calendar sync with per-email sharing controls' : null,
-                    'Custom fields with per-field encryption',
+                    'Custom attributes with per-attribute encryption',
                     'Self-hosted with full data ownership',
                     'Multi-workspace isolation with role-based permissions',
                     'CSV import and export',

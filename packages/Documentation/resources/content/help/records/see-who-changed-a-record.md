@@ -15,7 +15,7 @@ changed it and when.
 
 Each entry names the person and the field, as in "Alex changed Stage", and
 scrolling loads older history as far back as the record goes. Field edits are
-covered, custom fields included; every teammate's changes appear, not just
+covered, custom attributes included; every teammate's changes appear, not just
 your own.
 
 Tasks and notes don't have an activity tab; for those, the list columns show

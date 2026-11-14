@@ -71,8 +71,7 @@ function ownerWithAccessRequests(string ...$requesterNames): array
 
 function openInbox(User $owner, Workspace $workspace): AwaitableWebpage
 {
-    return loginViaBrowser($owner)
-        ->assertPathIs("/app/{$workspace->slug}")
+    return visitAs($owner, "/app/{$workspace->slug}")
         ->assertScript('!! (window.Alpine && window.Livewire)', true)
         ->wait(1)
         ->click(INBOX_TRIGGER)

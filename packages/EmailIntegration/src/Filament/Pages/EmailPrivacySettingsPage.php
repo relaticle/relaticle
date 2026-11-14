@@ -30,11 +30,13 @@ use Relaticle\EmailIntegration\Actions\UpdateWorkspaceEmailVisibilityAction;
 use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailBlocklistType;
 use Relaticle\EmailIntegration\Enums\EmailVisibilityEnforcement;
+use Relaticle\EmailIntegration\Filament\Concerns\HasEmailSettingsTrail;
 use Relaticle\EmailIntegration\Models\WorkspaceEmailBlocklist;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 
 final class EmailPrivacySettingsPage extends Page implements HasSchemas
 {
+    use HasEmailSettingsTrail;
     use HasWorkspaceSettingsNavigation;
     use InteractsWithSchemas;
 
@@ -76,6 +78,11 @@ final class EmailPrivacySettingsPage extends Page implements HasSchemas
     public function getTitle(): string
     {
         return __('workspaces.tabs.email');
+    }
+
+    public function getHeading(): string
+    {
+        return __("filament/pages/email-privacy-settings.tabs.{$this->tab}");
     }
 
     public static function getLabel(): string

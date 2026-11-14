@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Attributes\MimeType;
 use Laravel\Mcp\Server\Attributes\Uri;
 use Laravel\Mcp\Server\Resource;
 
-#[Description('Schema for companies including available custom fields. Read this before creating or updating companies.')]
+#[Description('Schema for companies including available custom attributes (custom fields). Read this before creating or updating companies.')]
 #[Uri('relaticle://schema/company')]
 #[MimeType('application/json')]
 #[Cacheable(ttlMs: CustomFieldSchemaCache::TTL * 1000, scope: CacheScope::Private)]

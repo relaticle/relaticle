@@ -34,7 +34,7 @@ and a note creates only those two.
 2. Select **Connect New Account** and sign in to Relaticle if asked.
 3. Approve access and **pick the workspace** the form may write to.
 4. Back in Maxforms, switch on the records you want and map each Relaticle
-   field to a form answer. Your custom fields are listed beside the
+   field to a form answer. Your custom attributes are listed beside the
    built-in ones.
 5. Save, send a test submission, and open the new records in Relaticle.
 

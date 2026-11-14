@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Enums;
 
+use App\Enums\CustomFields\OpportunityField;
+use App\Enums\CustomFields\TaskField;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -125,6 +127,50 @@ enum CrmEntity: string
     public function iconPath(): string
     {
         return IconPath::for($this->icon());
+    }
+
+    /**
+     * The built-in views a member can order, in the order a member who never ordered them sees.
+     *
+     * @return list<string>
+     */
+    public function builtInViews(): array
+    {
+        return match ($this) {
+            self::Opportunity => ['board', 'list'],
+            self::Task => ['list', 'board'],
+            self::Note => ['cards', 'list'],
+            self::Company, self::People => ['list'],
+        };
+    }
+
+    public function boardFieldCode(): ?string
+    {
+        return match ($this) {
+            self::Opportunity => OpportunityField::STAGE->value,
+            self::Task => TaskField::STATUS->value,
+            self::Company, self::People, self::Note => null,
+        };
+    }
+
+    /** @return list<string> */
+    public function nativeCardAttributes(): array
+    {
+        return match ($this) {
+            self::Opportunity => ['company', 'contact', 'creator', 'created_at', 'updated_at'],
+            self::Task => ['description', 'checklist', 'assignees', 'creator', 'created_at', 'updated_at'],
+            self::Company, self::People, self::Note => [],
+        };
+    }
+
+    /** @return list<string> */
+    public function defaultCardAttributes(): array
+    {
+        return match ($this) {
+            self::Opportunity => ['company', 'custom_fields.amount', 'custom_fields.close_date'],
+            self::Task => ['description', 'checklist', 'custom_fields.priority', 'custom_fields.due_date', 'assignees'],
+            self::Company, self::People, self::Note => [],
+        };
     }
 
     /** @return list<self> */

@@ -19,6 +19,7 @@ use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Knuckles\Scribe\ScribeServiceProvider;
 use Laravel\Pennant\Feature;
+use Livewire\Features\SupportDisablingBackButtonCache\SupportDisablingBackButtonCache;
 use Spatie\Activitylog\Actions\LogActivityAction;
 
 abstract class TestCase extends BaseTestCase
@@ -47,6 +48,10 @@ abstract class TestCase extends BaseTestCase
         // TrustHosts writes its patterns into Symfony's static Request state, so a test that
         // fakes production would otherwise answer every later request in the worker with a 400.
         Request::setTrustedHosts([]);
+
+        // Livewire sets this static at every component boot and only a finished response clears
+        // it, so a test whose component throws stamps no-cache headers on the next test's response.
+        SupportDisablingBackButtonCache::$disableBackButtonCache = false;
 
         return parent::createApplication();
     }

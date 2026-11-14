@@ -22,8 +22,8 @@ use Laravel\Mcp\Server\Attributes\Title;
 use Laravel\Mcp\Server\Tool;
 use Relaticle\CustomFields\Services\ValidationService;
 
-#[Title('List Custom Fields')]
-#[Description('List workspace custom-field definitions, including inactive fields and configured option labels. Use get-crm-schema-tool for the active write schema.')]
+#[Title('List Custom Attributes')]
+#[Description('List workspace custom attribute (custom field) definitions, including inactive ones and configured option labels. Use get-crm-schema-tool for the active write schema.')]
 final class ListCustomFieldsTool extends Tool
 {
     use ChecksTokenAbility;

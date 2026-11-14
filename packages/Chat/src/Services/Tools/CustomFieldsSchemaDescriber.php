@@ -29,13 +29,13 @@ final readonly class CustomFieldsSchemaDescriber
             ->sortBy([['active', 'desc'], ['code', 'asc']]);
 
         if ($fields->isEmpty()) {
-            return 'No custom fields are defined for this entity type.';
+            return 'No custom attributes (custom fields) are defined for this entity type.';
         }
 
         [$activeFields, $inactiveFields] = $fields->partition(fn (CustomField $field): bool => $field->active);
 
         $lines = [
-            'Available custom fields for this entity. Keys MUST be one of these codes. Values MUST match the documented format.',
+            'Available custom attributes (custom fields) for this entity. Keys MUST be one of these codes. Values MUST match the documented format.',
             '',
         ];
 

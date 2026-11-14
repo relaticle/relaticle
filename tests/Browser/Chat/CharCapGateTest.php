@@ -9,9 +9,7 @@ it('does not send when the composer text exceeds the character cap', function ()
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/chats")
+    $page = visitAs($user, "/app/{$workspace->slug}/chats")
         ->assertSourceHas('placeholder="Ask anything..."');
 
     // Load 5,100 characters into the TipTap composer (cap is 5,000) and ask the

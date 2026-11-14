@@ -1,6 +1,6 @@
 @php
     $capabilities = [
-        [__('Custom fields'), __('Add the fields your business tracks to any record, and link related records together.')],
+        [__('Custom attributes'), __('Add the attributes your business tracks to any record, and link related records together.')],
         [__('Companies and people'), __('Each company keeps its people, opportunities and history in one place.')],
         [__('Tasks'), __('Assign follow-ups, set due dates, and link them to the records they concern.')],
         [__('Notes and activity'), __('Write notes on the record, and review the activity history to see what changed.')],

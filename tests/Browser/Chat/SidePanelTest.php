@@ -13,8 +13,7 @@ it('renders the side panel on the dashboard', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    visitAs($user, "/app/{$workspace->slug}")
         ->assertSourceHas('data-chat-side-panel');
 });
 
@@ -23,8 +22,7 @@ it('stays closed when the browser goes back to a page where it was closed', func
     $workspace = $user->ownedWorkspaces()->first();
     $assistantName = config('chat.assistant_name');
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->click('a.fi-sidebar-item-btn[href$="/people"]')
         ->waitForText('No people')
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
@@ -46,8 +44,7 @@ it('keeps an open panel open when the browser goes back', function (): void {
     $workspace = $user->ownedWorkspaces()->first();
     $assistantName = config('chat.assistant_name');
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
+    $page = visitAs($user, "/app/{$workspace->slug}")
         ->click('a.fi-sidebar-item-btn[href$="/people"]')
         ->waitForText('No people')
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
@@ -70,10 +67,7 @@ it('keeps the open panel docked and on the current record across navigation, and
 
     $pageContextLabel = 'Alpine.$data(document.querySelector("[data-chat-side-panel] [data-chat-context=side-panel]")).pageContextLabel';
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/people")
+    $page = visitAs($user, "/app/{$workspace->slug}/people", 1440, 900)
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
         ->assertVisible('[data-chat-side-panel]');
 
@@ -116,10 +110,7 @@ it('stays open, docked beside the page, when a chat is picked from its history',
         })()
     JS;
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1440, 900)
-        ->navigate("/app/{$workspace->slug}/people")
+    $page = visitAs($user, "/app/{$workspace->slug}/people", 1440, 900)
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
         ->assertVisible('[data-chat-side-panel]')
         ->assertScript($contentMeetsPanel)
@@ -143,10 +134,7 @@ it('covers the page instead of docking below the xl breakpoint', function (): vo
     $workspace = $user->ownedWorkspaces()->first();
     $assistantName = config('chat.assistant_name');
 
-    loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->resize(1100, 900)
-        ->navigate("/app/{$workspace->slug}/people")
+    visitAs($user, "/app/{$workspace->slug}/people", 1100, 900)
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
         ->assertVisible('[data-chat-side-panel]')
         ->assertScript('getComputedStyle(document.querySelector(".fi-app-main-wrapper")).paddingRight', '0px');
@@ -157,9 +145,7 @@ it('keeps the history popover inside a phone viewport', function (): void {
     $workspace = $user->ownedWorkspaces()->first();
     $assistantName = config('chat.assistant_name');
 
-    $page = loginViaBrowser($user)
-        ->assertPathIs("/app/{$workspace->slug}")
-        ->navigate("/app/{$workspace->slug}/people")
+    $page = visitAs($user, "/app/{$workspace->slug}/people")
         ->resize(320, 640)
         ->click("button[aria-label=\"Ask {$assistantName}\"]")
         ->assertVisible('[data-chat-side-panel]')

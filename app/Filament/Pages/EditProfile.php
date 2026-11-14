@@ -45,8 +45,8 @@ final class EditProfile extends Page
         ]);
     }
 
-    public static function getLabel(): string
+    public function getTitle(): string
     {
-        return __('profile.edit_profile');
+        return self::getNavigationLabel();
     }
 }

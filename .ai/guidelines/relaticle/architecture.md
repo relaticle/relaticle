@@ -280,6 +280,7 @@ One word per business concept. The model class owns the word, and code, tests an
 | A business the workspace tracks | company (`App\Models\Company`) | account as the record's name |
 | A human the workspace tracks | person, people (`App\Models\People`) | contact as the record's name |
 | A sale in progress | opportunity (`App\Models\Opportunity`) | deal as a label or as the record's name |
+| A property a record carries beyond the built-in ones | custom attribute | custom field in published copy |
 
 `team` survives in three places. Jetstream's own contract and event names keep it
 (`AddsTeamMembers`, `TeamMemberAdded`). `teammate` is a person, not the tenant. A company's
@@ -304,6 +305,14 @@ use of the retired `editor` role key. It fails a bare `Contact` or `Deal` label 
 source. It fails `contacts` and `a contact` in published copy: `lang/`, `resources/views/`,
 `resources/js/` and each package's `resources/`. The gate reads no other form of the two
 words, so a reviewer does.
+
+`custom field` survives in code, the REST API (`custom_fields`), MCP tool names, help page slugs
+and the relaticle/custom-fields package. Everywhere a person reads it, the word is `custom
+attribute`. A tool description and the `CrmAssistant` prompt keep the old word as a synonym on
+the same line, so a model maps the user's word to the right tool. `tests/Arch/ConventionsTest.php`
+fails `custom field` in published copy: `lang/`, `resources/views/`, `resources/js/` and each
+package's `resources/` and `lang/`. The five files that test lists by name are exempt, because
+they carry the old word as a synonym or name the package.
 
 `account` names the sign-in and a connected mailbox, never a company. The company's
 "Account Owner" field keeps the word, and so does its `account_owner_id` column. No test can

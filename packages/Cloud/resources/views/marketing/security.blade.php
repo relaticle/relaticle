@@ -66,7 +66,7 @@
     ];
 
     $ownership = [
-        ['lucide-download', __('Export'), __('Download every record type as CSV or Excel, custom fields included. The REST API reads the same records. Export works while the workspace is active.')],
+        ['lucide-download', __('Export'), __('Download every record type as CSV or Excel, custom attributes included. The REST API reads the same records. Export works while the workspace is active.')],
         ['lucide-trash', __('Delete'), __('Ask for deletion at privacy@relaticle.com. An account scheduled for deletion is removed after a 30-day grace period. Records in shared workspaces remain. We delete a paused trial workspace that no one signs in to for 60 days, after two emails to the owner.')],
         ['lucide-server', __('Leave'), __('Relaticle is open source under AGPL-3.0. Move to your own server whenever you want.')],
     ];

@@ -62,9 +62,10 @@ const LIST_SURFACES = [
 const COMPARISON_OPERATORS = ['$eq', '$gt', '$gte', '$lt', '$lte', '$is_empty'];
 const SINGLE_CHOICE_OPERATORS = ['$eq', '$in', '$not_in', '$is_empty'];
 const LIST_OPERATORS = ['$has_any', '$has_none', '$is_empty'];
+const TEXT_LIST_OPERATORS = ['$has_any', '$has_none', '$contains', '$starts_with', '$ends_with', '$is_empty'];
 
 const FILTER_OPERATORS_BY_TYPE = [
-    'text' => ['$eq', '$contains', '$is_empty'],
+    'text' => ['$eq', '$contains', '$starts_with', '$ends_with', '$is_empty'],
     'number' => COMPARISON_OPERATORS,
     'currency' => COMPARISON_OPERATORS,
     'date' => COMPARISON_OPERATORS,
@@ -77,13 +78,14 @@ const FILTER_OPERATORS_BY_TYPE = [
     'multi-select' => LIST_OPERATORS,
     'checkbox-list' => LIST_OPERATORS,
     'tags-input' => LIST_OPERATORS,
-    'email' => LIST_OPERATORS,
-    'phone' => LIST_OPERATORS,
-    'link' => LIST_OPERATORS,
-    'domain' => LIST_OPERATORS,
+    'email' => TEXT_LIST_OPERATORS,
+    'phone' => TEXT_LIST_OPERATORS,
+    'link' => TEXT_LIST_OPERATORS,
+    'domain' => TEXT_LIST_OPERATORS,
+    'record' => LIST_OPERATORS,
 ];
 
-const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
+const EVERY_FILTER_OPERATOR = ['$eq', '$contains', '$starts_with', '$ends_with', '$gt', '$gte', '$lt', '$lte', '$in', '$not_in', '$has_any', '$has_none', '$is_empty'];
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -209,6 +211,10 @@ it('filters every native field of every entity alike on the api and mcp', functi
         [[$title => ['$eq' => 'Acme Renewal']], ['Acme Renewal']],
         [[$title => ['$eq' => 'acme renewal']], []],
         [[$title => ['$contains' => 'RENEW']], ['Acme Renewal']],
+        [[$title => ['$starts_with' => 'acme']], ['Acme Renewal']],
+        [[$title => ['$starts_with' => 'Renewal']], []],
+        [[$title => ['$ends_with' => 'PILOT']], ['Globex Pilot']],
+        [[$title => ['$ends_with' => 'Globex']], []],
         [[$title => ['$is_empty' => false]], ['Acme Renewal', 'Globex Pilot', 'Initech Upsell']],
         [[$title => ['$is_empty' => true]], []],
         [['created_at' => ['$eq' => '2026-06-15']], ['Globex Pilot']],
@@ -282,14 +288,74 @@ it('reads a padded operand as its trimmed value on the api and mcp', function ()
     ]);
 });
 
+it('reads a wildcard character in a partial match as a plain character on the api and mcp', function (): void {
+    unlinkedRecord($this->user, 'companies', 'Acme');
+    unlinkedRecord($this->user, 'companies', '%off Promo');
+    unlinkedRecord($this->user, 'companies', 'Back\\slash');
+
+    expectTitlesOnEverySurface($this, $this->user, 'companies', [
+        [['name' => ['$starts_with' => '%']], ['%off Promo']],
+        [['name' => ['$ends_with' => 'm_']], []],
+        [['name' => ['$contains' => 'c_e']], []],
+        [['name' => ['$contains' => '\\']], ['Back\\slash']],
+        [['name' => ['$starts_with' => '\\']], []],
+    ]);
+});
+
+it('reads a wildcard character in a partial match on a custom text field as a plain character on the api and mcp', function (): void {
+    $field = resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Probe', 'code' => 'probe', 'type' => 'text']);
+    unlinkedRecord($this->user, 'opportunities', 'Plain')->saveCustomFieldValue($field, 'Acme');
+    unlinkedRecord($this->user, 'opportunities', 'Marked')->saveCustomFieldValue($field, '%off\\promo');
+    $on = fn (array $condition): array => ['custom_fields' => ['probe' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on(['$starts_with' => '%']), ['Marked']],
+        [$on(['$ends_with' => 'm_']), []],
+        [$on(['$ends_with' => '\\promo']), ['Marked']],
+        [$on(['$contains' => '\\']), ['Marked']],
+        [$on(['$starts_with' => '\\']), []],
+    ]);
+});
+
 it('rejects a blank operand on the api and mcp', function (array $filter, string $key): void {
     unlinkedRecord($this->user, 'companies', 'Acme');
 
     expectErrorOnEverySurface($this, $this->user, 'companies', $filter, $key, 'must be a non-empty string, or use $is_empty for records without a value.');
 })->with([
     'empty' => [['name' => ['$contains' => '']], 'filter.name.$contains'],
+    'blank prefix' => [['name' => ['$starts_with' => '  ']], 'filter.name.$starts_with'],
+    'blank suffix' => [['name' => ['$ends_with' => '']], 'filter.name.$ends_with'],
     'spaces' => [['name' => ['$eq' => '   ']], 'filter.name.$eq'],
 ]);
+
+it('rejects a blank operand on a list custom field on the api and mcp', function (): void {
+    unlinkedRecord($this->user, 'people', 'Ada');
+
+    expectErrorOnEverySurface($this, $this->user, 'people', ['custom_fields' => ['emails' => ['$contains' => '']]], 'filter.custom_fields.emails.$contains', 'must be a non-empty string, or use $is_empty for records without a value.');
+});
+
+it('compares a partial operand as typed against the stored phone and link on the api and mcp', function (): void {
+    foreach ([['Line', 'line', 'phone'], ['Site', 'site', 'link']] as [$name, $code, $type]) {
+        resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => $name, 'code' => $code, 'type' => $type]);
+    }
+    $line = WorkspaceCustomField::byCode($this->workspace->getKey(), 'opportunity', 'line');
+    $site = WorkspaceCustomField::byCode($this->workspace->getKey(), 'opportunity', 'site');
+    $first = unlinkedRecord($this->user, 'opportunities', 'First');
+    $first->saveCustomFieldValue($line, '+14155550100');
+    $first->saveCustomFieldValue($site, 'https://acme.com/team');
+    unlinkedRecord($this->user, 'opportunities', 'Second')->saveCustomFieldValue($site, 'globex.com');
+    $on = fn (string $code, array $condition): array => ['custom_fields' => [$code => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on('line', ['$contains' => '+1 415']), []],
+        [$on('line', ['$contains' => '+1415']), ['First']],
+        [$on('line', ['$contains' => '+1_15']), []],
+        [$on('site', ['$starts_with' => 'acme']), []],
+        [$on('site', ['$starts_with' => 'https://acme']), ['First']],
+        [$on('site', ['$starts_with' => 'globex']), ['Second']],
+        [$on('site', ['$contains' => '%']), []],
+    ]);
+});
 
 it('rejects an operator a native field does not take on the api and mcp', function (string $route, string $name, string $operator, mixed $operand): void {
     $name = $name === 'title' ? LIST_SURFACES[$route][0]->titleColumn() : $name;
@@ -317,7 +383,7 @@ it('rejects a native operand of the wrong type on the api and mcp', function (ar
     'emptiness that is not a boolean' => [['name' => ['$is_empty' => 'maybe']], 'filter.name.$is_empty', 'must be true or false'],
     'text given a list' => [['name' => ['Acme', 'Globex']], 'filter.name', '{"$eq": ...}'],
     'text given an empty object' => [['name' => []], 'filter.name', '{"$eq": ...}'],
-    'operator of another kind' => [['name' => ['$gt' => 'a']], 'filter.name.$gt', 'Use $eq, $contains, $is_empty.'],
+    'operator of another kind' => [['name' => ['$gt' => 'a']], 'filter.name.$gt', 'Use $eq, $contains, $starts_with, $ends_with, $is_empty.'],
     'enum $eq given a list' => [['creation_source' => ['$eq' => ['api', 'web']]], 'filter.creation_source.$eq', 'must be one of: web, sample, import, api, mcp, chat, mailbox'],
     'enum $eq given a comma list' => [['creation_source' => ['$eq' => 'api,web']], 'filter.creation_source.$eq', 'must be one of: web, sample, import, api, mcp, chat, mailbox'],
     'unknown enum value' => [['creation_source' => ['$eq' => 'fax']], 'filter.creation_source.$eq', 'fax is not one of: web, sample, import, api, mcp, chat, mailbox'],
@@ -625,6 +691,57 @@ it('rejects a computed filter outside its one shape on the api and mcp', functio
     'assigned_to_me on another entity' => ['notes', ['assigned_to_me' => ['$eq' => true]], 'filter.assigned_to_me', 'Unknown filter assigned_to_me.'],
 ]);
 
+it('filters a record custom field by linked record id alike on the api and mcp', function (): void {
+    $partner = resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+    $acme = unlinkedRecord($this->user, 'companies', 'Acme');
+    $globex = unlinkedRecord($this->user, 'companies', 'Globex');
+    $stranger = User::factory()->withPersonalWorkspace()->create();
+    $foreign = Company::factory()->for($stranger->personalWorkspace())->create(['name' => 'Foreign']);
+    unlinkedRecord($this->user, 'opportunities', 'Low')->saveCustomFieldValue($partner, [$acme->getKey()]);
+    unlinkedRecord($this->user, 'opportunities', 'High')->saveCustomFieldValue($partner, [$acme->getKey(), $globex->getKey()]);
+    unlinkedRecord($this->user, 'opportunities', 'Cleared')->saveCustomFieldValue($partner, []);
+    unlinkedRecord($this->user, 'opportunities', 'Unset');
+    $on = fn (array $condition): array => ['custom_fields' => ['partner' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on(['$has_any' => [$globex->getKey()]]), ['High']],
+        [$on(['$has_any' => [$acme->getKey()]]), ['Low', 'High']],
+        [$on(['$has_any' => [strtoupper($acme->getKey())]]), ['Low', 'High']],
+        [$on(['$has_none' => [$globex->getKey()]]), ['Low', 'Cleared', 'Unset']],
+        [$on(['$is_empty' => true]), ['Cleared', 'Unset']],
+        [$on(['$is_empty' => false]), ['Low', 'High']],
+        [$on(['$has_any' => [$foreign->getKey()]]), []],
+        [$on(['$has_none' => [$foreign->getKey()]]), ['Low', 'High', 'Cleared', 'Unset']],
+        [$on(['$has_any' => $globex->getKey()]), ['High']],
+        [$on(['$has_none' => $globex->getKey()]), ['Low', 'Cleared', 'Unset']],
+    ]);
+
+    $globex->delete();
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [$on(['$has_any' => [$globex->getKey()]]), []],
+        [$on(['$has_none' => [$globex->getKey()]]), ['Low', 'High', 'Cleared', 'Unset']],
+        [$on(['$is_empty' => true]), ['Cleared', 'Unset']],
+        [$on(['$is_empty' => false]), ['Low', 'High']],
+    ]);
+});
+
+it('rejects a record custom field operand that is not a record id', function (string $operator): void {
+    resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+
+    expectErrorOnEverySurface($this, $this->user, 'opportunities', ['custom_fields' => ['partner' => [$operator => ['Acme']]]], "filter.custom_fields.partner.{$operator}", 'Acme is not a record ID.');
+})->with(['$has_any', '$has_none']);
+
+it('rejects a record custom field operand of the wrong shape', function (mixed $operand, string $message): void {
+    resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'opportunity', 'name' => 'Partner', 'code' => 'partner', 'type' => 'record', 'lookup_type' => 'company']);
+
+    expectErrorOnEverySurface($this, $this->user, 'opportunities', ['custom_fields' => ['partner' => ['$has_any' => $operand]]], 'filter.custom_fields.partner.$has_any', $message);
+})->with([
+    'empty list' => [[], 'partner $has_any'],
+    'nested list' => [[['01J8Z4Y6T5Q2M9N3B7K1W0X8VD']], 'partner $has_any'],
+    'one hundred and one ids' => [array_fill(0, 101, '01J8Z4Y6T5Q2M9N3B7K1W0X8VD'), 'partner $has_any takes at most 100 values'],
+]);
+
 it('publishes exactly the operators of each custom field type', function (): void {
     $published = [];
 
@@ -675,6 +792,9 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['$eq' => 'Alpha Corp'], ['Low']],
         [['$contains' => 'beta'], ['High']],
         [['$contains' => 'a'], ['Low', 'High']],
+        [['$starts_with' => 'alpha'], ['Low']],
+        [['$starts_with' => 'Corp'], []],
+        [['$ends_with' => 'LTD'], ['High']],
         [['$is_empty' => false, '$contains' => 'Corp'], ['Low']],
     ], 'x'],
     'number' => ['number', [], 10, 50, [
@@ -777,12 +897,18 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['domain' => ['$in' => ['acme.com', 'globex.com']], '$is_empty' => false], ['Low', 'High']],
         [['domain' => ['$in' => ['acme.com', 'globex.com']], '$has_none' => ['low@acme.com']], ['High']],
         [['domain' => ['$in' => [' acme.com ']]], ['Low']],
+        [['$contains' => 'ACME'], ['Low']],
+        [['$starts_with' => 'high@'], ['High']],
+        [['$ends_with' => 'globex.com'], ['High']],
     ], ['a@acme.com']],
     'phone' => ['phone', [], '+14155550100', '+442071838750', [
         [['$has_any' => ['+1 415 555 0100']], ['Low']],
         [['$has_any' => ['+14155550100', '+44 20 7183 8750']], ['Low', 'High']],
         [['$has_none' => ['+1 (415) 555-0100']], ['High', 'Unset']],
         [['$has_none' => ['+14155550100'], '$is_empty' => false], ['High']],
+        [['$contains' => '4155550'], ['Low']],
+        [['$starts_with' => '+44'], ['High']],
+        [['$ends_with' => '0100'], ['Low']],
     ], ['+14155550100']],
     'link' => ['link', [], 'acme.com/about', 'globex.com', [
         [['$has_any' => ['https://acme.com/about']], ['Low']],
@@ -791,6 +917,9 @@ it('applies every operator of every custom field type alike on the api and mcp',
         [['domain' => ['$in' => ['acme.com']]], ['Low']],
         [['domain' => ['$not_in' => ['acme.com']]], ['High', 'Unset']],
         [['domain' => ['$in' => ['globex.com']], '$is_empty' => false], ['High']],
+        [['$contains' => 'ABOUT'], ['Low']],
+        [['$starts_with' => 'globex'], ['High']],
+        [['$ends_with' => '/about'], ['Low']],
     ], ['acme.com']],
 ]);
 
@@ -807,21 +936,42 @@ it('filters company domains by any spelling on the api and mcp', function (): vo
         [$on(['$has_none' => ['https://acme.com/']]), ['Globex', 'Unset']],
         [$on(['$is_empty' => true]), ['Unset']],
         [$on(['$is_empty' => false]), ['Acme', 'Globex']],
+        [$on(['$contains' => 'CME']), ['Acme']],
+        [$on(['$starts_with' => 'glob']), ['Globex']],
+        [$on(['$ends_with' => '.com']), ['Acme', 'Globex']],
     ]);
 
     expectErrorOnEverySurface($this, $this->user, 'companies', $on(['domain' => ['$in' => ['acme.com']]]), 'filter.custom_fields.domains.domain', 'domains does not support domain.');
 });
 
+it('matches a partial operator against any value of a field and keeps an empty field under $not on the api and mcp', function (): void {
+    $emails = WorkspaceCustomField::byCode($this->workspace->getKey(), 'people', 'emails');
+    unlinkedRecord($this->user, 'people', 'Two Inboxes')->saveCustomFieldValue($emails, ['first@acme.com', 'second@globex.com']);
+    unlinkedRecord($this->user, 'people', 'One Inbox')->saveCustomFieldValue($emails, ['only@initech.com']);
+    unlinkedRecord($this->user, 'people', 'Odd Inbox')->saveCustomFieldValue($emails, ['100%@acme.com']);
+    unlinkedRecord($this->user, 'people', 'No Inbox');
+    $on = fn (array $condition): array => ['custom_fields' => ['emails' => $condition]];
+
+    expectTitlesOnEverySurface($this, $this->user, 'people', [
+        [$on(['$ends_with' => 'globex.com']), ['Two Inboxes']],
+        [$on(['$starts_with' => 'second@']), ['Two Inboxes']],
+        [$on(['$contains' => 'initech']), ['One Inbox']],
+        [$on(['$contains' => '%@']), ['Odd Inbox']],
+        [$on(['$starts_with' => '_irst']), []],
+        [['$not' => $on(['$contains' => 'acme'])], ['One Inbox', 'No Inbox']],
+    ]);
+});
+
 it('rejects a custom field that takes no filter on the api and mcp', function (string $type): void {
     resolve(CreateCustomField::class)->execute($this->user, ['entity_type' => 'company', 'name' => 'Probe', 'code' => 'probe', 'type' => $type]);
 
-    expectErrorOnEverySurface($this, $this->user, 'companies', ['custom_fields' => ['probe' => ['$eq' => 'x']]], 'filter.custom_fields.probe', '"probe" is not a filterable custom field');
+    expectErrorOnEverySurface($this, $this->user, 'companies', ['custom_fields' => ['probe' => ['$eq' => 'x']]], 'filter.custom_fields.probe', '"probe" is not a filterable custom attribute');
 })->with(['textarea', 'color-picker']);
 
 it('names the node to fix under the same key on the api and in the same words on mcp', function (string $route, array $filter, string $key, string $message): void {
     expectErrorOnEverySurface($this, $this->user, $route, $filter, $key, $message);
 })->with([
-    'unknown custom field' => ['opportunities', ['custom_fields' => ['stagee' => ['$eq' => 'Won']]], 'filter.custom_fields.stagee', '"stagee" is not a filterable custom field'],
+    'unknown custom field' => ['opportunities', ['custom_fields' => ['stagee' => ['$eq' => 'Won']]], 'filter.custom_fields.stagee', '"stagee" is not a filterable custom attribute'],
     'operator of another type' => ['opportunities', ['custom_fields' => ['amount' => ['$contains' => '5']]], 'filter.custom_fields.amount.$contains', 'amount does not support $contains.'],
     'bare custom field operator' => ['opportunities', ['custom_fields' => ['stage' => ['eq' => 'Won']]], 'filter.custom_fields.stage.eq', 'Use $eq.'],
     'bare native operator' => ['companies', ['name' => ['contains' => 'Acme']], 'filter.name.contains', 'Use $contains.'],
@@ -831,7 +981,7 @@ it('names the node to fix under the same key on the api and in the same words on
     'unknown name' => ['companies', ['industry' => ['$eq' => 'x']], 'filter.industry', 'name, created_at, updated_at, creation_source, creator, accountOwner, people, opportunities, custom_fields, $and, $or, $not'],
     'unknown keyword' => ['companies', ['$nor' => [['name' => ['$eq' => 'x']]]], 'filter.$nor', 'Unknown filter $nor.'],
     'unknown name on a related record' => ['people', ['company' => ['title' => ['$eq' => 'x']]], 'filter.company.title', 'Unknown filter title.'],
-    'unknown custom field on a related record' => ['people', ['company' => ['custom_fields' => ['nope' => ['$eq' => 'x']]]], 'filter.company.custom_fields.nope', '"nope" is not a filterable custom field on company'],
+    'unknown custom field on a related record' => ['people', ['company' => ['custom_fields' => ['nope' => ['$eq' => 'x']]]], 'filter.company.custom_fields.nope', '"nope" is not a filterable custom attribute (custom field) on company'],
     'unknown name inside a group' => ['companies', ['$or' => [['name' => ['$eq' => 'x']], ['industry' => ['$eq' => 'x']]]], 'filter.$or.1.industry', 'Unknown filter industry.'],
     'third relation hop' => ['people', ['$or' => [['name' => ['$eq' => 'x']], ['company' => ['people' => ['company' => ['name' => ['$eq' => 'x']]]]]]], 'filter.$or.1.company.people.company', 'nest at most 2 levels'],
     'fourth logic level' => ['companies', ['$not' => ['$or' => [['$and' => [['$not' => ['name' => ['$eq' => 'x']]]]]]]], 'filter.$not.$or.0.$and.0.$not', 'nest at most 3 levels'],

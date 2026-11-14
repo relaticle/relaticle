@@ -16,7 +16,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Attributes\Title;
 
 #[Title('Create Person')]
-#[Description('Create a new person (contact) in the CRM. Use the crm-schema resource to discover available custom fields.')]
+#[Description('Create a new person (contact) in the CRM. Use the crm-schema resource to discover available custom attributes (custom fields).')]
 final class CreatePeopleTool extends BaseCreateTool
 {
     use OperatesOnCrmEntity;

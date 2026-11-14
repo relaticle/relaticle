@@ -18,7 +18,7 @@ use Spatie\QueryBuilder\AllowedFilter;
 
 final readonly class EntityFilters
 {
-    public const string CUSTOM_FIELDS_RULE = 'custom_fields takes an object keyed by custom field code, each value an operator object.';
+    public const string CUSTOM_FIELDS_RULE = 'custom_fields takes an object keyed by custom attribute (custom field) code, each value an operator object.';
 
     public function __construct(private User $user, private ?string $viewerZone = null) {}
 

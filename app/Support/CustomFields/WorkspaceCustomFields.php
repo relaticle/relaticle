@@ -7,6 +7,7 @@ namespace App\Support\CustomFields;
 use App\Models\CustomField;
 use App\Models\Workspace;
 use Closure;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 
 final class WorkspaceCustomFields
@@ -53,7 +54,7 @@ final class WorkspaceCustomFields
             ->where('tenant_id', $tenantId)
             ->orderBy('sort_order')
             ->orderBy('id')
-            ->with('options')
+            ->with(['options' => static fn (HasMany $options) => $options->withoutGlobalScopes()->where('tenant_id', $tenantId)])
             ->get();
     }
 }

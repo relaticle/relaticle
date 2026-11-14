@@ -12,7 +12,7 @@ it('answers a request for a new table with custom fields from the docs', functio
     expect((new RelaTurn($w))(...))
         ->prompt('Can I add a new table for properties')
         ->toHaveToolCalls(['SearchDocsTool' => []])
-        ->toPassJudge('The reply explains that record types are fixed and offers custom fields on an existing record type. It never presents those fields as a new table.');
+        ->toPassJudge('The reply explains that record types are fixed and offers custom attributes (also called custom fields) on an existing record type. It never presents those attributes as a new table.');
 });
 
 it('searches the docs first for a product question', function (): void {

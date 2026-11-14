@@ -26,6 +26,11 @@ final class CustomFields extends CustomFieldsManagementPage
         return 'workspace/custom-fields';
     }
 
+    public function getTitle(): string
+    {
+        return __('custom-fields::custom-fields.heading.title');
+    }
+
     public function getSubheading(): ?string
     {
         return null;

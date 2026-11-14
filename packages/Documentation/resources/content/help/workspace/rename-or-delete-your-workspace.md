@@ -6,7 +6,7 @@ updated: "2026-11-06"
 related: [help/workspace/manage-members-and-roles, help/workspace/billing-and-plans]
 ---
 
-A workspace is a self-contained CRM: its own records, custom fields, members,
+A workspace is a self-contained CRM: its own records, custom attributes, members,
 and billing. Nothing is shared between workspaces, and you can belong to
 several at once.
 

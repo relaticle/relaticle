@@ -2,7 +2,7 @@
 title: Send one email to many people
 description: Select people or companies, write one message with merge tags, and Relaticle sends a separate email to each recipient within your send limits.
 order: 4
-updated: "2026-11-08"
+updated: "2026-11-12"
 related: [help/email-and-calendar/read-and-reply-to-email, help/email-and-calendar/connect-your-google-account, help/records/people-records]
 ---
 
@@ -14,7 +14,7 @@ person's own details.
 
 1. Open the **People** or **Companies** list.
 2. Tick the records you want to reach.
-3. Open the bulk actions menu and click **Send email**.
+3. Click **Send email** in the bar that appears at the bottom of the list.
 4. The composer opens as **New mass email** with the recipients listed.
    **Add recipients** adds more.
 5. Write the subject and the message. **Insert variable** adds a merge tag

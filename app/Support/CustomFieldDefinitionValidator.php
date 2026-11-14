@@ -36,6 +36,8 @@ use Relaticle\CustomFields\Facades\Entities;
  */
 final readonly class CustomFieldDefinitionValidator
 {
+    public const int NAME_MAX_LENGTH = 50;
+
     /**
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
@@ -55,7 +57,7 @@ final readonly class CustomFieldDefinitionValidator
         $validated = Validator::make(self::normalize($data), [
             'entity_type' => ['required', Rule::in(CrmEntity::morphAliases()), self::withinFieldCap($tenantId, $entityType, $proposedAlongside)],
             'type' => ['required', Rule::in($creatableTypes)],
-            'name' => ['required', 'string', 'max:50', self::uniqueNameIgnoringCase(
+            'name' => ['required', 'string', 'max:'.self::NAME_MAX_LENGTH, self::uniqueNameIgnoringCase(
                 $tenantId,
                 $entityType,
                 fn (): string => "A field named \":input\" already exists on {$entityType}. Field names must be unique per entity. Pick a different name, or update the existing field instead.",
@@ -69,7 +71,7 @@ final readonly class CustomFieldDefinitionValidator
             'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CrmEntity::morphAliases()).'.',
             'type.in' => 'Field type ":input" cannot be created. Allowed types: '.implode(', ', $creatableTypes).'.',
             'name.required' => 'A field name is required.',
-            'name.max' => 'Field names must be 50 characters or fewer.',
+            'name.max' => 'Field names must be '.self::NAME_MAX_LENGTH.' characters or fewer.',
             'code.max' => 'Field codes must be 50 characters or fewer.',
             'code.alpha_dash' => 'Field codes may only contain letters, numbers, dashes, and underscores.',
             'code.unique' => "A field with code \":input\" already exists on {$entityType}. Omit the code to auto-generate a unique one, or pick a different code.",
@@ -132,7 +134,7 @@ final readonly class CustomFieldDefinitionValidator
 
         $validated = Validator::make($data, [
             'name' => [
-                'sometimes', 'string', 'max:50',
+                'sometimes', 'string', 'max:'.self::NAME_MAX_LENGTH,
                 self::uniqueNameIgnoringCase(
                     $user->currentWorkspace->getKey(),
                     $entityType,
@@ -144,7 +146,7 @@ final readonly class CustomFieldDefinitionValidator
             'settings' => ['sometimes', 'array'],
             ...$prefixedSettingRules,
         ], [
-            'name.max' => 'Field names must be 50 characters or fewer.',
+            'name.max' => 'Field names must be '.self::NAME_MAX_LENGTH.' characters or fewer.',
             ...CustomFieldSettingsSchema::messages(),
         ], array_combine(array_keys($prefixedSettingRules), array_keys($settingRules)))->validate();
 
@@ -196,7 +198,7 @@ final readonly class CustomFieldDefinitionValidator
         if ($unsupported !== []) {
             throw ValidationException::withMessages([
                 'settings' => sprintf(
-                    'A %s field does not accept: %s. It accepts: %s. Some settings only apply alongside another in the same call: max_values needs allow_multiple set to true, list_toggleable_hidden needs visible_in_list set to true, and searchable is unavailable on encrypted fields.',
+                    'A %s field does not accept: %s. It accepts: %s. Some settings only apply alongside another in the same call: max_values needs allow_multiple set to true, and list_toggleable_hidden needs visible_in_list set to true.',
                     $field->type,
                     implode(', ', $unsupported),
                     implode(', ', array_keys($settingRules)),
@@ -286,7 +288,7 @@ final readonly class CustomFieldDefinitionValidator
     private static function withinFieldCap(int|string $tenantId, string $entityType, int $proposedAlongside): Closure
     {
         return function (string $attribute, mixed $value, Closure $fail) use ($tenantId, $entityType, $proposedAlongside): void {
-            $max = (int) config('chat.max_custom_fields_per_entity', 50);
+            $max = self::maxFields();
 
             $existing = DB::table(self::definitionsTable())
                 ->where(self::tenantKey(), $tenantId)
@@ -294,7 +296,7 @@ final readonly class CustomFieldDefinitionValidator
                 ->count();
 
             if ($existing + $proposedAlongside >= $max) {
-                $fail("Cannot create more than {$max} custom fields for entity type \"{$entityType}\".");
+                $fail("Cannot create more than {$max} custom attributes for entity type \"{$entityType}\".");
             }
         };
     }
@@ -330,6 +332,11 @@ final readonly class CustomFieldDefinitionValidator
     private static function expectsOptions(string $type): bool
     {
         return in_array($type, CreateCustomField::CHOICE_TYPES, true);
+    }
+
+    public static function maxFields(): int
+    {
+        return (int) config('chat.max_custom_fields_per_entity', 50);
     }
 
     public static function maxOptions(): int

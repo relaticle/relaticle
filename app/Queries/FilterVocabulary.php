@@ -136,6 +136,12 @@ final readonly class FilterVocabulary
             $entry['matching'] = $matching;
         }
 
+        $partialMatching = CustomFieldType::tryFrom($field->type)?->partialMatching();
+
+        if ($partialMatching !== null) {
+            $entry['partial_matching'] = $partialMatching;
+        }
+
         if (isset(CustomFieldFilterSchema::operatorsForType($field->type)['domain'])) {
             $entry['sub_fields'] = ['domain' => [
                 'operators' => CustomFieldFilterSchema::DOMAIN_OPERATORS,
