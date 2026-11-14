@@ -49,6 +49,7 @@ final readonly class MoveMergedRecordCommunication
     {
         return Email::query()
             ->withoutGlobalScopes()
+            ->with('participants')
             ->whereKey($this->sharedIds('emailables', 'email_id', 'emailable', $morph, $kept, $duplicate))
             ->get()
             ->filter(fn (Email $email): bool => $this->visibility->countsTowardCommunicationIntelligence($email));
@@ -61,6 +62,7 @@ final readonly class MoveMergedRecordCommunication
     {
         return Meeting::query()
             ->withoutGlobalScopes()
+            ->with(['attendees.contact', 'connectedAccount'])
             ->whereKey($this->sharedIds('meetingables', 'meeting_id', 'meetingable', $morph, $kept, $duplicate))
             ->get()
             ->filter(fn (Meeting $meeting): bool => $this->visibility->meetingCountsTowardCommunicationIntelligence($meeting));

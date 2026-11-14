@@ -184,3 +184,37 @@ it('never lets a combined counter go below zero', function (string $type): void 
 
     expect([$row->email_count, $row->inbound_email_count, $row->outbound_email_count, $row->meeting_count])->toBe([0, 0, 0, 0]);
 })->with(['company', 'people']);
+
+function mergeQueryCountWithSharedCommunication(int $shared): int
+{
+    $kept = communicationRecord('company');
+    $duplicate = communicationRecord('company');
+
+    foreach (range(1, $shared) as $index) {
+        $email = communicationEmail();
+        $kept->emails()->attach($email->getKey());
+        $duplicate->emails()->attach($email->getKey());
+        EmailParticipant::factory()->create(['email_id' => $email->getKey(), 'role' => EmailParticipantRole::FROM]);
+
+        $meeting = communicationMeeting("2026-02-{$index} 10:00:00");
+        MeetingAttendee::factory()->create(['meeting_id' => $meeting->getKey()]);
+        foreach ([$kept, $duplicate] as $record) {
+            DB::table('meetingables')->insert(['meeting_id' => $meeting->getKey(), 'meetingable_type' => 'company', 'meetingable_id' => $record->getKey(), 'link_source' => 'auto', 'created_at' => now(), 'updated_at' => now()]);
+        }
+    }
+
+    $queries = 0;
+    DB::listen(function () use (&$queries): void {
+        $queries++;
+    });
+
+    mergeCommunication('company', $kept, $duplicate);
+
+    return $queries;
+}
+
+it('issues the same number of queries however many emails and meetings the two records share', function (): void {
+    mergeQueryCountWithSharedCommunication(1);
+
+    expect(mergeQueryCountWithSharedCommunication(9))->toBe(mergeQueryCountWithSharedCommunication(2));
+});
