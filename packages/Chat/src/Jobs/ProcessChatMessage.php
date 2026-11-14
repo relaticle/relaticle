@@ -50,6 +50,7 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
+use Relaticle\Chat\Exceptions\MembershipRevoked;
 use Relaticle\Chat\Exceptions\ProviderStreamRejectedException;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
@@ -158,16 +159,13 @@ final class ProcessChatMessage implements ShouldQueue
         $this->workspace->refresh();
 
         if (! resolve(Entitlements::class)->allowsAccess($this->workspace)) {
-            $creditService->refundReservation(
-                $this->workspace,
-                resolutionKey: $this->resolutionKey(),
-                conversationId: $this->conversationId,
-            );
-            $this->broadcastSafely(new ChatStreamFailed(
-                conversationId: $this->conversationId,
-                message: __('billing.access.paused_chat'),
-            ));
-            $this->abandonTurn();
+            $this->refuseTurn($creditService, __('billing.access.paused_chat'));
+
+            return;
+        }
+
+        if (! $this->workspace->hasMember((string) $this->user->getKey())) {
+            $this->refuseTurn($creditService, MembershipRevoked::refusal());
 
             return;
         }
@@ -387,6 +385,8 @@ final class ProcessChatMessage implements ShouldQueue
                 // clears too.
                 $this->closeCompletedTurn();
             });
+        } catch (MembershipRevoked) {
+            $this->refuseTurn($creditService, MembershipRevoked::refusal());
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
             // transient -> release with backoff.
@@ -409,19 +409,7 @@ final class ProcessChatMessage implements ShouldQueue
                 return;
             }
 
-            $rejection = $e instanceof RequestException ? $e : $e->getPrevious();
-
-            if ($rejection instanceof RequestException) {
-                ChatTelemetry::providerRejected($rejection, $this->resolved['model'] ?? 'unknown');
-            }
-
-            if ($e instanceof ProviderStreamRejectedException) {
-                ChatTelemetry::streamRejected($e->error, $this->resolved['model'] ?? 'unknown');
-            }
-
-            if (! $rejection instanceof RequestException && ! $e instanceof ProviderStreamRejectedException && ($this->isProviderFailure($e) || $this->isTransient($e))) {
-                ChatTelemetry::providerFailed($e, $this->resolved['model'] ?? 'unknown');
-            }
+            $this->recordProviderFailure($e);
 
             // The user's model choice was 'auto' and nothing has streamed yet: fail
             // over to the next plan-allowed chain entry instead of failing the turn.
@@ -485,6 +473,23 @@ final class ProcessChatMessage implements ShouldQueue
             throw $e;
         } finally {
             $this->releaseAuth();
+        }
+    }
+
+    private function recordProviderFailure(Throwable $e): void
+    {
+        $rejection = $e instanceof RequestException ? $e : $e->getPrevious();
+
+        if ($rejection instanceof RequestException) {
+            ChatTelemetry::providerRejected($rejection, $this->resolved['model'] ?? 'unknown');
+        }
+
+        if ($e instanceof ProviderStreamRejectedException) {
+            ChatTelemetry::streamRejected($e->error, $this->resolved['model'] ?? 'unknown');
+        }
+
+        if (! $rejection instanceof RequestException && ! $e instanceof ProviderStreamRejectedException && ($this->isProviderFailure($e) || $this->isTransient($e))) {
+            ChatTelemetry::providerFailed($e, $this->resolved['model'] ?? 'unknown');
         }
     }
 
@@ -603,6 +608,20 @@ final class ProcessChatMessage implements ShouldQueue
             claimKey: $this->claimKey ?? null,
             nextStep: $this->nextStep ?? null,
         ));
+    }
+
+    private function refuseTurn(CreditService $creditService, string $message): void
+    {
+        $creditService->refundReservation(
+            $this->workspace,
+            resolutionKey: $this->resolutionKey(),
+            conversationId: $this->conversationId,
+        );
+        $this->broadcastSafely(new ChatStreamFailed(
+            conversationId: $this->conversationId,
+            message: $message,
+        ));
+        $this->abandonTurn();
     }
 
     private function abandonTurn(): void

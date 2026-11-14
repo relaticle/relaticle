@@ -2,17 +2,25 @@
 
 declare(strict_types=1);
 
+use App\Actions\Jetstream\RemoveWorkspaceMember;
+use App\Enums\WorkspaceRole;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Laravel\Ai\Events\InvokingTool;
+use Laravel\Ai\Events\ToolInvoked;
+use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Events\ChatStreamFailed;
+use Relaticle\Chat\Exceptions\MembershipRevoked;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\TurnPresence;
+use Relaticle\Chat\Tools\GetCrmSummaryTool;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
 function seedConversation(User $user, string $conversationId): void
@@ -45,9 +53,7 @@ it('broadcasts a stream.failed event when the job fails', function (): void {
 
     $job->failed(new RuntimeException('boom'));
 
-    Event::assertDispatched(ChatStreamFailed::class, function (ChatStreamFailed $event) {
-        return $event->conversationId === 'conv-123';
-    });
+    Event::assertDispatched(fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-123');
 });
 
 it('refunds the reservation when the job fails without ever streaming', function (): void {
@@ -128,8 +134,212 @@ it('refunds the reservation and stops when hosted access expires in the queue', 
 
     expect(TurnPresence::current('conv-paused'))->toBeNull();
 
-    Event::assertDispatched(ChatStreamFailed::class, fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-paused'
+    Event::assertDispatched(fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-paused'
         && $event->message === __('billing.access.paused_chat'));
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($balance->credits_remaining)->toBe(100)
+        ->and($balance->credits_used)->toBe(0);
+});
+
+it('refunds the reservation and stops when the user is removed from the workspace in the queue', function (): void {
+    withHostedBilling();
+    Event::fake();
+    CrmAssistant::fake(['should not run']);
+
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $member = User::factory()->create(['current_workspace_id' => $workspace->getKey()]);
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member = User::query()->findOrFail($member->getKey());
+    seedConversation($owner, 'conv-removed');
+
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_removed_member',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $credits = resolve(CreditService::class);
+    expect($credits->reserveCredit(
+        $workspace,
+        reservationKey: 'reserve-turn-removed',
+        conversationId: 'conv-removed',
+        userId: (string) $member->getKey(),
+    ))->toBeTrue();
+
+    $job = new ProcessChatMessage(
+        user: $member,
+        workspace: $workspace,
+        message: 'hello',
+        conversationId: 'conv-removed',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
+        turnId: 'turn-removed',
+    );
+
+    TurnPresence::begin('conv-removed', turnId: 'turn-removed', message: 'hello');
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    $job->handle($credits);
+
+    CrmAssistant::assertNeverPrompted();
+
+    expect(TurnPresence::current('conv-removed'))->toBeNull()
+        ->and(Auth::guard('web')->user())->toBeNull();
+
+    Event::assertDispatched(fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-removed'
+        && $event->message === __('You are no longer a member of this workspace, so the assistant stopped.'));
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    expect($balance->credits_remaining)->toBe(100)
+        ->and($balance->credits_used)->toBe(0);
+});
+
+it('still runs the turn for a member who has not been removed', function (): void {
+    CrmAssistant::fake(['ok']);
+
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $member = User::factory()->create(['current_workspace_id' => $workspace->getKey()]);
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member = User::query()->findOrFail($member->getKey());
+    seedConversation($owner, 'conv-member');
+
+    new ProcessChatMessage(
+        user: $member,
+        workspace: $workspace,
+        message: 'hello',
+        conversationId: 'conv-member',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
+    )->handle(resolve(CreditService::class));
+
+    CrmAssistant::assertPrompted(fn (): bool => true);
+});
+
+function invokingToolFor(CrmAssistant $agent): InvokingTool
+{
+    return new InvokingTool('inv-1', 'tool-inv-1', $agent, resolve(GetCrmSummaryTool::class), []);
+}
+
+function assistantFor(User $user, Workspace $workspace): CrmAssistant
+{
+    return new CrmAssistant()
+        ->withWorkspace($workspace)
+        ->withCurrentUser(['name' => $user->name, 'id' => (string) $user->getKey(), 'role' => '', 'capabilities' => []]);
+}
+
+it('refuses a tool call from an assistant whose user was removed from the workspace', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $member = User::factory()->create(['current_workspace_id' => $workspace->getKey()]);
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+
+    event(invokingToolFor(assistantFor($member, $workspace)));
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    expect(fn () => event(invokingToolFor(assistantFor($member, $workspace))))
+        ->toThrow(MembershipRevoked::class);
+});
+
+it('lets the workspace owner and a current member call tools', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+
+    event(invokingToolFor(assistantFor($owner, $workspace)));
+
+    expect(true)->toBeTrue();
+});
+
+it('does not guard an assistant with no workspace bound', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+
+    event(invokingToolFor(new CrmAssistant));
+    event(invokingToolFor(new CrmAssistant()->withCurrentUser(['name' => 'x', 'id' => (string) $user->getKey(), 'role' => '', 'capabilities' => []])));
+
+    expect(true)->toBeTrue();
+});
+
+it('ends a turn with the refusal before its first tool runs when the user was removed mid-turn', function (): void {
+    withHostedBilling();
+    Event::fake([ChatStreamFailed::class]);
+
+    $toolsRun = 0;
+    Event::listen(ToolInvoked::class, function () use (&$toolsRun): void {
+        $toolsRun++;
+    });
+
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $member = User::factory()->create(['current_workspace_id' => $workspace->getKey()]);
+    $workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member = User::query()->findOrFail($member->getKey());
+    seedConversation($owner, 'conv-mid-turn');
+
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_test_mid_turn',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+    ]);
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'workspace_id' => $workspace->getKey(),
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+
+    $credits = resolve(CreditService::class);
+    expect($credits->reserveCredit(
+        $workspace,
+        reservationKey: 'reserve-turn-mid',
+        conversationId: 'conv-mid-turn',
+        userId: (string) $member->getKey(),
+    ))->toBeTrue();
+
+    CrmAssistant::fake([
+        function () use ($owner, $workspace, $member): ToolCall {
+            resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+            return new ToolCall('call_1', 'GetCrmSummaryTool', []);
+        },
+        'should not be reached',
+    ]);
+
+    $job = new ProcessChatMessage(
+        user: $member,
+        workspace: $workspace,
+        message: 'hello',
+        conversationId: 'conv-mid-turn',
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
+        turnId: 'turn-mid',
+    );
+
+    TurnPresence::begin('conv-mid-turn', turnId: 'turn-mid', message: 'hello');
+
+    $job->handle($credits);
+
+    expect($toolsRun)->toBe(0)
+        ->and(TurnPresence::current('conv-mid-turn'))->toBeNull();
+
+    Event::assertDispatched(fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-mid-turn'
+        && $event->message === MembershipRevoked::refusal());
 
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
