@@ -8,12 +8,10 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
-use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
-use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\EmailIntegration\EmailIntegrationServiceProvider;
@@ -55,10 +53,7 @@ function mergeCommunication(string $type, Model $kept, Model $duplicate): void
     $page = $type === 'company' ? ViewCompany::class : ViewPeople::class;
 
     livewire($page, ['record' => $kept->getKey()])
-        ->callAction(
-            TestAction::make('mergeRecord')->schemaComponent('recordActions', schema: 'infolist'),
-            data: ['duplicate_id' => $duplicate->getKey(), 'keep' => 'current'],
-        )
+        ->callAction(mergeRecordAction(), data: ['duplicate_id' => $duplicate->getKey(), 'keep' => 'current'])
         ->assertHasNoActionErrors();
 }
 
@@ -81,17 +76,6 @@ function communicationMeeting(string $startsAt): Meeting
         'starts_at' => $startsAt,
         'ends_at' => date('Y-m-d H:i:s', strtotime($startsAt) + 1800),
     ]);
-}
-
-function linkedIds(string $table, string $itemColumn, string $morph, Model $record): array
-{
-    return DB::table($table)
-        ->where(Str::singular($table).'_type', $morph)
-        ->where(Str::singular($table).'_id', $record->getKey())
-        ->pluck($itemColumn)
-        ->sort()
-        ->values()
-        ->all();
 }
 
 it('moves emails, meetings, participants and attendees and keeps a shared link once', function (string $type): void {
@@ -117,10 +101,10 @@ it('moves emails, meetings, participants and attendees and keeps a shared link o
 
     mergeCommunication($type, $kept, $duplicate);
 
-    expect(linkedIds('emailables', 'email_id', $morph, $kept))->toBe(collect([$onlyKept, $onlyDuplicate, $shared])->map->getKey()->sort()->values()->all())
-        ->and(linkedIds('emailables', 'email_id', $morph, $duplicate))->toBe([])
-        ->and(linkedIds('meetingables', 'meeting_id', $morph, $kept))->toBe(collect([$sharedMeeting, $duplicateMeeting])->map->getKey()->sort()->values()->all())
-        ->and(linkedIds('meetingables', 'meeting_id', $morph, $duplicate))->toBe([])
+    expect(mergeLinkedIds('emailables', 'email_id', $kept))->toBe(collect([$onlyKept, $onlyDuplicate, $shared])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('emailables', 'email_id', $duplicate))->toBe([])
+        ->and(mergeLinkedIds('meetingables', 'meeting_id', $kept))->toBe(collect([$sharedMeeting, $duplicateMeeting])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('meetingables', 'meeting_id', $duplicate))->toBe([])
         ->and($participant->refresh()->{$contactColumn})->toBe($kept->getKey())
         ->and($attendee->refresh()->{$contactColumn})->toBe($kept->getKey());
 })->with(['company', 'people']);
@@ -179,8 +163,8 @@ it('moves the communication of merged records while the email feature is off', f
 
     mergeCommunication($type, $kept, $duplicate);
 
-    expect(linkedIds('emailables', 'email_id', $type, $kept))->toBe([$email->getKey()])
-        ->and(linkedIds('emailables', 'email_id', $type, $duplicate))->toBe([]);
+    expect(mergeLinkedIds('emailables', 'email_id', $kept))->toBe([$email->getKey()])
+        ->and(mergeLinkedIds('emailables', 'email_id', $duplicate))->toBe([]);
 })->with(['company', 'people']);
 
 it('never lets a combined counter go below zero', function (string $type): void {

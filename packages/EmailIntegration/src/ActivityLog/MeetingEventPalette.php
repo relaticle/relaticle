@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\ActivityLog;
 
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
+use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 enum MeetingEventPalette: string implements HasIcon, HasLabel
 {
@@ -27,6 +28,16 @@ enum MeetingEventPalette: string implements HasIcon, HasLabel
         $label = is_array($event) ? ($event['label'] ?? null) : null;
 
         return is_string($label) ? $label : $this->value;
+    }
+
+    public function title(): null
+    {
+        return null;
+    }
+
+    public function description(TimelineEntry $entry): null
+    {
+        return null;
     }
 
     public function badge(): null

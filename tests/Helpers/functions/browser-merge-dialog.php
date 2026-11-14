@@ -9,7 +9,7 @@ use App\Models\Workspace;
 use Pest\Browser\Api\AwaitableWebpage;
 use Tests\Helpers\WorkspaceCustomField;
 
-function dialogCompany(Workspace $workspace, User $owner, string $name, array $domains = []): Company
+function mergeDialogCompany(Workspace $workspace, User $owner, string $name, array $domains = []): Company
 {
     $company = Company::factory()->recycle([$owner, $workspace])->create(['name' => $name]);
 
@@ -20,7 +20,7 @@ function dialogCompany(Workspace $workspace, User $owner, string $name, array $d
     return $company;
 }
 
-function dialogPerson(Workspace $workspace, User $owner, string $name, array $emails = []): People
+function mergeDialogPerson(Workspace $workspace, User $owner, string $name, array $emails = []): People
 {
     $person = People::factory()->recycle([$owner, $workspace])->create(['name' => $name]);
 
@@ -44,9 +44,9 @@ function openMergeDialog(User $user, Workspace $workspace, Company|People $recor
 function pickInMergeDialog(AwaitableWebpage $page, string $search, string $name): AwaitableWebpage
 {
     return $page->click('[data-merge-picker]')
-        ->type('[data-merge-popover] input', $search)
+        ->type('.fi-merge-pop input', $search)
         ->wait(1.2)
-        ->click("[data-merge-popover] li:has-text(\"{$name}\")")
+        ->click(".fi-merge-pop li:has-text(\"{$name}\")")
         ->wait(1.2);
 }
 
@@ -83,7 +83,7 @@ JS;
 
 const MERGE_POPOVER_RECT = <<<'JS'
     (() => {
-        const box = document.querySelector('[data-merge-popover]').getBoundingClientRect();
+        const box = document.querySelector('.fi-merge-pop').getBoundingClientRect();
         const anchor = document.querySelector('[data-merge-picker]').getBoundingClientRect();
         const modal = document.querySelector('.fi-modal-window').getBoundingClientRect();
 
@@ -99,7 +99,7 @@ const MERGE_POPOVER_RECT = <<<'JS'
             modalRight: modal.right,
             windowWidth: window.innerWidth,
             windowHeight: window.innerHeight,
-            rows: document.querySelectorAll('[data-merge-popover] li').length,
+            rows: document.querySelectorAll('.fi-merge-pop li').length,
         };
     })()
 JS;
@@ -108,7 +108,7 @@ function searchMergePicker(AwaitableWebpage $page, string $term): array
 {
     $page->script(<<<JS
         (() => {
-            const input = document.querySelector('[data-merge-popover] input');
+            const input = document.querySelector('.fi-merge-pop input');
             input.value = '{$term}';
             input.dispatchEvent(new Event('input', { bubbles: true }));
         })()

@@ -44,6 +44,7 @@ return [
     'notifications' => [
         'url_copied' => 'URL copiée dans le presse-papiers',
         'id_copied' => "ID de l'enregistrement copié dans le presse-papiers",
+        'records_merged' => 'Fiches fusionnées',
     ],
     'merge' => [
         'heading' => 'Fusionner',
@@ -51,7 +52,6 @@ return [
         'search' => 'Rechercher',
         'swap' => 'Inverser les fiches',
         'submit' => 'Fusionner les fiches',
-        'merged' => 'Fiches fusionnées',
         'unavailable' => "Cette fiche n'est plus disponible pour la fusion.",
         'over_limit' => ":field peut contenir :max valeurs. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.",
         'pick' => 'Choisir une fiche',

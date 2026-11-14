@@ -26,9 +26,9 @@ afterEach(function (): void {
 });
 
 it('merges a duplicate picked from the dialog into the current company', function (): void {
-    $kept = dialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
-    $duplicate = dialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightline.health']);
-    dialogCompany($this->workspace, $this->user, 'Northwind Traders');
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightline.health']);
+    mergeDialogCompany($this->workspace, $this->user, 'Northwind Traders');
 
     $page = openMergeDialog($this->user, $this->workspace, $kept)
         ->assertSeeIn('[data-merge-right]', 'Brightline Health')
@@ -37,13 +37,13 @@ it('merges a duplicate picked from the dialog into the current company', functio
         ->assertScript('document.querySelector("[data-merge-swap]").disabled', true);
 
     $page->click('[data-merge-picker]')
-        ->assertAttribute('[data-merge-popover] input', 'placeholder', 'Search by name or domain')
-        ->assertAttribute('[data-merge-popover] input', 'aria-activedescendant', 'merge-option-0')
-        ->type('[data-merge-popover] input', 'zzzz')
+        ->assertAttribute('.fi-merge-pop input', 'placeholder', 'Search by name or domain')
+        ->assertAttribute('.fi-merge-pop input', 'aria-activedescendant', 'merge-option-0')
+        ->type('.fi-merge-pop input', 'zzzz')
         ->wait(1.2)
-        ->assertAttributeMissing('[data-merge-popover] input', 'aria-activedescendant')
-        ->assertAttributeMissing('[data-merge-popover] input', 'aria-controls')
-        ->keys('[data-merge-popover] input', 'Escape');
+        ->assertAttributeMissing('.fi-merge-pop input', 'aria-activedescendant')
+        ->assertAttributeMissing('.fi-merge-pop input', 'aria-controls')
+        ->keys('.fi-merge-pop input', 'Escape');
 
     pickInMergeDialog($page, 'brightline.health', 'Brightline Health Inc.')
         ->assertSeeIn('[data-merge-left]', 'Brightline Health Inc.')
@@ -60,8 +60,8 @@ it('merges a duplicate picked from the dialog into the current company', functio
 });
 
 it('keeps the other company when the member swaps the two', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Northwind', ['northwind.com']);
-    $other = dialogCompany($this->workspace, $this->user, 'Northwind Traders', ['northwindtraders.com']);
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Northwind', ['northwind.com']);
+    $other = mergeDialogCompany($this->workspace, $this->user, 'Northwind Traders', ['northwindtraders.com']);
 
     $page = openMergeDialog($this->user, $this->workspace, $current);
 
@@ -80,8 +80,8 @@ it('keeps the other company when the member swaps the two', function (): void {
 });
 
 it('disables merging and names the list over its limit', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Acme', ['a1.com', 'a2.com', 'a3.com']);
-    dialogCompany($this->workspace, $this->user, 'Acme Holdings', ['b1.com', 'b2.com', 'b3.com']);
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Acme', ['a1.com', 'a2.com', 'a3.com']);
+    mergeDialogCompany($this->workspace, $this->user, 'Acme Holdings', ['b1.com', 'b2.com', 'b3.com']);
 
     $page = openMergeDialog($this->user, $this->workspace, $current);
 
@@ -92,8 +92,8 @@ it('disables merging and names the list over its limit', function (): void {
 });
 
 it('shows domains as links that open a new tab and a logo in the list and the card', function (): void {
-    $current = dialogCompany($this->workspace, $this->user, 'Globex', ['globex.com']);
-    $other = dialogCompany($this->workspace, $this->user, 'Globex Europe', ['globex.eu']);
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex', ['globex.com']);
+    $other = mergeDialogCompany($this->workspace, $this->user, 'Globex Europe', ['globex.eu']);
     $other->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
 
     $links = <<<'JS'
@@ -103,7 +103,7 @@ it('shows domains as links that open a new tab and a logo in the list and the ca
     $page = openMergeDialog($this->user, $this->workspace, $current)
         ->click('[data-merge-picker]')
         ->wait(1.2)
-        ->assertPresent('[data-merge-popover] li:has-text("Globex Europe") img');
+        ->assertPresent('.fi-merge-pop li:has-text("Globex Europe") img');
 
     expect($page->script($links))->toBe([['https://globex.com', '_blank', 'noopener noreferrer'], ['https://globex.com', '_blank', 'noopener noreferrer']]);
 
@@ -113,7 +113,7 @@ it('shows domains as links that open a new tab and a logo in the list and the ca
 
     expect($page->script($visibleInResultTile))->toBe(['svg']);
 
-    $page->click('[data-merge-popover] li:has-text("Globex Europe")')
+    $page->click('.fi-merge-pop li:has-text("Globex Europe")')
         ->wait(1.2)
         ->assertPresent('[data-merge-left] img');
 
@@ -124,16 +124,16 @@ it('shows domains as links that open a new tab and a logo in the list and the ca
 });
 
 it('merges a duplicate person picked from the dialog and shows emails and contact opportunities', function (): void {
-    $kept = dialogPerson($this->workspace, $this->user, 'Dana Whitfield', ['dana@brightline.com']);
-    $duplicate = dialogPerson($this->workspace, $this->user, 'Dana W.', ['dana@gmail.com']);
-    dialogPerson($this->workspace, $this->user, 'Marcus Chen', ['marcus@northwind.com']);
+    $kept = mergeDialogPerson($this->workspace, $this->user, 'Dana Whitfield', ['dana@brightline.com']);
+    $duplicate = mergeDialogPerson($this->workspace, $this->user, 'Dana W.', ['dana@gmail.com']);
+    mergeDialogPerson($this->workspace, $this->user, 'Marcus Chen', ['marcus@northwind.com']);
     Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
 
     $page = openMergeDialog($this->user, $this->workspace, $kept)
         ->assertSeeIn('[data-merge-right]', 'dana@brightline.com')
         ->click('[data-merge-picker]')
-        ->assertAttribute('[data-merge-popover] input', 'placeholder', 'Search by name or email')
-        ->keys('[data-merge-popover] input', 'Escape');
+        ->assertAttribute('.fi-merge-pop input', 'placeholder', 'Search by name or email')
+        ->keys('.fi-merge-pop input', 'Escape');
 
     pickInMergeDialog($page, 'dana@gmail', 'Dana W.')
         ->assertSeeIn('[data-merge-left]', 'dana@gmail.com')

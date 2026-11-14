@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\ActivityLog;
 
 use Filament\Support\Contracts\HasIcon;
 use Filament\Support\Contracts\HasLabel;
+use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 enum EmailEventPalette: string implements HasIcon, HasLabel
 {
@@ -20,6 +21,16 @@ enum EmailEventPalette: string implements HasIcon, HasLabel
     public function getLabel(): string
     {
         return (string) __("activity-log.events.{$this->value}.label");
+    }
+
+    public function title(): null
+    {
+        return null;
+    }
+
+    public function description(TimelineEntry $entry): null
+    {
+        return null;
     }
 
     /**
