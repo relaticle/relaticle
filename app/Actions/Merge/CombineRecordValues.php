@@ -31,7 +31,11 @@ final readonly class CombineRecordValues
         $overLimit = [];
 
         foreach ($this->activeFields($kept) as $field) {
-            $value = $this->combine($field, $kept->getCustomFieldValue($field), $duplicate->getCustomFieldValue($field));
+            $value = $this->combine(
+                $field,
+                $this->repointedReferences($field, $kept->getCustomFieldValue($field), $kept, $duplicate),
+                $this->repointedReferences($field, $duplicate->getCustomFieldValue($field), $kept, $duplicate),
+            );
 
             $customFields[$field->code] = $value;
 
@@ -101,6 +105,20 @@ final readonly class CombineRecordValues
             ->where('active', true)
             ->orderBy('sort_order')
             ->get();
+    }
+
+    private function repointedReferences(CustomField $field, mixed $value, Company|People $kept, Company|People $duplicate): mixed
+    {
+        if ($field->type !== CustomFieldType::RECORD->value || $field->lookup_type !== $kept->getMorphClass() || ! is_array($value)) {
+            return $value;
+        }
+
+        $repointed = array_map(
+            fn (mixed $id): mixed => $id === $duplicate->getKey() ? $kept->getKey() : $id,
+            $value,
+        );
+
+        return array_values(array_unique($repointed, SORT_REGULAR));
     }
 
     private function combine(CustomField $field, mixed $kept, mixed $duplicate): mixed
