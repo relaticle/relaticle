@@ -6,10 +6,12 @@ namespace App\Actions\Merge;
 
 use App\Data\MergedValues;
 use App\Enums\CustomFieldType;
+use App\Filament\CustomFields\DomainFieldType;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
+use App\Support\EmailAddress;
 
 final readonly class CombineRecordValues
 {
@@ -35,7 +37,7 @@ final readonly class CombineRecordValues
             $limit = $this->limit($field);
 
             if ($limit !== null && is_array($value) && count($value) > $limit) {
-                $overLimit[$field->code] = $limit;
+                $overLimit[$field->code] = ['label' => $field->name, 'limit' => $limit];
             }
         }
 
@@ -88,10 +90,38 @@ final readonly class CombineRecordValues
     private function combine(CustomField $field, mixed $kept, mixed $duplicate): mixed
     {
         if ($this->isList($field) && is_array($kept) && is_array($duplicate)) {
-            return array_values(array_unique([...$kept, ...$duplicate]));
+            return $this->unique($field, [...$kept, ...$duplicate]);
         }
 
         return $this->pick($kept, $duplicate);
+    }
+
+    /**
+     * @param  array<int, mixed>  $values
+     * @return list<mixed>
+     */
+    private function unique(CustomField $field, array $values): array
+    {
+        $unique = [];
+
+        foreach ($values as $value) {
+            $unique[$this->normalize($field, $value)] ??= $value;
+        }
+
+        return array_values($unique);
+    }
+
+    private function normalize(CustomField $field, mixed $value): string|int
+    {
+        if (! is_string($value)) {
+            return is_int($value) ? $value : (string) json_encode($value);
+        }
+
+        return match ($field->type) {
+            CustomFieldType::DOMAIN->value => (new DomainFieldType)->setValue($value),
+            CustomFieldType::EMAIL->value => EmailAddress::canonicalize($value),
+            default => $value,
+        };
     }
 
     private function isList(CustomField $field): bool

@@ -6,11 +6,14 @@ namespace App\Filament\Actions;
 
 use App\Actions\Merge\CombineRecordValues;
 use App\Actions\Merge\MergeCompanies;
+use App\Actions\Merge\MergePeople;
 use App\Data\MergedValues;
 use App\Enums\CustomFields\CompanyField;
+use App\Enums\CustomFields\PeopleField;
 use App\Models\Company;
-use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Opportunity;
+use App\Models\People;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -21,7 +24,6 @@ use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
@@ -30,12 +32,18 @@ use Illuminate\Validation\ValidationException;
 
 final class MergeRecordAction extends Action
 {
-    private const array COUNTED_RELATIONS = ['people', 'opportunities', 'notes', 'tasks'];
+    private const array COUNT_ICONS = [
+        'people' => 'lucide-users',
+        'opportunities' => 'lucide-circle-dollar-sign',
+        'contact_opportunities' => 'lucide-circle-dollar-sign',
+        'notes' => 'lucide-file-text',
+        'tasks' => 'lucide-clipboard-check',
+    ];
 
-    /** @var array<string, array{other: Company, current: Company, values: MergedValues}|null> */
+    /** @var array<string, array{other: Company|People, current: Company|People, values: MergedValues}|null> */
     private array $pairings = [];
 
-    private ?Company $currentWithCounts = null;
+    private Company|People|null $currentWithCounts = null;
 
     public static function getDefaultName(): string
     {
@@ -48,10 +56,10 @@ final class MergeRecordAction extends Action
 
         $this->label(__('filament/record-page.actions.merge_record'))
             ->icon('lucide-merge')
-            ->visible(fn (Model $record): bool => $record instanceof Company
+            ->visible(fn (Model $record): bool => ($record instanceof Company || $record instanceof People)
                 && Gate::allows('update', $record)
                 && Gate::allows('delete', $record))
-            ->modalHeading(fn (): Htmlable => new HtmlString(view('filament.app.merge-record.heading', ['name' => $this->company()->name])->render()))
+            ->modalHeading(fn (): Htmlable => new HtmlString(view('filament.app.merge-record.heading', ['name' => $this->subject()->name])->render()))
             ->modalWidth(Width::FourExtraLarge)
             ->modalSubmitActionLabel(__('filament/record-page.merge.submit'))
             ->modalSubmitAction(fn (Action $action): Action => $action->disabled($this->isBlocked()))
@@ -81,10 +89,10 @@ final class MergeRecordAction extends Action
     /**
      * @param  array<string, mixed>  $data
      */
-    private function merge(array $data): Company
+    private function merge(array $data): Company|People
     {
-        $current = $this->company();
-        $other = Company::query()->whereKey($data['duplicate_id'])->first();
+        $current = $this->subject();
+        $other = $this->entities()->whereKey($data['duplicate_id'])->first();
 
         if ($other === null || $current->is($other)) {
             throw ValidationException::withMessages(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
@@ -95,13 +103,17 @@ final class MergeRecordAction extends Action
         $user = auth()->user();
         abort_unless($user instanceof User, 403);
 
-        return resolve(MergeCompanies::class)->execute($user, $kept, $duplicate);
+        return match (true) {
+            $kept instanceof People && $duplicate instanceof People => resolve(MergePeople::class)->execute($user, $kept, $duplicate),
+            $kept instanceof Company && $duplicate instanceof Company => resolve(MergeCompanies::class)->execute($user, $kept, $duplicate),
+            default => abort(404),
+        };
     }
 
-    private function company(): Company
+    private function subject(): Company|People
     {
         $record = $this->getRecord();
-        abort_unless($record instanceof Company, 404);
+        abort_unless($record instanceof Company || $record instanceof People, 404);
 
         return $record;
     }
@@ -114,7 +126,7 @@ final class MergeRecordAction extends Action
         $pairing = $this->pairing();
         $keepsOther = $pairing !== null && $this->formState('keep') === 'other';
 
-        $current = $this->card($this->currentCompany());
+        $current = $this->card($this->currentRecord());
         $other = $pairing === null ? null : $this->card($pairing['other']);
 
         return [
@@ -137,7 +149,7 @@ final class MergeRecordAction extends Action
     }
 
     /**
-     * @return array{other: Company, current: Company, values: MergedValues}|null
+     * @return array{other: Company|People, current: Company|People, values: MergedValues}|null
      */
     private function pairing(): ?array
     {
@@ -153,12 +165,12 @@ final class MergeRecordAction extends Action
     }
 
     /**
-     * @return array{other: Company, current: Company, values: MergedValues}|null
+     * @return array{other: Company|People, current: Company|People, values: MergedValues}|null
      */
     private function buildPairing(string $id, bool $keepsOther): ?array
     {
-        $current = $this->currentCompany();
-        $other = $this->companies()->whereKey($id)->whereKeyNot($current->getKey())->first();
+        $current = $this->currentRecord();
+        $other = $this->entities()->whereKey($id)->whereKeyNot($current->getKey())->first();
 
         if ($other === null) {
             return null;
@@ -170,56 +182,100 @@ final class MergeRecordAction extends Action
         return ['other' => $other, 'current' => $current, 'values' => $values];
     }
 
-    private function currentCompany(): Company
+    private function currentRecord(): Company|People
     {
-        return $this->currentWithCounts ??= $this->companies()->whereKey($this->company()->getKey())->firstOrFail();
+        return $this->currentWithCounts ??= $this->entities()->whereKey($this->subject()->getKey())->firstOrFail();
     }
 
     /**
-     * @return Builder<Company>
+     * @return Builder<Company>|Builder<People>
      */
-    private function companies(): Builder
+    private function entities(): Builder
     {
+        if ($this->subject() instanceof People) {
+            return People::query()
+                ->with(['customFieldValues.customField'])
+                ->withCount(['notes', 'tasks'])
+                ->addSelect(['contact_opportunities_count' => Opportunity::query()
+                    ->selectRaw('count(*)')
+                    ->whereColumn('contact_id', 'people.id')]);
+        }
+
         return Company::query()
             ->with(['customFieldValues.customField'])
-            ->withCount(self::COUNTED_RELATIONS);
+            ->withCount(['people', 'opportunities', 'notes', 'tasks']);
     }
 
     /**
-     * @return array{id: mixed, name: string, logo: ?string, initials: string, domains: list<string>, counts: array<string, int>}
+     * @return list<string>
      */
-    private function card(Company $company): array
+    private function countKeys(): array
+    {
+        return $this->subject() instanceof People
+            ? ['contact_opportunities', 'notes', 'tasks']
+            : ['people', 'opportunities', 'notes', 'tasks'];
+    }
+
+    private function detailCode(): string
+    {
+        return $this->subject() instanceof People ? PeopleField::EMAILS->value : CompanyField::DOMAINS->value;
+    }
+
+    /**
+     * @return array{id: mixed, name: string, logo: ?string, initials: string, details: list<string>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
+     */
+    private function card(Company|People $record): array
     {
         return [
-            'id' => $company->getKey(),
-            'name' => $company->name,
-            'logo' => $company->logo,
-            'initials' => $this->initials($company->name),
-            'domains' => $this->domains($company),
-            'counts' => Arr::mapWithKeys(self::COUNTED_RELATIONS, fn (string $relation): array => [$relation => (int) $company->getAttribute("{$relation}_count")]),
+            'id' => $record->getKey(),
+            'name' => $record->name,
+            'logo' => $record instanceof Company ? $record->logo : null,
+            'initials' => $this->initials($record->name),
+            'details' => $this->details($record),
+            'emptyDetails' => $this->emptyDetails(),
+            'counts' => $this->counts(fn (string $key): int => (int) $record->getAttribute("{$key}_count")),
         ];
     }
 
     /**
-     * @param  array{other: Company, current: Company, values: MergedValues}  $pairing
-     * @return array{id: mixed, name: string, logo: ?string, initials: string, domains: list<string>, counts: array<string, int>}
+     * @param  array{other: Company|People, current: Company|People, values: MergedValues}  $pairing
+     * @return array{id: mixed, name: string, logo: ?string, initials: string, details: list<string>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
      */
     private function resultCard(array $pairing): array
     {
         $values = $pairing['values'];
         $name = (string) $values->attributes['name'];
-        $counts = Arr::mapWithKeys(self::COUNTED_RELATIONS, fn (string $relation): array => [
-            $relation => (int) $pairing['other']->getAttribute("{$relation}_count") + (int) $pairing['current']->getAttribute("{$relation}_count"),
-        ]);
+        $kept = $this->formState('keep') === 'other' ? $pairing['other'] : $pairing['current'];
+        $dropped = $kept === $pairing['other'] ? $pairing['current'] : $pairing['other'];
 
         return [
             'id' => null,
             'name' => $name,
-            'logo' => ($this->formState('keep') === 'other' ? $pairing['other'] : $pairing['current'])->logo ?? $pairing['other']->logo ?? $pairing['current']->logo,
+            'logo' => $kept instanceof Company && $dropped instanceof Company ? $kept->logo ?? $dropped->logo : null,
             'initials' => $this->initials($name),
-            'domains' => $this->strings($values->customFields[CompanyField::DOMAINS->value] ?? []),
-            'counts' => $counts,
+            'details' => $this->strings($values->customFields[$this->detailCode()] ?? []),
+            'emptyDetails' => $this->emptyDetails(),
+            'counts' => $this->counts(fn (string $key): int => (int) $pairing['other']->getAttribute("{$key}_count") + (int) $pairing['current']->getAttribute("{$key}_count")),
         ];
+    }
+
+    /**
+     * @param  callable(string): int  $count
+     * @return list<array{key: string, icon: string, count: int}>
+     */
+    private function counts(callable $count): array
+    {
+        return array_map(
+            fn (string $key): array => ['key' => $key, 'icon' => self::COUNT_ICONS[$key], 'count' => $count($key)],
+            $this->countKeys(),
+        );
+    }
+
+    private function emptyDetails(): string
+    {
+        return $this->subject() instanceof People
+            ? __('filament/record-page.merge.no_emails')
+            : __('filament/record-page.merge.no_domains');
     }
 
     private function initials(string $name): string
@@ -235,10 +291,10 @@ final class MergeRecordAction extends Action
     /**
      * @return list<string>
      */
-    private function domains(Company $company): array
+    private function details(Company|People $record): array
     {
-        $value = $company->customFieldValues
-            ->first(fn (CustomFieldValue $fieldValue): bool => $fieldValue->customField->code === CompanyField::DOMAINS->value)
+        $value = $record->customFieldValues
+            ->first(fn (CustomFieldValue $fieldValue): bool => $fieldValue->customField->code === $this->detailCode())
             ?->getValue();
 
         return $this->strings($value);
@@ -253,23 +309,23 @@ final class MergeRecordAction extends Action
     }
 
     /**
-     * @return list<array{id: mixed, name: string, domain: ?string}>
+     * @return list<array{id: mixed, name: string, detail: ?string}>
      */
     private function searchResults(): array
     {
         $search = (string) $this->formState('search');
 
-        $companies = $this->companies()
-            ->whereKeyNot($this->company()->getKey())
+        $records = $this->entities()
+            ->whereKeyNot($this->subject()->getKey())
             ->when($search !== '', fn (Builder $query): Builder => $query->where('name', 'ilike', '%'.addcslashes($search, '%_\\').'%'))
             ->orderBy('name')
             ->limit(25)
             ->get();
 
-        return array_values($companies->map(fn (Company $company): array => [
-            'id' => $company->getKey(),
-            'name' => $company->name,
-            'domain' => $this->domains($company)[0] ?? null,
+        return array_values($records->map(fn (Company|People $record): array => [
+            'id' => $record->getKey(),
+            'name' => $record->name,
+            'detail' => $this->details($record)[0] ?? null,
         ])->all());
     }
 
@@ -284,17 +340,10 @@ final class MergeRecordAction extends Action
             return [];
         }
 
-        $names = CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $this->company()->workspace_id)
-            ->where('entity_type', $this->company()->getMorphClass())
-            ->whereIn('code', array_keys($overLimit))
-            ->pluck('name', 'code');
-
-        return array_values(Arr::map($overLimit, fn (int $max, string $code): string => __('filament/record-page.merge.over_limit', [
-            'field' => $names[$code] ?? $code,
-            'max' => $max,
-        ])));
+        return array_values(array_map(
+            fn (array $over): string => __('filament/record-page.merge.over_limit', ['field' => $over['label'], 'max' => $over['limit']]),
+            $overLimit,
+        ));
     }
 
     private function formState(string $key): mixed

@@ -45,20 +45,20 @@
         @endif
     </div>
 
-    <ul class="min-w-0 space-y-0.5 text-sm text-gray-600 dark:text-gray-300" data-merge-domains>
-        @forelse ($card['domains'] as $domain)
-            <li class="truncate" title="{{ $domain }}">{{ $domain }}</li>
+    <ul class="min-w-0 space-y-0.5 text-sm text-gray-600 dark:text-gray-300" data-merge-details>
+        @forelse ($card['details'] as $detail)
+            <li class="truncate" title="{{ $detail }}">{{ $detail }}</li>
         @empty
-            <li class="text-gray-400 dark:text-gray-500">{{ __('filament/record-page.merge.no_domains') }}</li>
+            <li class="text-gray-400 dark:text-gray-500">{{ $card['emptyDetails'] }}</li>
         @endforelse
     </ul>
 
     <ul class="mt-auto flex flex-wrap gap-x-3 gap-y-1 border-t border-gray-950/5 pt-3 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400" data-merge-counts>
-        @foreach (['people' => 'lucide-users', 'opportunities' => 'lucide-circle-dollar-sign', 'notes' => 'lucide-file-text', 'tasks' => 'lucide-clipboard-check'] as $relation => $icon)
-            <li class="inline-flex items-center gap-1" title="{{ trans_choice("filament/record-page.merge.counts.{$relation}", $card['counts'][$relation]) }}">
-                <x-filament::icon :icon="$icon" class="size-3.5" />
-                <span aria-hidden="true" class="tabular-nums">{{ $card['counts'][$relation] }}</span>
-                <span class="sr-only">{{ trans_choice("filament/record-page.merge.counts.{$relation}", $card['counts'][$relation]) }}</span>
+        @foreach ($card['counts'] as $count)
+            <li class="inline-flex items-center gap-1" title="{{ trans_choice("filament/record-page.merge.counts.{$count['key']}", $count['count']) }}">
+                <x-filament::icon :icon="$count['icon']" class="size-3.5" />
+                <span aria-hidden="true" class="tabular-nums">{{ $count['count'] }}</span>
+                <span class="sr-only">{{ trans_choice("filament/record-page.merge.counts.{$count['key']}", $count['count']) }}</span>
             </li>
         @endforeach
     </ul>
