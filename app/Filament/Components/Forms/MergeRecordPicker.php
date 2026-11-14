@@ -7,20 +7,21 @@ namespace App\Filament\Components\Forms;
 use App\Actions\Merge\CombineRecordValues;
 use App\Data\MergedValues;
 use App\Enums\CrmEntity;
-use App\Enums\CustomFields\CompanyField;
-use App\Enums\CustomFields\PeopleField;
+use App\Enums\RecordIdentity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
-use App\Models\Opportunity;
 use App\Models\People;
 use App\Support\LikePattern;
 use Filament\Forms\Components\Field;
+use Filament\Models\Contracts\HasAvatar;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 
 final class MergeRecordPicker extends Field
@@ -67,7 +68,7 @@ final class MergeRecordPicker extends Field
             'id' => $record->getKey(),
             'name' => $record->name,
             'detail' => $this->details($record)[0]['label'] ?? null,
-            'logo' => $this->logo($record),
+            'logo' => $this->image($record),
         ])->all());
     }
 
@@ -124,9 +125,7 @@ final class MergeRecordPicker extends Field
 
     public function getSearchPlaceholder(): string
     {
-        return $this->subject() instanceof People
-            ? __('filament/record-page.merge.search_placeholder.people')
-            : __('filament/record-page.merge.search_placeholder.company');
+        return $this->identity()->searchPlaceholder();
     }
 
     public function getEntityIcon(): string
@@ -207,18 +206,9 @@ final class MergeRecordPicker extends Field
      */
     private function entities(): Builder
     {
-        if ($this->subject() instanceof People) {
-            return People::query()
-                ->with(['customFieldValues.customField'])
-                ->withCount(['notes', 'tasks'])
-                ->addSelect(['contact_opportunities_count' => Opportunity::query()
-                    ->selectRaw('count(*)')
-                    ->whereColumn('contact_id', 'people.id')]);
-        }
-
-        return Company::query()
+        return $this->subject()->newQuery()
             ->with(['customFieldValues.customField'])
-            ->withCount(['people', 'opportunities', 'notes', 'tasks']);
+            ->withCount($this->entity()->mergeCountRelations());
     }
 
     /**
@@ -226,24 +216,27 @@ final class MergeRecordPicker extends Field
      */
     private function countKeys(): array
     {
-        return $this->subject() instanceof People
-            ? ['contact_opportunities', 'notes', 'tasks']
-            : ['people', 'opportunities', 'notes', 'tasks'];
+        return array_map(Str::snake(...), $this->entity()->mergeCountRelations());
     }
 
     private function detailCode(): string
     {
-        return $this->subject() instanceof People ? PeopleField::EMAILS->value : CompanyField::DOMAINS->value;
+        return $this->identity()->fieldCode();
     }
 
-    private function logo(Company|People $record): ?string
+    private function image(Model $record): ?string
     {
-        return $record instanceof Company ? $record->logo : null;
+        return $record instanceof HasAvatar ? $record->getFilamentAvatarUrl() : null;
     }
 
     private function entity(): CrmEntity
     {
-        return $this->subject() instanceof People ? CrmEntity::People : CrmEntity::Company;
+        return CrmEntity::tryFromModel($this->subject()) ?? abort(404);
+    }
+
+    private function identity(): RecordIdentity
+    {
+        return $this->entity()->identity() ?? abort(404);
     }
 
     /**
@@ -253,7 +246,7 @@ final class MergeRecordPicker extends Field
     {
         return $this->cardData(
             $record->name,
-            $this->logo($record),
+            $this->image($record),
             $this->details($record),
             fn (string $key): int => (int) $record->getAttribute("{$key}_count"),
         );
@@ -271,7 +264,7 @@ final class MergeRecordPicker extends Field
 
         return $this->cardData(
             (string) $values->attributes['name'],
-            $kept instanceof Company && $dropped instanceof Company ? $kept->logo ?? $dropped->logo : null,
+            $this->image($kept) ?? $this->image($dropped),
             $this->links($values->customFields[$this->detailCode()] ?? []),
             fn (string $key): int => (int) $pairing['other']->getAttribute("{$key}_count") + (int) $pairing['current']->getAttribute("{$key}_count"),
         );
@@ -288,9 +281,9 @@ final class MergeRecordPicker extends Field
             'name' => $name,
             'logo' => $logo,
             'icon' => $this->entity()->icon(),
-            'detailIcon' => $this->subject() instanceof People ? 'lucide-at-sign' : 'lucide-globe',
+            'detailIcon' => $this->identity()->icon(),
             'details' => $details,
-            'emptyDetails' => $this->emptyDetails(),
+            'emptyDetails' => $this->identity()->emptyLabel(),
             'counts' => $this->counts($count),
         ];
     }
@@ -305,13 +298,6 @@ final class MergeRecordPicker extends Field
             fn (string $key): array => ['key' => $key, 'icon' => self::COUNT_ICONS[$key], 'count' => $count($key)],
             $this->countKeys(),
         );
-    }
-
-    private function emptyDetails(): string
-    {
-        return $this->subject() instanceof People
-            ? __('filament/record-page.merge.no_emails')
-            : __('filament/record-page.merge.no_domains');
     }
 
     /**
@@ -335,9 +321,7 @@ final class MergeRecordPicker extends Field
 
         return array_values($strings->map(fn (string $item): array => [
             'label' => $item,
-            'href' => $this->subject() instanceof People
-                ? "mailto:{$item}"
-                : (preg_match('#^https?://#i', $item) === 1 ? $item : "https://{$item}"),
+            'href' => $this->identity()->href($item),
         ])->all());
     }
 
@@ -369,9 +353,8 @@ final class MergeRecordPicker extends Field
      */
     private function searchQuery(): Builder
     {
-        $query = $this->subject() instanceof People ? People::query() : Company::query()->with('media');
-
-        return $query
+        return $this->subject()->newQuery()
+            ->when($this->subject() instanceof HasAvatar, fn (Builder $query): Builder => $query->with('media'))
             ->select(['id', 'name'])
             ->with([
                 'customFieldValues' => fn (Relation $values): Relation => $values->whereRelation('customField', 'code', $this->detailCode()),
