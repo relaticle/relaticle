@@ -55,8 +55,8 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailSignature;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
-use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
+use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
@@ -107,6 +107,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      * it. A forward has a source but must not thread, which is why this is separate
      * from {@see $sourceEmailId}.
      */
+    #[Locked]
     public ?string $inReplyToEmailId = null;
 
     public ?string $replyMode = null;
@@ -421,14 +422,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     {
         $user = $this->authUser();
 
-        $email = Email::query()
-            ->with(['participants', 'body', 'shares', 'attachments'])
-            ->forWorkspace($user->current_workspace_id)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
-            ->whereKey($emailId)
-            ->first();
-
-        return $email instanceof Email && $user->can('view', $email) ? $email : null;
+        return resolve(VisibleEmailsQuery::class)->replyableEmail($user, (string) $user->current_workspace_id, $emailId, ['participants', 'shares', 'body', 'attachments']);
     }
 
     public function send(): void
