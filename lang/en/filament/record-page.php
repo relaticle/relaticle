@@ -64,10 +64,6 @@ return [
         'no_domains' => 'No domains',
         'no_emails' => 'No emails',
         'record' => 'record',
-        'keys' => [
-            'escape' => 'Esc',
-            'enter' => '↵',
-        ],
         'counts' => [
             'people' => '{0} No related people|{1} :count person|[2,*] :count people',
             'opportunities' => '{0} No related opportunities|{1} :count opportunity|[2,*] :count opportunities',
