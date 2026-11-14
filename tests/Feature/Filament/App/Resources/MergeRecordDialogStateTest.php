@@ -59,3 +59,12 @@ it('says nothing is unavailable before a record is picked', function (): void {
     expect(mergeDialogHtml($dialog))->toContain('data-merge-dialog')
         ->not->toContain(__('filament/record-page.merge.unavailable'));
 });
+
+it('renders the dialog heading as markup, not as escaped text', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Swaniawski Inc']);
+
+    $dialog = mergeDialogHtml(livewire(ViewCompany::class, ['record' => $kept->getKey()])->mountAction(mergeRecordAction()));
+
+    expect($dialog)->toContain('Swaniawski Inc')
+        ->not->toContain('&lt;span');
+});
