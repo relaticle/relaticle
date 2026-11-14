@@ -29,7 +29,7 @@
         <div class="relative grid gap-12 rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-950/5 @3xl:grid-cols-2 @3xl:gap-14 dark:bg-white/5 dark:ring-white/10">
             <div class="min-w-0" data-merge-left>
                 @if ($left)
-                    @include('filament.app.merge-record.card', ['card' => $left, 'isClearable' => ! $keepsOther])
+                    @include('filament.app.merge-record.card', ['role' => 'left', 'card' => $left, 'isClearable' => ! $keepsOther])
                 @else
                     @include('filament.app.merge-record.picker')
                 @endif
@@ -54,7 +54,7 @@
             </div>
 
             <div class="min-w-0" data-merge-right>
-                @include('filament.app.merge-record.card', ['card' => $getRightCard(), 'isClearable' => $keepsOther])
+                @include('filament.app.merge-record.card', ['role' => 'right', 'card' => $getRightCard(), 'isClearable' => $keepsOther])
             </div>
         </div>
 
@@ -69,7 +69,7 @@
         </div>
 
         <div class="min-w-0 px-3 @3xl:px-0 @3xl:py-3">
-            @include('filament.app.merge-record.card', ['card' => $getResultCard(), 'isClearable' => false, 'isResult' => true])
+            @include('filament.app.merge-record.card', ['role' => 'result', 'card' => $getResultCard(), 'isClearable' => false, 'isResult' => true])
         </div>
     </div>
 

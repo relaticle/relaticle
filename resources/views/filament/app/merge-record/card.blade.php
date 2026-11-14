@@ -16,7 +16,7 @@
     @endif
 
     <div class="flex min-w-0 flex-1 flex-col items-center justify-center gap-3 p-5 text-center">
-        @include('filament.app.merge-record.mark', ['logo' => $card['logo'], 'icon' => $card['icon'], 'size' => 'size-12 rounded-xl', 'iconSize' => 'size-6'])
+        @include('filament.app.merge-record.mark', ['role' => $role, 'logo' => $card['logo'], 'icon' => $card['icon'], 'size' => 'size-12 rounded-xl', 'iconSize' => 'size-6'])
 
         <p class="line-clamp-2 max-w-full break-words text-base font-semibold text-gray-950 dark:text-white" data-merge-name title="{{ $card['name'] }}">{{ $card['name'] }}</p>
 
