@@ -17,7 +17,7 @@ use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Notifications\ImportFinishedNotification;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(DownloadFailedRowsController::class);
+mutates(DownloadFailedRowsController::class, ImportHistory::class, MarkImportFailed::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -59,13 +59,23 @@ it('refuses the download to a user outside the import workspace', function (): v
     $this->actingAs($outsider)->get($url)->assertForbidden();
 });
 
+function importWorkspaceMemberWithRole(object $context, WorkspaceRole $role): User
+{
+    $member = User::factory()->withPersonalWorkspace()->create();
+    $context->workspaceA->users()->attach($member, ['role' => $role->value]);
+    $member->switchWorkspace($context->workspaceA);
+
+    return $member;
+}
+
 function viewerOf(object $context): User
 {
-    $viewer = User::factory()->withPersonalWorkspace()->create();
-    $context->workspaceA->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
-    $viewer->switchWorkspace($context->workspaceA);
+    return importWorkspaceMemberWithRole($context, WorkspaceRole::Viewer);
+}
 
-    return $viewer;
+function importerOf(object $context, string $who): User
+{
+    return $who === 'owner' ? $context->user : importWorkspaceMemberWithRole($context, WorkspaceRole::Member);
 }
 
 function stalledImportIn(object $context): Import
@@ -81,11 +91,11 @@ function stalledImportIn(object $context): Import
     return $stalled;
 }
 
-it('opens the import history page to a member who can import', function (): void {
-    $this->actingAs($this->user)
+it('opens the import history page to a user who can import', function (string $who): void {
+    $this->actingAs(importerOf($this, $who))
         ->get(ImportHistory::getUrl(tenant: $this->workspaceA))
         ->assertOk();
-});
+})->with(['owner', 'member']);
 
 it('refuses the import history page to a viewer', function (): void {
     $this->actingAs(viewerOf($this))
@@ -93,14 +103,14 @@ it('refuses the import history page to a viewer', function (): void {
         ->assertForbidden();
 });
 
-it('downloads the failed rows for a member who can import', function (): void {
+it('downloads the failed rows for a user who can import', function (string $who): void {
     $url = URL::temporarySignedRoute('import-history.failed-rows.download', now()->addHour(), ['import' => $this->import]);
 
-    $response = $this->actingAs($this->user)->get($url);
+    $response = $this->actingAs(importerOf($this, $who))->get($url);
 
     $response->assertOk();
     expect($response->streamedContent())->toContain('Name is required');
-});
+})->with(['owner', 'member']);
 
 it('refuses the failed rows download to a viewer', function (): void {
     $url = URL::temporarySignedRoute('import-history.failed-rows.download', now()->addHour(), ['import' => $this->import]);
@@ -108,7 +118,7 @@ it('refuses the failed rows download to a viewer', function (): void {
     $this->actingAs(viewerOf($this))->get($url)->assertForbidden();
 });
 
-it('refuses marking an import failed once the member is demoted to viewer', function (): void {
+it('refuses the mark failed action on the page once the member is demoted to viewer', function (): void {
     $stalled = stalledImportIn($this);
 
     $member = User::factory()->withPersonalWorkspace()->create();
@@ -128,15 +138,22 @@ it('refuses marking an import failed once the member is demoted to viewer', func
     expect($stalled->fresh()->status)->toBe(ImportStatus::Importing);
 });
 
-it('marks a stalled import failed for a member who can import', function (): void {
+it('marks a stalled import failed for a user who can import', function (string $who): void {
     $stalled = stalledImportIn($this);
 
-    $this->actingAs($this->user);
+    $this->actingAs(importerOf($this, $who));
     Filament::setTenant($this->workspaceA);
 
     Livewire::test(ImportHistory::class)->callTableAction('markFailed', $stalled);
 
     expect($stalled->fresh()->status)->toBe(ImportStatus::Failed);
+})->with(['owner', 'member']);
+
+it('refuses the mark failed action to a viewer', function (): void {
+    $stalled = stalledImportIn($this);
+
+    expect(fn () => resolve(MarkImportFailed::class)->execute(viewerOf($this), $stalled))->toThrow(HttpException::class);
+    expect($stalled->fresh()->status)->toBe(ImportStatus::Importing);
 });
 
 it('refuses marking an import failed unless it is importing and stalled', function (ImportStatus $status, bool $stalled): void {
