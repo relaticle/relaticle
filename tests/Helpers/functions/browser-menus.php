@@ -25,7 +25,7 @@ function menuMetrics(string $panel, string $rows, string $icons): string
                 rows: unique(rows.map((row) => Math.round(row.getBoundingClientRect().height))),
                 pitch: unique(rows.slice(1).map((row, index) => [row, rows[index]]).filter(([row, previous]) => row.parentElement === previous.parentElement).map(([row, previous]) => Math.round(row.getBoundingClientRect().top - previous.getBoundingClientRect().top))),
                 icons: unique([...panel.querySelectorAll('{$icons}')].filter(visible).map((icon) => Math.round(icon.getBoundingClientRect().width))),
-                panelRadius: getComputedStyle(panel.closest('.fi-dropdown-panel, .fi-filter-pop')).borderRadius,
+                panelRadius: getComputedStyle(panel.closest('.fi-dropdown-panel, .fi-filter-pop, [data-merge-popover]')).borderRadius,
                 rowRadius: unique(rows.map((row) => getComputedStyle(row).borderRadius)),
             };
         })()
@@ -36,7 +36,7 @@ function menuRoom(string $panel, string $list): string
 {
     return <<<JS
         (() => {
-            const panel = document.querySelector('{$panel}').closest('.fi-dropdown-panel, .fi-filter-pop');
+            const panel = document.querySelector('{$panel}').closest('.fi-dropdown-panel, .fi-filter-pop, [data-merge-popover]');
             const box = panel.getBoundingClientRect();
             const list = panel.querySelector('{$list}');
 

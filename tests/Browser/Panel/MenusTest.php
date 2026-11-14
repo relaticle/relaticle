@@ -15,7 +15,7 @@ beforeEach(function (): void {
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->workspace = $this->user->ownedWorkspaces()->first();
-    Company::factory()->recycle([$this->user, $this->workspace])->count(3)->create();
+    $this->company = Company::factory()->recycle([$this->user, $this->workspace])->count(3)->create()->first();
 
     foreach (['Hot leads', 'Renewals'] as $name) {
         SavedView::factory()->for($this->user)->for($this->workspace)->create([
@@ -39,6 +39,8 @@ function addBoardChoiceField(User $user): void
         'options' => [['name' => 'Americas'], ['name' => 'Europe']],
     ]);
 }
+
+const MERGE_PICKER_STEPS = ['.fi-record-rail-actions .fi-dropdown-trigger button', '.fi-dropdown-list-item:has-text("Merge record")'];
 
 const CHIP_RULES = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'name', condition: 'contains', value: 'chip' }])";
 
@@ -82,7 +84,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
         $steps = str_replace('%option%', $option, $steps);
     }
 
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/{$path}", 1440, 900);
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/".str_replace('%company%', (string) $this->company->getKey(), $path), 1440, 900);
 
     runMenuSteps($page, $steps);
 
@@ -117,6 +119,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'filter group menu' => ['[data-filter-group]', '.fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'tasks'],
     'filter chip kebab' => ['[data-filter-chip] [data-filter-more]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [CHIP_RULES], ['pitch' => []]],
     'filter deleted mode' => ['[data-deleted-mode-trigger]', '[data-filter-deleted] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [DELETED_CHIP]],
+    'merge record picker' => ['[data-merge-picker]', '[data-merge-popover]', '[data-merge-popover] li', '[data-merge-popover] svg', 'companies/%company%', MERGE_PICKER_STEPS],
     'views row menu' => ['.fi-ta-views-row[data-view-kind=list] [data-view-actions]', '.fi-ta-views-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-switcher .fi-dropdown-trigger button']],
     'view settings row menu' => ['[data-view-settings-menu] >> nth=0', '.fi-view-settings-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-settings-trigger'], ['pitch' => []]],
     'board stage row menu' => ['[data-stage-actions] >> nth=0', '.fi-board-stages-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger', '[data-board-columns-trigger]']],
@@ -185,10 +188,12 @@ it('draws a rule only between the groups a menu shows', function (array $steps, 
     ], '.fi-ta-column-menu'],
 ]);
 
-it('keeps a long menu above the window edge and scrolls only its list', function (string $open, string $panel, string $list, array $steps = [], bool $region = false): void {
+it('keeps a long menu above the window edge and scrolls only its list', function (string $open, string $panel, string $list, array $steps = [], bool $region = false, string $path = 'companies'): void {
     foreach (range(1, 8) as $index) {
         SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "Pipeline {$index}"]);
     }
+
+    Company::factory()->recycle([$this->user, $this->workspace])->count(12)->create();
 
     if ($region) {
         addCompanyRegionField($this->user);
@@ -196,7 +201,7 @@ it('keeps a long menu above the window edge and scrolls only its list', function
         $steps = str_replace('%option%', $option, $steps);
     }
 
-    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 320);
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/".str_replace('%company%', (string) $this->company->getKey(), $path), 1440, 320);
 
     runMenuSteps($page, $steps);
 
@@ -214,6 +219,7 @@ it('keeps a long menu above the window edge and scrolls only its list', function
     'view settings' => ['.fi-view-settings-trigger', '.fi-view-settings-panel', '.fi-view-settings-scroll'],
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '[role=listbox]'],
     'filter chip value checklist' => ['[data-filter-chip] [data-filter-segment="value"]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-options', [REGION_CHIP_RULES], true],
+    'merge record picker' => ['[data-merge-picker]', '[data-merge-popover]', '[data-merge-popover] ul', MERGE_PICKER_STEPS, false, 'companies/%company%'],
 ]);
 
 function currentItem(string $current, string $other): string
