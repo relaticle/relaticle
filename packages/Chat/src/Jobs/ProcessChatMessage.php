@@ -543,6 +543,8 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
+        $this->reportTimeout($exception);
+
         // Unconditional, because this instance can never answer the question the
         // charge depends on: the queue rebuilds the command from the original
         // dispatch payload before calling failed(), so $streamedAnything is false
@@ -576,6 +578,15 @@ final class ProcessChatMessage implements ShouldQueue
         // Last, after persistFailedTurn: a reload landing mid-failed() must
         // never find the marker gone AND the rows unpersisted at once.
         $this->abandonTurn();
+    }
+
+    private function reportTimeout(?Throwable $exception): void
+    {
+        // The worker kills its own process after a timeout instead of rethrowing,
+        // so Worker::runJob() never reports it. Every other failure is rethrown and reported there.
+        if ($exception instanceof TimeoutExceededException) {
+            rescue(fn () => report($exception), report: false);
+        }
     }
 
     /**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Onboarding\StartSetupGreeting;
 use App\Actions\Task\CreateTask;
+use App\Contracts\Entitlements;
 use App\Enums\Plan;
 use App\Features\Billing;
 use App\Features\SetupConversation;
@@ -911,6 +912,96 @@ it('reports a pre-model failure to the exception handler instead of only a bread
     $job->handle(resolve(CreditService::class));
 
     Exceptions::assertReported(RuntimeException::class);
+});
+
+it('reports a turn that timed out, because the worker kills its process right after failed() runs', function (): void {
+    Exceptions::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    makeFailedTurnJob($user, $conversationId)->failed(new TimeoutExceededException('timed out'));
+
+    Exceptions::assertReported(TimeoutExceededException::class);
+    Exceptions::assertReportedCount(1);
+});
+
+it('reports a timeout even when the refund throws first', function (): void {
+    Exceptions::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+    $job = makeFailedTurnJob($user, $conversationId);
+
+    app()->forgetInstance(CreditService::class);
+    $this->mock(Entitlements::class)->shouldReceive('metersCredits')->andThrow(new RuntimeException('ledger down'));
+
+    expect(fn () => $job->failed(new TimeoutExceededException('timed out')))->toThrow(RuntimeException::class, 'ledger down');
+
+    Exceptions::assertReported(TimeoutExceededException::class);
+});
+
+it('still writes the failure note when reporting the timeout itself throws', function (): void {
+    Exceptions::fake()->throwOnReport();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    makeFailedTurnJob($user, $conversationId)->failed(new TimeoutExceededException('timed out'));
+
+    $note = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->latest('id')
+        ->first();
+
+    expect(json_decode((string) $note->meta, true)['failure']['class'])->toBe(TimeoutExceededException::class);
+});
+
+it('leaves reporting to the worker for a failure it rethrows itself', function (Throwable $exception): void {
+    Exceptions::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    makeFailedTurnJob($user, $conversationId)->failed($exception);
+
+    Exceptions::assertNothingReported();
+})->with([
+    'a provider rejection' => [fn (): Throwable => rejectedByProvider(400, 'nope')],
+    'an expired job' => [fn (): Throwable => new MaxAttemptsExceededException('job expired')],
+    'our own error' => [fn (): Throwable => new RuntimeException('boom')],
+]);
+
+it('reports nothing when handle() releases a retryable attempt', function (): void {
+    Exceptions::fake();
+    Queue::fake();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro])->save();
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    AnthropicSse::fake("data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}\n\n");
+
+    $job = (new ProcessChatMessage(
+        user: $user,
+        workspace: $workspace,
+        message: 'hello',
+        conversationId: $conversationId,
+        resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'id' => 'claude-sonnet-5', 'source' => 'explicit'],
+        turnId: (string) Str::ulid(),
+    ))->withFakeQueueInteractions();
+
+    $job->handle(resolve(CreditService::class));
+
+    $job->assertReleased();
+    Exceptions::assertNothingReported();
 });
 
 it('logs the provider error type and message when the provider rejects an explicit pick', function (string $errorMessage): void {
