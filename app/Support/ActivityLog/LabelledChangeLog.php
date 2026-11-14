@@ -6,6 +6,8 @@ namespace App\Support\ActivityLog;
 
 use App\Models\ActivityLog\Activity;
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\Support\ActivityLogStatus;
+use Spatie\Activitylog\Support\CauserResolver;
 use Spatie\Activitylog\Support\Config;
 
 final readonly class LabelledChangeLog
@@ -35,6 +37,10 @@ final readonly class LabelledChangeLog
      */
     public static function writeMany(iterable $changes): void
     {
+        if (resolve(ActivityLogStatus::class)->disabled()) {
+            return;
+        }
+
         $template = self::template();
         $now = $template->fromDateTime(now());
         $rows = [];
@@ -71,7 +77,7 @@ final readonly class LabelledChangeLog
         $template->log_name = (string) config('activitylog.default_log_name');
         $template->event = self::EVENT;
         $template->properties = collect();
-        $template->causer()->associate(auth()->user());
+        $template->causer()->associate(resolve(CauserResolver::class)->resolve(auth()->user()));
 
         StampsActivity::apply($template);
 

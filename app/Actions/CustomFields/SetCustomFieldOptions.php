@@ -200,8 +200,13 @@ final readonly class SetCustomFieldOptions
                 $entity->withTrashed();
             }])
             ->chunkById(self::CLEAR_CHUNK, function (EloquentCollection $values) use ($field, $column, $optionId): void {
-                $this->changeLog->recordMany($field, $values->map(fn (CustomFieldValue $value): ?array => $this->clearedChange($value, $column, $optionId))->filter()->all());
-                $this->clearColumn(array_values($values->modelKeys()), $column, $optionId);
+                $cleared = $this->clearColumn(array_values($values->modelKeys()), $column, $optionId);
+
+                $this->changeLog->recordMany($field, $values
+                    ->filter(fn (CustomFieldValue $value): bool => in_array((string) $value->getKey(), $cleared, true))
+                    ->map(fn (CustomFieldValue $value): ?array => $this->clearedChange($value, $column, $optionId))
+                    ->filter()
+                    ->all());
             });
     }
 
@@ -223,21 +228,20 @@ final readonly class SetCustomFieldOptions
 
     /**
      * @param  list<mixed>  $valueIds
+     * @return list<string> the ids of the rows that still held the option and were cleared
      */
-    private function clearColumn(array $valueIds, string $column, string $optionId): void
+    private function clearColumn(array $valueIds, string $column, string $optionId): array
     {
-        if ($column !== 'json_value') {
-            CustomFieldValue::query()->whereKey($valueIds)->toBase()->update([$column => null]);
-
-            return;
-        }
-
         $table = (new CustomFieldValue)->getTable();
         $marks = implode(',', array_fill(0, count($valueIds), '?'));
 
-        DB::update(
-            "update {$table} set json_value = coalesce((select json_agg(element) from json_array_elements(json_value) as element where element #>> '{}' <> ?), '[]'::json) where id in ({$marks})",
-            [$optionId, ...$valueIds],
-        );
+        $rows = $column === 'json_value'
+            ? DB::select(
+                "update {$table} set json_value = case json_typeof(json_value) when 'array' then coalesce((select json_agg(element) from json_array_elements(json_value) as element where element #>> '{}' <> ?), '[]'::json) else '[]'::json end where id in ({$marks}) and json_value::jsonb @> ?::jsonb returning id",
+                [$optionId, ...$valueIds, json_encode($optionId)],
+            )
+            : DB::select("update {$table} set {$column} = null where id in ({$marks}) and {$column} = ? returning id", [...$valueIds, $optionId]);
+
+        return array_values(array_map(fn (object $row): string => (string) data_get($row, 'id'), $rows));
     }
 }

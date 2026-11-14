@@ -168,7 +168,7 @@ final readonly class CustomFieldOptionPlan
         }
 
         if ($vanished !== []) {
-            throw ValidationException::withMessages(['options' => $vanished]);
+            throw OptionsChangedException::withMessages(['options' => $vanished]);
         }
 
         $removed = $current->except(array_column($options, 'id'));

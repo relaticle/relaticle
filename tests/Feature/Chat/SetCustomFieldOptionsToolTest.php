@@ -27,6 +27,7 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Spatie\Activitylog\Support\CauserResolver;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SetCustomFieldOptionsTool::class, SetCustomFieldOptions::class, CustomFieldOptionPlan::class);
@@ -1018,4 +1019,73 @@ it('writes the same activity row in bulk as the per-record save wrote, for a mul
         ->and(setOptionsStoredValue($trashed, $this->segments))->toBe([$startup])
         ->and(setOptionsStoredValue($other, $this->segments))->toBe([$enterprise, $startup])
         ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $other->getKey())->count())->toBe($otherLogs);
+});
+
+it('clears a multi-select value stored as a bare json string and logs it', function (): void {
+    $smb = setOptionsId($this->segments, 'SMB');
+    $scalar = setOptionsCompany($this->workspace, $this->segments, [$smb]);
+    $array = setOptionsCompany($this->workspace, $this->segments, [$smb, setOptionsId($this->segments, 'Startup')]);
+    DB::table('custom_field_values')->where('entity_id', $scalar->getKey())->where('custom_field_id', $this->segments->getKey())->update(['json_value' => json_encode($smb)]);
+
+    setOptionsClearWithNull($this, $this->segments, ['Enterprise', 'Startup'], 'SMB');
+
+    expect(setOptionsStoredValue($scalar, $this->segments))->toBe([])
+        ->and(setOptionsStoredValue($array, $this->segments))->toBe([setOptionsId($this->segments, 'Startup')])
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $scalar->getKey())->count())->toBe(2);
+});
+
+it('leaves a card that moved out of the stage after the chunk was read untouched and unlogged', function (string $kind): void {
+    $multi = $kind === 'multi';
+    $field = $multi ? $this->segments : $this->lifecycle;
+    $removing = setOptionsId($field, $multi ? 'SMB' : 'Churned');
+    $staying = setOptionsId($field, $multi ? 'Startup' : 'Lead');
+    $make = fn (): Company => setOptionsCompany($this->workspace, $field, $multi ? [$removing] : $removing);
+    $cleared = $make();
+    $moved = $make();
+    $logsBefore = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $moved->getKey())->count();
+    $armed = true;
+
+    DB::listen(function ($query) use (&$armed, $moved, $field, $multi, $staying): void {
+        if ($armed && str_starts_with($query->sql, 'select') && str_contains($query->sql, 'custom_field_values') && str_contains($query->sql, 'order by')) {
+            $armed = false;
+            DB::table('custom_field_values')->where('entity_id', $moved->getKey())->where('custom_field_id', $field->getKey())->update([$multi ? 'json_value' : 'string_value' => $multi ? json_encode([$staying]) : $staying]);
+        }
+    });
+
+    setOptionsClearWithNull($this, $field, $multi ? ['Enterprise', 'Startup'] : ['Lead', 'Customer'], $multi ? 'SMB' : 'Churned');
+
+    expect(setOptionsStoredValue($moved, $field))->toBe($multi ? [$staying] : $staying)
+        ->and(setOptionsStoredValue($cleared, $field))->toBe($multi ? [] : null)
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $moved->getKey())->count())->toBe($logsBefore);
+})->with(['single', 'multi']);
+
+it('writes no activity rows while the activity log is disabled and still clears the values', function (): void {
+    $company = setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Churned'));
+    $logs = fn (): int => Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $company->getKey())->count();
+    $before = $logs();
+
+    activity()->withoutLogging(fn () => setOptionsClearWithNull($this, $this->lifecycle, ['Lead', 'Customer'], 'Churned'));
+
+    expect(setOptionsStoredValue($company, $this->lifecycle))->toBeNull()
+        ->and($logs())->toBe($before);
+});
+
+it('takes the causer from the causer resolver when nobody is signed in', function (): void {
+    $churned = setOptionsId($this->lifecycle, 'Churned');
+    $company = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    Auth::guard('web')->forgetUser();
+
+    resolve(CauserResolver::class)->withCauser($this->owner, fn () => setOptionsClearWithNull($this, $this->lifecycle, ['Lead', 'Customer'], 'Churned'));
+
+    $row = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $company->getKey())->orderByDesc('id')->first();
+
+    expect($row->causer_id)->toBe((string) $this->owner->getKey());
+});
+
+it('raises the changed exception when a kept option vanished before the write', function (): void {
+    $options = collect(['Lead', 'Customer'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $options[] = ['id' => '01jzzzzzzzzzzzzzzzzzzzzzzz', 'name' => 'Ghost', 'was' => 'Ghost'];
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]))
+        ->toThrow(OptionsChangedException::class);
 });
