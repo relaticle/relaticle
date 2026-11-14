@@ -56,6 +56,14 @@ return [
         'over_limit' => ':field can hold at most :max. Together these records have more. Remove some first.',
         'pick' => 'Choose a record',
         'clear' => 'Choose a different record',
+        'duplicate' => [
+            'heading' => 'Possible duplicate',
+            'notice' => [
+                'company' => ':name also has the domain :value.',
+                'people' => ':name also has the email :value.',
+            ],
+            'action' => 'Merge',
+        ],
         'search_placeholder' => [
             'company' => 'Search by name or domain',
             'people' => 'Search by name or email',

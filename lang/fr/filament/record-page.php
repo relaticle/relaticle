@@ -56,6 +56,14 @@ return [
         'over_limit' => ":field peut contenir au plus :max. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.",
         'pick' => 'Choisir une fiche',
         'clear' => 'Choisir une autre fiche',
+        'duplicate' => [
+            'heading' => 'Doublon possible',
+            'notice' => [
+                'company' => ':name a aussi le domaine :value.',
+                'people' => ":name a aussi l'e-mail :value.",
+            ],
+            'action' => 'Fusionner',
+        ],
         'search_placeholder' => [
             'company' => 'Rechercher par nom ou domaine',
             'people' => 'Rechercher par nom ou e-mail',

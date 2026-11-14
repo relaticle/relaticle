@@ -144,3 +144,23 @@ it('merges a duplicate person picked from the dialog and shows emails and contac
 
     expect(People::query()->find($duplicate->getKey()))->toBeNull();
 });
+
+it('opens the merge from the duplicate prompt with the duplicate picked', function (): void {
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightlinehealth.com', 'brightline.health']);
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
+        ->assertSee('Brightline Health Inc. also has the domain brightlinehealth.com.')
+        ->click('.fi-callout button:has-text("Merge")')
+        ->assertVisible('[data-merge-dialog]')
+        ->assertSeeIn('[data-merge-left]', 'Brightline Health Inc.')
+        ->assertSeeIn('[data-merge-result]', 'brightline.health')
+        ->assertScript(MERGE_SUBMIT_DISABLED, false)
+        ->click('.fi-modal-footer-actions button[type=submit]')
+        ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
+        ->assertSee('Records merged')
+        ->assertDontSee('Possible duplicate')
+        ->assertNoJavaScriptErrors();
+
+    expect(Company::query()->find($duplicate->getKey()))->toBeNull();
+});
