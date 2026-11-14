@@ -19,7 +19,7 @@ return [
 
     'guard' => 'web',
 
-    // Passport's HttpResponseException skips the exception handler, so only a route middleware can reach it.
+    // Passport's HttpResponseException skips the exception handler, so only a response middleware can reach it.
     'middleware' => [StripOAuthErrorHint::class],
 
     /*
