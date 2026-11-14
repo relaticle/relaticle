@@ -1672,7 +1672,7 @@ it('shows an error in the menu and changes nothing for a blank or taken stage na
 
     $component = livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $ids[1], $taken);
 
-    $component->assertHasErrors(['boardStageMenu']);
+    $component->assertHasErrors(['boardStageMenu.'.$ids[1]]);
 
     expect(stageOption($ids[1])->name)->toBe($before)
         ->and(stageMenuOf($component, $ids[1]))->toContain('data-stage-error');
@@ -1683,7 +1683,7 @@ it('clears the menu error once a rename succeeds', function (): void {
 
     livewire(OpportunitiesBoard::class)
         ->call('renameBoardColumn', $id, '')
-        ->assertHasErrors(['boardStageMenu'])
+        ->assertHasErrors(['boardStageMenu.'.$id])
         ->call('renameBoardColumn', $id, 'Discovery')
         ->assertHasNoErrors();
 });
@@ -1732,7 +1732,7 @@ it('refuses a color outside the palette and changes nothing', function (): void 
 
     livewire(OpportunitiesBoard::class)
         ->call('setBoardColumnColor', $id, '#123456')
-        ->assertHasErrors(['boardStageMenu']);
+        ->assertHasErrors(['boardStageMenu.'.$id]);
 
     expect(stageOption($id)->settings->color)->toBe($before);
 });
@@ -1818,4 +1818,63 @@ it('keeps the stage menu in the page after a rename re-renders the board', funct
     $component = livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $id, 'Discovery');
 
     expect(stageMenuOf($component, $id))->toContain('value="Discovery"');
+});
+
+it('turns option colors on when the picked color is the one the option already stores', function (): void {
+    $id = stageIds($this->stageField)[1];
+    stageOption($id)->update(['settings' => ['color' => OptionColor::Blue->value]]);
+    $settings = $this->stageField->settings;
+    $settings->enable_option_colors = false;
+    $this->stageField->update(['settings' => $settings]);
+
+    livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnColor', $id, OptionColor::Blue->value)
+        ->assertHasNoErrors();
+
+    expect($this->stageField->refresh()->settings->enable_option_colors)->toBeTrue()
+        ->and(stageOption($id)->settings->color)->toBe(OptionColor::Blue->value);
+});
+
+it('rings only the stored color of a stage, never the gray display fallback', function (string $case): void {
+    $id = stageIds($this->stageField)[1];
+    $stored = match ($case) {
+        'none stored' => null,
+        'outside the palette' => '#123456',
+        'colors off' => OptionColor::Gray->value,
+    };
+    stageOption($id)->update(['settings' => ['color' => $stored]]);
+
+    if ($case !== 'colors off') {
+        $settings = $this->stageField->settings;
+        $settings->enable_option_colors = true;
+        $this->stageField->update(['settings' => $settings]);
+    } else {
+        $settings = $this->stageField->settings;
+        $settings->enable_option_colors = false;
+        $this->stageField->update(['settings' => $settings]);
+    }
+
+    $menu = stageMenuOf(livewire(OpportunitiesBoard::class), $id);
+
+    expect($menu)->toContain('data-stage-swatch="#6b7280"');
+
+    $ringed = substr_count($menu, 'aria-pressed="true"');
+
+    expect($ringed)->toBe($case === 'colors off' ? 1 : 0);
+})->with(['none stored', 'outside the palette', 'colors off']);
+
+it('shows a failed rename error only in the menu of the stage it was for', function (): void {
+    $ids = stageIds($this->stageField);
+    $component = livewire(OpportunitiesBoard::class)->call('renameBoardColumn', $ids[1], '');
+
+    expect(stageMenuOf($component, $ids[1]))->toContain('data-stage-error')
+        ->and(stageMenuOf($component, $ids[2]))->not->toContain('data-stage-error');
+});
+
+it('draws the menu dot and swatches through the same color path as the board header', function (): void {
+    $id = stageIds($this->stageField)[1];
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnColor', $id, OptionColor::Olive->value);
+    $menu = stageMenuOf($component, $id);
+
+    expect($menu)->toContain('var(--color-500)')->not->toContain('background-color: '.OptionColor::Olive->value);
 });

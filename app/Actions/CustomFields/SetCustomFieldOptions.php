@@ -106,7 +106,7 @@ final readonly class SetCustomFieldOptions
 
             $changes = array_filter([
                 'name' => $option->name !== $target['name'] ? $target['name'] : null,
-                'settings' => $target['color'] !== null && $target['color'] !== $option->settings->color ? new CustomFieldOptionSettingsData(color: $target['color']) : null,
+                'settings' => $target['color'] !== null && $target['color'] !== $option->settings->color ? CustomFieldOptionSettingsData::from([...$option->settings->toArray(), 'color' => $target['color']]) : null,
             ]);
 
             if ($changes !== []) {
@@ -125,7 +125,7 @@ final readonly class SetCustomFieldOptions
 
     private function enableOptionColors(CustomField $field, CustomFieldOptionPlan $plan): void
     {
-        if ($field->settings->enable_option_colors || array_filter(array_column($plan->targets, 'color')) === []) {
+        if (! $plan->enablesColors) {
             return;
         }
 

@@ -1,4 +1,3 @@
-@use('App\Enums\OptionColor')
 @use('Illuminate\Support\Js')
 
 <div class="fi-board-stage-menu flex flex-col gap-1" data-stage-menu="{{ $id }}" x-data="{ swatches: false }">
@@ -8,7 +7,7 @@
                 <button
                     type="button"
                     class="size-4 shrink-0 rounded-full"
-                    style="background-color: {{ $dot }}"
+                    style="{{ $dot }}; background-color: var(--color-500)"
                     data-stage-color-trigger
                     aria-label="{{ __('filament/pages/boards.stage_menu.color', ['noun' => $noun]) }}"
                     x-bind:aria-expanded="swatches.toString()"
@@ -28,21 +27,21 @@
             </div>
 
             <div
-                class="absolute inset-x-0 top-full z-10 mt-1 grid grid-cols-4 gap-2 rounded-lg border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)] p-3 shadow-lg"
+                class="absolute inset-x-0 top-full z-10 mt-1 grid grid-cols-4 gap-2 rounded-lg bg-white p-3 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10"
                 data-stage-swatches
                 x-show="swatches"
                 x-cloak
                 x-on:click.outside="swatches = false"
             >
-                @foreach (OptionColor::cases() as $color)
+                @foreach ($swatches as $swatch)
                     <button
                         type="button"
-                        class="mx-auto size-6 rounded-full ring-offset-2 ring-offset-[var(--surface-block-bg)] aria-pressed:ring-2 aria-pressed:ring-gray-950 dark:aria-pressed:ring-white"
-                        style="background-color: {{ $color->value }}"
-                        data-stage-swatch="{{ $color->value }}"
-                        aria-pressed="{{ $current === $color ? 'true' : 'false' }}"
-                        aria-label="{{ __('filament/pages/boards.stage_menu.set_color', ['color' => $color->label()]) }}"
-                        x-on:click="swatches = false; $wire.setBoardColumnColor({{ Js::from($id) }}, {{ Js::from($color->value) }})"
+                        class="mx-auto size-8 rounded-lg ring-offset-2 ring-offset-white aria-pressed:ring-2 dark:ring-offset-gray-900"
+                        style="{{ $swatch['style'] }}; background-color: var(--color-500); --tw-ring-color: var(--color-500)"
+                        data-stage-swatch="{{ $swatch['value'] }}"
+                        aria-pressed="{{ $swatch['current'] ? 'true' : 'false' }}"
+                        aria-label="{{ __('filament/pages/boards.stage_menu.set_color', ['color' => $swatch['label']]) }}"
+                        x-on:click="swatches = false; $wire.setBoardColumnColor({{ Js::from($id) }}, {{ Js::from($swatch['value']) }})"
                     ></button>
                 @endforeach
             </div>
@@ -53,7 +52,9 @@
         @endif
     @else
         <div class="flex items-center gap-2 px-1 py-1.5 text-sm font-medium text-gray-950 dark:text-white" data-stage-name>
-            <span class="size-4 shrink-0 rounded-full" style="background-color: {{ $dot }}"></span>
+            @if ($dot)
+                <span class="size-4 shrink-0 rounded-full" style="{{ $dot }}; background-color: var(--color-500)"></span>
+            @endif
             <span class="min-w-0 truncate">{{ $name }}</span>
         </div>
     @endif

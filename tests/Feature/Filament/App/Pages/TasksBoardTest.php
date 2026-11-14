@@ -43,6 +43,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
@@ -1731,6 +1732,8 @@ it('exports the tasks the bar\'s filters match from the board, hidden statuses a
     taskInStatus($this, 'Globex brief', 'In progress');
     $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
 
+    Bus::fake();
+
     $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $todo, false);
 
     if ($noValueColumn) {
@@ -2128,9 +2131,9 @@ it('refuses to rename the Done status and a taken status name in the menu', func
 
     livewire(TasksBoard::class)
         ->call('renameBoardColumn', (string) $done->getKey(), 'Finished')
-        ->assertHasErrors(['boardStageMenu'])
+        ->assertHasErrors(['boardStageMenu.'.$done->getKey()])
         ->call('renameBoardColumn', (string) $todo->getKey(), 'DONE')
-        ->assertHasErrors(['boardStageMenu']);
+        ->assertHasErrors(['boardStageMenu.'.$todo->getKey()]);
 
     expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail((string) $done->getKey())->name)->toBe('Done')
         ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail((string) $todo->getKey())->name)->toBe('To do');

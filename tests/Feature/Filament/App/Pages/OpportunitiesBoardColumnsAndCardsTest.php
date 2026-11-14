@@ -35,6 +35,7 @@ use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
@@ -575,6 +576,8 @@ it('exports the opportunities the bar\'s filters match from the board, hidden st
     noStageOpportunity($this, 'Acme no stage');
     opportunityInStage($this, 'Globex upsell', 'Qualification');
     $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
+
+    Bus::fake();
 
     $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $prospecting, false);
 

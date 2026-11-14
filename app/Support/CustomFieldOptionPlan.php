@@ -25,6 +25,7 @@ final readonly class CustomFieldOptionPlan
     private function __construct(
         public array $targets,
         public array $removals,
+        public bool $enablesColors,
     ) {}
 
     /**
@@ -206,7 +207,7 @@ final readonly class CustomFieldOptionPlan
             $errors[] = __('The task Status option "Done" marks a task complete, so it cannot be renamed or removed.');
         }
 
-        if ($removals === [] && self::sameList($current, $targets)) {
+        if ($removals === [] && self::sameList($field, $current, $targets)) {
             $errors[] = __('Nothing to change. The field already has these options in this order.');
         }
 
@@ -214,7 +215,7 @@ final readonly class CustomFieldOptionPlan
             throw ValidationException::withMessages(['options' => $errors]);
         }
 
-        return new self($targets, $removals);
+        return new self($targets, $removals, self::turnsOnColors($field, $targets));
     }
 
     /**
@@ -265,8 +266,8 @@ final readonly class CustomFieldOptionPlan
                 $rows[] = ['label' => __('Renamed'), 'old' => (string) $target['option']->name, 'new' => $target['name']];
             }
 
-            if (self::recolors($target)) {
-                $rows[] = ['label' => __('Color'), 'value' => self::colorRow($target['name'], (string) $target['color'])];
+            if ($target['color'] !== null && ($this->enablesColors || self::recolors($target))) {
+                $rows[] = ['label' => __('Color'), 'value' => self::colorRow($target['name'], $target['color'])];
             }
         }
 
@@ -331,9 +332,7 @@ final readonly class CustomFieldOptionPlan
      */
     private static function colorEntry(string $color): array
     {
-        $known = OptionColor::fromInput($color);
-
-        return $color === '' ? [] : ['color' => $known instanceof OptionColor ? $known->value : $color];
+        return $color === '' ? [] : ['color' => $color];
     }
 
     /**
@@ -344,6 +343,14 @@ final readonly class CustomFieldOptionPlan
         return $target['option'] instanceof CustomFieldOption
             && $target['color'] !== null
             && $target['color'] !== $target['option']->settings->color;
+    }
+
+    /**
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
+     */
+    private static function turnsOnColors(CustomField $field, array $targets): bool
+    {
+        return ! $field->settings->enable_option_colors && array_filter(array_column($targets, 'color')) !== [];
     }
 
     private static function colorRow(string $name, string $color): string
@@ -444,7 +451,7 @@ final readonly class CustomFieldOptionPlan
      * @param  Collection<string, CustomFieldOption>  $current
      * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
      */
-    private static function sameList(Collection $current, array $targets): bool
+    private static function sameList(CustomField $field, Collection $current, array $targets): bool
     {
         $before = $current
             ->map(fn (CustomFieldOption $option): array => [(string) $option->getKey(), (string) $option->name])
@@ -459,6 +466,6 @@ final readonly class CustomFieldOptionPlan
             $targets,
         );
 
-        return $before === $after && array_filter($targets, self::recolors(...)) === [];
+        return $before === $after && array_filter($targets, self::recolors(...)) === [] && ! self::turnsOnColors($field, $targets);
     }
 }

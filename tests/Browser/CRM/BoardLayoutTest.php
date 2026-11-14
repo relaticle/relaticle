@@ -962,3 +962,27 @@ it('selects a word on a double-click in the stage name input and does not collap
     expect(storedBoardState($user, $entity)?->collapsedColumns ?? [])->toBe([]);
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
+
+it('draws the swatches as rounded tiles on the dropdown surface in light and dark', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $menu = "[data-stage-menu=\"{$ids[1]}\"]";
+
+    $page = openBoard($user, $path);
+
+    $page->page()->locator(boardHeaderTitle($ids[1]))->click();
+    $page->page()->locator("{$menu} [data-stage-color-trigger]")->click();
+    $page->assertVisible("{$menu} [data-stage-swatches]");
+
+    $geometry = "(() => { const swatch = document.querySelector('{$menu} [data-stage-swatch]'); const box = swatch.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height), parseFloat(getComputedStyle(swatch).borderTopLeftRadius)]; })()";
+    $page->assertScript($geometry, [32, 32, 8]);
+
+    $surface = "(() => { const grid = document.querySelector('{$menu} [data-stage-swatches]'); return getComputedStyle(grid).backgroundColor === getComputedStyle(grid.closest('.fi-dropdown-panel')).backgroundColor; })()";
+    $page->assertScript($surface, true);
+
+    $page->script('document.documentElement.classList.add("dark")');
+    $page->assertScript($surface, true);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');

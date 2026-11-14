@@ -16,24 +16,11 @@ enum OptionColor: string
     case Magenta = '#d946ef';
     case Purple = '#a855f7';
     case Pink = '#ec4899';
-    case Olive = '#808a3c';
+    case Olive = '#7c7c67';
     case Gray = '#6b7280';
 
     public function label(): string
     {
-        return __('filament/pages/boards.stage_menu.colors.'.strtolower($this->name));
-    }
-
-    public static function fromInput(string $input): ?self
-    {
-        $input = strtolower(trim($input));
-
-        foreach (self::cases() as $case) {
-            if ($input === $case->value || $input === strtolower($case->name)) {
-                return $case;
-            }
-        }
-
-        return null;
+        return __('colors.option.'.strtolower($this->name));
     }
 }

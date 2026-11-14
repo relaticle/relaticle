@@ -21,7 +21,6 @@ use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\SavedView;
-use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use Closure;
@@ -42,6 +41,9 @@ use LogicException;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
+use Relaticle\Flowforge\Support\ColorResolver;
+
+use function Filament\Support\get_color_css_variables;
 
 trait HasBoardStageOrder
 {
@@ -191,12 +193,14 @@ trait HasBoardStageOrder
             return;
         }
 
-        $this->writeStageOption($optionId, ['color' => $color], fn (array $option): bool => strtolower($option['color']) === strtolower($color));
+        $colorsOn = $this->boardColumnField()->settings->enable_option_colors ?? false;
+
+        $this->writeStageOption($optionId, ['color' => $color], fn (array $option): bool => $colorsOn && $option['stored'] === $color);
     }
 
     /**
      * @param  array{name?: string, color?: string}  $change
-     * @param  Closure(array{id: string, name: string, color: string}): bool  $unchanged
+     * @param  Closure(array{id: string, name: string, color: string, stored: ?string}): bool  $unchanged
      */
     private function writeStageOption(mixed $optionId, array $change, Closure $unchanged): void
     {
@@ -206,7 +210,7 @@ trait HasBoardStageOrder
             return;
         }
 
-        $this->resetErrorBag('boardStageMenu');
+        $this->resetErrorBag("boardStageMenu.{$option['id']}");
 
         if ($unchanged($option)) {
             return;
@@ -223,7 +227,7 @@ trait HasBoardStageOrder
         try {
             resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
         } catch (ValidationException $exception) {
-            $this->addError('boardStageMenu', (string) collect($exception->errors())->flatten()->first());
+            $this->addError("boardStageMenu.{$option['id']}", (string) collect($exception->errors())->flatten()->first());
 
             return;
         }
@@ -239,18 +243,29 @@ trait HasBoardStageOrder
     protected function boardStageMenu(array $column): Htmlable
     {
         $id = (string) $column['id'];
-        $current = OptionColor::fromInput((string) ($column['color'] ?? ''));
-        $dot = $current instanceof OptionColor ? $current->value : (str_starts_with((string) $column['color'], '#') ? (string) $column['color'] : OptionColor::Gray->value);
+        $stored = $this->boardColumnOptions()->firstWhere('id', $id)['stored'] ?? null;
 
         return new HtmlString(view('filament.app.board-stage-menu', [
             'id' => $id,
             'name' => (string) $column['label'],
             'noun' => $this->boardStageNoun(),
-            'dot' => $dot,
-            'current' => $current,
+            'dot' => $this->colorStyle($column['color'] ?? null),
+            'swatches' => array_map(fn (OptionColor $color): array => [
+                'value' => $color->value,
+                'label' => $color->label(),
+                'style' => $this->colorStyle($color->value),
+                'current' => $stored !== null && strtolower($stored) === $color->value,
+            ], OptionColor::cases()),
             'editable' => $id !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages(),
-            'error' => $this->getErrorBag()->first('boardStageMenu'),
+            'error' => $this->getErrorBag()->first("boardStageMenu.{$id}"),
         ])->render());
+    }
+
+    private function colorStyle(mixed $color): ?string
+    {
+        $resolved = ColorResolver::resolve($color);
+
+        return $resolved === null ? null : get_color_css_variables($resolved, [500]);
     }
 
     /**
@@ -283,9 +298,9 @@ trait HasBoardStageOrder
 
     private function canEditStages(): bool
     {
-        $user = auth()->user();
+        $user = $this->viewSwitcherUser();
 
-        return $user instanceof User && $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage);
+        return $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage);
     }
 
     private function boardStageNoun(): string
@@ -366,7 +381,7 @@ trait HasBoardStageOrder
     }
 
     /**
-     * @return Collection<int, array{id: string, name: string, color: string}>
+     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string}>
      */
     protected function boardColumnOptions(): Collection
     {
@@ -377,6 +392,7 @@ trait HasBoardStageOrder
             'id' => (string) $option->getKey(),
             'name' => (string) $option->getAttribute('name'),
             'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
+            'stored' => $option->settings->color,
         ]);
 
         $order = $this->storedBoardState()->orderStages(array_column($options->all(), 'id'));
