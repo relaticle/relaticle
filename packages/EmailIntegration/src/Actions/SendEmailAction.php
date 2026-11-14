@@ -27,7 +27,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
+use Relaticle\EmailIntegration\Queries\VisibleEmailsQuery;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 
@@ -36,6 +36,7 @@ final readonly class SendEmailAction
     public function __construct(
         private EmailInlineImageEmbedder $inlineImageEmbedder,
         private ForwardAttachmentCopyService $attachments,
+        private VisibleEmailsQuery $emails,
     ) {}
 
     /**
@@ -111,7 +112,7 @@ final readonly class SendEmailAction
         );
 
         return DB::transaction(function () use ($user, $account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
-            $inReplyTo = $this->replyTarget($user, $account, $data['in_reply_to_email_id'] ?? null);
+            $inReplyTo = $this->emails->replyableEmail($user, (string) $account->workspace_id, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
             $email = $account->emails()->chaperone()->create([
@@ -258,20 +259,5 @@ final readonly class SendEmailAction
         }
 
         return null;
-    }
-
-    private function replyTarget(User $user, ConnectedAccount $account, ?string $emailId): ?Email
-    {
-        if ($emailId === null) {
-            return null;
-        }
-
-        $email = Email::query()
-            ->where('workspace_id', $account->workspace_id)
-            ->withGlobalScope('visible', new VisibleEmailScope($user))
-            ->whereKey($emailId)
-            ->first();
-
-        return $email instanceof Email && $user->can('view', $email) ? $email : null;
     }
 }
