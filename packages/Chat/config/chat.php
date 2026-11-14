@@ -268,7 +268,7 @@ return [
     ],
 
     'models' => [
-        ['label' => 'Sonnet 5', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 3.00, 'output_per_mtok' => 15.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
+        ['label' => 'Sonnet 5', 'provider' => 'anthropic', 'model' => 'claude-sonnet-5', 'min_plan' => 'free', 'credit_multiplier' => 1.0, 'input_per_mtok' => 2.00, 'output_per_mtok' => 10.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
         ['label' => 'GPT 5.5', 'provider' => 'openai', 'model' => 'gpt-5.5', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 5.00, 'output_per_mtok' => 30.00, 'auto' => true, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
         ['label' => 'Opus 5', 'provider' => 'anthropic', 'model' => 'claude-opus-5', 'min_plan' => 'pro', 'credit_multiplier' => 3.0, 'input_per_mtok' => 5.00, 'output_per_mtok' => 25.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
         ['label' => 'GPT 5.4', 'provider' => 'openai', 'model' => 'gpt-5.4', 'min_plan' => 'pro', 'credit_multiplier' => 1.5, 'input_per_mtok' => 2.50, 'output_per_mtok' => 15.00, 'auto' => false, 'enabled' => true, 'capabilities' => ['supports_tools' => true, 'write_guard' => 'api'], 'verified_at' => null],
