@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Infolists\RecordDetails;
 use App\Filament\Components\Infolists\RecordOverview;
@@ -328,6 +329,7 @@ trait HasRecordPageLayout
                     CopyToClipboardAction::make('copyRecordId')
                         ->label(__('filament/record-page.actions.copy_record_id'))
                         ->copies((string) $this->getRecord()->getKey(), __('filament/record-page.notifications.id_copied')),
+                    MergeRecordAction::make(),
                 ])->dropdown(false),
                 DeleteAction::make(),
             ])

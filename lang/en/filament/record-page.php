@@ -15,6 +15,7 @@ return [
     'actions' => [
         'copy_page_url' => 'Copy page URL',
         'copy_record_id' => 'Copy record ID',
+        'merge_record' => 'Merge record',
         'new_note' => 'New note',
         'new_task' => 'New task',
         'open_preview' => 'Open preview',
@@ -43,6 +44,16 @@ return [
     'notifications' => [
         'url_copied' => 'URL copied to clipboard',
         'id_copied' => 'Record ID copied to clipboard',
+    ],
+    'merge' => [
+        'heading' => 'Merge',
+        'notice' => 'The record on the right wins where both records hold a value.',
+        'search' => 'Search',
+        'swap' => 'Swap records',
+        'submit' => 'Merge records',
+        'merged' => 'Records merged',
+        'unavailable' => 'That record is no longer available to merge.',
+        'over_limit' => ':field can hold :max values. Together these records have more. Remove some first.',
     ],
     'empty' => '—',
     'view_all' => 'View all',
