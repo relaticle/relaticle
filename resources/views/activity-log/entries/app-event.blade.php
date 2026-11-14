@@ -1,8 +1,10 @@
 @php
     $causerName = $entry->causer?->name ?? null;
     $fallbackTitle = $palette->getLabel();
-    $title = $entry->title ?? $fallbackTitle;
-    $description = $entry->description
+    $appPalette = $palette instanceof \App\ActivityLog\AppEventPalette ? $palette : null;
+    $title = $appPalette?->title() ?? $entry->title ?? $fallbackTitle;
+    $description = $appPalette?->description($entry)
+        ?? $entry->description
         ?? ($causerName
             ? sprintf('%s %s', $causerName, Str::lower($fallbackTitle))
             : $fallbackTitle);
