@@ -144,6 +144,9 @@ it('masks secret path parameters in the url and keeps other parameters', functio
     'invitation account switch' => ['POST', '/invitations/iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii/switch-account', '/invitations/{token}/switch-account', 'iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii'],
     'join link' => ['GET', '/join/jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj', '/join/{token}', 'jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj'],
     'email change' => ['GET', '/app/email-change-verification/verify/42/new%40example.com', '/app/email-change-verification/verify/42/{email}', 'new%40example.com'],
+    'email verification' => ['GET', '/email/verify/42/hash-secret', '/email/verify/42/{hash}', 'hash-secret'],
+    'panel email verification' => ['GET', '/app/email-verification/verify/42/hash-secret', '/app/email-verification/verify/42/{hash}', 'hash-secret'],
+    'sysadmin email verification' => ['GET', '/sysadmin/email-verification/verify/42/hash-secret', '/sysadmin/email-verification/verify/42/{hash}', 'hash-secret'],
     'record ulid' => ['GET', '/api/v1/companies/01JABCDEFGHJKMNPQRSTVWXYZ0', '/api/v1/companies/01JABCDEFGHJKMNPQRSTVWXYZ0', '[Filtered]'],
 ]);
 
