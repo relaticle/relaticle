@@ -294,6 +294,8 @@ it('does not greet when the workspace is out of credits', function (): void {
 });
 
 it('greets an owner who connected a mailbox with what it brought in', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+
     $user = User::factory()->create();
     $workspace = personalWorkspaceFor($user, ['onboarding_use_case' => OnboardingUseCase::Sales]);
     ConnectedAccount::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
