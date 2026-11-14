@@ -9,8 +9,7 @@
     @elseif ($this->showConnectPrompt)
         <div class="flex min-h-[30rem] items-center justify-center">
             <x-email-integration::not-connected
-                :heading="__('filament/pages/email-accounts.not_connected.record.heading')"
-                :description="__('filament/pages/email-accounts.not_connected.record.description')"
+                :state="$this->connectState"
                 :action="$this->connectMailboxAction"
                 :secondary-action="$this->connectAzureAction"
             />
@@ -45,6 +44,35 @@
                     {{ $this->composeEmailAction }}
                 </div>
             </div>
+
+            @if ($this->recordAccessOwners->isNotEmpty())
+                <div class="flex flex-wrap items-center gap-2 px-4 pb-4 sm:px-6" data-record-access-bar>
+                    @foreach ($this->recordAccessOwners->take(2) as $bar)
+                        <div wire:key="record-access-{{ $bar['owner']->getKey() }}">
+                            @if ($bar['pending'])
+                                <span class="inline-flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                                    <x-filament::icon icon="lucide-clock" class="size-4 shrink-0" />
+                                    {{ __('filament/pages/record-emails.actions.request_record_access.pending', ['name' => $bar['owner']->name]) }}
+                                </span>
+                            @else
+                                <button
+                                    type="button"
+                                    wire:click="mountAction('requestRecordAccess', { ownerId: @js((string) $bar['owner']->getKey()) })"
+                                    class="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-left text-sm font-medium text-gray-700 shadow-xs ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:text-gray-200 dark:ring-white/20 dark:hover:bg-white/10"
+                                >
+                                    <x-filament::icon icon="lucide-key" class="size-4 shrink-0 text-gray-400" />
+                                    {{ __('filament/pages/record-emails.actions.request_record_access.label', ['name' => $bar['owner']->name, 'count' => $bar['count'], 'record' => $this->getOwnerRecord()->name]) }}
+                                </button>
+                            @endif
+                        </div>
+                    @endforeach
+                    @if ($this->recordAccessOwners->count() > 2)
+                        <span class="text-sm text-gray-500 dark:text-gray-400">
+                            {{ __('filament/pages/record-emails.actions.request_record_access.more', ['count' => $this->recordAccessOwners->count() - 2]) }}
+                        </span>
+                    @endif
+                </div>
+            @endif
 
             @if ($this->showsConversations)
                 <x-email-integration::live-conversations :user-id="auth()->id()" :workspace-id="filament()->getTenant()?->getKey()" />

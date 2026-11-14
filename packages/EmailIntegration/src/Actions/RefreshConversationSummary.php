@@ -17,6 +17,8 @@ use Relaticle\EmailIntegration\Models\EmailParticipant;
 
 final readonly class RefreshConversationSummary
 {
+    public function __construct(private CloseAnsweredFollowUps $followUps) {}
+
     /** @param  list<string>  $alsoNotify */
     public function execute(string $workspaceId, string $conversationKey, bool $broadcast = true, array $alsoNotify = []): void
     {
@@ -25,6 +27,7 @@ final readonly class RefreshConversationSummary
             DB::select('select pg_advisory_xact_lock(hashtext(?))', ["{$workspaceId}:{$conversationKey}"]);
 
             $this->write($workspaceId, $conversationKey);
+            $this->followUps->execute($workspaceId, $conversationKey);
         });
 
         if ($broadcast) {

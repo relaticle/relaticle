@@ -61,7 +61,7 @@ function keyboardBrowserInbound(ConnectedAccount $mailbox, string $key, string $
 }
 
 it('moves through conversations with j and k and marks done with e', function (string $theme): void {
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -84,7 +84,7 @@ it('does not fire shortcuts while typing in the search field or the reply editor
     $search = '[data-conversation-search] input';
     $editor = '[data-inline-composer] [contenteditable="true"]';
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -112,7 +112,7 @@ it('disables letter keys but keeps modified and named keys when single-key short
     $this->owner->forceFill(['single_key_shortcuts' => false])->save();
     $heading = '#email-reader-heading';
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -140,7 +140,7 @@ it('disables letter keys but keeps modified and named keys when single-key short
 })->with(['inLightMode', 'inDarkMode']);
 
 it('undoes done with z while the toast is visible', function (string $theme): void {
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -160,7 +160,7 @@ it('undoes done with z while the toast is visible', function (string $theme): vo
 it('lists the shortcuts in the help sheet', function (string $theme): void {
     $sheet = '[data-shortcut-sheet] [role="dialog"]';
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -179,7 +179,7 @@ it('lists the shortcuts in the help sheet', function (string $theme): void {
 })->with(['inLightMode', 'inDarkMode']);
 
 it('turns single-character keys off from the profile page without a reload', function (string $theme): void {
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/settings/profile")
         ->assertScript('Alpine.store("shortcuts").singleKeys', true)

@@ -19,8 +19,8 @@ use Livewire\Attributes\Url;
 use Livewire\Component;
 use Relaticle\EmailIntegration\Actions\CancelQueuedEmailAction;
 use Relaticle\EmailIntegration\Actions\RetryMailboxHistoryImportFailuresAction;
+use Relaticle\EmailIntegration\Actions\UndoQueuedSend;
 use Relaticle\EmailIntegration\Data\ConversationRow;
-use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
 use Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions;
@@ -213,6 +213,7 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         $email = Email::query()
             ->whereKey($emailId)
             ->where('user_id', $user->getKey())
+            ->where('workspace_id', $user->current_workspace_id)
             ->first();
 
         if (! $email instanceof Email) {
@@ -225,13 +226,36 @@ final class EmailAccessNotificationHandler extends Component implements HasActio
         }
 
         try {
-            resolve(CancelQueuedEmailAction::class)->execute($email);
+            resolve(UndoQueuedSend::class)->execute($user, $emailId);
             $this->dispatch('outbox:changed');
+            $this->dispatch('drafts:changed');
+            $this->dispatch('composer:open', draftId: $emailId);
             $this->notifyCancelled();
         } catch (RuntimeException) {
-            $email->refresh()->status === EmailStatus::CANCELLED
-                ? $this->notifyCancelled()
-                : $this->notifyTooLate();
+            $this->notifyTooLate();
+        }
+    }
+
+    #[On('cancel-held-send')]
+    public function cancelHeldSend(string $emailId): void
+    {
+        $email = Email::query()
+            ->where('user_id', $this->authUser()->getKey())
+            ->where('workspace_id', $this->authUser()->current_workspace_id)
+            ->whereKey($emailId)
+            ->first();
+
+        if (! $email instanceof Email) {
+            return;
+        }
+
+        try {
+            resolve(CancelQueuedEmailAction::class)->execute($email);
+            $this->dispatch('outbox:changed');
+            $this->refreshDatabaseNotifications();
+            Notification::make()->title(__('filament/concerns/email-compose.notifications.send_cancelled.title'))->success()->send();
+        } catch (RuntimeException) {
+            $this->notifyTooLate();
         }
     }
 

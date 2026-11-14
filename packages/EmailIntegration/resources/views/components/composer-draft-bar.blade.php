@@ -1,9 +1,15 @@
+@props(['autosaveState' => 'idle'])
+
 {{-- The Draft marker and the one control that deletes. Every × on a Draft bar
      throws the draft away, including a row a previous save already wrote,
      unlike the window chrome's ×, which puts the draft away and keeps it. --}}
 <div {{ $attributes->class(['flex shrink-0 items-center justify-between gap-2']) }}>
-    <span class="text-sm font-medium text-primary-600 dark:text-primary-400">
-        {{ __('filament/emails/composer.draft') }}
+    <span class="flex items-center gap-3">
+        <span class="text-sm font-medium text-primary-600 dark:text-primary-400">{{ __('filament/emails/composer.draft') }}</span>
+        <span wire:loading wire:target="autosave" class="text-xs text-gray-500 dark:text-gray-400">{{ __('filament/emails/composer.autosave.saving') }}</span>
+        @if ($autosaveState === 'saved')
+            <span wire:loading.remove wire:target="autosave" class="text-xs text-gray-500 dark:text-gray-400">{{ __('filament/emails/composer.autosave.saved') }}</span>
+        @endif
     </span>
 
     <button

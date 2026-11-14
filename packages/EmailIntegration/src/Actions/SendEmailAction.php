@@ -21,6 +21,7 @@ use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\UndoSendWindow;
 use Relaticle\EmailIntegration\Exceptions\OutboxFull;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -29,6 +30,7 @@ use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
 use Relaticle\EmailIntegration\Services\EmailInlineImageEmbedder;
+use Relaticle\EmailIntegration\Services\EmailVariableCatalogue;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 
 final readonly class SendEmailAction
@@ -37,6 +39,8 @@ final readonly class SendEmailAction
         private EmailInlineImageEmbedder $inlineImageEmbedder,
         private ForwardAttachmentCopyService $attachments,
         private ConversationKeyResolver $resolver,
+        private EmailVariableCatalogue $variables,
+        private CreateEmailFollowUp $followUps,
     ) {}
 
     /**
@@ -52,6 +56,7 @@ final readonly class SendEmailAction
      *     in_reply_to_email_id?: ?string,
      *     creation_source: EmailCreationSource,
      *     batch_id?: ?string,
+     *     follow_up?: bool,
      *     scheduled_for?: ?DateTimeInterface,
      *     priority?: EmailPriority,
      *     attachments?: array<int, string>,
@@ -70,11 +75,13 @@ final readonly class SendEmailAction
 
         abort_unless($account->isSendable(), 403);
 
+        $this->variables->assertResolved($data['subject'], $data['body_html']);
+
         $priority = $data['priority'] ?? EmailPriority::BULK;
 
         $this->assertUnderMaxQueued((string) $account->user_id);
 
-        $scheduledFor = $this->resolveScheduledFor($data, $priority);
+        $scheduledFor = $this->resolveScheduledFor($user, $data, $priority);
 
         $embedded = $this->inlineImageEmbedder->embed(
             $user,
@@ -111,17 +118,14 @@ final readonly class SendEmailAction
             strlen((string) $data['body_html']),
         );
 
-        return DB::transaction(function () use ($account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
+        return DB::transaction(function () use ($user, $account, $data, $priority, $scheduledFor, $linkToType, $linkToId, $attachmentPaths, $attachmentAttributes, $attachmentFileNames, $hasDownloadableAttachments): Email {
             $inReplyTo = $this->lockedParent($account, $data['in_reply_to_email_id'] ?? null);
 
             /** @var Email $email */
             $email = $account->emails()->chaperone()->create([
                 'workspace_id' => $account->workspace_id,
                 'user_id' => $account->user_id,
-                // Stamp a stable RFC Message-ID now (used as the outgoing Message-ID
-                // header) so a retry that re-enters after the provider already
-                // delivered can find the sent message and adopt it instead of
-                // double-sending. See EmailSendingService::send().
+                // Stable across retries, so provider reconciliation adopts a delivered message rather than sending twice.
                 'rfc_message_id' => $this->generateRfcMessageId($account),
                 'provider_message_id' => null,
                 // Gmail threadId / Graph conversationId exist only inside the
@@ -159,22 +163,27 @@ final readonly class SendEmailAction
 
             $this->storeAttachments($email, $attachmentPaths, $attachmentFileNames, $attachmentAttributes);
 
-            if ($linkToType !== null && $linkToId !== null && in_array($linkToType, [Company::class, Opportunity::class, People::class], true)) {
-                $linked = $linkToType::query()
-                    ->where('workspace_id', $account->workspace_id)
-                    ->whereKey($linkToId)
-                    ->first();
+            $this->linkToRecord($email, $linkToType, $linkToId);
 
-                if ($linked instanceof Company || $linked instanceof Opportunity || $linked instanceof People) {
-                    // Attach through the record relation so emailable_type is the
-                    // morph alias (`people`), not the class name. Relation::enforceMorphMap
-                    // means `$person->emails()` would miss a fully-qualified class name.
-                    $linked->emails()->attach($email->getKey(), ['link_source' => 'manual']);
-                }
+            if ($data['follow_up'] ?? false) {
+                $this->followUps->execute($user, $email);
             }
 
             return $email;
         });
+    }
+
+    /** @param class-string|null $type */
+    private function linkToRecord(Email $email, ?string $type, ?string $id): void
+    {
+        if ($id === null || ! in_array($type, [Company::class, Opportunity::class, People::class], true)) {
+            return;
+        }
+
+        $record = $type::query()->where('workspace_id', $email->workspace_id)->whereKey($id)->first();
+        if ($record instanceof Company || $record instanceof Opportunity || $record instanceof People) {
+            $record->emails()->attach($email->getKey(), ['link_source' => 'manual']);
+        }
     }
 
     private function lockedParent(ConnectedAccount $account, ?string $parentId): ?Email
@@ -275,16 +284,14 @@ final readonly class SendEmailAction
     /**
      * @param  array<string, mixed>  $data
      */
-    private function resolveScheduledFor(array $data, EmailPriority $priority): ?CarbonInterface
+    private function resolveScheduledFor(User $user, array $data, EmailPriority $priority): ?CarbonInterface
     {
         if (isset($data['scheduled_for']) && $data['scheduled_for'] instanceof DateTimeInterface) {
             return Date::instance($data['scheduled_for']);
         }
 
         if ($priority === EmailPriority::PRIORITY) {
-            $undoWindow = Config::integer('email-integration.outbox.undo_send_window_seconds');
-
-            return now()->addSeconds($undoWindow);
+            return now()->addSeconds(UndoSendWindow::forUser($user)->value);
         }
 
         return null;

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Observers;
 
 use Relaticle\EmailIntegration\Actions\LinkEmailAction;
+use Relaticle\EmailIntegration\Enums\AutomatedReason;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Services\PrivacyService;
@@ -32,7 +34,9 @@ final readonly class EmailObserver
             : ConnectedAccount::withTrashed()->find($email->connected_account_id);
 
         if ($mailbox instanceof ConnectedAccount) {
-            $email->privacy_tier = $this->privacyService->tierForMailbox($mailbox);
+            $email->privacy_tier = $email->automated_reason instanceof AutomatedReason
+                ? EmailPrivacyTier::PRIVATE
+                : $this->privacyService->tierForMailbox($mailbox);
             // LinkEmailAction reads the email's workspace next.
             $email->setRelation('workspace', $mailbox->workspace);
         }

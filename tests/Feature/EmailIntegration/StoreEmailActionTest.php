@@ -31,6 +31,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailConversation;
+use Relaticle\EmailIntegration\Models\EmailFollowUp;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Services\AutomatedMailDetector;
 use Relaticle\EmailIntegration\Services\ConversationKeyResolver;
@@ -78,6 +79,42 @@ function makeFetchedEmailData(array $overrides = []): FetchedEmailData
         headers: $overrides['headers'] ?? [],
     );
 }
+
+it('completes a follow-up only after a later external reply in its conversation', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    $outbound = resolve(SendEmailAction::class)->execute($this->user, [
+        'connected_account_id' => $this->account->getKey(),
+        'creation_source' => EmailCreationSource::COMPOSE,
+        'subject' => 'Renewal',
+        'body_html' => '<p>Shall we renew?</p>',
+        'to' => [['email' => 'buyer@example.test', 'name' => 'Ana']],
+        'follow_up' => true,
+    ]);
+    $followUp = EmailFollowUp::query()->sole();
+    $status = CustomField::query()->where('entity_type', 'task')->where('code', 'status')->with('options')->sole();
+    $doneId = $status->options->firstWhere('name', 'Done')->getKey();
+    $this->travel(1)->minutes();
+
+    $store = resolve(StoreEmailAction::class);
+    $teammate = $store->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'teammate', 'rfcMessageId' => '<teammate@example.test>',
+        'inReplyTo' => $outbound->rfc_message_id,
+        'participants' => [['email_address' => $this->user->email, 'role' => 'from', 'name' => 'Owner']],
+    ]));
+    app()->call((new SettleConversation($this->workspace->getKey(), $teammate->getKey()))->handle(...));
+    expect((string) $followUp->task->load('customFieldValues.customField')->getCustomFieldValue($status))->not->toBe((string) $doneId);
+
+    $reply = $store->execute($this->account, makeFetchedEmailData([
+        'providerMessageId' => 'buyer', 'rfcMessageId' => '<buyer@example.test>',
+        'inReplyTo' => $outbound->rfc_message_id,
+        'participants' => [['email_address' => 'buyer@example.test', 'role' => 'from', 'name' => 'Ana']],
+    ]));
+    $job = new SettleConversation($this->workspace->getKey(), $reply->getKey());
+    app()->call($job->handle(...));
+    app()->call($job->handle(...));
+
+    expect((string) $followUp->task->fresh(['customFieldValues.customField'])->getCustomFieldValue($status))->toBe((string) $doneId);
+});
 
 it('persists the email record with correct fields', function (): void {
     $sentAt = now()->subHour();

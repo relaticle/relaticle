@@ -23,6 +23,7 @@ enum ProposalEntity: string
     case EmailRetry = 'email_retries';
     case EmailLink = 'email_links';
     case EmailUnlink = 'email_unlinks';
+    case EmailAccessRequest = 'email_access_requests';
     case WorkspaceInvitation = 'workspace_invitations';
     case CustomField = 'custom_field';
     case SampleData = 'sample_data';
@@ -31,6 +32,7 @@ enum ProposalEntity: string
     public function singularName(): string
     {
         return match ($this) {
+            self::EmailAccessRequest => 'Email access request',
             self::Company => CrmEntity::Company->singularName(),
             self::People => CrmEntity::People->singularName(),
             self::Opportunity => CrmEntity::Opportunity->singularName(),
@@ -50,6 +52,7 @@ enum ProposalEntity: string
     public function titleKey(): string
     {
         return match ($this) {
+            self::EmailAccessRequest => 'subject',
             self::Company => CrmEntity::Company->titleColumn(),
             self::People => CrmEntity::People->titleColumn(),
             self::Opportunity => CrmEntity::Opportunity->titleColumn(),
@@ -65,6 +68,7 @@ enum ProposalEntity: string
     public function titleLabel(): string
     {
         return match ($this) {
+            self::EmailAccessRequest => 'Subject',
             self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => 'Name',
             self::Task, self::Note => 'Title',
             self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink => 'Subject',
@@ -77,6 +81,7 @@ enum ProposalEntity: string
     public function coreKeys(): array
     {
         return match ($this) {
+            self::EmailAccessRequest => [$this->titleKey()],
             self::Company => [$this->titleKey(), 'account_owner_id'],
             self::WorkspaceInvitation => [$this->titleKey(), 'role'],
             self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => [$this->titleKey()],
@@ -91,6 +96,7 @@ enum ProposalEntity: string
     public function isIndivisible(): bool
     {
         return match ($this) {
+            self::EmailAccessRequest => true,
             self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WebAccess => true,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::WorkspaceInvitation, self::CustomField, self::SampleData => false,
         };
@@ -99,6 +105,7 @@ enum ProposalEntity: string
     public function needsOwnApproval(): bool
     {
         return match ($this) {
+            self::EmailAccessRequest => false,
             self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => true,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData => false,
         };
@@ -107,6 +114,7 @@ enum ProposalEntity: string
     public function approvesFromKeyboard(): bool
     {
         return match ($this) {
+            self::EmailAccessRequest => true,
             self::Email, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation => false,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => true,
         };
@@ -120,6 +128,7 @@ enum ProposalEntity: string
     public function createSummary(string $title): string
     {
         return match ($this) {
+            self::EmailAccessRequest => "Request access to \"{$title}\"",
             self::WorkspaceInvitation => "Invite \"{$title}\"",
             self::WebAccess => "Search the web for \"{$title}\"",
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData => Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.Str::lower($this->singularName())." \"{$title}\"",
@@ -129,6 +138,7 @@ enum ProposalEntity: string
     public function action(PendingActionOperation $operation, int $count = 1): string
     {
         return match ($this) {
+            self::EmailAccessRequest => __('Request access'),
             self::Email => __('Send'),
             self::EmailDraft => __('Save draft'),
             self::EmailDraftSend => __('Send'),
@@ -147,6 +157,7 @@ enum ProposalEntity: string
     public function deletes(PendingActionOperation $operation): bool
     {
         return match ($this) {
+            self::EmailAccessRequest => false,
             self::EmailDraftDelete => true,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $operation === PendingActionOperation::Delete,
         };
@@ -155,6 +166,7 @@ enum ProposalEntity: string
     public function confirmLabel(PendingActionOperation $operation, int $count = 1): string
     {
         return match ($this) {
+            self::EmailAccessRequest => $this->action($operation, $count),
             self::Email => __('Send email'),
             self::EmailDraftDelete => trans_choice('Delete draft|Delete :count drafts', $count, ['count' => $count]),
             self::SampleData => __('Remove sample data'),
@@ -169,6 +181,7 @@ enum ProposalEntity: string
     public function declineLabel(): string
     {
         return match ($this) {
+            self::EmailAccessRequest => __('Discard'),
             self::Email, self::EmailDraftSend, self::WorkspaceInvitation => __("Don't send"),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => __('Discard'),
         };
@@ -177,6 +190,7 @@ enum ProposalEntity: string
     public function followUpLabel(): string
     {
         return match ($this) {
+            self::EmailAccessRequest => __('Then request access'),
             self::Email => __('Then email'),
             self::EmailDraftSend => __('Then send draft'),
             self::EmailCancel => __('Then cancel email'),
@@ -193,6 +207,7 @@ enum ProposalEntity: string
     public function done(PendingActionOperation $operation): string
     {
         return match ($this) {
+            self::EmailAccessRequest => __('Requested'),
             self::Email => __('Sent'),
             self::EmailDraft => __('Saved'),
             self::EmailDraftSend => __('Sent'),
@@ -211,6 +226,7 @@ enum ProposalEntity: string
     public function verb(PendingActionOperation $operation): string
     {
         return match ($this) {
+            self::EmailAccessRequest => 'request',
             self::Email => 'send',
             self::EmailDraft => 'save',
             self::EmailDraftSend => 'send',
@@ -229,6 +245,7 @@ enum ProposalEntity: string
     public function notDone(PendingActionOperation $operation): string
     {
         return match ($this) {
+            self::EmailAccessRequest => 'NOT requested',
             self::Email => 'NOT sent',
             self::EmailDraft => 'NOT saved',
             self::EmailDraftSend => 'NOT sent',
@@ -247,6 +264,7 @@ enum ProposalEntity: string
     public function noun(): string
     {
         return match ($this) {
+            self::EmailAccessRequest => 'email access request',
             self::Email => 'email',
             self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete => 'email draft',
             self::EmailCancel, self::EmailReschedule => 'queued email',
@@ -261,6 +279,7 @@ enum ProposalEntity: string
     public function decisionWord(PendingActionStatus $status): string
     {
         return match ($this) {
+            self::EmailAccessRequest => $status->promptWord(),
             self::WebAccess => match ($status) {
                 PendingActionStatus::Pending => 'PENDING',
                 PendingActionStatus::Approved => 'ALLOWED (web search for the resumed turn only, not a write)',
@@ -274,6 +293,7 @@ enum ProposalEntity: string
     public function receiptVerb(PendingActionOperation $operation): string
     {
         return match ($this) {
+            self::EmailAccessRequest => $this->done($operation),
             self::Task => $operation === PendingActionOperation::Create ? __('Created task') : $operation->done(),
             self::Note => $operation === PendingActionOperation::Create ? __('Added note') : $operation->done(),
             self::Email => __('Queued email to'),
@@ -284,6 +304,7 @@ enum ProposalEntity: string
     public function receiptTarget(): ?string
     {
         return match ($this) {
+            self::EmailAccessRequest => null,
             self::Email => 'To',
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
         };
@@ -292,6 +313,7 @@ enum ProposalEntity: string
     public function declinedOutcome(): ProposalOutcome
     {
         return match ($this) {
+            self::EmailAccessRequest => ProposalOutcome::LeftOut,
             self::Email, self::EmailDraftSend, self::WorkspaceInvitation => ProposalOutcome::NotSent,
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::EmailLink, self::EmailUnlink, self::CustomField, self::SampleData, self::WebAccess => ProposalOutcome::LeftOut,
         };
@@ -300,6 +322,7 @@ enum ProposalEntity: string
     private function receiptBatch(PendingActionOperation $operation, int $count): string
     {
         return match ($this) {
+            self::EmailAccessRequest => __('Requested access to :count emails', ['count' => ':count']),
             self::WorkspaceInvitation => $count === 1
                 ? __('Sent :count invitation', ['count' => ':count'])
                 : __('Sent :count invitations', ['count' => ':count']),

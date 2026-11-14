@@ -10,11 +10,14 @@ use App\Models\People;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\Paginator;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
@@ -93,6 +96,20 @@ final readonly class VisibleEmailsQuery
     public function find(User $viewer, string $id): ?Email
     {
         return $this->withDetail($this->visibleTo($viewer), $viewer, $id);
+    }
+
+    /**
+     * @param  list<string>  $recipients
+     * @return Collection<int, Email>
+     */
+    public function recentSentTo(User $viewer, array $recipients): Collection
+    {
+        return $this->deliveredTo($viewer)->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->where('workspace_id', $viewer->current_workspace_id)->where('user_id', $viewer->getKey())
+            ->where('direction', EmailDirection::OUTBOUND)
+            ->whereHas('participants', fn (Builder $query): Builder => $query->where('role', EmailParticipantRole::TO)
+                ->whereIn(DB::raw('lower(email_address)'), array_map(strtolower(...), $recipients)))
+            ->with('body')->latest('sent_at')->limit(5)->get();
     }
 
     /** @throws ValidationException */

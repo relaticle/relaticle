@@ -15,6 +15,7 @@ use Relaticle\EmailIntegration\Models\AiSummary;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
@@ -108,6 +109,14 @@ final readonly class PurgeStoredMailboxData
             ->where('summarizable_type', (new EmailThread)->getMorphClass())
             ->whereIn('summarizable_id', $threads->select('id'))
             ->delete();
+
+        AiSummary::query()->where('user_id', $user->getKey())->delete();
+        AiSummary::query()->where('summarizable_type', (new EmailConversation)->getMorphClass())
+            ->whereIn('summarizable_id', EmailConversation::query()->whereExists(
+                fn (\Illuminate\Database\Query\Builder $query): \Illuminate\Database\Query\Builder => $query->selectRaw('1')->fromSub($this->emails($user), 'owned_emails')
+                    ->whereColumn('owned_emails.workspace_id', 'email_conversations.workspace_id')
+                    ->whereColumn('owned_emails.conversation_key', 'email_conversations.conversation_key')
+            )->select('id'))->delete();
     }
 
     /** @return Builder<ConnectedAccount> */

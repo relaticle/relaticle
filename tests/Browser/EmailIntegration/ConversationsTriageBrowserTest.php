@@ -54,7 +54,7 @@ it('shows a done row again when new mail brings it back on a refetch', function 
     triageBrowserInbound($this->mailbox, 'conv-back', now()->subHour());
     $row = '[data-conversation="conv-back"]';
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
         ->assertPresent($row)
@@ -76,7 +76,7 @@ it('does nothing on o when single-key shortcuts are off and still opens the focu
     triageBrowserInbound($this->mailbox, 'conv-off', now()->subHour());
     $button = '[data-conversation="conv-off"] > button';
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
         ->assertPresent($button)
@@ -93,7 +93,7 @@ it('marks done on Enter from the Done pill without opening the reader', function
     triageBrowserInbound($this->mailbox, 'conv-pill', now()->subHour());
     $row = '[data-conversation="conv-pill"]';
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
         ->assertPresent($row)
@@ -110,7 +110,7 @@ it('marks done on Enter from the Done pill without opening the reader', function
 it('keeps the reader open on Escape while one of its dropdowns is open', function (string $theme): void {
     triageBrowserInbound($this->mailbox, 'conv-menu', now()->subHour());
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -135,7 +135,7 @@ it('moves the tab stop to a visible row when e marks the hovered tab stop done',
     triageBrowserInbound($this->mailbox, 'conv-below', now()->subHour());
     $tabStops = '[...document.querySelectorAll("[data-conversation]")].filter((row) => ! row.hidden && row.querySelector(":scope > button").tabIndex === 0).map((row) => row.dataset.conversation)';
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -155,7 +155,7 @@ it('selects a range with shift-click and clears it after mark read', function (s
     }
     $checkbox = fn (string $key): string => "[data-conversation=\"{$key}\"] [data-select-conversation]";
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -184,7 +184,7 @@ it('toggles the focused row with x and marks the selection done with e', functio
         triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
     }
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -207,7 +207,7 @@ it('marks two checked conversations done with e while a checkbox has focus', fun
         triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
     }
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -232,7 +232,7 @@ it('undoes a mixed bulk done without reopening the row that was already done', f
         'done_through' => now()->addMinute(),
     ]);
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -256,7 +256,7 @@ it('marks the selection done with e while the reader shows another conversation'
         triageBrowserInbound($this->mailbox, $key, now()->subMinutes($minutes));
     }
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -277,7 +277,7 @@ it('marks the selection done with e while the reader shows another conversation'
 it('clears the selection with Escape', function (string $theme): void {
     triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
         ->click('[data-conversation="conv-one"] [data-select-conversation]')
@@ -292,7 +292,7 @@ it('marks done from the reader a conversation the list does not show', function 
     triageBrowserInbound($this->mailbox, 'conv-linked', now()->subHour());
     $email = Email::query()->where('conversation_key', 'conv-linked')->sole();
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=awaiting_reply&email={$email->id}")
         ->assertVisible('[data-email-reader] [data-reader-action=done]')
@@ -308,7 +308,7 @@ it('keeps the selection bar over the list when the sidebar collapses', function 
     triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
     $edges = '(() => { const wrapper = document.querySelector("[data-triage-bar]").parentElement; const list = document.querySelector("[data-select-page]").closest("[x-data]"); return Math.abs(wrapper.getBoundingClientRect().left - list.getBoundingClientRect().left) < 1 })()';
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -330,7 +330,7 @@ it('says the selection is already done when a bulk done changes nothing', functi
         EmailConversationState::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $this->owner->id, 'conversation_key' => $key]);
     }
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
         ->click('[data-conversation="conv-one"] [data-select-conversation]')
@@ -349,7 +349,7 @@ it('empties the search box on Escape and keeps the selection', function (string 
     $search = '[data-conversation-search] input';
     $subject = Email::query()->where('conversation_key', 'conv-one')->value('subject');
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
         ->click('[data-conversation="conv-one"] [data-select-conversation]')
@@ -376,7 +376,7 @@ it('undoes a reopen from the reader of a conversation the list does not show', f
         'done_through' => $email->sent_at,
     ]);
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=awaiting_reply&email={$email->id}")
         ->assertMissing('[data-conversation="conv-linked"]')
@@ -392,7 +392,7 @@ it('undoes a reopen from the reader of a conversation the list does not show', f
 it('drops the selection after leaving the view and coming back', function (string $theme): void {
     triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
         ->click('[data-conversation="conv-one"] [data-select-conversation]')
@@ -414,7 +414,7 @@ it('drops the selection after paging away and back', function (string $theme): v
         triageBrowserInbound($this->mailbox, "conv-{$index}", now()->subMinutes($index));
     }
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
         ->click('[data-conversation="conv-1"] [data-select-conversation]')
@@ -434,7 +434,7 @@ it('closes the reader on Escape from an empty search box', function (string $the
     triageBrowserInbound($this->mailbox, 'conv-one', now()->subMinutes(10));
     $search = '[data-conversation-search] input';
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")
@@ -454,7 +454,7 @@ it('keeps the selection bar beside the reader while the reader is resized', func
     $meets = '(() => { const bar = document.querySelector("[data-triage-bar]").parentElement.getBoundingClientRect(); const reader = document.querySelector("[data-email-reader]").getBoundingClientRect(); return Math.abs(bar.right - reader.left) < 2 })()';
     $separator = '[data-email-reader] [role=separator]';
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(1440, 900)
         ->navigate("/app/{$this->workspace->slug}/email?view=needs_reply")

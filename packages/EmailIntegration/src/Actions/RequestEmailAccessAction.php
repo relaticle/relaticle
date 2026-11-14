@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use App\Actions\Notifications\RefreshNotificationBell;
+use App\Models\ActivityLog\Activity;
 use App\Models\User;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\DB;
@@ -21,8 +22,12 @@ final readonly class RequestEmailAccessAction
         private RefreshNotificationBell $refreshBell,
     ) {}
 
-    public function execute(Email $email, User $requester, EmailPrivacyTier $tierRequested): ?EmailAccessRequest
+    public function execute(Email $email, User $requester, EmailPrivacyTier $tierRequested, ?string $note = null): ?EmailAccessRequest
     {
+        $note = filled($note) ? trim($note) : null;
+
+        abort_if($note !== null && mb_strlen($note) > EmailAccessRequest::NOTE_MAX_LENGTH, 422);
+
         // Access requests are only valid within the email's own workspace. Never
         // let a user from another workspace open a cross-workspace request (mirrors the workspace
         // check already enforced on the approval path).
@@ -34,11 +39,13 @@ final readonly class RequestEmailAccessAction
             return null;
         }
 
-        $request = $this->openRequest($email, $requester, $tierRequested);
+        $request = $this->openRequest($email, $requester, $tierRequested, $note);
 
         if (! $request instanceof EmailAccessRequest) {
             return null;
         }
+
+        $this->logRequested($request, $requester);
 
         $email->user?->notify(new EmailAccessRequestedNotification($request));
 
@@ -49,7 +56,7 @@ final readonly class RequestEmailAccessAction
         return $request;
     }
 
-    private function openRequest(Email $email, User $requester, EmailPrivacyTier $tierRequested): ?EmailAccessRequest
+    private function openRequest(Email $email, User $requester, EmailPrivacyTier $tierRequested, ?string $note): ?EmailAccessRequest
     {
         try {
             return DB::transaction(fn (): EmailAccessRequest => EmailAccessRequest::query()->create([
@@ -57,6 +64,7 @@ final readonly class RequestEmailAccessAction
                 'requester_id' => $requester->getKey(),
                 'owner_id' => $email->user_id,
                 'tier_requested' => $tierRequested->value,
+                'note' => $note,
                 'status' => EmailAccessRequestStatus::PENDING,
                 'workspace_id' => $email->workspace_id,
                 'expires_at' => now()->addDays(EmailAccessRequest::EXPIRES_AFTER_DAYS),
@@ -64,6 +72,16 @@ final readonly class RequestEmailAccessAction
         } catch (UniqueConstraintViolationException) {
             return null;
         }
+    }
+
+    private function logRequested(EmailAccessRequest $request, User $requester): void
+    {
+        activity(Activity::EMAIL_ACCESS_LOG)
+            ->performedOn($request)
+            ->causedBy($requester)
+            ->event('requested')
+            ->withProperties(['tier' => $request->tier_requested, 'has_note' => filled($request->note)])
+            ->log('requested');
     }
 
     private function expireOverdueRequests(Email $email, User $requester): void

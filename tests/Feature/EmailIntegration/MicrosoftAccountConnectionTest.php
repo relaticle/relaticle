@@ -22,6 +22,7 @@ use Relaticle\EmailIntegration\Enums\ContactCreationMode;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailProvider;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccountsPage;
+use Relaticle\EmailIntegration\Filament\Pages\MailboxSharingPage;
 use Relaticle\EmailIntegration\Jobs\InitialCalendarSyncJob;
 use Relaticle\EmailIntegration\Jobs\InitialEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\RelinkMailboxHistoryJob;
@@ -633,7 +634,9 @@ it('connects the mailbox to the workspace where authorization started after the 
     Socialite::fake('gmail', $social);
 
     $this->get(route('email-accounts.callback', ['provider' => 'gmail']))
-        ->assertRedirect(EmailAccountsPage::getUrl([
+        ->assertRedirect(MailboxSharingPage::getUrl([
+            'mailbox' => ConnectedAccount::query()->where('workspace_id', $initiatingTeam->id)->where('email_address', 'bind@example.com')->sole()->id,
+            'return' => EmailAccountsPage::getUrl(['tenant' => $initiatingTeam->slug], panel: 'app'),
             'tenant' => $initiatingTeam->slug,
         ], panel: 'app'));
 

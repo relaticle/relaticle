@@ -292,7 +292,7 @@ describe('EmailAccessNotificationHandler', function (): void {
 });
 
 describe('undo queued send', function (): void {
-    it('cancels the sender\'s queued email from the undo toast', function (): void {
+    it('restores the sender\'s queued email as a draft from the undo toast', function (): void {
         $email = Email::factory()->outbound()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $this->owner->id,
@@ -306,7 +306,7 @@ describe('undo queued send', function (): void {
             ->assertNotified(__('filament/concerns/email-compose.notifications.cancelled.title'))
             ->assertDispatched('outbox:changed');
 
-        expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+        expect($email->refresh()->status)->toBe(EmailStatus::DRAFT);
     });
 
     it('does not cancel another user\'s queued email from the undo toast', function (): void {
@@ -330,7 +330,7 @@ describe('undo queued send', function (): void {
         expect($theirs->refresh()->status)->toBe(EmailStatus::QUEUED);
     });
 
-    it('says the email is already cancelled when undo is pressed twice', function (): void {
+    it('keeps the restored draft when undo is pressed twice', function (): void {
         $email = Email::factory()->outbound()->create([
             'workspace_id' => $this->workspace->id,
             'user_id' => $this->owner->id,
@@ -341,11 +341,11 @@ describe('undo queued send', function (): void {
 
         Livewire::test(EmailAccessNotificationHandler::class)
             ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
-            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
             ->assertNotified(__('filament/concerns/email-compose.notifications.cancelled.title'))
-            ->assertNotNotified(__('filament/concerns/email-compose.notifications.too_late.title'));
+            ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
+            ->assertNotified(__('filament/concerns/email-compose.notifications.too_late.title'));
 
-        expect($email->refresh()->status)->toBe(EmailStatus::CANCELLED);
+        expect($email->refresh()->status)->toBe(EmailStatus::DRAFT);
     });
 
     it('notifies too late when the queued email has already been sent', function (): void {
@@ -465,7 +465,7 @@ describe('EmailSendHeldNotification', function (): void {
         resolve(QueuedSendNotifier::class)->sendHeld($this->held, $this->owner, 'Claude', 300);
 
         Livewire::test(EmailAccessNotificationHandler::class)
-            ->dispatch('undo-queued-send', emailId: (string) $this->held->getKey());
+            ->dispatch('cancel-held-send', emailId: (string) $this->held->getKey());
 
         $this->travelTo(now()->addSeconds(301));
 

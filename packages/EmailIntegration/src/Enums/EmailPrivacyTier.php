@@ -50,6 +50,12 @@ enum EmailPrivacyTier: string implements HasDescription, HasIcon, HasLabel
         return '{'.implode(',', array_map(fn (self $tier): string => $tier->value, $tiers)).'}';
     }
 
+    /** @return list<self> */
+    public static function offeredAtConnect(): array
+    {
+        return [self::METADATA_ONLY, self::SUBJECT];
+    }
+
     public function getLabel(): string
     {
         return match ($this) {

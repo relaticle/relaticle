@@ -36,7 +36,12 @@ const createStore = () => ({
     init() {
         this.readPreference()
         document.addEventListener('livewire:navigated', () => this.readPreference())
-        document.addEventListener('keydown', (event) => this.dispatch(event))
+        document.addEventListener('keydown', (event) => {
+            if (! event.ctrlKey && ! event.metaKey) this.dispatch(event)
+        })
+        document.addEventListener('keydown', (event) => {
+            if (event.ctrlKey || event.metaKey) this.dispatch(event)
+        }, true)
     },
 
     readPreference() {
@@ -61,8 +66,8 @@ const createStore = () => ({
         this.registrations = this.registrations.filter((registration) => registration.name !== name || (id !== null && registration.id !== id))
     },
 
-    allows(event, { editors = false, character = true } = {}) {
-        if (event.ctrlKey || event.metaKey || event.altKey) {
+    allows(event, { editors = false, character = true, modified = false } = {}) {
+        if (event.altKey || (! modified && (event.ctrlKey || event.metaKey))) {
             return false
         }
 
@@ -88,7 +93,8 @@ const createStore = () => ({
             return
         }
 
-        const key = keyOf(event)
+        const modified = event.ctrlKey || event.metaKey
+        const key = `${modified ? `Mod+${event.shiftKey ? 'Shift+' : ''}` : ''}${keyOf(event)}`
 
         // Shift makes ? and other symbols, but Shift+J is not j.
         if (event.shiftKey && /^[a-z]$/.test(key)) {
@@ -101,12 +107,13 @@ const createStore = () => ({
             for (const registration of registrations) {
                 const entry = registration.entries.find((candidate) => candidate.keys.includes(key))
 
-                if (! entry || ! registration.isActive() || ! this.allows(event, { editors: entry.editors, character: key.length === 1 })) {
+                if (! entry || ! registration.isActive() || ! this.allows(event, { editors: entry.editors, character: key.length === 1, modified })) {
                     continue
                 }
 
                 if (registration.handlers[entry.action](event, entry) !== false) {
                     event.preventDefault()
+                    if (modified) event.stopPropagation()
 
                     return
                 }

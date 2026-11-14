@@ -122,6 +122,40 @@ it('records no outcome for an overdue request and leaves it pending', function (
         ->and(EmailShare::query()->exists())->toBeFalse();
 })->with(['approveRequest', 'denyRequest']);
 
+it('lets the owner share current record mail from the bell without sharing another record', function (): void {
+    Notification::fake();
+    $request = pendingEmailAccessRequest($this->user, $this->workspaceA, 'Pilot pricing', 'Dana Whitfield');
+    $person = People::factory()->create(['workspace_id' => $this->workspaceA->id, 'name' => 'Alex Rivera']);
+    $otherPerson = People::factory()->create(['workspace_id' => $this->workspaceA->id, 'name' => 'Morgan Chen']);
+    $sibling = $request->email->replicate(['rfc_message_id', 'provider_message_id', 'subject_search', 'body_search']);
+    $sibling->save();
+    $unrelated = $request->email->replicate(['rfc_message_id', 'provider_message_id', 'subject_search', 'body_search']);
+    $unrelated->save();
+    $request->email->people()->attach($person);
+    $sibling->people()->attach($person);
+    $unrelated->people()->attach($otherPerson);
+
+    ($this->panel)()
+        ->assertSee('Share all my mail on Alex Rivera')
+        ->call('approveRequest', 'email_access', $request->getKey(), $person->getMorphClass().':'.$person->getKey());
+
+    expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED)
+        ->and(EmailShare::query()->where('shared_with', $request->requester_id)->pluck('email_id')->all())
+        ->toEqualCanonicalizing([$request->email_id, $sibling->getKey()]);
+});
+
+it('refuses a forged record answer in the bell', function (): void {
+    $request = pendingEmailAccessRequest($this->user, $this->workspaceA, 'Pilot pricing', 'Dana Whitfield');
+    $person = People::factory()->create(['workspace_id' => $this->workspaceA->id]);
+
+    ($this->panel)()
+        ->call('approveRequest', 'email_access', $request->getKey(), $person->getMorphClass().':'.$person->getKey())
+        ->assertStatus(422);
+
+    expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING)
+        ->and(EmailShare::query()->exists())->toBeFalse();
+});
+
 it('keeps the query count constant from one pending request to three', function (): void {
     $queriesPerRender = function (): int {
         $component = ($this->panel)();

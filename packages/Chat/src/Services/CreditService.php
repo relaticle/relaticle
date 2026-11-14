@@ -296,6 +296,8 @@ final readonly class CreditService
     /**
      * Settle a reserved credit by charging the difference between the real cost
      * and the already-reserved credits. Idempotent on $resolutionKey.
+     *
+     * @param  array<string, mixed>  $metadata
      */
     public function settleReservation(
         Workspace $workspace,
@@ -309,6 +311,7 @@ final readonly class CreditService
         ?string $conversationId = null,
         int $reservedCredits = 1,
         string $resolutionKey = '',
+        array $metadata = [],
     ): void {
         if (! $this->entitlements->metersCredits($workspace)) {
             return;
@@ -329,7 +332,7 @@ final readonly class CreditService
             usedDelta: $adjustment,
             userId: (string) $user->getKey(),
             conversationId: $conversationId,
-            metadata: ['tool_calls_count' => $toolCallsCount, 'web_searches_count' => $webSearchCount],
+            metadata: [...$metadata, 'tool_calls_count' => $toolCallsCount, 'web_searches_count' => $webSearchCount],
         );
     }
 

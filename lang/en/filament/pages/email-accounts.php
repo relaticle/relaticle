@@ -6,6 +6,12 @@ return [
     'title' => 'Email and calendar accounts',
     'navigation_label' => 'Accounts',
     'subheading' => 'Manage and sync your email and calendar accounts to stay organized.',
+    'undo_send' => [
+        'heading' => 'Sending',
+        'label' => 'Undo send',
+        'seconds' => ':seconds seconds',
+        'help' => 'After Send, you have this long to take the email back. This applies to every mailbox you connect.',
+    ],
     'actions' => [
         'connect_gmail' => 'Connect Google account',
         'connect_azure' => 'Connect Microsoft account',
@@ -145,17 +151,41 @@ return [
         'calendar' => 'Calendar',
     ],
     'not_connected' => [
-        'inbox' => [
-            'heading' => 'Send emails in Relaticle',
-            'description' => 'Connect your email account to read and reply without leaving Relaticle. You also get mass sending, templates, and attachments.',
-        ],
-        'record' => [
-            'heading' => 'Keep emails on the record',
-            'description' => 'Connect your email account to see every conversation with this record and reply in one click.',
-        ],
         'meetings' => [
             'heading' => 'See your meetings in Relaticle',
             'description' => 'Connect your account to track meetings alongside your CRM records.',
+        ],
+    ],
+    'connect_card' => [
+        'no_provider' => [
+            'heading' => 'Email is not set up on this server',
+            'description' => 'Ask your administrator to add a Google or Microsoft app. The self-hosting guide shows how.',
+            'guide' => 'Open the self-hosting guide',
+        ],
+        'not_connected' => [
+            'heading' => 'Connect your mailbox',
+            'description' => 'Relaticle puts your mail on the right company, person and opportunity. You choose what teammates see.',
+        ],
+        'sharing_unanswered' => [
+            'heading' => 'Choose what teammates see',
+            'description' => 'Your mailbox is connected. Until you choose, teammates see at most who and when.',
+            'choose' => 'Choose now',
+        ],
+        'connected' => [
+            'heading' => 'Your mailbox is connected',
+            'description' => 'Teammates see your mail at the level you chose.',
+        ],
+    ],
+    'sharing_step' => [
+        'title' => 'Choose what teammates see',
+        'description' => 'Only you can read your mail. Pick how :mailbox appears to other members of your workspace.',
+        'importing' => 'Your mailbox is syncing.',
+        'save' => 'Save and continue',
+        'more_options' => 'More sharing options',
+        'preview' => [
+            'heading' => 'How a teammate sees your mail',
+            'empty' => 'Nothing is linked to a record yet. Teammates see only mail that is.',
+            'subject_hidden' => 'Subject hidden',
         ],
     ],
 ];

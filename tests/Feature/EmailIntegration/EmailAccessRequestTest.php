@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\Notifications\NotificationReason;
 use App\Models\ActivityLog\Activity;
+use App\Models\Company;
 use App\Models\Notification as NotificationRow;
 use App\Models\User;
 use App\Models\Workspace;
@@ -21,19 +22,24 @@ use Relaticle\EmailIntegration\Actions\CancelEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\DecideEmailAccessRequest;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\RequestEmailAccessAction;
+use Relaticle\EmailIntegration\Actions\RequestRecordEmailAccess;
+use Relaticle\EmailIntegration\Actions\UpdateEmailSharingAction;
 use Relaticle\EmailIntegration\Console\Commands\ExpireEmailAccessRequestsCommand;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
+use Relaticle\EmailIntegration\Events\ConversationChanged;
 use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
+use Relaticle\EmailIntegration\Inbox\EmailAccessRequestSource;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Notifications\EmailAccessRespondedNotification;
+use Relaticle\EmailIntegration\Support\MarkdownText;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ApproveEmailAccessRequestAction::class, DecideEmailAccessRequest::class, CancelEmailAccessRequestAction::class, DenyEmailAccessRequestAction::class, RequestEmailAccessAction::class, EmailAccessRequestedNotification::class, EmailAccessRespondedNotification::class, ExpireEmailAccessRequestsCommand::class);
+mutates(ApproveEmailAccessRequestAction::class, RequestRecordEmailAccess::class, DecideEmailAccessRequest::class, CancelEmailAccessRequestAction::class, DenyEmailAccessRequestAction::class, RequestEmailAccessAction::class, EmailAccessRequestedNotification::class, EmailAccessRespondedNotification::class, ExpireEmailAccessRequestsCommand::class);
 
 beforeEach(function (): void {
     $this->owner = User::factory()->withWorkspace()->create();
@@ -538,6 +544,43 @@ describe('CancelEmailAccessRequestAction', function (): void {
 });
 
 describe('RequestEmailAccessAction', function (): void {
+    it('stores the note and shows it to the owner', function (): void {
+        Notification::fake();
+
+        $request = resolve(RequestEmailAccessAction::class)
+            ->execute($this->email, $this->requester, EmailPrivacyTier::FULL, '  Prepping the [renewal](https://evil.example) call  ');
+
+        $mail = (new EmailAccessRequestedNotification($request))->toMail($this->owner);
+        $inbox = resolve(EmailAccessRequestSource::class)->find($this->owner, $this->workspace, $request->getKey());
+
+        expect($request->fresh()->note)->toBe('Prepping the [renewal](https://evil.example) call')
+            ->and(implode("\n", $mail->introLines))->toContain(MarkdownText::escape('Prepping the [renewal](https://evil.example) call'))
+            ->and($inbox?->body)->toContain('Prepping the [renewal](https://evil.example) call');
+    });
+
+    it('logs a new request once and not a repeated pending one', function (): void {
+        Notification::fake();
+
+        $first = resolve(RequestEmailAccessAction::class)->execute($this->email, $this->requester, EmailPrivacyTier::FULL, 'For the renewal');
+        $second = resolve(RequestEmailAccessAction::class)->execute($this->email, $this->requester, EmailPrivacyTier::FULL, 'Again');
+
+        $logged = Activity::query()->where('log_name', Activity::EMAIL_ACCESS_LOG)->where('event', 'requested')->sole();
+
+        expect($second)->toBeNull()
+            ->and($logged->subject_id)->toBe($first->getKey())
+            ->and($logged->causer_id)->toBe($this->requester->getKey())
+            ->and($logged->properties->all())->toMatchArray(['tier' => EmailPrivacyTier::FULL->value, 'has_note' => true])
+            ->and(json_encode($logged->getAttributes()))->not->toContain('For the renewal');
+    });
+
+    it('refuses a note longer than 500 characters', function (): void {
+        expect(fn () => resolve(RequestEmailAccessAction::class)
+            ->execute($this->email, $this->requester, EmailPrivacyTier::FULL, str_repeat('a', 501)))
+            ->toThrow(HttpException::class);
+
+        expect(EmailAccessRequest::query()->count())->toBe(0);
+    });
+
     it('creates a pending access request for a team member', function (): void {
         Notification::fake();
 
@@ -647,6 +690,143 @@ describe('RequestEmailAccessAction', function (): void {
         expect($first->fresh()->status)->toBe(EmailAccessRequestStatus::EXPIRED);
 
         Notification::assertNotSentTo($this->requester, EmailAccessRespondedNotification::class);
+    });
+});
+
+describe('record requests', function (): void {
+    beforeEach(function (): void {
+        Notification::fake();
+        $this->airbnb = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Airbnb']);
+        $this->stripe = Company::factory()->create(['workspace_id' => $this->workspace->id, 'name' => 'Stripe']);
+    });
+
+    it('shares only the owner mail on the requested record when a record request is approved', function (): void {
+        Event::fake([ConversationChanged::class]);
+        $onAirbnb = ownerEmailOn($this, $this->airbnb, 'renewal');
+        $alsoOnAirbnb = ownerEmailOn($this, $this->airbnb, 'pricing');
+        $onStripe = ownerEmailOn($this, $this->stripe, 'stripe');
+
+        $request = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->airbnb, $this->owner, EmailPrivacyTier::FULL, null);
+        $approved = resolve(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        expect($approved)->toBeTrue()
+            ->and($this->requester->can('viewBody', $onAirbnb->fresh()))->toBeTrue()
+            ->and($this->requester->can('viewBody', $alsoOnAirbnb->fresh()))->toBeTrue()
+            ->and($this->requester->can('viewBody', $onStripe->fresh()))->toBeFalse()
+            ->and(EmailShare::query()->where('shared_with', $this->requester->getKey())->count())->toBe(2)
+            ->and($request->fresh()->status)->toBe(EmailAccessRequestStatus::APPROVED);
+
+        Event::assertDispatchedTimes(ConversationChanged::class, 2);
+        Event::assertDispatched(ConversationChanged::class, fn (ConversationChanged $event): bool => $event->conversationKey === 'renewal');
+        Notification::assertSentTo($this->requester, EmailAccessRespondedNotification::class);
+    });
+
+    it('does not share a teammate copy of the same message the owner does not hold', function (): void {
+        $third = User::factory()->create(['current_workspace_id' => $this->workspace->id]);
+        $this->workspace->users()->attach($third, ['role' => 'member']);
+        $ownCopy = ownerEmailOn($this, $this->airbnb, 'renewal');
+        $thirdCopy = Email::factory()->private()->create([
+            'workspace_id' => $this->workspace->id,
+            'user_id' => $third->id,
+            'connected_account_id' => ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create(['workspace_id' => $this->workspace->id, 'user_id' => $third->id]))->getKey(),
+            'rfc_message_id' => $ownCopy->rfc_message_id,
+            'conversation_key' => 'renewal',
+        ]);
+        $thirdCopy->companies()->attach($this->airbnb->getKey(), ['link_source' => 'auto']);
+
+        $request = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->airbnb, $this->owner, EmailPrivacyTier::FULL, null);
+        resolve(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        expect(EmailShare::query()->where('shared_with', $this->requester->getKey())->pluck('email_id')->all())->toBe([$ownCopy->getKey()]);
+    });
+
+    it('refuses a record request for a record in another workspace', function (): void {
+        $foreign = Company::factory()->create(['workspace_id' => Workspace::factory()->create()->id]);
+
+        expect(fn () => resolve(RequestRecordEmailAccess::class)->execute($this->requester, $foreign, $this->owner, EmailPrivacyTier::FULL, null))
+            ->toThrow(HttpException::class);
+
+        expect(EmailAccessRequest::query()->count())->toBe(0);
+    });
+
+    it('keeps one pending record request per requester, owner and record', function (): void {
+        $first = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->airbnb, $this->owner, EmailPrivacyTier::FULL, null);
+        $second = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->airbnb, $this->owner, EmailPrivacyTier::SUBJECT, 'Again');
+        $other = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->stripe, $this->owner, EmailPrivacyTier::FULL, null);
+
+        expect($first)->toBeInstanceOf(EmailAccessRequest::class)
+            ->and($second)->toBeNull()
+            ->and($other)->toBeInstanceOf(EmailAccessRequest::class)
+            ->and(EmailAccessRequest::query()->count())->toBe(2);
+        Notification::assertSentToTimes($this->owner, EmailAccessRequestedNotification::class, 2);
+    });
+
+    it('lets the owner answer a single email request with all their mail on its record', function (): void {
+        $asked = ownerEmailOn($this, $this->airbnb, 'renewal');
+        $sibling = ownerEmailOn($this, $this->airbnb, 'pricing');
+        $request = resolve(RequestEmailAccessAction::class)->execute($asked, $this->requester, EmailPrivacyTier::SUBJECT);
+
+        resolve(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner, $this->airbnb);
+
+        expect($request->fresh())
+            ->emailable_type->toBe($this->airbnb->getMorphClass())
+            ->emailable_id->toBe($this->airbnb->getKey())
+            ->status->toBe(EmailAccessRequestStatus::APPROVED)
+            ->and(EmailShare::query()->where('shared_with', $this->requester->getKey())->where('tier', EmailPrivacyTier::SUBJECT->value)->pluck('email_id')->sort()->values()->all())
+            ->toBe(collect([$asked->getKey(), $sibling->getKey()])->sort()->values()->all());
+    });
+
+    it('refuses to widen a request to a record its email is not on', function (): void {
+        $asked = ownerEmailOn($this, $this->airbnb, 'renewal');
+        $request = resolve(RequestEmailAccessAction::class)->execute($asked, $this->requester, EmailPrivacyTier::FULL);
+
+        expect(fn () => resolve(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner, $this->stripe))
+            ->toThrow(HttpException::class);
+
+        expect($request->fresh()->status)->toBe(EmailAccessRequestStatus::PENDING)
+            ->and(EmailShare::query()->count())->toBe(0);
+    });
+
+    it('logs each manual share and each record share', function (): void {
+        ownerEmailOn($this, $this->airbnb, 'renewal');
+        ownerEmailOn($this, $this->airbnb, 'pricing');
+        $request = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->airbnb, $this->owner, EmailPrivacyTier::FULL, null);
+        resolve(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner);
+
+        resolve(UpdateEmailSharingAction::class)->execute($this->email, $this->owner, EmailPrivacyTier::PRIVATE, [
+            ['shared_with' => $this->requester->id, 'tier' => EmailPrivacyTier::SUBJECT],
+        ]);
+
+        $shares = Activity::query()->where('log_name', Activity::EMAIL_ACCESS_LOG)->where('event', 'shared')->get();
+        $recordShare = $shares->firstWhere('subject_id', $request->getKey());
+        $manualShare = $shares->firstWhere('subject_id', $this->email->getKey());
+
+        expect($shares)->toHaveCount(2)
+            ->and($recordShare->properties->all())->toMatchArray(['record_type' => $this->airbnb->getMorphClass(), 'record_id' => $this->airbnb->getKey(), 'count' => 2])
+            ->and($manualShare->properties->all())->toMatchArray(['shared_with' => $this->requester->getKey(), 'tier' => EmailPrivacyTier::SUBJECT->value])
+            ->and($manualShare->causer_id)->toBe($this->owner->getKey());
+    });
+
+    it('denies a record request as stale once its record is gone', function (): void {
+        $request = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->airbnb, $this->owner, EmailPrivacyTier::FULL, null);
+        $this->airbnb->forceDelete();
+
+        expect(resolve(ApproveEmailAccessRequestAction::class)->execute($request, $this->owner))->toBeFalse()
+            ->and($request->fresh()->status)->toBe(EmailAccessRequestStatus::DENIED);
+    });
+
+    it('names the record and the count of mail in the owner notice', function (): void {
+        ownerEmailOn($this, $this->airbnb, 'renewal');
+        ownerEmailOn($this, $this->airbnb, 'pricing');
+        $request = resolve(RequestRecordEmailAccess::class)->execute($this->requester, $this->airbnb, $this->owner, EmailPrivacyTier::FULL, 'For the renewal call');
+
+        $mail = (new EmailAccessRequestedNotification($request))->toMail($this->owner);
+        $inbox = resolve(EmailAccessRequestSource::class)->find($this->owner, $this->workspace, $request->getKey());
+
+        expect($inbox?->title)->toBe("{$this->requester->name} asks for your 2 emails on Airbnb")
+            ->and($inbox?->body)->toBe('For the renewal call')
+            ->and(implode("\n", $mail->introLines))->toContain('emails on Airbnb')
+            ->and(implode("\n", $mail->introLines))->toContain('For the renewal call');
     });
 });
 
@@ -1029,3 +1209,16 @@ describe('email:expire-access-requests', function (): void {
             ->and($logged->first()->causer_id)->toBeNull();
     });
 });
+
+function ownerEmailOn(object $test, Company $company, string $conversationKey): Email
+{
+    $email = Email::factory()->private()->create([
+        'workspace_id' => $test->workspace->id,
+        'user_id' => $test->owner->id,
+        'connected_account_id' => $test->account->getKey(),
+        'conversation_key' => $conversationKey,
+    ]);
+    $email->companies()->attach($company->getKey(), ['link_source' => 'auto']);
+
+    return $email;
+}

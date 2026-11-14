@@ -155,11 +155,11 @@ it('re-stamps synced mail of this mailbox and keeps hand-set mail when the level
         ->and($customized->fresh()->privacy_tier)->toBe(EmailPrivacyTier::PRIVATE);
 });
 
-it('selects the inherited level when the mailbox has no level of its own', function (): void {
+it('caps the inherited level until the mailbox owner has answered sharing', function (): void {
     $this->workspace->update(['default_email_sharing_tier' => EmailPrivacyTier::SUBJECT]);
 
     livewire(EmailAccountSettingsPage::class, ['account' => $this->account->getKey()])
-        ->assertSet('data.sharing_tier', EmailPrivacyTier::SUBJECT->value)
+        ->assertSet('data.sharing_tier', EmailPrivacyTier::METADATA_ONLY->value)
         ->assertDontSee('Use workspace default');
 });
 

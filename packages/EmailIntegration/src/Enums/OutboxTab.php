@@ -6,7 +6,6 @@ namespace Relaticle\EmailIntegration\Enums;
 
 use Filament\Support\Contracts\HasLabel;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Models\Email;
 
 enum OutboxTab: string implements HasLabel
@@ -58,7 +57,7 @@ enum OutboxTab: string implements HasLabel
     {
         // An undo window and an assistant's hold are not scheduled sends, so the queued
         // segment shows both at once, matching the outbox badge.
-        $dueCutoff = now()->addSeconds(Config::integer('email-integration.outbox.undo_send_window_seconds'));
+        $dueCutoff = now()->addSeconds(UndoSendWindow::MAX);
 
         return match ($this) {
             self::SCHEDULED => $query->where('status', EmailStatus::QUEUED)

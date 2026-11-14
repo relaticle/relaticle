@@ -14,20 +14,20 @@ use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
-use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
-use Laravel\Ai\Exceptions\AiException;
 use Livewire\Attributes\On;
 use Relaticle\EmailIntegration\Actions\ApproveEmailAccessRequestAction;
+use Relaticle\EmailIntegration\Actions\CreateEmailFollowUp;
 use Relaticle\EmailIntegration\Actions\DenyEmailAccessRequestAction;
 use Relaticle\EmailIntegration\Actions\LinkEmailToRecord;
 use Relaticle\EmailIntegration\Actions\MarkEmailAsReadAction;
@@ -41,10 +41,8 @@ use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailShare;
-use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 use Relaticle\EmailIntegration\Queries\EmailLinkTargetsQuery;
-use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 
 /**
  * Sharing, summarize, and request-access actions for `x-email-integration::email-view`,
@@ -61,6 +59,15 @@ trait HasEmailReaderActions
 
     /** @var EloquentCollection<int, Email>|null */
     private ?EloquentCollection $copyConversation = null;
+
+    public function createEmailFollowUp(string $emailId): void
+    {
+        $user = $this->readerUser();
+        $email = Email::query()->forWorkspace($user->current_workspace_id)->whereKey($emailId)->firstOrFail();
+        resolve(CreateEmailFollowUp::class)->execute($user, $email);
+
+        Notification::make()->success()->title(__('filament/emails/composer.follow_up.created'))->send();
+    }
 
     /**
      * Open the reader on the host's selected copy. A copy below the body tier opens only
@@ -239,47 +246,14 @@ trait HasEmailReaderActions
             });
     }
 
-    protected function summarizeThreadAction(): Action
-    {
-        return Action::make('summarizeThread')
-            ->label(__('filament/pages/record-emails.actions.summarize_thread.label'))
-            ->icon('lucide-sparkles')
-            ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/record-emails.actions.summarize_thread.label'))
-            ->visible(function (mixed $record = null): bool {
-                if (! $record instanceof Email) {
-                    return true;
-                }
-
-                return $record->user_id === $this->readerUser()->getKey()
-                    || $this->readerUser()->can('viewBody', $record);
-            })
-            ->modalHeading(__('filament/pages/record-emails.actions.summarize_thread.modal_heading'))
-            ->modalIcon('lucide-sparkles')
-            ->modalSubmitAction(false)
-            ->modalCancelActionLabel(__('filament/emails/composer.actions.close'))
-            ->modalContent(function (array $arguments, mixed $record = null): View {
-                $email = $this->emailForReaderAction($record instanceof Email ? $record : null, $arguments, 'viewBody');
-
-                if (! $email instanceof Email) {
-                    return view('email-integration::filament.actions.ai-summary', ['summary' => null, 'failed' => false]);
-                }
-
-                return $this->buildThreadSummaryView($email);
-            });
-    }
-
     protected function requestAccessAction(): Action
     {
         return Action::make('requestAccess')
             ->label(__('filament/pages/record-emails.actions.request_access.label'))
             ->icon('lucide-key')
             ->color('gray')
-            ->iconButton()
-            ->extraAttributes(['class' => 'fi-email-reader-action'])
-            ->tooltip(__('filament/pages/record-emails.actions.request_access.label'))
+            ->button()
+            ->size(Size::Small)
             ->modalHeading(__('filament/pages/record-emails.actions.request_access.modal_heading'))
             ->modalWidth(Width::Large)
             ->visible(function (mixed $record = null, array $arguments = []): bool {
@@ -293,19 +267,7 @@ trait HasEmailReaderActions
 
                 return $this->canOpenRequestAccess($email);
             })
-            ->schema([
-                Radio::make('tier_requested')
-                    ->hiddenLabel()
-                    ->options([
-                        EmailPrivacyTier::SUBJECT->value => EmailPrivacyTier::SUBJECT->getLabel(),
-                        EmailPrivacyTier::FULL->value => EmailPrivacyTier::FULL->getLabel(),
-                    ])
-                    ->view('email-integration::forms.request-access-tier-cards')
-                    ->viewData([
-                        'ariaLabel' => __('filament/pages/record-emails.fields.tier_requested.label'),
-                    ])
-                    ->required(),
-            ])
+            ->schema($this->requestAccessSchema())
             ->action(function (array $data, array $arguments, mixed $record = null): void {
                 $email = $this->emailForReaderAction($record instanceof Email ? $record : null, $arguments, 'requestAccess');
 
@@ -317,6 +279,7 @@ trait HasEmailReaderActions
                     $data['tier_requested'] instanceof EmailPrivacyTier
                         ? $data['tier_requested']
                         : EmailPrivacyTier::from($data['tier_requested']),
+                    is_string($data['note'] ?? null) ? $data['note'] : null,
                 );
 
                 if (! $request instanceof EmailAccessRequest) {
@@ -333,6 +296,27 @@ trait HasEmailReaderActions
                     ->title(__('filament/pages/record-emails.notifications.access_request_sent.title'))
                     ->send();
             });
+    }
+
+    /** @return list<Radio|Textarea> */
+    private function requestAccessSchema(): array
+    {
+        return [
+            Radio::make('tier_requested')
+                ->hiddenLabel()
+                ->options([
+                    EmailPrivacyTier::SUBJECT->value => EmailPrivacyTier::SUBJECT->getLabel(),
+                    EmailPrivacyTier::FULL->value => EmailPrivacyTier::FULL->getLabel(),
+                ])
+                ->view('email-integration::forms.request-access-tier-cards')
+                ->viewData(['ariaLabel' => __('filament/pages/record-emails.fields.tier_requested.label')])
+                ->required(),
+            Textarea::make('note')
+                ->label(__('filament/pages/record-emails.fields.access_note.label'))
+                ->placeholder(__('filament/pages/record-emails.fields.access_note.placeholder'))
+                ->maxLength(EmailAccessRequest::NOTE_MAX_LENGTH)
+                ->rows(3),
+        ];
     }
 
     protected function linkRecordAction(): Action
@@ -626,29 +610,6 @@ trait HasEmailReaderActions
             ->orderBy('name')
             ->pluck('name', 'id')
             ->all();
-    }
-
-    private function buildThreadSummaryView(Email $email): View
-    {
-        $thread = EmailThread::query()
-            ->where('thread_id', $email->thread_id)
-            ->where('connected_account_id', $email->connected_account_id)
-            ->first();
-
-        if ($thread === null) {
-            return view('email-integration::filament.actions.ai-summary', ['summary' => null, 'failed' => false]);
-        }
-
-        try {
-            $summary = resolve(EmailThreadSummaryService::class)
-                ->getSummary($thread, $this->readerUser());
-        } catch (AiException|RequestException $exception) {
-            report($exception);
-
-            return view('email-integration::filament.actions.ai-summary', ['summary' => null, 'failed' => true]);
-        }
-
-        return view('email-integration::filament.actions.ai-summary', ['summary' => $summary, 'failed' => false]);
     }
 
     protected function approveAccessRequestAction(): Action

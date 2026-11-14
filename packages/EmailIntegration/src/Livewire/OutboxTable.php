@@ -22,7 +22,6 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Date;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -33,6 +32,7 @@ use Relaticle\EmailIntegration\Actions\RetryFailedEmailAction;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
+use Relaticle\EmailIntegration\Enums\UndoSendWindow;
 use Relaticle\EmailIntegration\Models\Email;
 use RuntimeException;
 
@@ -232,6 +232,6 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
     // shows both at once, matching the outbox badge.
     private function queuedDueCutoff(): CarbonInterface
     {
-        return now()->addSeconds(Config::integer('email-integration.outbox.undo_send_window_seconds'));
+        return now()->addSeconds(UndoSendWindow::MAX);
     }
 }

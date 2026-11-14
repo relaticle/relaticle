@@ -6,48 +6,32 @@ namespace Relaticle\EmailIntegration\Services;
 
 use App\Models\User;
 use Carbon\CarbonInterface;
-use Filament\Facades\Filament;
-use Relaticle\EmailIntegration\Agents\ThreadSummarizer;
+use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Models\AiSummary;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailLabel;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
-use Relaticle\EmailIntegration\Models\EmailThread;
-use RuntimeException;
+use Relaticle\EmailIntegration\Queries\ConversationsQuery;
 
 final readonly class EmailThreadSummaryService
 {
     public function __construct(
         private PrivacyService $privacy,
+        private ConversationsQuery $conversations,
     ) {}
 
-    /**
-     * Get or generate an AI summary for an email thread.
-     * Only includes messages and fields the viewer can see.
-     */
-    public function getSummary(EmailThread $thread, User $viewer, bool $regenerate = false): AiSummary
+    public function cached(User $viewer, EmailConversation $conversation, string $inputHash): ?AiSummary
     {
-        $prompt = $this->buildPrompt($thread, $viewer);
-        $inputHash = hash('sha256', $viewer->getKey()."\n".$prompt);
-
-        if (! $regenerate) {
-            $cached = $thread->aiSummary()->where('input_hash', $inputHash)->first();
-            if ($cached !== null) {
-                return $cached;
-            }
-        }
-
-        return $this->generateAndCache($thread, $prompt, $inputHash);
+        return AiSummary::query()->where('workspace_id', $viewer->current_workspace_id)
+            ->where('user_id', $viewer->getKey())->where('summarizable_type', $conversation->getMorphClass())
+            ->where('summarizable_id', $conversation->getKey())->where('input_hash', $inputHash)->first();
     }
 
-    private function buildPrompt(EmailThread $thread, User $viewer): string
+    public function prompt(User $viewer, string $conversationKey): string
     {
-        $emails = $thread->emails()
-            ->withRecordLinkState()
-            ->with(['from', 'participants', 'body', 'labels', 'shares'])
-            ->oldest('sent_at')
-            ->get();
+        $emails = $this->conversations->messages($viewer, $conversationKey)->load(['from', 'body', 'labels']);
 
         /** @var list<array{email: Email, tier: EmailPrivacyTier}> $entries */
         $entries = [];
@@ -64,7 +48,7 @@ final readonly class EmailThreadSummaryService
             $entries[] = ['email' => $email, 'tier' => $tier];
         }
 
-        $lines = $this->headerLines($entries);
+        $lines = $this->headerLines($entries, $viewer);
 
         foreach ($entries as $index => $entry) {
             $lines = [...$lines, ...$this->emailLines($index + 1, $entry['email'], $entry['tier'])];
@@ -77,7 +61,7 @@ final readonly class EmailThreadSummaryService
      * @param  list<array{email: Email, tier: EmailPrivacyTier}>  $entries
      * @return list<string>
      */
-    private function headerLines(array $entries): array
+    private function headerLines(array $entries, User $viewer): array
     {
         $subject = null;
         $earliest = null;
@@ -104,7 +88,9 @@ final readonly class EmailThreadSummaryService
             }
 
             foreach ($email->participants as $participant) {
-                $participantAddresses[] = $participant->email_address;
+                if ($participant->role !== EmailParticipantRole::BCC || $email->user_id === $viewer->getKey()) {
+                    $participantAddresses[] = $participant->email_address;
+                }
             }
         }
 
@@ -152,33 +138,5 @@ final readonly class EmailThreadSummaryService
         $lines[] = '';
 
         return $lines;
-    }
-
-    private function generateAndCache(EmailThread $thread, string $prompt, string $inputHash): AiSummary
-    {
-        $provider = (string) config('services.email_summary.provider');
-        $model = (string) config('services.email_summary.model');
-
-        $response = (new ThreadSummarizer)->prompt(
-            $prompt,
-            provider: $provider,
-            model: $model,
-        );
-
-        $workspaceId = Filament::getTenant()?->getKey();
-        throw_if($workspaceId === null, RuntimeException::class, 'No workspace context available for AI thread summary');
-
-        $thread->aiSummary()->delete();
-
-        return AiSummary::query()->create([
-            'workspace_id' => $workspaceId,
-            'summarizable_type' => $thread->getMorphClass(),
-            'summarizable_id' => $thread->getKey(),
-            'summary' => $response->text,
-            'input_hash' => $inputHash,
-            'model_used' => $model,
-            'prompt_tokens' => $response->usage->inputTokens,
-            'completion_tokens' => $response->usage->outputTokens,
-        ]);
     }
 }

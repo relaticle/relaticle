@@ -76,7 +76,7 @@ it('reads a conversation beside a live list and closes with Escape', function (s
     $first = drawerBrowserMessage($this->ownerMailbox, 'conv-first', 'brian@airbnb.test', ['subject' => 'Pricing for 40 seats']);
     drawerBrowserMessage($this->ownerMailbox, 'conv-second', 'kim@notion.test', ['subject' => 'Security questionnaire', 'sent_at' => now()->subHour()]);
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -103,7 +103,7 @@ it('lands a resolver link on the company tab with exactly one reader open', func
     $email = drawerBrowserMessage($this->ownerMailbox, 'conv-linked', 'brian@airbnb.test', ['subject' => 'Renewal terms']);
     $this->company->emails()->attach($email->id);
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate(route('email.open', $email, absolute: false))
@@ -120,7 +120,7 @@ it('folds the record details away while the drawer is open so a second row stays
     }
     $emails = (string) array_search(EmailsRelationManager::class, CompanyResource::getRelations(), true);
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->resize(1440, 900)
@@ -148,7 +148,7 @@ it('opens one reader when a record page switches from another tab to Emails', fu
     $notes = (string) array_search(NotesRelationManager::class, CompanyResource::getRelations(), true);
     $emails = (string) array_search(EmailsRelationManager::class, CompanyResource::getRelations(), true);
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/companies/{$this->company->id}?relation={$notes}&email={$email->id}")
@@ -166,7 +166,7 @@ it('opens a locked row at the gate with Request access', function (string $theme
     ]);
     $this->company->emails()->attach($email->id);
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -182,7 +182,7 @@ it('opens a locked row at the gate with Request access', function (string $theme
 it('fills the screen on a phone and saves a typed reply when it closes', function (string $theme): void {
     drawerBrowserMessage($this->ownerMailbox, 'conv-phone', 'brian@airbnb.test', ['subject' => 'Can we talk Monday']);
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->resize(390, 844)
@@ -209,7 +209,7 @@ it('saves a typed reply when Next opens another conversation and replies there',
     drawerBrowserMessage($this->ownerMailbox, 'conv-first', 'brian@airbnb.test', ['subject' => 'Pricing for 40 seats']);
     drawerBrowserMessage($this->ownerMailbox, 'conv-second', 'kim@notion.test', ['subject' => 'Security questionnaire', 'sent_at' => now()->subHour()]);
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->resize(1440, 900)

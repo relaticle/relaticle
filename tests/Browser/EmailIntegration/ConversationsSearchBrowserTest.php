@@ -59,7 +59,7 @@ it('finds a conversation by a body word', function (string $theme): void {
     searchBrowserMessage($this->mailbox, 'conv-orchard', 'brian@airbnb.com', 'Orchard update', 'The kumquat harvest is late');
     searchBrowserMessage($this->mailbox, 'conv-pricing', 'olivia@stripe.com', 'Pricing for 40 seats', 'Our floor is 18 dollars');
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -79,7 +79,7 @@ it('turns a typed operator into a chip and back into text when edited', function
     searchBrowserMessage($this->mailbox, 'conv-airbnb', 'brian@airbnb.com', 'Pricing', 'Seats');
     searchBrowserMessage($this->mailbox, 'conv-stripe', 'olivia@stripe.com', 'Pricing', 'Seats');
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -101,7 +101,7 @@ it('turns a typed operator into a chip and back into text when edited', function
 it('keeps search and chips in the url across reload and scrolls the chips on a phone', function (string $theme): void {
     searchBrowserMessage($this->mailbox, 'conv-airbnb', 'brian@airbnb.com', 'Pricing', 'Seats');
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->navigate("/app/{$this->workspace->slug}/email?view=all")

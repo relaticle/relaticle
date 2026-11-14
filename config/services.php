@@ -62,11 +62,6 @@ return [
         'invite_url' => env('DISCORD_INVITE_URL'),
     ],
 
-    'email_summary' => [
-        'provider' => env('EMAIL_SUMMARY_PROVIDER', 'openai'),
-        'model' => env('EMAIL_SUMMARY_MODEL', 'gpt-4o-mini'),
-    ],
-
     'gmail' => [
         'client_id' => env('GMAIL_CLIENT_ID'),
         'client_secret' => env('GMAIL_CLIENT_SECRET'),

@@ -31,7 +31,7 @@ trait RunsMailboxSteps
 
     public function saveSharing(): void
     {
-        $this->validate(['sharingTier' => ['required', Rule::enum(EmailPrivacyTier::class)->only(SaveOnboardingSharing::OFFERED_TIERS)]]);
+        $this->validate(['sharingTier' => ['required', Rule::enum(EmailPrivacyTier::class)->only(EmailPrivacyTier::offeredAtConnect())]]);
 
         resolve(SaveOnboardingSharing::class)->execute($this->authUser(), $this->workspace, EmailPrivacyTier::from($this->sharingTier));
     }
@@ -122,7 +122,7 @@ trait RunsMailboxSteps
      */
     public function sharingOptions(): array
     {
-        return collect(SaveOnboardingSharing::OFFERED_TIERS)
+        return collect(EmailPrivacyTier::offeredAtConnect())
             ->mapWithKeys(fn (EmailPrivacyTier $tier): array => [$tier->value => [
                 'label' => $tier->getLabel(),
                 'description' => $tier->getDescription(),
@@ -175,7 +175,7 @@ trait RunsMailboxSteps
             ? resolve(PrivacyService::class)->tierForMailbox($mailbox)
             : EmailPrivacyTier::METADATA_ONLY;
 
-        return in_array($effective, SaveOnboardingSharing::OFFERED_TIERS, true) ? $effective->value : EmailPrivacyTier::METADATA_ONLY->value;
+        return in_array($effective, EmailPrivacyTier::offeredAtConnect(), true) ? $effective->value : EmailPrivacyTier::METADATA_ONLY->value;
     }
 
     private function mailboxProgress(): string

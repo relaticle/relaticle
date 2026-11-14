@@ -3,35 +3,47 @@
 declare(strict_types=1);
 
 use App\Enums\WorkspaceRole;
+use App\Features\Billing;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Filament\Notifications\NotificationMailbox;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
+use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Relaticle\Chat\Actions\OpenEmailRelaConversation;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Agents\EmailDrafter;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Jobs\WriteRelaEmailDraft;
+use Relaticle\Chat\Livewire\Chat\EmailRelaDraft;
+use Relaticle\Chat\Livewire\Chat\EmailRelaSlot;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\PlanReference;
 use Relaticle\Chat\Support\ResolvedActionText;
+use Relaticle\Chat\Support\TurnPresence;
 use Relaticle\Chat\Tools\Email\CancelEmailTool;
 use Relaticle\Chat\Tools\Email\CreateEmailDraftTool;
 use Relaticle\Chat\Tools\Email\DeleteEmailDraftTool;
@@ -39,6 +51,7 @@ use Relaticle\Chat\Tools\Email\GetEmailTool;
 use Relaticle\Chat\Tools\Email\LinkEmailsTool;
 use Relaticle\Chat\Tools\Email\ListEmailAccountsTool;
 use Relaticle\Chat\Tools\Email\ListEmailsTool;
+use Relaticle\Chat\Tools\Email\RequestEmailAccessTool;
 use Relaticle\Chat\Tools\Email\RescheduleEmailTool;
 use Relaticle\Chat\Tools\Email\RetryEmailTool;
 use Relaticle\Chat\Tools\Email\SendEmailDraftTool;
@@ -50,26 +63,32 @@ use Relaticle\EmailIntegration\Actions\LinkAssistantEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
+use Relaticle\EmailIntegration\Actions\RefreshConversationSummary;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveAssistantEmailDraft;
+use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
 use Relaticle\EmailIntegration\Actions\SendAssistantEmail;
 use Relaticle\EmailIntegration\Actions\UnlinkAssistantEmail;
 use Relaticle\EmailIntegration\Data\AgentConnection;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailCreationSource;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Livewire\EmailAccessNotificationHandler;
+use Relaticle\EmailIntegration\Livewire\EmailComposer;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
+use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
 use Relaticle\EmailIntegration\Models\EmailBody;
 use Relaticle\EmailIntegration\Models\EmailLinkSuppression;
 use Relaticle\EmailIntegration\Models\EmailParticipant;
 use Relaticle\EmailIntegration\Models\EmailShare;
 use Relaticle\EmailIntegration\Models\EmailSignature;
+use Relaticle\EmailIntegration\Services\EmailThreadSummaryService;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SendEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, SaveAssistantEmailDraft::class, SaveAgentEmailDraft::class, PrepareAgentEmailDraft::class, SendEmailTool::class, SendAssistantEmail::class, PrepareAgentEmail::class, LinkEmailsTool::class, UnlinkEmailsTool::class, LinkAssistantEmail::class, UnlinkAssistantEmail::class);
@@ -116,6 +135,180 @@ beforeEach(function (): void {
 
         return $email;
     };
+});
+
+it('writes a queued Rela draft without sending and preserves the subject recipients and signature', function (): void {
+    Queue::fake();
+    $this->actingAs($this->viewer);
+    $draft = resolve(SaveEmailDraftAction::class)->execute($this->viewer, [
+        'connected_account_id' => $this->viewerAccount->id,
+        'subject' => 'Our agreed subject',
+        'body_html' => '<p>Rough notes</p><div data-type="customBlock" data-id="signature" data-config="{}"></div>',
+        'to' => ['client@acme.test'], 'cc' => ['assistant@acme.test'], 'bcc' => [],
+    ]);
+    EmailDrafter::fake([['subject' => 'Changed subject', 'body_markdown' => 'Tuesday at 10 works.']]);
+    $component = Livewire::test(EmailRelaDraft::class, ['composerId' => 'composer-a'])
+        ->set('instruction', 'Accept Tuesday')
+        ->dispatch('composer:autosaved', composerId: 'composer-a', draftId: $draft->id, draftVersion: $draft->draft_version)
+        ->assertSet('state', 'working');
+    $job = Queue::pushed(WriteRelaEmailDraft::class)->first();
+    app()->call($job->handle(...));
+    $component->call('check')->assertSet('state', 'done')->assertDispatched('composer:rela-finished');
+    $draft->refresh()->load(['body', 'participants']);
+    expect($draft->status)->toBe(EmailStatus::DRAFT)
+        ->and($draft->subject)->toBe('Our agreed subject')
+        ->and($draft->body->body_html)->toContain('Tuesday at 10 works.', 'data-id="signature"')
+        ->and($draft->participants->where('role', EmailParticipantRole::CC)->pluck('email_address')->all())->toBe(['assistant@acme.test'])
+        ->and(Email::query()->whereIn('status', [EmailStatus::QUEUED, EmailStatus::SENDING, EmailStatus::SENT])->count())->toBe(0)
+        ->and(PendingAction::query()->count())->toBe(0);
+    Livewire::test(EmailRelaDraft::class, ['composerId' => 'reopened', 'currentDraftId' => $draft->id])
+        ->assertSee(__('filament/emails/composer.rela.done'));
+});
+
+it('keeps a users newer draft when Rela finishes and ignores another composers autosave', function (): void {
+    Queue::fake();
+    $this->actingAs($this->viewer);
+    $data = ['connected_account_id' => $this->viewerAccount->id, 'subject' => 'Renewal', 'body_html' => '<p>First</p>', 'to' => ['client@acme.test'], 'cc' => [], 'bcc' => []];
+    $draft = resolve(SaveEmailDraftAction::class)->execute($this->viewer, $data);
+    $component = Livewire::test(EmailRelaDraft::class, ['composerId' => 'composer-a'])->set('instruction', 'Accept Tuesday');
+    $component->dispatch('composer:autosaved', composerId: 'composer-b', draftId: $draft->id, draftVersion: 0)->assertSet('state', 'idle');
+    Queue::assertNotPushed(WriteRelaEmailDraft::class);
+    $component->dispatch('composer:autosaved', composerId: 'composer-a', draftId: $draft->id, draftVersion: 0);
+    resolve(SaveEmailDraftAction::class)->execute($this->viewer, [...$data, 'body_html' => '<p>My newer words</p>'], $draft->id, 0);
+    EmailDrafter::fake([['subject' => null, 'body_markdown' => 'Obsolete words']]);
+    $job = Queue::pushed(WriteRelaEmailDraft::class)->first();
+    app()->call($job->handle(...));
+    $component->call('check')->assertSet('state', 'failed');
+    expect($draft->fresh()->body->body_html)->toBe('<p>My newer words</p>');
+    EmailDrafter::assertNeverPrompted();
+});
+
+it('refunds a Rela draft changed during generation or rejected by the provider', function (bool $providerFails): void {
+    Feature::define(Billing::class, true);
+    Queue::fake();
+    $this->actingAs($this->viewer);
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->id], ['credits_remaining' => 25, 'credits_used' => 0]);
+    $data = ['connected_account_id' => $this->viewerAccount->id, 'subject' => 'Renewal', 'body_html' => '<p>Original</p>', 'to' => ['client@acme.test'], 'cc' => [], 'bcc' => []];
+    $draft = resolve(SaveEmailDraftAction::class)->execute($this->viewer, $data);
+    EmailDrafter::fake(function () use ($providerFails, $draft, $data): array {
+        if ($providerFails) {
+            throw new RuntimeException('Provider unavailable');
+        }
+        resolve(SaveEmailDraftAction::class)->execute($this->viewer, [...$data, 'body_html' => '<p>Newer edit</p>'], $draft->id, 0);
+
+        return ['subject' => null, 'body_markdown' => 'Do not replace the newer edit'];
+    });
+    $component = Livewire::test(EmailRelaDraft::class, ['composerId' => 'draft-cas'])->set('instruction', 'Rewrite this')
+        ->dispatch('composer:autosaved', composerId: 'draft-cas', draftId: $draft->id, draftVersion: 0);
+    app()->call(Queue::pushed(WriteRelaEmailDraft::class)->first()->handle(...));
+    $component->call('check')->assertSet('state', 'failed');
+
+    expect($draft->fresh()->body->body_html)->toBe($providerFails ? '<p>Original</p>' : '<p>Newer edit</p>')
+        ->and(AiCreditBalance::query()->where('workspace_id', $this->workspace->id)->sole()->credits_remaining)->toBe(25)
+        ->and(AiCreditTransaction::query()->where('type', AiCreditType::Draft)->exists())->toBeFalse();
+})->with([false, true]);
+
+describe('Rela email review', function (): void {
+    beforeEach(function (): void {
+        Queue::fake();
+        $this->actingAs($this->viewer);
+        Filament::setTenant($this->workspace);
+        $this->reviewEmail = ($this->emailFrom)($this->viewer, ['conversation_key' => hash('sha256', 'review'), 'privacy_tier' => EmailPrivacyTier::FULL]);
+        EmailBody::factory()->create(['email_id' => $this->reviewEmail->id]);
+        EmailParticipant::factory()->create(['email_id' => $this->reviewEmail->id, 'role' => EmailParticipantRole::TO, 'email_address' => $this->viewer->email]);
+        resolve(RefreshConversationSummary::class)->execute($this->workspace->id, $this->reviewEmail->conversation_key, broadcast: false);
+        AiCreditBalance::query()->updateOrCreate(['workspace_id' => $this->workspace->id], ['credits_remaining' => 25, 'credits_used' => 0]);
+    });
+
+    it('queues one review turn and excludes sending and deleting tools', function (): void {
+        $slot = Livewire::test(EmailRelaSlot::class, ['conversationKey' => $this->reviewEmail->conversation_key]);
+        $slot->call('suggest')->call('suggest');
+        Queue::assertPushed(ProcessChatMessage::class, 1);
+        CrmAssistant::fake(['Here are the next steps.']);
+        Queue::pushed(ProcessChatMessage::class)->first()->handle(resolve(CreditService::class));
+        CrmAssistant::assertPrompted(function ($prompt): bool {
+            $classes = array_map(fn (object $tool): string => $tool::class, $prompt->agent->tools());
+
+            return $prompt->agent->emailReviewMode && in_array(CreateEmailDraftTool::class, $classes, true)
+                && ! in_array(SendEmailTool::class, $classes, true) && ! in_array(DeleteEmailDraftTool::class, $classes, true);
+        });
+    });
+
+    it('waits for the complete review plan before showing approval controls', function (): void {
+        $conversation = resolve(OpenEmailRelaConversation::class)->execute($this->viewer, $this->reviewEmail->conversation_key);
+        $turn = (string) Str::ulid();
+        TurnPresence::begin($conversation->id, $turn, 'Review', origin: MessageOrigin::EmailReview);
+        proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [[
+            'connected_account_id' => $this->viewerAccount->id, 'subject' => 'Re: Renewal', 'to' => ['client@acme.test'], 'body' => 'Tuesday works.', 'in_reply_to_email_id' => $this->reviewEmail->id,
+        ]], $conversation->id, $turn);
+
+        $slot = Livewire::test(EmailRelaSlot::class, ['conversationKey' => $this->reviewEmail->conversation_key])
+            ->assertSet('reviewing', true)->assertDontSee('Draft, not sent');
+        TurnPresence::clear($conversation->id, $turn);
+        $slot->call('check')->assertSet('reviewing', false)->assertSee('Draft, not sent');
+    });
+
+    it('shows teammate replies received as inbound copies as the last message from us without AI', function (): void {
+        $this->travelTo(now()->setDate(2026, 11, 13)->setTime(12, 0));
+        $this->reviewEmail->update(['sent_at' => now()->subDays(5)]);
+        $reply = ($this->emailFrom)($this->viewer, [
+            'conversation_key' => $this->reviewEmail->conversation_key,
+            'direction' => EmailDirection::INBOUND,
+            'sent_at' => now()->subDays(3),
+        ], $this->coworker->email);
+        config(['chat.models' => [], 'self-hosted-ai.models' => []]);
+        app()->forgetInstance(ModelRegistry::class);
+
+        Livewire::test(EmailRelaSlot::class, ['conversationKey' => $this->reviewEmail->conversation_key])
+            ->assertViewHas('facts', fn (array $facts): bool => $facts['last_from_us'] === $reply->sent_at->toIso8601String() && $facts['waiting_days'] === 3)
+            ->assertDontSee(__('filament/emails/composer.rela.suggest'));
+    });
+
+    it('refuses a review approval after another message arrives', function (): void {
+        $conversation = resolve(OpenEmailRelaConversation::class)->execute($this->viewer, $this->reviewEmail->conversation_key);
+        $conversation->update(['email_input_hash' => hash('sha256', resolve(EmailThreadSummaryService::class)->prompt($this->viewer, $this->reviewEmail->conversation_key))]);
+        $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [[
+            'connected_account_id' => $this->viewerAccount->id, 'subject' => 'Re: Renewal', 'to' => ['client@acme.test'], 'body' => 'Tuesday works.', 'in_reply_to_email_id' => $this->reviewEmail->id,
+        ]], $conversation->id));
+        ($this->emailFrom)($this->viewer, ['conversation_key' => $this->reviewEmail->conversation_key, 'sent_at' => now()->addMinute()]);
+
+        expect(fn (): mixed => resolve(PendingActionService::class)->approve($pending, $this->viewer))->toThrow(ValidationException::class);
+        expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
+    });
+
+    it('opens an approved reader reply as a draft without sending or resuming', function (): void {
+        $conversation = resolve(OpenEmailRelaConversation::class)->execute($this->viewer, $this->reviewEmail->conversation_key);
+        $conversation->update(['email_input_hash' => hash('sha256', resolve(EmailThreadSummaryService::class)->prompt($this->viewer, $this->reviewEmail->conversation_key))]);
+        $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [[
+            'connected_account_id' => $this->viewerAccount->id, 'subject' => 'Re: Renewal', 'to' => ['client@acme.test'], 'body' => 'Tuesday works.', 'in_reply_to_email_id' => $this->reviewEmail->id,
+        ]], $conversation->id, (string) Str::ulid()));
+
+        Livewire::test(ProposalCard::class, ['pendingActionId' => $pending->id, 'context' => 'email-reader'])
+            ->call('createCurrent')->assertDispatched('composer:resume-draft', emailId: $this->reviewEmail->id);
+
+        Livewire::test(EmailComposer::class, ['dock' => 'inline'])
+            ->dispatch('composer:resume-draft', emailId: $this->reviewEmail->id)
+            ->assertSet('isOpen', true)
+            ->assertSet('draftId', Email::query()->where('status', EmailStatus::DRAFT)->sole()->id);
+
+        expect(Email::query()->where('status', EmailStatus::DRAFT)->sole()->body->body_html)->toContain('Tuesday works.');
+        Queue::assertNotPushed(ProcessChatMessage::class);
+    });
+
+    it('refuses a reader draft with no source or a copied-only source', function (bool $ccOnly): void {
+        if ($ccOnly) {
+            $this->reviewEmail->participants()->where('role', EmailParticipantRole::TO)->update(['role' => EmailParticipantRole::CC]);
+        }
+        $conversation = resolve(OpenEmailRelaConversation::class)->execute($this->viewer, $this->reviewEmail->conversation_key);
+        $conversation->update(['email_input_hash' => hash('sha256', resolve(EmailThreadSummaryService::class)->prompt($this->viewer, $this->reviewEmail->conversation_key))]);
+        $pending = pendingChatEmail(proposeChatEmails($this->viewer, CreateEmailDraftTool::class, [[
+            'connected_account_id' => $this->viewerAccount->id, 'subject' => 'Re: Renewal', 'to' => ['client@acme.test'], 'body' => 'Tuesday works.',
+            ...($ccOnly ? ['in_reply_to_email_id' => $this->reviewEmail->id] : []),
+        ]], $conversation->id));
+
+        expect(fn (): mixed => resolve(PendingActionService::class)->approve($pending, $this->viewer))->toThrow(ValidationException::class);
+        expect(Email::query()->where('status', EmailStatus::DRAFT)->exists())->toBeFalse();
+    })->with([false, true]);
 });
 
 /**
@@ -995,7 +1188,7 @@ it('queues one email in the undo window and shows the undo toast when the card i
     resolve(PendingActionService::class)->approve($pending, $this->viewer);
 
     $email = Email::query()->sole();
-    $undoWindow = config('email-integration.outbox.undo_send_window_seconds');
+    $undoWindow = 10;
 
     $toast = flashedNotifications()->sole();
 
@@ -1788,14 +1981,15 @@ describe('an email card', function (): void {
     it('leaves no email and a pending card when the undo toast cannot be built', function (): void {
         $pending = ($this->sendCard)();
 
-        Event::listen('eloquent.created: '.Email::class, fn () => config(['email-integration.outbox.undo_send_window_seconds' => 'not-a-number']));
+        $this->mock(NotificationMailbox::class)
+            ->shouldReceive('push')->andThrow(new InvalidArgumentException('The notification mailbox is unavailable.'));
 
         expect(fn () => resolve(PendingActionService::class)->approve($pending, $this->viewer))->toThrow(InvalidArgumentException::class)
             ->and(Email::query()->count())->toBe(0)
             ->and($pending->fresh()->status)->toBe(PendingActionStatus::Pending);
     });
 
-    it('ends cancelled when the user presses undo on the toast of a chat send', function (): void {
+    it('reopens a draft when the user presses undo on the toast of a chat send', function (): void {
         $this->travelTo(now()->startOfSecond());
 
         resolve(PendingActionService::class)->approve(($this->sendCard)(), $this->viewer);
@@ -1806,7 +2000,7 @@ describe('an email card', function (): void {
             ->dispatch('undo-queued-send', emailId: (string) $email->getKey())
             ->assertDispatched('outbox:changed');
 
-        expect($email->fresh()->status)->toBe(EmailStatus::CANCELLED);
+        expect($email->fresh()->status)->toBe(EmailStatus::DRAFT);
     });
 
     it('stays pending with the outbox message when the outbox is full', function (): void {
@@ -2063,6 +2257,47 @@ it('keeps a teammate email no record links to away from the assistant', function
     expect(array_column(chatEmailTool($this->viewer, ListEmailsTool::class)['items'], 'id'))->toBe([$linked->id])
         ->and(chatEmailTool($this->viewer, GetEmailTool::class, ['id' => $unlinked->id]))->toBe(['error' => 'Email not found.'])
         ->and(chatEmailTool($this->coworker, ListEmailsTool::class)['items'])->toHaveCount(2);
+});
+
+describe('requesting email access', function (): void {
+    it('requests access only after approval and keeps locked subjects out of the proposal', function (): void {
+        $first = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY, 'subject' => 'Confidential pricing']);
+        $second = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::SUBJECT, 'subject' => 'Renewal']);
+
+        $proposal = proposeChatEmails($this->viewer, RequestEmailAccessTool::class, [
+            ['email_id' => $first->id, 'note' => 'Preparing the renewal'],
+            ['email_id' => $second->id, 'tier_requested' => 'full'],
+        ]);
+
+        expect(json_encode($proposal))->not->toContain('Confidential pricing');
+        expect(EmailAccessRequest::query()->count())->toBe(0);
+
+        $pending = pendingChatEmail($proposal);
+        resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 0);
+        resolve(PendingActionService::class)->approveItem($pending, $this->viewer, 1);
+
+        expect(EmailAccessRequest::query()->pluck('email_id')->all())->toEqualCanonicalizing([$first->id, $second->id]);
+        $this->assertDatabaseHas('email_access_requests', ['email_id' => $first->id, 'requester_id' => $this->viewer->id, 'tier_requested' => 'full', 'note' => 'Preparing the renewal']);
+    });
+
+    it('does not propose requests for private or fully readable mail', function (EmailPrivacyTier $tier): void {
+        $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => $tier]);
+
+        $result = proposeChatEmails($this->viewer, RequestEmailAccessTool::class, [['email_id' => $email->id]]);
+
+        expect($result['error'])->toContain('visible email');
+        expect(PendingAction::query()->count())->toBe(0);
+    })->with([EmailPrivacyTier::PRIVATE, EmailPrivacyTier::FULL]);
+
+    it('rechecks visibility before notifying the owner', function (): void {
+        $email = ($this->emailFrom)($this->coworker, ['privacy_tier' => EmailPrivacyTier::METADATA_ONLY]);
+        $proposal = proposeChatEmails($this->viewer, RequestEmailAccessTool::class, [['email_id' => $email->id]]);
+        $email->update(['privacy_tier' => EmailPrivacyTier::PRIVATE]);
+
+        expect(fn (): mixed => resolve(PendingActionService::class)->approve(pendingChatEmail($proposal), $this->viewer))
+            ->toThrow(ValidationException::class, 'visible email');
+        expect(EmailAccessRequest::query()->count())->toBe(0);
+    });
 });
 
 describe('linking email to records', function (): void {

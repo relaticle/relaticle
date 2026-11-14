@@ -7,6 +7,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 use Relaticle\Chat\Livewire\App\Chat\ChatSidePanel;
+use Relaticle\Chat\Queries\ConversationsQuery;
 
 mutates(ChatSidePanel::class);
 
@@ -99,4 +100,14 @@ it('no longer renders the credit balance footer', function (): void {
         ->set('isOpen', true)
         ->assertDontSee('Upgrade to Pro')
         ->assertDontSee('Buy more credits');
+});
+
+it('keeps email review conversations out of history and search', function (): void {
+    sidePanelConversation($this->user, 'ordinary-chat', 'Renewal planning');
+    sidePanelConversation($this->user, 'email-review', 'Renewal email review');
+    DB::table('agent_conversations')->where('id', 'email-review')->update(['purpose' => 'email']);
+
+    $queries = resolve(ConversationsQuery::class);
+    expect($queries->recent($this->user)->pluck('id')->all())->toBe(['ordinary-chat'])
+        ->and($queries->search($this->user, 'Renewal')->pluck('id')->all())->toBe(['ordinary-chat']);
 });

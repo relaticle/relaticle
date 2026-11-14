@@ -1,9 +1,9 @@
 <x-filament-panels::page class="fi-edge-to-edge-page">
-    @unless ($this->hasConnectedMailbox)
+    @if ($this->connectState->showsCard())
         <x-email-integration::not-connected
             compact
-            :heading="__('filament/pages/email-accounts.not_connected.inbox.heading')"
-            :description="__('filament/pages/email-accounts.not_connected.inbox.description')"
+            :state="$this->connectState"
+            :sharing-url="$this->sharingStepUrl"
             :action="$this->connectMailboxAction"
             :secondary-action="$this->connectAzureAction"
         />
@@ -12,7 +12,7 @@
             :mailboxes="$this->unhealthyMailboxes"
             class="border-b border-gray-200/60 dark:border-white/10"
         />
-    @endunless
+    @endif
 
     @if ($this->showsConversations)
         <x-email-integration::live-conversations :user-id="auth()->id()" :workspace-id="filament()->getTenant()?->getKey()" />
@@ -149,6 +149,7 @@
                                 replyAll: () => this.reply('reply_all'),
                                 forward: () => this.reply('forward'),
                                 link: reader('link'),
+                                summarize: () => window.dispatchEvent(new CustomEvent('rela:summarize')),
                             },
                             isActive: () => document.querySelector('[data-email-reader]') !== null,
                         }),

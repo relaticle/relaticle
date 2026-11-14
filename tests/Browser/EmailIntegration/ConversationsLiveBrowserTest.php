@@ -66,7 +66,7 @@ function liveBrowserSignal(string $workspaceId, string $key): string
 it('subscribes to the user channel on the emails page', function (string $theme): void {
     liveBrowserBroadcasting();
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email")
         ->assertPresent('[data-live-conversations]')
@@ -78,7 +78,7 @@ it('subscribes to the user channel on the emails page', function (string $theme)
 it('refreshes once for a burst of signals', function (string $theme): void {
     liveBrowserBroadcasting();
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email")
         ->assertPresent('[data-live-conversations]')
@@ -97,7 +97,7 @@ it('refreshes once for a burst of signals', function (string $theme): void {
 it('keeps refreshing at most once per 750 ms while signals keep arriving', function (string $theme): void {
     liveBrowserBroadcasting();
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email")
         ->assertPresent('[data-live-conversations]')
@@ -116,7 +116,7 @@ it('binds the listener once after navigating away and back', function (string $t
     liveBrowserBroadcasting();
     $bindings = "(() => { const name = Object.keys(window.Echo.connector.channels).find((channel) => channel.startsWith('private-App.Models.User.')); return (window.Echo.connector.channels[name].subscription.callbacks.get('email.conversation.changed') ?? []).length })()";
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email")
         ->assertPresent('[data-live-conversations]')
@@ -134,7 +134,7 @@ it('binds the listener once after navigating away and back', function (string $t
 it('ignores a signal for another workspace', function (string $theme): void {
     liveBrowserBroadcasting();
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email")
         ->assertPresent('[data-live-conversations]')
@@ -147,7 +147,7 @@ it('ignores a signal for another workspace', function (string $theme): void {
 it('boots without errors when broadcasting is off', function (string $theme): void {
     config(['filament.broadcasting' => []]);
 
-    loginViaBrowser($this->owner, $theme)
+    visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->navigate("/app/{$this->workspace->slug}/email")
         ->assertPresent('[data-live-conversations]')

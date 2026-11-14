@@ -9,8 +9,11 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Resources\Resource as FilamentResource;
+use Filament\Support\Enums\Width;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
@@ -21,11 +24,14 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Relaticle\EmailIntegration\Actions\RequestRecordEmailAccess;
 use Relaticle\EmailIntegration\Data\ConversationFilters;
 use Relaticle\EmailIntegration\Data\ConversationPage;
 use Relaticle\EmailIntegration\Data\ConversationRow;
 use Relaticle\EmailIntegration\Enums\ConversationView;
+use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\MailboxConnectState;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationReader;
 use Relaticle\EmailIntegration\Filament\Concerns\HasConversationsFlag;
@@ -36,6 +42,7 @@ use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Queries\ConversationsQuery;
+use Relaticle\EmailIntegration\Queries\RecordEmailAccessQuery;
 use Relaticle\EmailIntegration\Services\EmailSearchService;
 use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
@@ -47,6 +54,7 @@ use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
  * @property-read bool $showsConversations
  * @property-read Email|null $selectedEmail
  * @property-read Collection<int, EmailAccessRequest> $pendingAccessRequests
+ * @property-read Collection<int, array{owner: User, count: int, pending: bool}> $recordAccessOwners
  */
 abstract class BaseEmailsRelationManager extends RelationManager
 {
@@ -267,6 +275,15 @@ abstract class BaseEmailsRelationManager extends RelationManager
             ->doesntExist();
     }
 
+    #[Computed]
+    public function connectState(): MailboxConnectState
+    {
+        $workspace = filament()->getTenant();
+        $state = MailboxConnectState::for($this->authUser(), $workspace instanceof Workspace ? $workspace : null);
+
+        return $state === MailboxConnectState::NoProvider ? $state : MailboxConnectState::NotConnected;
+    }
+
     /** @return EloquentCollection<int, ConnectedAccount> */
     #[Computed]
     public function unhealthyMailboxes(): EloquentCollection
@@ -347,6 +364,77 @@ abstract class BaseEmailsRelationManager extends RelationManager
         }
 
         return $email;
+    }
+
+    /** @return Collection<int, array{owner: User, count: int, pending: bool}> */
+    #[Computed]
+    public function recordAccessOwners(): Collection
+    {
+        $viewer = $this->authUser();
+        $record = $this->ownerRecordWithEmails();
+
+        if ($this->hidesRecordMailbox()) {
+            return new Collection;
+        }
+
+        $counts = resolve(RecordEmailAccessQuery::class)->lockedCountsByOwner($viewer, $record)
+            ->filter(fn (int $count): bool => $count >= 2)->all();
+        $owners = User::query()->inWorkspace((string) $record->workspace_id)->whereKey(array_keys($counts))->get();
+        $pending = EmailAccessRequest::query()->open()
+            ->where('workspace_id', $record->workspace_id)
+            ->whereNull('email_id')
+            ->where('emailable_type', $record->getMorphClass())
+            ->where('emailable_id', $record->getKey())
+            ->where('requester_id', $viewer->getKey())
+            ->pluck('owner_id')->all();
+
+        return $owners
+            ->map(fn (User $owner): array => [
+                'owner' => $owner,
+                'count' => $counts[$owner->getKey()],
+                'pending' => in_array($owner->getKey(), $pending, true),
+            ])->sortByDesc('count')->values();
+    }
+
+    public function requestRecordAccessAction(): Action
+    {
+        return Action::make('requestRecordAccess')
+            ->label(__('filament/pages/record-emails.actions.request_access.label'))
+            ->modalHeading(fn (array $arguments): string => __('filament/pages/record-emails.actions.request_record_access.modal_heading', [
+                'name' => $this->recordAccessOwner($arguments)?->name,
+                'record' => $this->ownerRecordWithEmails()->name,
+            ]))
+            ->modalWidth(Width::Large)
+            ->schema($this->requestAccessSchema())
+            ->action(function (array $data, array $arguments): void {
+                $owner = $this->recordAccessOwner($arguments);
+                abort_unless($owner instanceof User, 403);
+
+                $request = resolve(RequestRecordEmailAccess::class)->execute(
+                    $this->authUser(), $this->ownerRecordWithEmails(), $owner,
+                    $data['tier_requested'] instanceof EmailPrivacyTier ? $data['tier_requested'] : EmailPrivacyTier::from($data['tier_requested']),
+                    is_string($data['note'] ?? null) ? $data['note'] : null,
+                );
+                unset($this->recordAccessOwners);
+
+                if (! $request instanceof EmailAccessRequest) {
+                    Notification::make()->warning()->title(__('filament/pages/record-emails.notifications.pending_record_request.title'))->send();
+
+                    return;
+                }
+
+                Notification::make()->success()->title(__('filament/pages/record-emails.notifications.access_request_sent.title'))->send();
+            });
+    }
+
+    /** @param array<string, mixed> $arguments */
+    private function recordAccessOwner(array $arguments): ?User
+    {
+        $ownerId = $arguments['ownerId'] ?? null;
+
+        return is_string($ownerId)
+            ? ($this->recordAccessOwners->first(fn (array $bar): bool => (string) $bar['owner']->getKey() === $ownerId)['owner'] ?? null)
+            : null;
     }
 
     /**

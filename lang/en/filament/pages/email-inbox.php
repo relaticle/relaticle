@@ -322,6 +322,10 @@ return [
             'undo' => 'Undo',
             'select' => 'Select conversation',
             'link' => 'Link record',
+            'send' => 'Send email',
+            'send_later' => 'Send later',
+            'draft_with_rela' => 'Draft with Rela',
+            'summarize' => 'Summarize conversation',
         ],
         'scopes' => [
             'list' => 'Conversation list',

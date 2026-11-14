@@ -13,6 +13,7 @@ use App\Notifications\InboxNotification;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Notifications\Messages\MailMessage;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
+use Relaticle\EmailIntegration\Filament\Pages\EmailAccessRequestsPage;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
 use Relaticle\EmailIntegration\Support\MarkdownText;
 
@@ -62,6 +63,13 @@ final class EmailAccessRespondedNotification extends InboxNotification
         $mail = (new MailMessage)
             ->subject(__(self::LANG.".{$outcome}.title"))
             ->line(__(self::LANG.".{$outcome}.body", ['owner' => MarkdownText::escape($ownerName)]));
+
+        if ($email === null) {
+            return $mail->action(
+                __('filament/notifications/email-access-requested.mail.action'),
+                EmailAccessRequestsPage::getUrl(panel: 'app', tenant: $this->workspace()),
+            );
+        }
 
         if ($notifiable->can('viewSubject', $email)) {
             $mail->line(__(self::LANG.'.mail.subject_line', [

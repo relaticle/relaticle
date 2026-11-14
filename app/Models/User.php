@@ -78,6 +78,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property array<string, mixed>|null $ai_preferences
  * @property array<string, mixed>|null $notification_preferences
  * @property bool $single_key_shortcuts
+ * @property int $email_undo_seconds
  * @property-read Workspace|null $currentWorkspace
  * @property-read Membership|null $membership the `workspace_user` row, populated only when the user was
  *     loaded through `Workspace::users()`; null on a user reached any other way
@@ -93,6 +94,7 @@ use Laravel\Sanctum\HasApiTokens;
     'ai_preferences',
     'notification_preferences',
     'single_key_shortcuts',
+    'email_undo_seconds',
 ])]
 #[Hidden([
     'password',
@@ -146,6 +148,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
             'single_key_shortcuts' => 'boolean',
+            'email_undo_seconds' => 'integer',
             'scheduled_deletion_at' => 'datetime',
         ];
     }

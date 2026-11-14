@@ -110,7 +110,7 @@ return [
             'description' => 'Nothing is shared. Only you can see these emails.',
         ],
         'metadata_only' => [
-            'label' => 'Participants only',
+            'label' => 'Who and when',
             'description' => 'Your workspace sees the participants and timestamp. Subject and message stay private.',
         ],
         'subject' => [

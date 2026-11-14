@@ -248,6 +248,20 @@
 
                     <x-email-integration::detail-action-bar :email="$email" />
 
+                    @php
+                        $followUpTarget = $thread->last(fn (\Relaticle\EmailIntegration\Models\Email $message): bool => $message->user_id === $authUser->getKey() && $message->direction === \Relaticle\EmailIntegration\Enums\EmailDirection::OUTBOUND);
+                    @endphp
+                    @if ($followUpTarget !== null)
+                        <x-filament::button
+                            size="sm"
+                            color="gray"
+                            icon="lucide-calendar-clock"
+                            wire:click="createEmailFollowUp('{{ $followUpTarget->getKey() }}')"
+                        >
+                            {{ __('filament/emails/composer.follow_up.action') }}
+                        </x-filament::button>
+                    @endif
+
                     <button
                         x-on:click="closeReader()"
                         data-reader-action="close"
@@ -264,7 +278,7 @@
 
             @if ($email->user_id !== $authUser->getKey())
                 <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    {{ __('filament/pages/email-inbox.drawer.source', ['name' => $email->user?->name ?? __('filament/pages/email-inbox.pending_access.unknown_user')]) }}
+                    {{ __('filament/pages/email-inbox.drawer.source', ['name' => $email->mailboxViaName() ?? __('filament/pages/email-inbox.pending_access.unknown_user')]) }}
                 </p>
             @endif
 
@@ -318,6 +332,9 @@
         <x-email-integration::reader-access-bar :pending-access-requests="$pendingAccessRequests" />
 
         <div class="min-h-0 flex-1 overflow-y-auto motion-safe:scroll-smooth" data-email-scroll-region>
+            @if (filled($email->conversation_key))
+                <livewire:chat.email-rela-slot :conversation-key="$email->conversation_key" :auto-summary="$triage" :key="'email-rela-'.$email->conversation_key" />
+            @endif
             <x-email-integration::reader-thread :thread="$thread" :bodies="$bodies" :expanded="$expanded" :reply-target="$replyTarget" :email="$email" />
         </div>
     </aside>

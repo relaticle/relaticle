@@ -875,3 +875,18 @@ it('starts a new conversation for a new queued email', function (): void {
 
     expect($email->conversation_key)->toBe(ConversationKeyResolver::keyFor($this->workspace->id, $email->rfc_message_id));
 });
+
+it('refuses unresolved variables before queuing mail from any caller', function (string $field): void {
+    $data = [
+        'connected_account_id' => $this->account->id,
+        'subject' => 'Renewal',
+        'body_html' => '<p>Tuesday works.</p>',
+        'to' => [['email' => 'ana@example.test', 'name' => 'Ana']],
+        'creation_source' => EmailCreationSource::CHAT,
+    ];
+    $data[$field] = '{{ person.unknown | fallback }}';
+
+    expect(fn (): Email => resolve(SendEmailAction::class)->execute($this->user, $data))
+        ->toThrow(ValidationException::class);
+    expect(Email::query()->count())->toBe(0);
+})->with(['subject', 'body_html']);

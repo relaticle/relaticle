@@ -14,6 +14,7 @@ use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Enums\EmailPrivacyTier;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Exceptions\EmptyDraft;
+use Relaticle\EmailIntegration\Exceptions\StaleDraft;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAttachment;
@@ -57,7 +58,7 @@ final readonly class SaveEmailDraftAction
      *     unresolved_attachments?: list<array{filename: string, mime_type: string, size: int, is_inline?: bool, content_id?: ?string, provider_attachment_id?: ?string}>,
      * }  $data
      */
-    public function execute(User $user, array $data, ?string $draftId = null): Email
+    public function execute(User $user, array $data, ?string $draftId = null, ?int $expectedVersion = null): Email
     {
         /** @var ConnectedAccount $account */
         $account = ConnectedAccount::query()
@@ -65,20 +66,11 @@ final readonly class SaveEmailDraftAction
             ->whereKey($data['connected_account_id'])
             ->firstOrFail();
 
-        return DB::transaction(function () use ($user, $account, $data, $draftId): Email {
-            $existing = $draftId !== null
-                ? Email::query()
-                    ->where('user_id', $user->getKey())
-                    ->where('workspace_id', $account->workspace_id)
-                    ->where('status', EmailStatus::DRAFT)
-                    ->whereKey($draftId)
-                    ->first()
-                : null;
-
-            abort_if($draftId !== null && $existing === null, 403);
+        return DB::transaction(function () use ($user, $account, $data, $draftId, $expectedVersion): Email {
+            $existing = $this->existingDraft($user, $account, $draftId, $expectedVersion);
 
             if ($this->isEmpty($data)) {
-                throw_if($existing === null, EmptyDraft::create());
+                throw_if(! $existing instanceof Email, EmptyDraft::create());
 
                 return $existing;
             }
@@ -105,38 +97,65 @@ final readonly class SaveEmailDraftAction
                 // it resumes the reply or forward it was.
                 'in_reply_to' => $source?->rfc_message_id,
                 'thread_id' => $source?->thread_id,
+                'draft_version' => $existing instanceof Email ? $existing->draft_version + 1 : 0,
             ];
 
-            if ($existing !== null) {
+            if ($existing instanceof Email) {
                 $existing->update($attributes);
                 $draft = $existing;
             } else {
                 $draft = Email::query()->create($attributes);
             }
 
-            $draft->body()->updateOrCreate([], [
-                'body_html' => $data['body_html'],
-                'body_text' => PlainText::paragraphsFromHtml((string) $data['body_html']),
-            ]);
-
-            $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? [], $data['attachment_attributes'] ?? []);
-            $this->attachUnresolved($draft, $data['unresolved_attachments'] ?? []);
-
-            $draft->participants()->delete();
-
-            foreach (['to', 'cc', 'bcc'] as $role) {
-                foreach ($data[$role] as $address) {
-                    EmailParticipant::query()->create([
-                        'email_id' => $draft->getKey(),
-                        'email_address' => $address,
-                        'name' => null,
-                        'role' => $role,
-                    ]);
-                }
-            }
+            $this->saveContent($draft, $data);
 
             return $draft;
         });
+    }
+
+    private function existingDraft(User $user, ConnectedAccount $account, ?string $id, ?int $expectedVersion): ?Email
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        $draft = Email::query()
+            ->where('user_id', $user->getKey())
+            ->where('workspace_id', $account->workspace_id)
+            ->where('status', EmailStatus::DRAFT)
+            ->whereKey($id)
+            ->lockForUpdate()
+            ->first();
+
+        throw_if($expectedVersion !== null && ($draft === null || $draft->draft_version !== $expectedVersion), StaleDraft::class, gone: $draft === null);
+
+        abort_if($draft === null, 403);
+
+        return $draft;
+    }
+
+    /** @param array<string, mixed> $data */
+    private function saveContent(Email $draft, array $data): void
+    {
+        $draft->body()->updateOrCreate([], [
+            'body_html' => $data['body_html'],
+            'body_text' => PlainText::paragraphsFromHtml((string) $data['body_html']),
+        ]);
+
+        $this->attachFiles($draft, $data['attachments'] ?? [], $data['attachment_file_names'] ?? [], $data['attachment_attributes'] ?? []);
+        $this->attachUnresolved($draft, $data['unresolved_attachments'] ?? []);
+        $draft->participants()->delete();
+
+        foreach (['to', 'cc', 'bcc'] as $role) {
+            foreach ($data[$role] as $address) {
+                EmailParticipant::query()->create([
+                    'email_id' => $draft->getKey(),
+                    'email_address' => $address,
+                    'name' => null,
+                    'role' => $role,
+                ]);
+            }
+        }
     }
 
     /**

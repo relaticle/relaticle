@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Enums\ConversationView;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailPageTab;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\MailboxConnectState;
 use Relaticle\EmailIntegration\Enums\OutboxTab;
 use Relaticle\EmailIntegration\Enums\SendFailureRemedy;
 use Relaticle\EmailIntegration\Filament\Actions\ConnectMailboxAction;
@@ -377,6 +378,27 @@ final class EmailInboxPage extends Page
         $workspace = filament()->getTenant();
 
         return ConnectedAccount::hasConnectedFor($this->authUser(), $workspace instanceof Workspace ? $workspace : null);
+    }
+
+    #[Computed]
+    public function connectState(): MailboxConnectState
+    {
+        $workspace = filament()->getTenant();
+
+        return MailboxConnectState::for($this->authUser(), $workspace instanceof Workspace ? $workspace : null);
+    }
+
+    #[Computed]
+    public function sharingStepUrl(): ?string
+    {
+        $workspace = filament()->getTenant();
+        $mailbox = $workspace instanceof Workspace
+            ? ConnectedAccount::query()->newestConnectedFor($this->authUser(), $workspace)->first()
+            : null;
+
+        return $mailbox instanceof ConnectedAccount
+            ? MailboxSharingPage::getUrl(['mailbox' => $mailbox->getKey(), 'return' => self::getUrl()])
+            : null;
     }
 
     /** @return Collection<int, ConnectedAccount> */

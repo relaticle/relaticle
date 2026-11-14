@@ -36,9 +36,9 @@ final readonly class InboxRequests
             ->sum(fn (RequestSource $source): int => $source->countPendingFor($user, $workspace));
     }
 
-    public function approve(User $user, Workspace $workspace, string $kind, string $id): bool
+    public function approve(User $user, Workspace $workspace, string $kind, string $id, ?string $option = null): bool
     {
-        return $this->source($kind)->approve($user, $workspace, $id);
+        return $this->source($kind)->approve($user, $workspace, $id, $option);
     }
 
     public function deny(User $user, Workspace $workspace, string $kind, string $id): bool

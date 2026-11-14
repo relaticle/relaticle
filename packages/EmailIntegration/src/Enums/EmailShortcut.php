@@ -21,6 +21,10 @@ enum EmailShortcut: string
     case Help = 'help';
     case Undo = 'undo';
     case Link = 'link';
+    case Send = 'send';
+    case SendLater = 'send_later';
+    case DraftWithRela = 'draft_with_rela';
+    case Summarize = 'summarize';
 
     /** @return list<string> keys in `KeyboardEvent.key` form */
     public function keys(): array
@@ -41,6 +45,10 @@ enum EmailShortcut: string
             self::Help => ['?'],
             self::Undo => ['z'],
             self::Link => ['l'],
+            self::Send => ['Mod+Enter'],
+            self::SendLater => ['Mod+Shift+Enter'],
+            self::DraftWithRela => ['Mod+j'],
+            self::Summarize => ['s'],
         };
     }
 
@@ -51,8 +59,9 @@ enum EmailShortcut: string
             self::Next, self::Previous, self::Done, self::MarkUnread => [ShortcutScope::List, ShortcutScope::Reader],
             self::Open, self::Select, self::FocusSearch => [ShortcutScope::List],
             self::Close => [ShortcutScope::List, ShortcutScope::Reader, ShortcutScope::Composer],
-            self::Reply, self::ReplyAll, self::Forward, self::Link => [ShortcutScope::Reader],
+            self::Reply, self::ReplyAll, self::Forward, self::Link, self::Summarize => [ShortcutScope::Reader],
             self::Compose, self::Help, self::Undo => [ShortcutScope::Global],
+            self::Send, self::SendLater, self::DraftWithRela => [ShortcutScope::Composer],
         };
     }
 
@@ -83,6 +92,10 @@ enum EmailShortcut: string
             self::Help => 'help',
             self::Undo => 'undo',
             self::Link => 'link',
+            self::Send => 'send',
+            self::SendLater => 'sendLater',
+            self::DraftWithRela => 'draftWithRela',
+            self::Summarize => 'summarize',
         };
     }
 
@@ -90,18 +103,18 @@ enum EmailShortcut: string
     public function isCharacterKey(): bool
     {
         return match ($this) {
-            self::Close => false,
+            self::Close, self::Send, self::SendLater, self::DraftWithRela => false,
             self::Next, self::Previous, self::Open, self::Reply, self::ReplyAll, self::Forward, self::Done,
-            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo, self::Link => true,
+            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo, self::Link, self::Summarize => true,
         };
     }
 
     public function firesInEditors(): bool
     {
         return match ($this) {
-            self::Close => true,
+            self::Close, self::Send, self::SendLater, self::DraftWithRela => true,
             self::Next, self::Previous, self::Open, self::Reply, self::ReplyAll, self::Forward, self::Done,
-            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo, self::Link => false,
+            self::MarkUnread, self::Select, self::FocusSearch, self::Compose, self::Help, self::Undo, self::Link, self::Summarize => false,
         };
     }
 

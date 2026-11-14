@@ -144,6 +144,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'retry_email' => __('Preparing to send an email again…'),
             'link_emails' => __('Linking emails…'),
             'unlink_emails' => __('Removing email links…'),
+            'request_email_access' => __('Requesting email access…'),
             'list_custom_fields' => __('Reading custom attributes…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),

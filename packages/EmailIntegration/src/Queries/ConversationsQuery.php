@@ -282,7 +282,7 @@ final readonly class ConversationsQuery
 
         return $this->preferredCopies->restrictToVisiblePreferredCopies($query, $viewer)
             ->withRecordLinkState()
-            ->with(['participants', 'shares', 'user'])
+            ->with(['participants', 'shares', 'user', 'connectedAccount'])
             ->oldest('sent_at')
             ->oldest('id')
             ->get();

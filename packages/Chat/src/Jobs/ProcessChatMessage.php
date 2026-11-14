@@ -230,7 +230,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->continue($this->conversationId, as: $this->user);
             $agent->withUserTimezone($this->user->timezone);
             $agent->withWorkspace($this->workspace);
-            $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation());
+            $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation())->withEmailReviewMode($this->isEmailConversation());
             $agent->withTurnOrigin($this->origin);
             $agent->withCurrentUser([
                 'name' => $this->user->name,
@@ -1254,6 +1254,11 @@ final class ProcessChatMessage implements ShouldQueue
                 ->where('conversation_id', $this->conversationId)
                 ->where('role', 'assistant')
                 ->exists();
+    }
+
+    private function isEmailConversation(): bool
+    {
+        return AgentConversation::query()->whereKey($this->conversationId)->where('purpose', AgentConversation::PURPOSE_EMAIL)->exists();
     }
 
     private function isSetupConversation(): bool

@@ -62,6 +62,7 @@ use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
  * @property string|null $history_import_batch_id
  * @property string|null $history_import_notified_batch_id
  * @property EmailPrivacyTier|null $sharing_tier
+ * @property CarbonInterface|null $sharing_confirmed_at
  * @property MailboxHealth $health
  * @property string|null $health_reason
  * @property CarbonInterface|null $health_changed_at
@@ -356,6 +357,11 @@ final class ConnectedAccount extends Model
             ->active()
             ->get()
             ->contains(fn (ConnectedAccount $account): bool => $account->isSendable());
+    }
+
+    public function hasAnsweredSharing(): bool
+    {
+        return $this->sharing_confirmed_at !== null;
     }
 
     public function isTokenExpired(): bool
@@ -758,6 +764,7 @@ final class ConnectedAccount extends Model
             'health_changed_at' => 'datetime',
             'health_notified_at' => 'datetime',
             'sharing_tier' => EmailPrivacyTier::class,
+            'sharing_confirmed_at' => 'datetime',
             'token_expires_at' => 'datetime',
             'last_synced_at' => 'datetime',
             'last_calendar_synced_at' => 'datetime',

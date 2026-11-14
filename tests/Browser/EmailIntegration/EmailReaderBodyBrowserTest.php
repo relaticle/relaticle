@@ -31,7 +31,7 @@ function openEmailOnPersonPage(string $systemTheme, ?string $bodyHtml, string $b
     $person->emails()->attach($email->id);
     $relation = array_search(EmailsRelationManager::class, PeopleResource::getRelations(), true);
 
-    return loginViaBrowser($user, $systemTheme)
+    return visitAs($user, "/app/{$workspace->slug}", theme: $systemTheme)
         ->assertPathIs("/app/{$workspace->slug}")
         ->resize($width, $height)
         ->navigate("/app/{$workspace->slug}/people/{$person->id}?relation={$relation}")

@@ -22,6 +22,12 @@ return [
             'label' => 'Request access',
             'modal_heading' => 'Request access',
         ],
+        'request_record_access' => [
+            'label' => "Request :name's :count emails on :record",
+            'pending' => 'Requested from :name',
+            'more' => '+:count more',
+            'modal_heading' => "Request :name's emails on :record",
+        ],
         'approve_access_request' => [
             'modal_heading' => 'Approve access request',
         ],
@@ -30,6 +36,10 @@ return [
         ],
     ],
     'fields' => [
+        'access_note' => [
+            'label' => 'Note (optional)',
+            'placeholder' => 'Say why you need it, for example the opportunity you are working on.',
+        ],
         'privacy_tier' => [
             'label' => 'Who can see this email?',
         ],
@@ -66,6 +76,9 @@ return [
         ],
         'pending_request' => [
             'title' => 'You already have a pending request for this email.',
+        ],
+        'pending_record_request' => [
+            'title' => 'You already have a pending request for this mail.',
         ],
         'access_request_sent' => [
             'title' => 'Access request sent.',

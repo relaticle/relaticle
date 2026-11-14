@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\EmailIntegration\Actions;
 
+use App\Models\ActivityLog\Activity;
 use App\Models\User;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
@@ -52,9 +53,26 @@ final readonly class UpdateEmailSharingAction
             event(new ConversationChanged($email->workspace_id, $email->conversation_key, $previousAudience));
         }
 
+        $this->logShares($email, $sharer, $newlyGranted);
+
         $newlyGranted->each(fn (User $recipient) => $recipient->notify(
             new EmailSharedNotification($email, $sharer, $recipient),
         ));
+    }
+
+    /** @param  Collection<string, User>  $recipients */
+    private function logShares(Email $email, User $sharer, Collection $recipients): void
+    {
+        $tiers = $email->shares()->whereIn('shared_with', $recipients->keys()->all())->pluck('tier', 'shared_with');
+
+        foreach ($recipients->keys() as $recipientId) {
+            activity(Activity::EMAIL_ACCESS_LOG)
+                ->performedOn($email)
+                ->causedBy($sharer)
+                ->event('shared')
+                ->withProperties(['shared_with' => $recipientId, 'tier' => $tiers->get($recipientId)])
+                ->log('shared');
+        }
     }
 
     /**

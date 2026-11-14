@@ -57,6 +57,7 @@ use Relaticle\EmailIntegration\Livewire\TemplatesTable;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\EmailAccessRequest;
+use Relaticle\EmailIntegration\Models\EmailConversation;
 use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\EmailThread;
 use Relaticle\EmailIntegration\Models\Meeting;
@@ -100,14 +101,7 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        Relation::morphMap([
-            'email' => Email::class,
-            'connected_account' => ConnectedAccount::class,
-            'email_thread' => EmailThread::class,
-            'email_access_request' => EmailAccessRequest::class,
-            'meeting' => Meeting::class,
-        ]);
-
+        $this->registerMorphMap();
         $this->registerCleanupThatIgnoresTheFeatureFlag();
 
         if (! self::enabled()) {
@@ -158,6 +152,18 @@ final class EmailIntegrationServiceProvider extends ServiceProvider
         );
 
         $this->registerCommands();
+    }
+
+    private function registerMorphMap(): void
+    {
+        Relation::morphMap([
+            'email' => Email::class,
+            'connected_account' => ConnectedAccount::class,
+            'email_thread' => EmailThread::class,
+            'email_conversation' => EmailConversation::class,
+            'email_access_request' => EmailAccessRequest::class,
+            'meeting' => Meeting::class,
+        ]);
     }
 
     /**

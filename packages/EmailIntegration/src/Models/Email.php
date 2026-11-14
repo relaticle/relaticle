@@ -65,6 +65,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
  * @property EmailDirection $direction
  * @property EmailFolder|null $folder
  * @property EmailStatus $status
+ * @property int $draft_version
  * @property EmailPrivacyTier $privacy_tier
  * @property bool $privacy_tier_customized
  * @property bool $has_attachments
@@ -110,6 +111,7 @@ use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
     'attempts',
     'linked_at',
     'priority',
+    'draft_version',
 ])]
 #[Hidden(['subject_search', 'body_search'])]
 final class Email extends Model
@@ -553,7 +555,7 @@ final class Email extends Model
 
         return $bodyHtml.($asForward
             ? '<br><p><strong>---------- Forwarded message ----------</strong></p>'.$quotedBodyHtml
-            : '<br><blockquote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$quotedBodyHtml.'</blockquote>');
+            : '<br><blockquote data-relaticle-quote style="border-left:3px solid #ccc;margin-left:0;padding-left:1rem">'.$quotedBodyHtml.'</blockquote>');
     }
 
     /**
@@ -731,6 +733,7 @@ final class Email extends Model
             'is_internal' => 'boolean',
             'scheduled_for' => 'datetime',
             'attempts' => 'integer',
+            'draft_version' => 'integer',
             'linked_at' => 'datetime',
             'priority' => EmailPriority::class,
             'automated_reason' => AutomatedReason::class,

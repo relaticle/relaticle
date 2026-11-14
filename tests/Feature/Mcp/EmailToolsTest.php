@@ -1420,6 +1420,7 @@ it('still sends an email while the connector that queued it is connected', funct
 });
 
 it('queues the email and holds it for the configured window', function (): void {
+    $this->viewer->update(['email_undo_seconds' => 5]);
     $this->travelTo(now()->startOfSecond());
 
     $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, ['cc' => ['boss@acme.test']]));

@@ -10,6 +10,7 @@ use Illuminate\Support\Str;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Support\TurnPresence;
@@ -58,6 +59,9 @@ final readonly class TurnContinuationService
      */
     public function resume(User $user, string $conversationId, string $resolvedTurnId, ?string $model = null): bool
     {
+        if (AgentConversation::query()->ownedBy($user)->whereKey($conversationId)->where('purpose', AgentConversation::PURPOSE_EMAIL)->exists()) {
+            return false;
+        }
         $workspace = $user->currentWorkspace;
 
         if ($workspace === null) {

@@ -60,7 +60,7 @@ function emailLinkSource(Email $email, Company $company): ?string
 }
 
 it('links the open conversation with l and the record picker', function (string $theme): void {
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->resize(1440, 900)
@@ -86,7 +86,7 @@ it('unlinks a chip from its keyboard menu and links it back from Undo', function
     $this->company->emails()->attach($this->email->id, ['link_source' => 'auto']);
     $chip = '[data-email-reader] [data-linked-record="company:'.$this->company->id.'"]';
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->resize(1440, 900)
@@ -124,7 +124,7 @@ it('unlinks a record from the overflow menu on a phone', function (string $theme
     usort($records, fn (Company $a, Company $b): int => strcmp($a->name, $b->name));
     $hidden = '[data-email-reader] [data-reader-links-overflow] [data-unlink-record="company:'.$records[1]->id.'"]';
 
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->resize(390, 844)
         ->navigate("/app/{$this->workspace->slug}/email?view=all")
@@ -144,7 +144,7 @@ it('unlinks a record from the overflow menu on a phone', function (string $theme
 })->with(['inLightMode', 'inDarkMode']);
 
 it('groups an unlinked sender and creates a person from the group', function (string $theme): void {
-    $page = loginViaBrowser($this->owner, $theme)
+    $page = visitAs($this->owner, "/app/{$this->workspace->slug}", theme: $theme)
         ->assertPathIs("/app/{$this->workspace->slug}")
         ->assertScript('document.documentElement.classList.contains("dark")', $theme === 'inDarkMode')
         ->resize(1440, 900)

@@ -9,6 +9,7 @@ use Carbon\CarbonImmutable;
 
 final readonly class InboxRequest
 {
+    /** @param array<string, string> $approvalOptions */
     public function __construct(
         public string $id,
         public string $kind,
@@ -18,5 +19,6 @@ final readonly class InboxRequest
         public CarbonImmutable $createdAt,
         public ?CarbonImmutable $expiresAt,
         public ?string $url,
+        public array $approvalOptions = [],
     ) {}
 }

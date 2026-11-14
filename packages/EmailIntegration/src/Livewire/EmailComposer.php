@@ -15,6 +15,7 @@ use App\Services\AvatarService;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\RichEditor\ToolbarButtonGroup;
 use Filament\Forms\Components\TextInput;
@@ -28,10 +29,14 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
+use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Livewire\WithFileUploads;
@@ -47,8 +52,11 @@ use Relaticle\EmailIntegration\Enums\EmailCreationSource;
 use Relaticle\EmailIntegration\Enums\EmailParticipantRole;
 use Relaticle\EmailIntegration\Enums\EmailPriority;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
+use Relaticle\EmailIntegration\Enums\SendLaterPreset;
 use Relaticle\EmailIntegration\Exceptions\OutboxFull;
+use Relaticle\EmailIntegration\Exceptions\StaleDraft;
 use Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource\Schemas\EmailTemplateForm;
+use Relaticle\EmailIntegration\Filament\RichContent\ComposerCommandsPlugin;
 use Relaticle\EmailIntegration\Filament\RichContent\SignatureBlock;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -58,12 +66,14 @@ use Relaticle\EmailIntegration\Models\EmailTemplate;
 use Relaticle\EmailIntegration\Models\Scopes\VisibleEmailScope;
 use Relaticle\EmailIntegration\Queries\PersonByEmailQuery;
 use Relaticle\EmailIntegration\Services\EmailTemplateRenderService;
+use Relaticle\EmailIntegration\Services\EmailVariableCatalogue;
 use Relaticle\EmailIntegration\Services\ForwardAttachmentCopyService;
 use Relaticle\EmailIntegration\Services\MassSendRecipientResolver;
 use Relaticle\EmailIntegration\Services\PreferredEmailCopyService;
 use Relaticle\EmailIntegration\Services\RecipientSuggestionService;
 use Relaticle\EmailIntegration\Support\ComposerInlineImage;
 use Relaticle\EmailIntegration\Support\ComposerPageTo;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Relaticle\EmailIntegration\Support\PersonRecipientFormatter;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
@@ -112,6 +122,26 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public ?string $replyMode = null;
 
     public ?string $draftId = null;
+
+    #[Locked]
+    public int $draftVersion = 0;
+
+    public string $autosaveState = 'idle';
+
+    #[Locked]
+    public bool $relaWriting = false;
+
+    /** @var array<string, list<string>> */
+    public array $variableWarning = [];
+
+    public bool $showVariablePreview = false;
+
+    public int $previewIndex = 0;
+
+    public bool $followUp = false;
+
+    #[Locked]
+    public ?string $scheduledFor = null;
 
     public ?string $accountId = null;
 
@@ -274,11 +304,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->isOpen = true;
         $this->isMinimized = false;
-        // Composing and opening a saved draft are the same task and now present the
-        // same way: fit to the screen, like the reader. A forwarded message that was
-        // parked as a draft used to come back in the small corner window while the
-        // message it answers opened full size, which read as two different features.
-        $this->isExpanded = true;
+        $this->isExpanded = $this->isMassSend || $this->sourceEmailId !== null;
     }
 
     /**
@@ -443,14 +469,79 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         return $email instanceof Email && $user->can('view', $email) ? $email : null;
     }
 
-    public function send(): void
+    public function send(bool $confirmEmptyVariables = false): void
+    {
+        if ($this->relaWriting) {
+            return;
+        }
+        DB::transaction(function () use ($confirmEmptyVariables): void {
+            if ($this->draftId !== null && ! $this->saveDraftSafely(withAttachments: false)) {
+                return;
+            }
+
+            $this->sendCurrentMessage($confirmEmptyVariables);
+        });
+    }
+
+    public function sendLater(string $preset): void
+    {
+        $option = SendLaterPreset::tryFrom($preset);
+        abort_if($option === null || $this->isMassSend, 422);
+        $this->sendAt($option->resolve($this->authUser())->toIso8601String());
+    }
+
+    public function sendAt(string $localDateTime): void
+    {
+        abort_if($this->isMassSend, 422);
+        validator(['scheduledFor' => $localDateTime], ['scheduledFor' => ['required', 'date']])->validate();
+        $date = Date::parse($localDateTime, $this->authUser()->effectiveTimezone())->utc();
+
+        if ($date->lessThan(now()->addMinute())) {
+            throw ValidationException::withMessages(['scheduledFor' => __('filament/emails/composer.send_later.too_soon')]);
+        }
+
+        $this->scheduledFor = $date->toIso8601String();
+        try {
+            $this->send();
+        } finally {
+            if ($this->variableWarning === []) {
+                $this->scheduledFor = null;
+            }
+        }
+    }
+
+    /** @return array<string, string> */
+    #[Computed]
+    public function sendLaterOptions(): array
+    {
+        return collect(SendLaterPreset::cases())
+            ->unique(fn (SendLaterPreset $preset): string => $preset->resolve($this->authUser())->toIso8601String())
+            ->mapWithKeys(fn (SendLaterPreset $preset): array => [$preset->value => $preset->label().' · '.$preset->resolve($this->authUser())->setTimezone($this->authUser()->effectiveTimezone())->isoFormat('ddd, MMM D, HH:mm')])
+            ->all();
+    }
+
+    public function sendLaterAction(): Action
+    {
+        return Action::make('sendLater')
+            ->label(__('filament/emails/composer.send_later.custom'))
+            ->modalHeading(__('filament/emails/composer.send_later.title'))
+            ->schema([
+                DateTimePicker::make('send_at')
+                    ->label(__('filament/emails/composer.send_later.time'))
+                    ->timezone($this->authUser()->effectiveTimezone())
+                    ->native(false)->seconds(false)->minDate(now()->addMinute())->required(),
+            ])
+            ->action(fn (array $data) => $this->sendAt(Date::parse((string) $data['send_at'], 'UTC')->toIso8601String()));
+    }
+
+    private function sendCurrentMessage(bool $confirmEmptyVariables): void
     {
         if (! $this->canSendFromSelectedAccount()) {
             return;
         }
 
         if ($this->isMassSend) {
-            $this->sendMass();
+            $this->sendMass($confirmEmptyVariables);
 
             return;
         }
@@ -472,39 +563,23 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return;
         }
 
-        [$copiedPaths, $copiedNames, $copiedAttributes, $copiedUnavailable] = $this->copySavedAttachments();
-        [$forwardedPaths, $forwardedNames, $forwardedAttributes, $unavailable] = $this->copyForwardedSourceAttachments();
-        [$inlinePaths, $inlineNames, $inlineAttributes, $inlineUnavailable] = $this->copyForwardedInlineAttachments();
-
-        $unavailable = [...$copiedUnavailable, ...$unavailable, ...$inlineUnavailable];
-
-        if ($unavailable !== []) {
-            $this->notifyUnavailableForwardedAttachments($unavailable, abortingSend: true);
-            $this->deleteCopiedAttachmentFiles([...$copiedPaths, ...$forwardedPaths, ...$inlinePaths]);
-
+        if (! $this->checkVariables($bodyHtml, $this->variableRecipients(), $confirmEmptyVariables)) {
             return;
         }
 
-        [$pendingPaths, $pendingNames, $pendingAttributes] = $this->storeAttachments();
+        [$paths, $names, $attributes, $unavailable] = $this->collectOutgoingAttachments();
 
-        $email = $this->queueEmail(
-            $bodyHtml,
-            [...$pendingPaths, ...$copiedPaths, ...$forwardedPaths, ...$inlinePaths],
-            [...$pendingNames, ...$copiedNames, ...$forwardedNames, ...$inlineNames],
-            [...$pendingAttributes, ...$copiedAttributes, ...$forwardedAttributes, ...$inlineAttributes],
-        );
+        if ($unavailable !== []) {
+            return;
+        }
+
+        $email = $this->queueEmail($bodyHtml, $paths, $names, $attributes);
 
         if (! $email instanceof Email) {
             return;
         }
 
         if ($this->draftId !== null) {
-            // Best-effort: two tabs open on the same draft, or a retried request,
-            // can mean the draft row is already gone by now. SendEmailAction has
-            // already committed the queued email above, so a 403 here must never
-            // abort this method (it would leave the composer open and populated
-            // with no feedback, inviting the user to press Send again and queue
-            // a duplicate). executeIfExists() is a no-op when the draft is gone.
             resolve(DeleteEmailDraftAction::class)->executeIfExists($this->authUser(), $this->draftId);
         }
 
@@ -533,14 +608,16 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 user: $this->authUser(),
                 data: [
                     'connected_account_id' => (string) $this->accountId,
-                    'subject' => $renderer->renderPlainText((string) $this->subject, $mergeTagRecord),
-                    'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml, $mergeTagRecord)),
+                    'subject' => $renderer->renderPlainText((string) $this->subject, $mergeTagRecord, $this->authUser()),
+                    'body_html' => $this->withQuotedBody($renderer->renderForSending($bodyHtml, $mergeTagRecord, $this->authUser())),
                     'to' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->to),
                     'cc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->cc),
                     'bcc' => array_map(fn (string $email): array => ['email' => $email, 'name' => null], $this->bcc),
                     'in_reply_to_email_id' => $this->inReplyToEmailId,
                     'creation_source' => $this->creationSource(),
                     'batch_id' => null,
+                    'follow_up' => $this->followUp,
+                    'scheduled_for' => $this->scheduledFor === null ? null : Date::parse($this->scheduledFor),
                     // Interactive sends from the composer keep the undo-send window.
                     'priority' => EmailPriority::PRIORITY,
                     'attachments' => $attachmentPaths,
@@ -572,7 +649,92 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             && ! str_contains($bodyHtml, '<img');
     }
 
-    private function sendMass(): void
+    /**
+     * @param  list<array{email: string, record: Model|null}>  $recipients
+     */
+    private function checkVariables(string $bodyHtml, array $recipients, bool $confirmEmpty): bool
+    {
+        $check = resolve(EmailVariableCatalogue::class)->check((string) $this->subject, $bodyHtml, $recipients, $this->authUser());
+        $this->variableWarning = [];
+        if ($check['unknown'] !== []) {
+            $this->addError('bodyHtml', __('filament/emails/composer.variables.unresolved', ['tags' => implode(', ', $check['unknown'])]));
+
+            return false;
+        }
+        if ($check['empty'] !== [] && ! $confirmEmpty) {
+            $this->variableWarning = $check['empty'];
+            $this->mountAction('confirmEmptyVariables');
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public function confirmEmptyVariablesAction(): Action
+    {
+        return Action::make('confirmEmptyVariables')
+            ->modalHeading(__('filament/emails/composer.variables.warning_title'))
+            ->modalContent(fn (): View => view('email-integration::components.composer-variable-warning', [
+                'warnings' => $this->variableWarning,
+                'labels' => resolve(EmailVariableCatalogue::class)->variables($this->authUser()),
+            ]))
+            ->modalSubmitActionLabel(__('filament/emails/composer.variables.send_anyway'))
+            ->action(fn () => $this->send(confirmEmptyVariables: true));
+    }
+
+    /** @return list<array{email: string, record: Model|null}> */
+    private function variableRecipients(): array
+    {
+        if ($this->isMassSend) {
+            return array_map(fn (array $recipient): array => ['email' => $recipient['email'], 'record' => $recipient['person']], $this->massSendRecipients());
+        }
+
+        $record = $this->mergeTagRecord();
+
+        return array_map(fn (string $email): array => ['email' => $email, 'record' => $record], $this->to);
+    }
+
+    /** @return list<array{person: People, email: string}> */
+    private function massSendRecipients(): array
+    {
+        $personIds = array_values(array_unique(array_column($this->massRecipients, 'personId')));
+        $order = array_flip($personIds);
+        $people = People::query()->with('company')
+            ->where('workspace_id', $this->authUser()->current_workspace_id)
+            ->whereKey($personIds)->get()
+            ->sortBy(fn (People $person): int => $order[(string) $person->getKey()] ?? PHP_INT_MAX)
+            ->values();
+
+        return resolve(MassSendRecipientResolver::class)->resolveFromPeople($people)->recipients;
+    }
+
+    /** @return array{email: string, subject: string, html: string|null, index: int, count: int}|null */
+    #[Computed]
+    public function variablePreview(): ?array
+    {
+        if (! $this->showVariablePreview) {
+            return null;
+        }
+
+        $recipients = $this->variableRecipients();
+        if ($recipients === []) {
+            return null;
+        }
+        $index = max(0, min($this->previewIndex, count($recipients) - 1));
+        $recipient = $recipients[$index];
+        $renderer = resolve(EmailTemplateRenderService::class);
+
+        return [
+            'email' => $recipient['email'],
+            'subject' => $renderer->renderPlainText((string) $this->subject, $recipient['record'], $this->authUser()),
+            'html' => EmailHtmlSanitizer::sanitize($renderer->renderForSending($this->bodyHtmlValue(), $recipient['record'], $this->authUser())),
+            'index' => $index,
+            'count' => count($recipients),
+        ];
+    }
+
+    private function sendMass(bool $confirmEmptyVariables): void
     {
         $this->validate([
             'accountId' => ['required'],
@@ -587,49 +749,27 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $bodyHtml = $this->bodyHtmlForPersistence();
 
-        if (
-            trim(strip_tags($bodyHtml)) === ''
-            && ! str_contains($bodyHtml, 'data-id="'.SignatureBlock::ID.'"')
-            && ! str_contains($bodyHtml, '<img')
-        ) {
+        if ($this->isBlankBody($bodyHtml)) {
             $this->addError('bodyHtml', __('filament/emails/composer.validation.body_required'));
 
             return;
         }
 
-        [$attachmentPaths, $attachmentNames, $attachmentAttributes, $unavailable] = $this->collectOutgoingAttachments();
-
-        if ($unavailable !== []) {
-            return;
-        }
-
-        /** @var list<string> $personIds */
-        $personIds = array_values(array_unique(array_column($this->massRecipients, 'personId')));
-
-        if ($personIds === []) {
-            $this->addError('massRecipients', __('filament/emails/composer.mass_send.no_recipients'));
-
-            return;
-        }
-
-        $people = People::query()
-            ->with('company')
-            ->where('workspace_id', $this->authUser()->current_workspace_id)
-            ->whereKey($personIds)
-            ->get();
-
-        $order = array_flip($personIds);
-
-        $orderedPeople = $people
-            ->sortBy(fn (People $person): int => $order[(string) $person->getKey()] ?? PHP_INT_MAX)
-            ->values();
-
-        $result = resolve(MassSendRecipientResolver::class)->resolveFromPeople($orderedPeople);
-        $recipients = $result->recipients;
+        $recipients = $this->massSendRecipients();
 
         if ($recipients === []) {
             $this->addError('massRecipients', __('filament/emails/composer.mass_send.no_recipients'));
 
+            return;
+        }
+
+        $variableRecipients = array_map(fn (array $recipient): array => ['email' => $recipient['email'], 'record' => $recipient['person']], $recipients);
+        if (! $this->checkVariables($bodyHtml, $variableRecipients, $confirmEmptyVariables)) {
+            return;
+        }
+
+        [$attachmentPaths, $attachmentNames, $attachmentAttributes, $unavailable] = $this->collectOutgoingAttachments();
+        if ($unavailable !== []) {
             return;
         }
 
@@ -751,11 +891,83 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     public function close(): void
     {
-        if ($this->persistDraft()) {
+        if ($this->relaWriting) {
+            $this->closeComposer();
+
+            return;
+        }
+        if ($this->saveDraftSafely()) {
             $this->notifyDraftSaved();
         }
 
+        if (in_array($this->autosaveState, ['stale', 'gone'], true)) {
+            return;
+        }
+
         $this->closeComposer();
+    }
+
+    public function autosave(): void
+    {
+        if (! $this->isOpen || $this->relaWriting || in_array($this->autosaveState, ['stale', 'gone'], true)) {
+            return;
+        }
+
+        $this->saveDraftSafely(withAttachments: false);
+    }
+
+    #[On('composer:flush-autosave')]
+    public function flushForRela(string $composerId): void
+    {
+        if ($composerId !== $this->getId() || ! $this->isOpen || $this->isMassSend || $this->relaWriting) {
+            return;
+        }
+        if ($this->saveDraftSafely() && $this->draftId !== null) {
+            $this->dispatch('composer:autosaved', composerId: $this->getId(), draftId: $this->draftId, draftVersion: $this->draftVersion);
+        }
+    }
+
+    #[On('composer:rela-started')]
+    public function relaStarted(string $composerId): void
+    {
+        if ($composerId === $this->getId()) {
+            $this->relaWriting = true;
+        }
+    }
+
+    #[On('composer:rela-finished')]
+    public function relaFinished(string $composerId, bool $reload): void
+    {
+        if ($composerId !== $this->getId()) {
+            return;
+        }
+        $this->relaWriting = false;
+        if ($reload && $this->isOpen) {
+            $this->reloadDraft();
+        }
+    }
+
+    public function reloadDraft(): void
+    {
+        if ($this->draftId !== null) {
+            $this->loadDraft($this->draftId);
+        }
+    }
+
+    public function saveAsNewDraft(): void
+    {
+        $this->saveDraftSafely(asNew: true);
+    }
+
+    private function saveDraftSafely(bool $withAttachments = true, bool $asNew = false): bool
+    {
+        try {
+            return $this->persistDraft($withAttachments, $asNew);
+        } catch (StaleDraft $exception) {
+            $this->autosaveState = $exception->gone ? 'gone' : 'stale';
+
+            return false;
+        }
     }
 
     /**
@@ -777,6 +989,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     public function updatedIsMassSend(bool $value): void
     {
         if ($value) {
+            $this->isExpanded = true;
             $this->syncMassRecipientsFromTo();
             $this->to = [];
             $this->cc = [];
@@ -1077,23 +1290,34 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 // The local disk cannot sign a URL, and Storage::url() points at the public disk.
                 ->getFileAttachmentUrlUsing(fn (mixed $file): ?string => resolve(ComposerInlineImage::class)->previewUrl($this->authUser(), $file))
                 ->statePath('bodyHtml')
-                ->mergeTags(EmailTemplateRenderService::MERGE_TAGS)
+                ->plugins([new ComposerCommandsPlugin])
                 ->customBlocks([SignatureBlock::class])
                 ->placeholder(__('filament/emails/composer.fields.body_placeholder'))
                 ->toolbarButtons([
-                    ['bold', 'italic', 'underline', 'strike', 'attachFiles'],
-                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.paragraph'), ['paragraph', 'h1', 'h2', 'h3'])],
-                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.alignment'), ['alignStart', 'alignCenter', 'alignEnd', 'alignJustify'])],
-                    ['blockquote', 'codeBlock'],
+                    ['bold', 'italic', 'link'],
                     [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.lists'), ['bulletList', 'orderedList'])],
-                    ['undo', 'redo'],
-                    ['mergeTags'],
+                    ['attachFiles'],
+                    [ToolbarButtonGroup::make(__('filament/emails/composer.toolbar.more'), ['paragraph', 'h2', 'h3', 'strike', 'underline', 'blockquote', 'codeBlock'])],
                 ])
                 ->floatingToolbars([
                     'paragraph' => ['bold', 'italic', 'underline', 'strike', 'link', 'bulletList', 'orderedList', 'blockquote'],
                 ])
-                ->extraAttributes(['class' => 'email-composer-body']),
+                ->extraAttributes(fn (): array => ['class' => 'email-composer-body', ...$this->commandAttributes()]),
         ]);
+    }
+
+    /** @return array<string, string> */
+    private function commandAttributes(): array
+    {
+        $commands = [];
+        foreach ($this->templateOptions() as $id => $label) {
+            $commands[] = ['id' => $id, 'label' => $label, 'kind' => 'template'];
+        }
+        foreach ($this->signatureOptions() as $id => $label) {
+            $commands[] = ['id' => $id, 'label' => $label, 'kind' => 'signature'];
+        }
+
+        return ComposerCommandsPlugin::attributes($this->authUser(), $commands);
     }
 
     /**
@@ -1436,10 +1660,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
                 ->first()
             : null;
 
-        $rendered = resolve(EmailTemplateRenderService::class)->renderWithSignature($template, null, $signature);
-
-        $this->subject = $rendered['subject'];
-        $this->setBodyHtml($rendered['body_html']);
+        $this->subject = $template->subject;
+        $this->setBodyHtml(resolve(EmailTemplateRenderService::class)->applySignatureBlock((string) $template->body_html, $signature));
     }
 
     /**
@@ -1890,18 +2112,9 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         resolve(ForwardAttachmentCopyService::class)->deleteCopiedFiles($paths);
     }
 
-    /**
-     * Persist the in-progress message as a DRAFT unless it is blank. Skipped
-     * entirely for a blank compose (nothing to save) or when the account was
-     * rejected by {@see self::ownedAccountId()} (nothing safe to save under).
-     * Reusing this on both `minimize()` and `close()` means a user who clears
-     * out an already-saved draft and closes leaves that draft row untouched
-     * rather than wiping it: {@see SaveEmailDraftAction} never runs in that
-     * case, so there is nothing to reconcile.
-     */
-    private function persistDraft(): bool
+    private function persistDraft(bool $withAttachments = true, bool $asNew = false): bool
     {
-        if ($this->isDraftEmpty()) {
+        if ($this->isDraftEmpty($withAttachments)) {
             return false;
         }
 
@@ -1911,52 +2124,67 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             return false;
         }
 
-        [$attachmentPaths, $attachmentNames, $attachmentAttributes] = $this->storeAttachments();
-        [$forwardedPaths, $forwardedNames, $forwardedAttributes, $unavailable] = $this->copyForwardedSourceAttachments();
-        [$inlinePaths, $inlineNames, $inlineAttributes, $inlineUnavailable] = $this->copySourceInlineAttachments();
+        $files = $this->draftAttachmentData($withAttachments, $asNew);
 
-        $unavailable = [...$unavailable, ...$inlineUnavailable];
+        try {
+            $draft = resolve(SaveEmailDraftAction::class)->execute(
+                user: $this->authUser(),
+                data: [
+                    'connected_account_id' => $accountId,
+                    'subject' => $this->subject,
+                    'body_html' => $this->bodyHtmlForPersistence(),
+                    'to' => $this->isMassSend ? $this->massRecipientEmails() : $this->to,
+                    'cc' => $this->isMassSend ? [] : $this->cc,
+                    'bcc' => $this->isMassSend ? [] : $this->bcc,
+                    'source_email_id' => $this->sourceEmailId,
+                    'creation_source' => $this->creationSource(),
+                    ...$files,
+                ],
+                draftId: $asNew ? null : $this->draftId,
+                expectedVersion: $this->draftVersion,
+            );
+        } catch (StaleDraft $exception) {
+            $this->deleteCopiedAttachmentFiles($files['attachments']);
+
+            throw $exception;
+        }
+
+        $created = $asNew || $this->draftId === null;
+        $this->draftId = (string) $draft->getKey();
+        $this->draftVersion = $draft->draft_version;
+        $this->autosaveState = 'saved';
+
+        if ($withAttachments) {
+            $this->attachments = [];
+        }
+        $this->loadSavedAttachments($draft);
+
+        if ($created || $withAttachments) {
+            $this->dispatch('drafts:changed');
+        }
+
+        return true;
+    }
+
+    /** @return array{attachments: list<string>, attachment_file_names: array<string, string>, attachment_attributes: array<string, array{is_inline: bool, content_id: ?string}>, unresolved_attachments: list<array{filename: string, mime_type: string, size: int, is_inline: bool, content_id: ?string, provider_attachment_id: ?string}>} */
+    private function draftAttachmentData(bool $withAttachments, bool $asNew): array
+    {
+        [$paths, $names, $attributes] = $withAttachments ? $this->storeAttachments() : [[], [], []];
+        [$forwarded, $forwardedNames, $forwardedAttributes, $unavailable] = $withAttachments ? $this->copyForwardedSourceAttachments() : [[], [], [], []];
+        [$inline, $inlineNames, $inlineAttributes, $inlineUnavailable] = $withAttachments ? $this->copySourceInlineAttachments() : [[], [], [], []];
+        [$saved, $savedNames, $savedAttributes, $savedUnavailable] = $asNew ? $this->copySavedAttachments() : [[], [], [], []];
+        $unavailable = [...$unavailable, ...$inlineUnavailable, ...$savedUnavailable];
 
         if ($unavailable !== []) {
             $this->notifyUnavailableForwardedAttachments($unavailable, abortingSend: false);
         }
 
-        $draft = resolve(SaveEmailDraftAction::class)->execute(
-            user: $this->authUser(),
-            data: [
-                'connected_account_id' => $accountId,
-                'subject' => $this->subject,
-                'body_html' => $this->bodyHtmlForPersistence(),
-                'to' => $this->isMassSend ? $this->massRecipientEmails() : $this->to,
-                'cc' => $this->isMassSend ? [] : $this->cc,
-                'bcc' => $this->isMassSend ? [] : $this->bcc,
-                // Without these a reply parked as a draft comes back as a plain new
-                // message: no original to show, and no threading when it is sent.
-                'source_email_id' => $this->sourceEmailId,
-                'creation_source' => $this->creationSource(),
-                'attachments' => [...$attachmentPaths, ...$forwardedPaths, ...$inlinePaths],
-                'attachment_file_names' => [...$attachmentNames, ...$forwardedNames, ...$inlineNames],
-                'attachment_attributes' => [...$attachmentAttributes, ...$forwardedAttributes, ...$inlineAttributes],
-                // Keep failed downloads on the draft so reopen still lists them
-                // and send can retry, then abort if they are still missing.
-                'unresolved_attachments' => $this->unresolvedAttachmentPayload($unavailable),
-            ],
-            draftId: $this->draftId,
-        );
-
-        $this->draftId = (string) $draft->getKey();
-
-        // The pending uploads are rows on the draft now; keeping them in
-        // `$attachments` too would store and attach them a second time on the
-        // next save, and send them twice.
-        $this->attachments = [];
-        $this->loadSavedAttachments($draft);
-
-        // The drafts tab and its badge are rendered by other components; without
-        // this they only pick the new draft up on a full page load.
-        $this->dispatch('drafts:changed');
-
-        return true;
+        return [
+            'attachments' => [...$paths, ...$forwarded, ...$inline, ...$saved],
+            'attachment_file_names' => [...$names, ...$forwardedNames, ...$inlineNames, ...$savedNames],
+            'attachment_attributes' => [...$attributes, ...$forwardedAttributes, ...$inlineAttributes, ...$savedAttributes],
+            'unresolved_attachments' => $this->unresolvedAttachmentPayload($unavailable),
+        ];
     }
 
     private function notifyDraftSaved(): void
@@ -1983,7 +2211,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         ], $attachments);
     }
 
-    private function isDraftEmpty(): bool
+    private function isDraftEmpty(bool $withAttachments = true): bool
     {
         return blank($this->subject)
             && trim(strip_tags($this->bodyHtmlValue())) === ''
@@ -1991,8 +2219,7 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             && $this->cc === []
             && $this->bcc === []
             && $this->massRecipients === []
-            && $this->attachments === []
-            && $this->savedAttachments === [];
+            && (! $withAttachments || ($this->attachments === [] && $this->savedAttachments === []));
     }
 
     private function loadSavedAttachments(Email $draft): void
@@ -2037,6 +2264,8 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         }
 
         $this->draftId = (string) $draft->getKey();
+        $this->draftVersion = $draft->draft_version;
+        $this->autosaveState = 'saved';
 
         if ($this->isOwnedAccountId((string) $draft->connected_account_id)) {
             $this->accountId = (string) $draft->connected_account_id;
@@ -2138,6 +2367,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     {
         $this->reset([
             'draftId',
+            'draftVersion',
+            'autosaveState',
+            'relaWriting',
+            'variableWarning',
+            'showVariablePreview',
+            'previewIndex',
+            'followUp',
+            'scheduledFor',
             'to',
             'cc',
             'bcc',

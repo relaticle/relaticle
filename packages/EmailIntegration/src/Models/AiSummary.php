@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 #[Fillable([
     'workspace_id',
+    'user_id',
     'summarizable_type',
     'summarizable_id',
     'summary',

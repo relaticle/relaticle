@@ -11,6 +11,7 @@ enum AiCreditType: string implements HasColor, HasLabel
 {
     case Chat = 'chat';
     case Summary = 'summary';
+    case Draft = 'draft';
     case Embedding = 'embedding';
     case Adjustment = 'adjustment';
     case Refund = 'refund';
@@ -21,7 +22,7 @@ enum AiCreditType: string implements HasColor, HasLabel
     public function getColor(): string
     {
         return match ($this) {
-            self::Chat => 'primary',
+            self::Chat, self::Draft => 'primary',
             self::Summary => 'info',
             self::Embedding, self::Reservation, self::Internal => 'gray',
             self::Adjustment => 'warning',
