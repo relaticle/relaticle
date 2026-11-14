@@ -48,6 +48,7 @@ use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\SearchDocsTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
+use Relaticle\Chat\Tools\Workspace\RemoveSampleDataTool;
 use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 
@@ -1040,33 +1041,34 @@ it('leaves the chatgpt plugin line out when the install has no plugin', function
         ->not->toContain('chatgpt_plugin:');
 });
 
-it('drops update, delete and field definition tools in setup mode and keeps the rest', function (): void {
+it('drops only the delete tools in setup mode and keeps updates and field definitions', function (): void {
     $names = fn (CrmAssistant $agent): array => array_map(fn (object $tool): string => $tool::class, $agent->tools());
 
     $normal = $names(resolve(CrmAssistant::class));
     $setup = $names(resolve(CrmAssistant::class)->withSetupMode(true));
 
     expect($setup)
-        ->not->toContain(UpdatePersonTool::class)
         ->not->toContain(DeletePersonTool::class)
-        ->not->toContain(UpdateCompanyTool::class)
         ->not->toContain(DeleteCompanyTool::class)
-        ->not->toContain(UpdateOpportunityTool::class)
         ->not->toContain(DeleteOpportunityTool::class)
-        ->not->toContain(UpdateTaskTool::class)
         ->not->toContain(DeleteTaskTool::class)
-        ->not->toContain(UpdateNoteTool::class)
         ->not->toContain(DeleteNoteTool::class)
-        ->not->toContain(CreateCustomFieldTool::class)
-        ->not->toContain(UpdateCustomFieldTool::class)
         ->not->toContain(DeleteCustomFieldTool::class)
+        ->toContain(UpdatePersonTool::class)
+        ->toContain(UpdateCompanyTool::class)
+        ->toContain(UpdateOpportunityTool::class)
+        ->toContain(UpdateTaskTool::class)
+        ->toContain(UpdateNoteTool::class)
+        ->toContain(CreateCustomFieldTool::class)
+        ->toContain(UpdateCustomFieldTool::class)
         ->toContain(CreatePersonTool::class)
         ->toContain(CreateCompanyTool::class)
         ->toContain(SetCustomFieldOptionsTool::class)
+        ->toContain(RemoveSampleDataTool::class)
         ->toContain(GuideToPageTool::class)
         ->toContain(SearchDocsTool::class)
         ->toContain(ListPeopleTool::class)
-        ->and($setup)->toHaveCount(count($normal) - 13);
+        ->and($setup)->toHaveCount(count($normal) - 6);
 });
 
 it('carries the setup mode instructions in the cached static block', function (): void {
@@ -1079,7 +1081,11 @@ it('carries the setup mode instructions in the cached static block', function ()
         ->toContain('More than 25 rows, or the user mentions a CSV file they have not attached: call GuideToPageTool')
         ->not->toContain('or the user mentions a file')
         ->toContain('propose the first 25 rows')
-        ->toContain('edits happen on the record page or in a new conversation')
+        ->toContain('the delete tools are absent on purpose')
+        ->toContain('propose the change with the update tool')
+        ->toContain('never update a record only because a pasted row resembles it')
+        ->toContain('deleting happens on the record page')
+        ->not->toContain('edits happen on the record page or in a new conversation')
         ->toContain('Never answer that it is unsupported');
 });
 
