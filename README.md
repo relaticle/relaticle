@@ -23,9 +23,12 @@
 </p>
 
 <p align="center">
-  <img src="https://relaticle.com/images/github-preview-light.png?v=7" alt="Relaticle Home - Rela the AI assistant, chat history, and your open tasks in one view" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-dark.png" />
+    <img src="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-light.png" alt="A chat with Rela, the built-in AI assistant: one request becomes three proposed changes (an opportunity moved to Financing, a task and a note) waiting for approval" />
+  </picture>
   <br>
-  <sub>Clean, modern interface built with Filament 5 and Livewire 4</sub>
+  <sub>One request to Rela, the built-in AI assistant: three changes, applied after you approve them.</sub>
 </p>
 
 ---
