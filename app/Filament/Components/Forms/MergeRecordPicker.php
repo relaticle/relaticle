@@ -26,14 +26,6 @@ use Livewire\Attributes\Renderless;
 
 final class MergeRecordPicker extends Field
 {
-    private const array COUNT_ICONS = [
-        'people' => 'lucide-users',
-        'opportunities' => 'lucide-circle-dollar-sign',
-        'contact_opportunities' => 'lucide-circle-dollar-sign',
-        'notes' => 'lucide-file-text',
-        'tasks' => 'lucide-clipboard-check',
-    ];
-
     protected string $view = 'filament.app.merge-record';
 
     /** @var array<string, array{other: Company|People, current: Company|People, values: MergedValues}|null> */
@@ -218,12 +210,15 @@ final class MergeRecordPicker extends Field
             ->withCount($this->entity()->mergeCountRelations());
     }
 
-    /**
-     * @return list<string>
-     */
-    private function countKeys(): array
+    private function countIcon(string $relation): string
     {
-        return array_map(Str::snake(...), $this->entity()->mergeCountRelations());
+        if ($relation === 'people') {
+            return 'lucide-users';
+        }
+
+        $related = $this->subject()->{$relation}()->getRelated();
+
+        return (CrmEntity::tryFromModel($related) ?? abort(404))->icon();
     }
 
     private function detailCode(): string
@@ -301,10 +296,11 @@ final class MergeRecordPicker extends Field
      */
     private function counts(callable $count): array
     {
-        return array_map(
-            fn (string $key): array => ['key' => $key, 'icon' => self::COUNT_ICONS[$key], 'count' => $count($key)],
-            $this->countKeys(),
-        );
+        return array_map(function (string $relation) use ($count): array {
+            $key = Str::snake($relation);
+
+            return ['key' => $key, 'icon' => $this->countIcon($relation), 'count' => $count($key)];
+        }, $this->entity()->mergeCountRelations());
     }
 
     /**
