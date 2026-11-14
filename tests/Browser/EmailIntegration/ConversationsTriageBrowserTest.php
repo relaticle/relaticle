@@ -39,9 +39,7 @@ it('shows a done row again when new mail brings it back on a refetch', function 
 
     $page->script("Livewire.find(document.querySelector('{$row}').closest('[wire\\\\:id]').getAttribute('wire:id')).call('refreshConversations'); true");
 
-    $page
-        ->wait(1.5)
-        ->assertScript("document.querySelector('{$row}').hidden", false)
+    $page->assertScript("document.querySelector('{$row}').hidden", false)
         ->assertScript("document.querySelector('{$row}').dataset.done", 'false')
         ->assertNoJavaScriptErrors();
 })->with(['inLightMode', 'inDarkMode']);
@@ -57,7 +55,6 @@ it('does nothing on o when single-key shortcuts are off and still opens the focu
         ->assertPresent($button)
         ->assertScript('Alpine.store("shortcuts").singleKeys', false)
         ->keys($button, 'o')
-        ->wait(1)
         ->assertMissing('.fi-email-reader-drawer')
         ->keys($button, 'Enter')
         ->assertVisible('.fi-email-reader-drawer')
@@ -74,7 +71,7 @@ it('marks done on Enter from the Done pill without opening the reader', function
         ->assertPresent($row)
         ->assertScript("document.querySelector('{$row} > button').focus() || true")
         ->keys("{$row} [data-triage-action=markDone]", 'Enter')
-        ->wait(1.5)
+        ->assertMissing('[data-triage-pending]')
         ->assertMissing('.fi-email-reader-drawer')
         ->assertScript("document.querySelector('{$row}').dataset.done", 'true')
         ->assertNoJavaScriptErrors();
@@ -95,7 +92,6 @@ it('moves the tab stop to a visible row when e marks the hovered tab stop done',
         ->assertScript($tabStops, ['conv-top'])
         ->hover('[data-conversation="conv-top"]')
         ->keys('[data-reveal-active-tab]', 'e')
-        ->wait(1.5)
         ->assertScript('document.querySelector(\'[data-conversation="conv-top"]\').hidden', true)
         ->assertScript($tabStops, ['conv-below'])
         ->assertNoJavaScriptErrors();
@@ -124,7 +120,6 @@ it('selects a range with shift-click and clears it after mark read', function (s
     $page->screenshot(filename: "conversation-selection-{$theme}");
 
     $page->click('[data-triage-bulk="markRead"]')
-        ->wait(1.5)
         ->assertMissing('[data-triage-bar]')
         ->assertScript('[...document.querySelectorAll("[data-conversation][data-unread=true]")].map((row) => row.dataset.conversation)', ['conv-four'])
         ->assertSeeIn('[data-undo-toast]', '3 conversations marked read.')
@@ -146,7 +141,7 @@ it('toggles the focused row with x and marks the selection done with e', functio
         ->keys('[data-conversation="conv-two"] > button', 'x')
         ->assertSeeIn('[data-triage-selected]', '2 selected')
         ->keys('[data-conversation="conv-two"] > button', 'e')
-        ->wait(1.5)
+        ->assertMissing('[data-triage-pending]')
         ->assertScript('[...document.querySelectorAll("[data-conversation]")].filter((row) => ! row.hidden).map((row) => row.dataset.conversation)', ['conv-three'])
         ->assertMissing('[data-triage-bar]')
         ->assertNoJavaScriptErrors();
@@ -166,7 +161,6 @@ it('marks two checked conversations done with e while a checkbox has focus', fun
         ->click('[data-conversation="conv-one"] [data-select-conversation]')
         ->click('[data-conversation="conv-two"] [data-select-conversation]')
         ->keys('[data-conversation="conv-two"] [data-select-conversation]', 'e')
-        ->wait(1.5)
         ->assertScript('[...document.querySelectorAll("[data-conversation]")].filter((row) => ! row.hidden).map((row) => row.dataset.conversation)', ['conv-three'])
         ->assertSeeIn('[data-undo-toast]', '2 conversations marked Done in Relaticle.')
         ->assertNoJavaScriptErrors();
@@ -192,10 +186,9 @@ it('undoes a mixed bulk done without reopening the row that was already done', f
         ->click('[data-conversation="conv-done"] [data-select-conversation]')
         ->click('[data-conversation="conv-open"] [data-select-conversation]')
         ->keys('[data-conversation="conv-open"] [data-select-conversation]', 'e')
-        ->wait(1.5)
         ->assertSeeIn('[data-undo-toast]', 'Conversation marked Done in Relaticle.')
         ->click('[data-undo-action]')
-        ->wait(1.5)
+        ->assertMissing('[data-triage-pending]')
         ->assertScript('document.querySelector(\'[data-conversation="conv-done"]\').dataset.done', 'true')
         ->assertScript('document.querySelector(\'[data-conversation="conv-open"]\').dataset.done', 'false')
         ->assertNoJavaScriptErrors();
@@ -219,7 +212,7 @@ it('marks the selection done with e while the reader shows another conversation'
         ->assertVisible('[data-triage-bar]')
         ->assertScript('document.querySelector("[data-triage-bar]").getBoundingClientRect().right <= document.querySelector(".fi-email-reader-drawer").getBoundingClientRect().left', true)
         ->keys('[data-conversation="conv-two"] [data-select-conversation]', 'e')
-        ->wait(1.5)
+        ->assertMissing('[data-triage-pending]')
         ->assertVisible('.fi-email-reader-drawer')
         ->assertNoJavaScriptErrors();
 

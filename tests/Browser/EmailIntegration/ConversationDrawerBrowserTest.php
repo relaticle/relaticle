@@ -92,7 +92,7 @@ it('reads a conversation beside a live list and closes with Escape', function (s
 
     $page->script('document.querySelector(\'[data-conversation="conv-second"] > button\').click()');
 
-    $page->assertSee('Security questionnaire')
+    $page->assertSeeIn('#email-reader-heading', 'Security questionnaire')
         ->keys('#email-reader-heading', 'Escape')
         ->assertMissing('.fi-email-reader-drawer')
         ->assertScript('document.activeElement.closest("[data-conversation]")?.dataset.conversation', 'conv-second')
