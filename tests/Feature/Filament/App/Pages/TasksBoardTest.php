@@ -43,7 +43,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Events\QueryExecuted;
-use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
@@ -1732,7 +1732,7 @@ it('exports the tasks the bar\'s filters match from the board, hidden statuses a
     taskInStatus($this, 'Globex brief', 'In progress');
     $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
 
-    Bus::fake();
+    Auth::guard('web')->login($this->user);
 
     $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $todo, false);
 
@@ -1744,7 +1744,8 @@ it('exports the tasks the bar\'s filters match from the board, hidden statuses a
         ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Acme']])
         ->callAction('export');
 
-    expect(Export::query()->sole()->total_rows)->toBe(3);
+    expect(Export::query()->sole()->total_rows)->toBe(3)
+        ->and(Export::query()->sole()->processed_rows)->toBe(3);
 })->with([
     'no status column off' => [false],
     'no status column on' => [true],

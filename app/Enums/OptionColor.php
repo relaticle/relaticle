@@ -16,7 +16,7 @@ enum OptionColor: string
     case Magenta = '#d946ef';
     case Purple = '#a855f7';
     case Pink = '#ec4899';
-    case Olive = '#7c7c67';
+    case Olive = '#c9b100';
     case Gray = '#6b7280';
 
     public function label(): string

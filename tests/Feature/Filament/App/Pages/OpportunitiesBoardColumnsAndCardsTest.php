@@ -35,7 +35,7 @@ use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use Filament\Facades\Filament;
-use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
@@ -577,7 +577,7 @@ it('exports the opportunities the bar\'s filters match from the board, hidden st
     opportunityInStage($this, 'Globex upsell', 'Qualification');
     $prospecting = (string) $this->stageField->options->firstWhere('name', 'Prospecting')->getKey();
 
-    Bus::fake();
+    Auth::guard('web')->login($this->user);
 
     $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', $prospecting, false);
 
@@ -589,7 +589,8 @@ it('exports the opportunities the bar\'s filters match from the board, hidden st
         ->call('setFilterRules', [['field' => 'name', 'condition' => 'contains', 'value' => 'Acme']])
         ->callAction('export');
 
-    expect(Export::query()->sole()->total_rows)->toBe(3);
+    expect(Export::query()->sole()->total_rows)->toBe(3)
+        ->and(Export::query()->sole()->processed_rows)->toBe(3);
 })->with([
     'no stage column off' => [false],
     'no stage column on' => [true],
