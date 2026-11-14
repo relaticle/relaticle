@@ -1,64 +1,62 @@
 <div
     @class([
-        'flex h-full min-w-0 flex-col gap-3 rounded-xl p-4 ring-1',
-        'bg-gray-50 ring-gray-950/5 dark:bg-white/5 dark:ring-white/10' => ! $isResult,
-        'bg-primary-50 ring-primary-600/20 dark:bg-primary-400/10 dark:ring-primary-400/30' => $isResult,
+        'relative flex h-full min-w-0 flex-col items-center gap-4 p-5 text-center',
+        'rounded-xl bg-white shadow-xs ring-1 ring-gray-950/10 dark:bg-gray-900 dark:ring-white/10' => $isResult,
     ])
     @if ($isResult) data-merge-result @endif
 >
-    <div class="flex items-start gap-3">
-        @if ($card['logo'])
-            <img src="{{ $card['logo'] }}" alt="" class="size-10 shrink-0 rounded-lg bg-white object-contain ring-1 ring-gray-950/5 dark:ring-white/10" />
-        @else
-            <span
-                @class([
-                    'flex size-10 shrink-0 items-center justify-center rounded-lg text-sm font-semibold',
-                    'bg-gray-200 text-gray-600 dark:bg-white/10 dark:text-gray-300' => ! $isResult,
-                    'bg-primary-100 text-primary-700 dark:bg-primary-400/20 dark:text-primary-300' => $isResult,
-                ])
-                aria-hidden="true"
-            >{{ $card['initials'] }}</span>
-        @endif
+    @if ($isClearable)
+        <button
+            type="button"
+            x-on:click="
+                $wire.set(@js($statePath.'.keep'), 'current', false)
+                $wire.set(@js($statePath.'.duplicate_id'), null).then(() => document.querySelector('[data-merge-dialog] [data-merge-picker]')?.focus())
+            "
+            aria-label="{{ __('filament/record-page.merge.clear') }}"
+            title="{{ __('filament/record-page.merge.clear') }}"
+            class="absolute end-2 top-2 flex size-7 items-center justify-center rounded-md text-gray-400 outline-none transition hover:bg-gray-950/5 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-primary-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
+            data-merge-clear
+        >
+            <x-filament::icon icon="lucide-x" class="size-menu-icon" />
+        </button>
+    @endif
 
-        <div class="min-w-0 flex-1">
-            <p class="line-clamp-2 break-words text-sm font-semibold text-gray-950 dark:text-white" data-merge-name title="{{ $card['name'] }}">{{ $card['name'] }}</p>
+    <div class="flex w-full flex-1 min-w-0 flex-col items-center gap-3">
+        @include('filament.app.merge-record.mark', ['logo' => $card['logo'], 'icon' => $card['icon'], 'size' => 'size-12 rounded-xl', 'iconSize' => 'size-6'])
 
-            @if ($isKept || $isResult)
-                <p @class([
-                    'mt-0.5 text-xs font-medium',
-                    'text-gray-500 dark:text-gray-400' => $isKept,
-                    'text-primary-700 dark:text-primary-300' => $isResult,
-                ])>{{ $isResult ? __('filament/record-page.merge.result') : __('filament/record-page.merge.kept') }}</p>
-            @endif
+        <p class="line-clamp-2 max-w-full break-words text-base font-semibold text-gray-950 dark:text-white" data-merge-name title="{{ $card['name'] }}">{{ $card['name'] }}</p>
+
+        <div class="flex w-full min-w-0 items-start justify-center gap-1.5 text-sm" data-merge-details>
+            <x-filament::icon :icon="$card['detailIcon']" class="mt-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-500" />
+
+            <ul class="min-w-0 space-y-0.5 text-start">
+                @forelse ($card['details'] as $detail)
+                    <li class="truncate">
+                        <a
+                            href="{{ $detail['href'] }}"
+                            @if (str_starts_with($detail['href'], 'http')) target="_blank" rel="noopener noreferrer" @endif
+                            title="{{ $detail['label'] }}"
+                            class="font-medium text-primary-600 hover:underline focus-visible:underline dark:text-primary-400"
+                        >{{ $detail['label'] }}</a>
+                    </li>
+                @empty
+                    <li class="text-gray-400 dark:text-gray-500">{{ $card['emptyDetails'] }}</li>
+                @endforelse
+            </ul>
         </div>
-
-        @if ($isClearable)
-            <button
-                type="button"
-                x-on:click="$wire.set(@js($statePath.'.keep'), 'current', false); $wire.set(@js($statePath.'.duplicate_id'), null)"
-                aria-label="{{ __('filament/record-page.merge.clear') }}"
-                title="{{ __('filament/record-page.merge.clear') }}"
-                class="-m-1 flex size-7 shrink-0 items-center justify-center rounded-md text-gray-400 outline-none transition hover:bg-gray-950/5 hover:text-gray-600 focus-visible:outline-2 focus-visible:outline-primary-500 dark:hover:bg-white/10 dark:hover:text-gray-200"
-            >
-                <x-filament::icon icon="lucide-x" class="size-menu-icon" />
-            </button>
-        @endif
     </div>
 
-    <ul class="min-w-0 space-y-0.5 text-sm text-gray-600 dark:text-gray-300" data-merge-details>
-        @forelse ($card['details'] as $detail)
-            <li class="truncate" title="{{ $detail }}">{{ $detail }}</li>
-        @empty
-            <li class="text-gray-400 dark:text-gray-500">{{ $card['emptyDetails'] }}</li>
-        @endforelse
-    </ul>
-
-    <ul class="mt-auto flex flex-wrap gap-x-3 gap-y-1 border-t border-gray-950/5 pt-3 text-xs text-gray-500 dark:border-white/10 dark:text-gray-400" data-merge-counts>
+    <ul class="flex w-full flex-wrap items-center justify-center gap-1.5 border-t border-gray-950/5 pt-4 dark:border-white/10" data-merge-counts>
         @foreach ($card['counts'] as $count)
-            <li class="inline-flex items-center gap-1" title="{{ trans_choice("filament/record-page.merge.counts.{$count['key']}", $count['count']) }}">
+            @php($label = trans_choice("filament/record-page.merge.counts.{$count['key']}", $count['count']))
+
+            <li
+                x-tooltip="{ content: @js($label), theme: $store.theme }"
+                class="inline-flex items-center gap-1 rounded-full border border-gray-950/10 px-2 py-0.5 text-xs text-gray-600 dark:border-white/15 dark:text-gray-300"
+            >
                 <x-filament::icon :icon="$count['icon']" class="size-3.5" />
                 <span aria-hidden="true" class="tabular-nums">{{ $count['count'] }}</span>
-                <span class="sr-only">{{ trans_choice("filament/record-page.merge.counts.{$count['key']}", $count['count']) }}</span>
+                <span class="sr-only">{{ $label }}</span>
             </li>
         @endforeach
     </ul>

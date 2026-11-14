@@ -1,16 +1,47 @@
 <div
-    class="relative h-full"
+    class="relative flex h-full min-h-56 items-center justify-center rounded-xl border border-dashed border-gray-300 dark:border-white/20"
     x-data="{
         open: false,
+        active: 0,
+        options() {
+            return [...$refs.popover.querySelectorAll('[role=option]')]
+        },
+        move(step) {
+            const count = this.options().length
+
+            if (count === 0) {
+                return
+            }
+
+            this.active = (this.active + step + count) % count
+            this.$nextTick(() => this.options()[this.active]?.scrollIntoView({ block: 'nearest' }))
+        },
+        pickActive() {
+            const option = this.options()[this.active] ?? this.options()[0]
+
+            if (option) {
+                this.choose(option.dataset.id)
+            }
+        },
+        async choose(id) {
+            this.open = false
+
+            await $wire.set(@js($statePath.'.search'), '', false)
+            await $wire.set(@js($statePath.'.duplicate_id'), id)
+
+            document.querySelector('[data-merge-dialog] [data-merge-clear]')?.focus()
+        },
         place() {
             const gap = 8
             const edge = 16
             const popover = $refs.popover
-            const anchor = $refs.plus.getBoundingClientRect()
+            const anchor = $refs.trigger.getBoundingClientRect()
             const height = document.documentElement.clientHeight
             const width = document.documentElement.clientWidth
 
             popover.style.setProperty('--menu-room', '100dvh')
+            // WebKit runs $nextTick before x-show unhides the popover, and a hidden box measures 0.
+            popover.style.display = 'flex'
 
             const below = height - anchor.bottom - gap - edge
             const above = anchor.top - gap - edge
@@ -24,22 +55,22 @@
     }"
     x-on:resize.window="open && place()"
     x-on:scroll.window.capture="open && place()"
-    x-on:keydown.escape.stop="open = false; $refs.trigger.focus()"
+    x-on:keydown.escape="if (open) { $event.stopPropagation(); open = false; $refs.trigger.focus() }"
+    x-on:keydown.tab="open = false"
     x-on:click.outside="open = false"
 >
     <button
         type="button"
         x-ref="trigger"
-        x-on:click="open = ! open; if (open) $nextTick(() => { place(); $refs.search.focus({ preventScroll: true }) })"
-        aria-haspopup="true"
+        x-on:click="open = ! open; if (open) { active = 0; $nextTick(() => { place(); $refs.search.focus({ preventScroll: true }) }) }"
+        aria-haspopup="listbox"
         x-bind:aria-expanded="open"
-        class="flex h-full min-h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-gray-300 p-4 text-sm font-medium text-gray-600 outline-none transition hover:border-gray-400 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-500 dark:border-white/20 dark:text-gray-300 dark:hover:border-white/30 dark:hover:bg-white/5"
+        aria-label="{{ __('filament/record-page.merge.pick') }}"
+        title="{{ __('filament/record-page.merge.pick') }}"
+        class="flex size-9 items-center justify-center rounded-lg bg-white text-gray-600 shadow-xs ring-1 ring-gray-950/10 outline-none transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-500 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-gray-700"
         data-merge-picker
     >
-        <span x-ref="plus" class="flex size-9 items-center justify-center rounded-full bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-300">
-            <x-filament::icon icon="lucide-plus" class="size-5" />
-        </span>
-        {{ __('filament/record-page.merge.pick') }}
+        <x-filament::icon icon="lucide-plus" class="size-menu-icon" />
     </button>
 
     <div
@@ -55,8 +86,15 @@
                 type="search"
                 x-ref="search"
                 wire:model.live.debounce.250ms="{{ $statePath }}.search"
-                x-on:keydown.arrow-down.prevent="$refs.list.querySelector('button')?.focus()"
-                x-on:keydown.enter.prevent
+                x-on:input="active = 0"
+                x-on:keydown.arrow-down.prevent="move(1)"
+                x-on:keydown.arrow-up.prevent="move(-1)"
+                x-on:keydown.enter.prevent="pickActive()"
+                role="combobox"
+                aria-expanded="true"
+                aria-controls="merge-listbox"
+                aria-autocomplete="list"
+                x-bind:aria-activedescendant="'merge-option-' + active"
                 placeholder="{{ __('filament/record-page.merge.search_placeholder') }}"
                 aria-label="{{ __('filament/record-page.merge.search') }}"
                 autocomplete="off"
@@ -64,35 +102,37 @@
             />
         </div>
 
-        <ul
-            x-ref="list"
-            class="min-h-0 max-h-[calc(var(--spacing-menu-row)*6+0.5rem)] overflow-y-auto p-1"
-            x-on:keydown.arrow-down.prevent="$focus.wrap().next()"
-            x-on:keydown.arrow-up.prevent="$focus.wrap().previous()"
-        >
-            @forelse ($results as $result)
-                <li wire:key="merge-result-{{ $result['id'] }}" class="rounded-menu-item">
-                    <button
-                        type="button"
-                        x-on:click="open = false; $wire.set(@js($statePath.'.search'), '', false); $wire.set(@js($statePath.'.duplicate_id'), @js($result['id']))"
-                        class="flex min-h-menu-row w-full items-center gap-2 rounded-menu-item px-2 py-1.5 text-start text-sm text-gray-950 outline-none transition hover:bg-gray-50 focus-visible:bg-gray-50 dark:text-white dark:hover:bg-white/5 dark:focus-visible:bg-white/5"
+        @if ($results === [])
+            <p class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{{ __('filament/record-page.merge.no_results') }}</p>
+        @else
+            <ul
+                id="merge-listbox"
+                role="listbox"
+                aria-label="{{ __('filament/record-page.merge.search') }}"
+                class="min-h-0 max-h-[calc(var(--spacing-menu-row)*6+0.5rem)] overflow-y-auto p-1"
+            >
+                @foreach ($results as $result)
+                    <li
+                        wire:key="merge-result-{{ $result['id'] }}"
+                        id="merge-option-{{ $loop->index }}"
+                        role="option"
+                        data-id="{{ $result['id'] }}"
+                        x-bind:aria-selected="active === {{ $loop->index }}"
+                        x-bind:class="active === {{ $loop->index }} && 'bg-gray-50 dark:bg-white/5'"
+                        x-on:mouseenter="active = {{ $loop->index }}"
+                        x-on:click="choose(@js($result['id']))"
+                        class="flex min-h-menu-row cursor-pointer items-center gap-2 rounded-menu-item px-2 py-1.5 text-sm text-gray-950 dark:text-white"
                     >
-                        @if ($result['logo'] ?? null)
-                            <img src="{{ $result['logo'] }}" alt="" class="size-5 shrink-0 rounded bg-white object-contain ring-1 ring-gray-950/10 dark:ring-white/15" />
-                        @else
-                            <span class="flex size-5 shrink-0 items-center justify-center rounded bg-gray-100 text-[0.625rem] font-semibold text-gray-600 ring-1 ring-gray-950/5 dark:bg-white/10 dark:text-gray-300 dark:ring-white/10" aria-hidden="true">{{ $result['initials'] ?? str($result['name'])->squish()->explode(' ')->take(2)->map(fn (string $word): string => mb_strtoupper(mb_substr($word, 0, 1)))->implode('') }}</span>
-                        @endif
+                        @include('filament.app.merge-record.mark', ['logo' => $result['logo'], 'icon' => $result['icon'], 'size' => 'size-5 rounded', 'iconSize' => 'size-menu-icon'])
 
                         <span class="truncate font-medium">{{ $result['name'] }}</span>
 
                         @if ($result['detail'])
                             <span class="truncate text-xs text-gray-500 dark:text-gray-400">{{ $result['detail'] }}</span>
                         @endif
-                    </button>
-                </li>
-            @empty
-                <li class="px-3 py-6 text-center text-sm text-gray-500 dark:text-gray-400">{{ __('filament/record-page.merge.no_results') }}</li>
-            @endforelse
-        </ul>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
     </div>
 </div>
