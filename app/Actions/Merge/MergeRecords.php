@@ -74,6 +74,8 @@ final readonly class MergeRecords
     {
         $lockedKeys = $kept->newQueryWithoutRelationships()
             ->whereKey([$kept->getKey(), $duplicate->getKey()])
+            // One lock order for every merge, so two opposite merges of the same pair wait instead of deadlocking.
+            ->orderBy($kept->getKeyName())
             ->lockForUpdate()
             ->pluck($kept->getKeyName());
 
