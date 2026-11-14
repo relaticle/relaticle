@@ -386,7 +386,7 @@ final class ProcessChatMessage implements ShouldQueue
                 $this->closeCompletedTurn();
             });
         } catch (MembershipRevokedException $e) {
-            $this->refuseTurn($creditService, $this->failureMessage($e), $e);
+            $this->stopRevokedTurn($creditService, $e);
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
             // transient -> release with backoff.
@@ -615,7 +615,7 @@ final class ProcessChatMessage implements ShouldQueue
         }
     }
 
-    private function refuseTurn(CreditService $creditService, string $message, ?Throwable $cause = null): void
+    private function refuseTurn(CreditService $creditService, string $message): void
     {
         $creditService->refundReservation(
             $this->workspace,
@@ -623,10 +623,26 @@ final class ProcessChatMessage implements ShouldQueue
             conversationId: $this->conversationId,
         );
 
-        if ($cause instanceof Throwable) {
-            $this->leaveFailedTurn($cause);
-        }
+        $this->endTurnWith($message);
+    }
 
+    // A tool call only comes after a provider step, so the turn pays its minimum as a cancel does.
+    private function stopRevokedTurn(CreditService $creditService, MembershipRevokedException $revoked): void
+    {
+        $creditService->settleReservedMinimum(
+            workspace: $this->workspace,
+            user: $this->user,
+            conversationId: $this->conversationId,
+            resolutionKey: $this->resolutionKey(),
+            reason: 'membership_revoked',
+        );
+
+        $this->leaveFailedTurn($revoked);
+        $this->endTurnWith($this->failureMessage($revoked));
+    }
+
+    private function endTurnWith(string $message): void
+    {
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
             message: $message,

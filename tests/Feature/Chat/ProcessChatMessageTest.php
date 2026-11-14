@@ -15,12 +15,14 @@ use Laravel\Ai\Events\ToolInvoked;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Exceptions\MembershipRevokedException;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\TurnPresence;
@@ -282,7 +284,7 @@ it('does not guard an assistant with a workspace but no user', function (): void
     expect(fn () => event(invokingToolFor(new CrmAssistant()->withWorkspace($workspace))))->not->toThrow(MembershipRevokedException::class);
 });
 
-it('ends a turn with the refusal before its first tool runs when the user was removed mid-turn', function (): void {
+it('ends a turn with the refusal and settles the reserved minimum when the user was removed mid-turn', function (): void {
     withHostedBilling();
     Event::fake([ChatStreamFailed::class]);
 
@@ -370,10 +372,19 @@ it('ends a turn with the refusal before its first tool runs when the user was re
             ->where('content', 'hello')
             ->exists())->toBeTrue();
 
+    $settlement = AiCreditTransaction::query()
+        ->where('workspace_id', $workspace->getKey())
+        ->where('idempotency_key', 'resolve-turn-mid')
+        ->sole();
+
+    expect($settlement->type)->toBe(AiCreditType::Chat)
+        ->and($settlement->credits_charged)->toBe(1)
+        ->and($settlement->metadata['reason'])->toBe('membership_revoked');
+
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
-    expect($balance->credits_remaining)->toBe(100)
-        ->and($balance->credits_used)->toBe(0);
+    expect($balance->credits_remaining)->toBe(99)
+        ->and($balance->credits_used)->toBe(1);
 });
 
 /** @param array{provider: string, model: string, id: string, source: string} $resolved */
