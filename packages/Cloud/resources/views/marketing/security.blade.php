@@ -3,7 +3,7 @@
     $emailActive = \Relaticle\EmailIntegration\EmailIntegrationServiceProvider::enabled();
     $hosted = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $signupChallenge = \App\Rules\TurnstileChallenge::isEnabled();
-    $errorReportsCarryIdentity = (bool) config('sentry.send_default_pii');
+    $errorReportsCarryIdentity = (bool) config('sentry.data_collection.user_info');
 
     $aiProviders = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
         ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): ?string => match ($model->provider) {
