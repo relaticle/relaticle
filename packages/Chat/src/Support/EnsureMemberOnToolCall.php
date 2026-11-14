@@ -7,7 +7,7 @@ namespace Relaticle\Chat\Support;
 use App\Models\Workspace;
 use Laravel\Ai\Events\InvokingTool;
 use Relaticle\Chat\Agents\CrmAssistant;
-use Relaticle\Chat\Exceptions\MembershipRevoked;
+use Relaticle\Chat\Exceptions\MembershipRevokedException;
 
 /**
  * laravel/ai dispatches InvokingTool outside the tool's own try/catch, so a throw
@@ -24,7 +24,7 @@ final readonly class EnsureMemberOnToolCall
         }
 
         if (! $agent->workspace->hasMember($agent->currentUser['id'])) {
-            throw MembershipRevoked::forWorkspace((string) $agent->workspace->getKey());
+            throw MembershipRevokedException::forWorkspace((string) $agent->workspace->getKey());
         }
     }
 }

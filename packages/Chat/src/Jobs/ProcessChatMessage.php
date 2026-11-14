@@ -50,7 +50,7 @@ use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Events\ConversationResolved;
 use Relaticle\Chat\Events\PendingActionsSuperseded;
-use Relaticle\Chat\Exceptions\MembershipRevoked;
+use Relaticle\Chat\Exceptions\MembershipRevokedException;
 use Relaticle\Chat\Exceptions\ProviderStreamRejectedException;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
@@ -165,7 +165,7 @@ final class ProcessChatMessage implements ShouldQueue
         }
 
         if (! $this->workspace->hasMember((string) $this->user->getKey())) {
-            $this->refuseTurn($creditService, MembershipRevoked::refusal());
+            $this->refuseTurn($creditService, $this->membershipRevokedMessage());
 
             return;
         }
@@ -385,8 +385,8 @@ final class ProcessChatMessage implements ShouldQueue
                 // clears too.
                 $this->closeCompletedTurn();
             });
-        } catch (MembershipRevoked) {
-            $this->refuseTurn($creditService, MembershipRevoked::refusal());
+        } catch (MembershipRevokedException $e) {
+            $this->refuseTurn($creditService, $this->failureMessage($e), $e);
         } catch (Throwable $e) {
             // Rate-limit, overloaded, dropped-connection and provider stream errors are
             // transient -> release with backoff.
@@ -564,16 +564,7 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
-        resolve(PendingActionService::class)->supersedePendingForConversation($this->conversationId);
-
-        if (! $this->opensTheThread()) {
-            try {
-                $this->persistFailedTurn($exception);
-            } catch (Throwable $e) {
-                report($e);
-                ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
-            }
-        }
+        $this->leaveFailedTurn($exception);
 
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
@@ -610,13 +601,32 @@ final class ProcessChatMessage implements ShouldQueue
         ));
     }
 
-    private function refuseTurn(CreditService $creditService, string $message): void
+    private function leaveFailedTurn(?Throwable $exception): void
+    {
+        resolve(PendingActionService::class)->supersedePendingForConversation($this->conversationId);
+
+        if (! $this->opensTheThread()) {
+            try {
+                $this->persistFailedTurn($exception);
+            } catch (Throwable $e) {
+                report($e);
+                ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
+            }
+        }
+    }
+
+    private function refuseTurn(CreditService $creditService, string $message, ?Throwable $cause = null): void
     {
         $creditService->refundReservation(
             $this->workspace,
             resolutionKey: $this->resolutionKey(),
             conversationId: $this->conversationId,
         );
+
+        if ($cause instanceof Throwable) {
+            $this->leaveFailedTurn($cause);
+        }
+
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
             message: $message,
@@ -640,8 +650,17 @@ final class ProcessChatMessage implements ShouldQueue
         return $this->origin === MessageOrigin::Greeting;
     }
 
+    private function membershipRevokedMessage(): string
+    {
+        return __('You are no longer a member of this workspace, so the assistant stopped.');
+    }
+
     private function failureMessage(?Throwable $exception): string
     {
+        if ($exception instanceof MembershipRevokedException) {
+            return $this->membershipRevokedMessage();
+        }
+
         if ($exception instanceof TimeoutExceededException) {
             return __('This reply hit the :seconds-second limit before it finished. Ask for a shorter answer, or for it in parts.', [
                 'seconds' => self::TIMEOUT_SECONDS,

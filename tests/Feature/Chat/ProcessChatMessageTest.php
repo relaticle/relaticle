@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Company\CreateCompany;
 use App\Actions\Jetstream\RemoveWorkspaceMember;
 use App\Enums\WorkspaceRole;
 use App\Models\User;
@@ -14,10 +15,13 @@ use Laravel\Ai\Events\ToolInvoked;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\ChatStreamFailed;
-use Relaticle\Chat\Exceptions\MembershipRevoked;
+use Relaticle\Chat\Exceptions\MembershipRevokedException;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Chat\Support\TurnPresence;
 use Relaticle\Chat\Tools\GetCrmSummaryTool;
@@ -252,7 +256,7 @@ it('refuses a tool call from an assistant whose user was removed from the worksp
     resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
 
     expect(fn () => event(invokingToolFor(assistantFor($member, $workspace))))
-        ->toThrow(MembershipRevoked::class);
+        ->toThrow(MembershipRevokedException::class);
 });
 
 it('lets the workspace owner and a current member call tools', function (): void {
@@ -315,6 +319,19 @@ it('ends a turn with the refusal before its first tool runs when the user was re
 
     CrmAssistant::fake([
         function () use ($owner, $workspace, $member): ToolCall {
+            PendingAction::query()->create([
+                'workspace_id' => $workspace->getKey(),
+                'user_id' => $member->getKey(),
+                'conversation_id' => 'conv-mid-turn',
+                'action_class' => CreateCompany::class,
+                'operation' => PendingActionOperation::Create,
+                'entity_type' => 'company',
+                'action_data' => ['name' => 'Acme'],
+                'display_data' => ['title' => 'Create Company', 'summary' => 'Create Acme', 'fields' => []],
+                'status' => PendingActionStatus::Pending,
+                'expires_at' => now()->addMinutes(15),
+            ]);
+
             resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
 
             return new ToolCall('call_1', 'GetCrmSummaryTool', []);
@@ -339,7 +356,14 @@ it('ends a turn with the refusal before its first tool runs when the user was re
         ->and(TurnPresence::current('conv-mid-turn'))->toBeNull();
 
     Event::assertDispatched(fn (ChatStreamFailed $event): bool => $event->conversationId === 'conv-mid-turn'
-        && $event->message === MembershipRevoked::refusal());
+        && $event->message === __('You are no longer a member of this workspace, so the assistant stopped.'));
+
+    expect(PendingAction::query()->where('conversation_id', 'conv-mid-turn')->sole()->status)->toBe(PendingActionStatus::Superseded)
+        ->and(DB::table('agent_conversation_messages')
+            ->where('conversation_id', 'conv-mid-turn')
+            ->where('role', 'user')
+            ->where('content', 'hello')
+            ->exists())->toBeTrue();
 
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
 
