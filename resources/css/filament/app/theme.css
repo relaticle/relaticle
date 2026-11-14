@@ -2068,19 +2068,25 @@ html.fi-record-stacked .fi-record-layout {
 
 /* The stage menu on a board header: a name block over the actions, rules running edge to edge. */
 .ff-column-menu .fi-dropdown-panel {
-    @apply sm:w-72 sm:min-w-72 sm:p-0;
+    @apply sm:p-0;
 
     & .fi-dropdown-list {
         @apply sm:p-1;
     }
 
-    & .fi-dropdown-list-item:not(.fi-color-danger) {
+    & .fi-dropdown-list-item:not(.fi-color-danger) :is(.fi-dropdown-list-item-label, .fi-icon) {
         @apply text-gray-950 dark:text-white;
-
-        & .fi-icon {
-            @apply text-gray-600 dark:text-gray-300;
-        }
     }
+}
+
+.fi-board-stage-swatch[aria-pressed='true'] {
+    --tint: color-mix(in oklab, var(--color-500) 18%, var(--color-white));
+
+    box-shadow: inset 0 0 0 1.5px var(--tint), 0 0 0 1.5px var(--tint), 0 0 0 2.5px var(--color-500);
+}
+
+.dark .fi-board-stage-swatch[aria-pressed='true'] {
+    --tint: color-mix(in oklab, var(--color-500) 30%, var(--color-gray-900));
 }
 
 .ff-column-menu-block {

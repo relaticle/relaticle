@@ -44,8 +44,8 @@ Under **Visible attributes**, choose what each card shows, reorder it, and add
 more with **Add attribute to view**. **Show attribute labels** and **Hide empty
 attributes** adjust how the card reads. The buttons at the end of the filter
 row collapse or expand every column, and switch the cards between compact and
-full. Double-click a stage header to collapse that stage alone. Click its
-collapsed rail to expand it again. The board remembers these settings, your
+full. To collapse one stage, click its header and choose **Collapse stage**.
+Click its collapsed rail to expand it again. The board remembers these settings, your
 filters and your sort for you alone, and the stage field's settings stay as
 they are. Choose
 **Create new view** in the view switcher to save the board as a view only you see.

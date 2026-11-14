@@ -714,7 +714,7 @@ it('collapses every column from the bar and expands them again, flat and with la
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
 ]);
 
-it('collapses a stage by double-clicking its header and expands it by clicking its rail, flat and with lanes', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+it('collapses a stage from its header menu and expands it by clicking its rail, flat and with lanes', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -736,7 +736,7 @@ it('collapses a stage by double-clicking its header and expands it by clicking i
 
     $page = openBoard($user, $path);
 
-    $page->page()->locator(boardHeaderTitle($first))->dblclick();
+    collapseStageFromMenu($page, $first);
     waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$first]);
     expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([$first]);
     $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === 1"), true);
@@ -750,7 +750,7 @@ it('collapses a stage by double-clicking its header and expands it by clicking i
     $page->click("[data-board-grouping=\"{$groupBy}\"]")->assertVisible('.ff-lanes-heads');
     closeViewSettings($page);
 
-    $page->page()->locator(boardHeaderTitle($first, '.ff-lanes-heads'))->dblclick();
+    collapseStageFromMenu($page, $first, '.ff-lanes-heads');
     waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$first]);
     expect(storedBoardState($user, $entity)?->collapsedColumns)->toBe([$first]);
     $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-lanes-heads > .ff-column[data-collapsed]').length === 1"), true);
@@ -811,7 +811,7 @@ it('collapses one stage after collapse all and expand all on one page load, and 
     pressLayout($page, 'columns', 'expanded', 'boardColumns');
     $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-column[data-collapsed]").length === 0'), true);
 
-    $page->page()->locator(boardHeaderTitle($first))->dblclick();
+    collapseStageFromMenu($page, $first);
     $page->assertScript(boardWaitFor("document.querySelectorAll('.ff-column[data-collapsed]').length === 1"), true);
     waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$first]);
 
@@ -858,7 +858,7 @@ it('drags a collapsed rail, keeps the order and leaves it collapsed, while a pla
     $page = openBoard($user, $path);
 
     foreach ([$ids[0], $ids[1]] as $id) {
-        $page->page()->locator(boardHeaderTitle($id))->dblclick();
+        collapseStageFromMenu($page, $id);
         $page->assertScript(boardWaitFor("document.querySelector('{$rail($id)}') !== null"), true);
     }
 
@@ -940,6 +940,26 @@ it('opens the stage menu on a header click, renames on Enter and recolors from t
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
 
+it('keeps the stage open and its menu up on a double-click on its header, with the name focused', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $menu = "[data-stage-menu=\"{$ids[1]}\"]";
+
+    $page = openBoard($user, $path);
+
+    $page->page()->locator(boardHeaderTitle($ids[1]))->dblclick();
+    $page->wait(1);
+
+    $page->assertVisible("{$menu} [data-stage-name-input]")
+        ->assertScript("document.activeElement === document.querySelector('{$menu} [data-stage-name-input]')", true)
+        ->assertScript('document.querySelectorAll(".ff-column[data-collapsed]").length', 0);
+
+    expect(storedBoardState($user, $entity)?->collapsedColumns ?? [])->toBe([]);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
 it('selects a word on a double-click in the stage name input and does not collapse the column', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
     $this->withVite();
 
@@ -977,7 +997,7 @@ it('draws the swatches as rounded tiles on the dropdown surface in light and dar
     $page->assertVisible("{$menu} [data-stage-swatches]");
 
     $geometry = "(() => { const swatch = document.querySelector('{$menu} [data-stage-swatch]'); const box = swatch.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height), parseFloat(getComputedStyle(swatch).borderTopLeftRadius)]; })()";
-    $page->assertScript($geometry, [28, 28, 8]);
+    $page->assertScript($geometry, [24, 24, 6]);
 
     $surface = "(() => { const grid = document.querySelector('{$menu} [data-stage-swatches]'); return getComputedStyle(grid).backgroundColor === getComputedStyle(grid.closest('.fi-dropdown-panel')).backgroundColor; })()";
     $page->assertScript($surface, true);

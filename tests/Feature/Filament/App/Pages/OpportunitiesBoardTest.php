@@ -1443,7 +1443,7 @@ it('collapses a stage for the member and expands it again', function (): void {
         ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
 });
 
-it('collapses a stage through the header double-click callback', function (): void {
+it('toggles a stage through the rail collapse callback', function (): void {
     $ids = stageIds($this->stageField);
     $component = livewire(OpportunitiesBoard::class)->call('toggleBoardColumnCollapse', $ids[2]);
 

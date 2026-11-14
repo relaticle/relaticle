@@ -137,6 +137,12 @@ function boardHeaderTitle(string $id, string $container = '.ff-columns'): string
     return "{$container} > [data-column-root=\"{$id}\"] .ff-column-title";
 }
 
+function collapseStageFromMenu(mixed $page, string $id, string $container = '.ff-columns'): void
+{
+    $page->page()->locator(boardHeaderTitle($id, $container))->click();
+    $page->page()->locator("{$container} > [data-column-root=\"{$id}\"] .fi-dropdown-list-item:has-text(\"Collapse\")")->click();
+}
+
 function openBoard(User $user, string $path, int $width = 1440, string $query = ''): mixed
 {
     $workspace = $user->ownedWorkspaces()->first();

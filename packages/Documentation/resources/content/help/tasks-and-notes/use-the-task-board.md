@@ -19,7 +19,7 @@ date approaches. Choose what a card shows under **Visible attributes** in **View
 
 Click **Filter** to narrow the whole board by most attributes. Filter by **Assignees** to see one person's plate. Click **Sort** to order the cards in every column. Open **View settings** and pick **Assignee** under **Lanes** to split the board into a lane per assignee. A **Sort** orders the cards inside each lane too.
 
-Without a sort, cards keep the order you dragged them into. With a sort set, you can still drag a card to another column but not reorder it by hand. The buttons at the end of the filter row collapse or expand every column, and switch the cards between compact and full. Double-click a column header to collapse that column alone. Click its collapsed rail to expand it again.
+Without a sort, cards keep the order you dragged them into. With a sort set, you can still drag a card to another column but not reorder it by hand. The buttons at the end of the filter row collapse or expand every column, and switch the cards between compact and full. To collapse one column, click its header and choose **Collapse status**. Click its collapsed rail to expand it again.
 
 ![The task board with To do, In progress, and Done columns, cards showing priority flags, due-date badges, and assignee avatars](/help-assets/tasks-and-notes/use-the-task-board-1.png)
 
