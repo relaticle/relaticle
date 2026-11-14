@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Actions\Merge\CombineRecordValues;
 use App\Actions\Merge\MergeCompanies;
+use App\Actions\Merge\MoveRecordLinks;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\Enums\CreationSource;
+use App\Enums\MediaCollection;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Resources\CompanyResource;
@@ -13,18 +15,29 @@ use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\Note;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergeCompanies::class, CombineRecordValues::class, MergeRecordAction::class);
+mutates(MergeCompanies::class, CombineRecordValues::class, MoveRecordLinks::class, MergeRecordAction::class);
 
 beforeEach(function (): void {
+    Storage::fake('local');
+    Storage::fake('public');
+    Queue::fake();
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
     $this->workspace = $this->user->currentWorkspace;
@@ -249,3 +262,115 @@ it('takes the duplicate\'s owner when the kept company has none and the owner is
 
     expect($kept->refresh()->account_owner_id)->toBe($this->user->getKey());
 });
+
+function mergeMedia(Company $company, string $collection, array $attributes = []): Media
+{
+    return $company->addMediaFromString(onePixelPng())
+        ->usingFileName('image.png')
+        ->withAttributes(['workspace_id' => $company->workspace_id])
+        ->toMediaCollection($collection);
+}
+
+function mergeLinkedIds(string $table, string $itemColumn, string $morphColumn, Company $company): array
+{
+    return DB::table($table)->where($morphColumn.'_type', 'company')->where($morphColumn.'_id', $company->getKey())->pluck($itemColumn)->sort()->values()->all();
+}
+
+it('moves the duplicate\'s notes and tasks and keeps a shared one once', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+    [$onlyDuplicate, $shared, $onlyKept] = Note::factory()->count(3)->recycle([$this->user, $this->workspace])->create()->all();
+    [$taskOnDuplicate, $sharedTask] = Task::factory()->count(2)->recycle([$this->user, $this->workspace])->create()->all();
+    $duplicate->notes()->attach([$onlyDuplicate->getKey(), $shared->getKey()]);
+    $kept->notes()->attach([$shared->getKey(), $onlyKept->getKey()]);
+    $duplicate->tasks()->attach([$taskOnDuplicate->getKey(), $sharedTask->getKey()]);
+    $kept->tasks()->attach($sharedTask->getKey());
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergeLinkedIds('noteables', 'note_id', 'noteable', $kept))->toBe(collect([$onlyDuplicate, $shared, $onlyKept])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('taskables', 'task_id', 'taskable', $kept))->toBe(collect([$taskOnDuplicate, $sharedTask])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('noteables', 'note_id', 'noteable', $duplicate))->toBe([])
+        ->and(mergeLinkedIds('taskables', 'task_id', 'taskable', $duplicate))->toBe([]);
+});
+
+it('copies a rich-text value with its image from the duplicate', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'code' => 'brief',
+        'name' => 'Brief',
+        'type' => 'rich-editor',
+        'validation_rules' => [],
+        'active' => true,
+        'system_defined' => false,
+    ]);
+    $kept = mergeCompany($this->workspace, $this->user);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+    $image = mergeMedia($duplicate, MediaCollection::Attachments->value);
+    $html = "<p>Notes</p><p><img data-id=\"{$image->uuid}\" src=\"stale\"></p>";
+    $duplicate->saveCustomFieldValue($field, $html);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $image = Media::query()->where('uuid', $image->uuid)->firstOrFail();
+
+    expect(mergeCompanyValue($kept, 'brief'))->toContain($image->uuid)
+        ->and($image->model_id)->toBe($kept->getKey())
+        ->and($image->collection_name)->toBe(MediaCollection::Attachments->value);
+});
+
+it('repoints record-type attributes on other records to the kept company', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'opportunity',
+        'code' => 'partner',
+        'name' => 'Partner',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'settings' => new CustomFieldSettingsData(allow_multiple: true),
+    ]);
+    $kept = mergeCompany($this->workspace, $this->user);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+    $other = mergeCompany($this->workspace, $this->user);
+    $both = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $onlyDuplicate = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $unrelated = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $both->saveCustomFieldValue($field, [$duplicate->getKey(), $kept->getKey()]);
+    $onlyDuplicate->saveCustomFieldValue($field, [$other->getKey(), $duplicate->getKey()]);
+    $unrelated->saveCustomFieldValue($field, [$other->getKey()]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $read = fn (Opportunity $opportunity): mixed => Opportunity::query()->with('customFieldValues.customField')->findOrFail($opportunity->getKey())->getCustomFieldValue($field);
+
+    expect($read($both))->toBe([$kept->getKey()])
+        ->and($read($onlyDuplicate))->toBe([$other->getKey(), $kept->getKey()])
+        ->and($read($unrelated))->toBe([$other->getKey()]);
+});
+
+it('moves the duplicate\'s people and opportunities to the kept company', function (): void {
+    $kept = mergeCompany($this->workspace, $this->user);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect($person->refresh()->company_id)->toBe($kept->getKey())
+        ->and($opportunity->refresh()->company_id)->toBe($kept->getKey());
+});
+
+it('takes the duplicate\'s logo only when the kept company has none', function (bool $keptHasLogo): void {
+    $kept = mergeCompany($this->workspace, $this->user);
+    $duplicate = mergeCompany($this->workspace, $this->user);
+    $keptLogo = $keptHasLogo ? mergeMedia($kept, Company::LOGO_MEDIA_COLLECTION) : null;
+    $duplicateLogo = mergeMedia($duplicate, Company::LOGO_MEDIA_COLLECTION);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $logos = Media::query()->where('model_type', 'company')->where('collection_name', Company::LOGO_MEDIA_COLLECTION)->get();
+
+    expect($logos->where('model_id', $kept->getKey())->pluck('id')->all())->toBe([($keptLogo ?? $duplicateLogo)->getKey()])
+        ->and($logos->where('model_id', $duplicate->getKey())->pluck('id')->all())->toBe($keptHasLogo ? [$duplicateLogo->getKey()] : []);
+})->with([true, false]);
