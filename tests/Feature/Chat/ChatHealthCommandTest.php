@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Task\CreateTask;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Commands\ChatHealthCommand;
@@ -132,6 +133,23 @@ it('counts timeouts, typed turns and blank replies', function (): void {
         ->and($report['error_turns'])->toBe(2)
         ->and($report['timeouts'])->toBe(1)
         ->and($report['blank_replies'])->toBe(1);
+});
+
+it('counts a failed turn by its stored failure class once, even when the banner text also matches', function (): void {
+    $conversation = chatHealthConversation($this->user);
+    $failure = ['error' => true, 'failure' => ['class' => TimeoutExceededException::class, 'status' => null, 'body' => null]];
+
+    chatHealthMessage($this->user, $conversation, content: __('The assistant encountered an error. Please try again.'), meta: $failure);
+    chatHealthMessage($this->user, $conversation, content: TurnNotes::timeout(120), meta: $failure);
+    chatHealthMessage($this->user, $conversation, content: __('The assistant encountered an error. Please try again.'), meta: ['error' => true, 'failure' => ['class' => RuntimeException::class]]);
+
+    chatHealthMessage($this->user, $conversation, content: __('The assistant encountered an error. Please try again.'), meta: $failure, at: now()->subDays(3));
+    chatHealthMessage($this->user, $conversation, meta: ['failure' => $failure['failure']]);
+
+    $report = resolve(ChatHealthQuery::class)->forWindow(...chatHealthWindow());
+
+    expect($report['error_turns'])->toBe(3)
+        ->and($report['timeouts'])->toBe(2);
 });
 
 it('reports cache follow-ups per provider and proposals by status', function (): void {

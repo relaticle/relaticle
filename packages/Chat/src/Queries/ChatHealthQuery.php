@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Queries;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\LazyCollection;
 use Laravel\Ai\Storage\StoredMessage;
@@ -58,7 +59,11 @@ final readonly class ChatHealthQuery
     {
         $pattern = TurnNotes::timeout('%').'%';
 
-        return $this->assistantTurns($from, $to)->errored()->where('content', 'like', $pattern)->count();
+        return $this->assistantTurns($from, $to)->errored()
+            ->where(fn (Builder $query): Builder => $query
+                ->where('content', 'like', $pattern)
+                ->orWhere('meta->failure->class', TimeoutExceededException::class))
+            ->count();
     }
 
     /**

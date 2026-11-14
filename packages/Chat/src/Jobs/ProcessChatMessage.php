@@ -816,7 +816,7 @@ final class ProcessChatMessage implements ShouldQueue
             'attachments' => '[]',
             'steps' => StoredSteps::text($text),
             'usage' => '[]',
-            'meta' => json_encode(['error' => true], JSON_THROW_ON_ERROR),
+            'meta' => json_encode(['error' => true, 'failure' => ChatTelemetry::failureEvidence($exception, $this->resolved['provider'], $this->resolved['model'])], JSON_THROW_ON_ERROR),
             'document' => json_encode($document, JSON_THROW_ON_ERROR),
             'created_at' => $now,
             'updated_at' => $now,

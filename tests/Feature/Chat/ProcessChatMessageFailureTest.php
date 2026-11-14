@@ -12,6 +12,11 @@ use App\Models\User;
 use App\Services\SelfHostedEntitlements;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
+use GuzzleHttp\Psr7\NoSeekStream;
+use GuzzleHttp\Psr7\Response as Psr7Response;
+use GuzzleHttp\Psr7\Utils;
+use Illuminate\Http\Client\RequestException;
+use Illuminate\Http\Client\Response as HttpResponse;
 use Illuminate\Queue\MaxAttemptsExceededException;
 use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
@@ -1078,6 +1083,115 @@ it('logs the provider error type and message when the provider reports a rejecti
             && $context['model'] === 'claude-sonnet-5'
             && $context['error_type'] === 'invalid_request_error'
             && $context['error_message'] === 'bad request');
+});
+
+function rejectedByProvider(int $status, string $body): RequestException
+{
+    return new RequestException(new HttpResponse(new Psr7Response($status, [], $body)));
+}
+
+/** @return array{user: User, conversationId: string, meta: array<string, mixed>} */
+function failedTurnMeta(?Throwable $exception): array
+{
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    makeFailedTurnJob($user, $conversationId)->failed($exception);
+
+    $meta = DB::table('agent_conversation_messages')
+        ->where('conversation_id', $conversationId)
+        ->where('role', 'assistant')
+        ->value('meta');
+
+    return ['user' => $user, 'conversationId' => $conversationId, 'meta' => json_decode((string) $meta, true, flags: JSON_THROW_ON_ERROR)];
+}
+
+it('keeps the provider rejection body on the failed turn', function (): void {
+    $body = '{"type":"error","error":{"type":"invalid_request_error","message":"credit balance is too low"}}';
+
+    ['meta' => $meta] = failedTurnMeta(rejectedByProvider(400, $body));
+
+    expect($meta['error'])->toBeTrue()
+        ->and($meta['failure'])->toEqual([
+            'class' => RequestException::class,
+            'status' => 400,
+            'body' => $body,
+            'provider' => 'ollama',
+            'model' => 'qwen3:8b',
+        ]);
+});
+
+it('keeps the rejection body when the gateway already drained the streamed response', function (): void {
+    $body = '{"type":"error","error":{"type":"invalid_request_error","message":"credit balance is too low"}}';
+    $response = new HttpResponse(new Psr7Response(400, [], new NoSeekStream(Utils::streamFor($body))));
+
+    expect($response->json('error.message'))->toBe('credit balance is too low');
+
+    ['meta' => $meta] = failedTurnMeta(new RequestException($response));
+
+    expect($meta['failure']['body'])->toContain('invalid_request_error')->toContain('credit balance is too low');
+});
+
+it('stores a null body when a drained streamed response leaves nothing to read', function (): void {
+    $response = new HttpResponse(new Psr7Response(502, [], new NoSeekStream(Utils::streamFor('<html>bad gateway</html>'))));
+    $response->json();
+
+    ['meta' => $meta] = failedTurnMeta(new RequestException($response));
+
+    expect($meta['failure']['status'])->toBe(502)
+        ->and($meta['failure']['body'])->toBeNull();
+});
+
+it('still writes the failure note when the rejection body is not valid UTF-8', function (): void {
+    ['meta' => $meta] = failedTurnMeta(rejectedByProvider(400, "upstream said \xC3\x28 and \xFF"));
+
+    expect($meta['error'])->toBeTrue()
+        ->and(mb_check_encoding($meta['failure']['body'], 'UTF-8'))->toBeTrue();
+});
+
+it('caps the stored rejection body at 2000 characters without splitting a multibyte character', function (): void {
+    ['meta' => $meta] = failedTurnMeta(rejectedByProvider(400, str_repeat('日本語', 1667)));
+
+    expect(mb_strlen($meta['failure']['body']))->toBe(2000)
+        ->and(mb_check_encoding($meta['failure']['body'], 'UTF-8'))->toBeTrue();
+});
+
+it('stores the stream error type and message when the provider rejects inside the stream', function (): void {
+    ['meta' => $meta] = failedTurnMeta(new ProviderStreamRejectedException(new Error('evt-1', 'invalid_request_error', 'bad request', false, 0)));
+
+    expect($meta['failure'])->toMatchArray([
+        'class' => ProviderStreamRejectedException::class,
+        'status' => null,
+        'body' => 'invalid_request_error: bad request',
+    ]);
+});
+
+it('stores no status and no body when the failure carries no response', function (Throwable $exception): void {
+    ['meta' => $meta] = failedTurnMeta($exception);
+
+    expect($meta['failure'])->toMatchArray(['class' => $exception::class, 'status' => null, 'body' => null]);
+})->with([
+    'a timeout' => [new TimeoutExceededException('timed out')],
+    'an expired job' => [new MaxAttemptsExceededException('job expired')],
+    'our own error' => [new RuntimeException('boom')],
+]);
+
+it('stores a null failure class when the queue hands over no exception', function (): void {
+    ['meta' => $meta] = failedTurnMeta(null);
+
+    expect($meta['error'])->toBeTrue()
+        ->and($meta['failure'])->toMatchArray(['class' => null, 'status' => null, 'body' => null]);
+});
+
+it('never sends the stored failure body to the transcript', function (): void {
+    ['user' => $user, 'conversationId' => $conversationId] = failedTurnMeta(rejectedByProvider(400, 'sk-ant-leaked-key-fragment'));
+
+    $messages = resolve(ConversationMessagesQuery::class)->get($user, $conversationId);
+
+    expect(array_column($messages, 'role'))->toBe(['user', 'assistant'])
+        ->and(json_encode($messages))->not->toContain('sk-ant-leaked-key-fragment')
+        ->and(json_encode($messages))->not->toContain('failure');
 });
 
 /**
