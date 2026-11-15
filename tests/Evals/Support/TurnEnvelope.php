@@ -21,6 +21,12 @@ final readonly class TurnEnvelope
         public int $durationMs,
         public ?string $error,
         public array $stepsText = [],
+        public string $servedModel = '',
+        public int $cacheReadTokens = 0,
+        public int $cacheWriteTokens = 0,
+        public int $reasoningTokens = 0,
+        public int $steps = 0,
+        public int $retries = 0,
     ) {}
 
     public static function failed(string $error): self
@@ -39,7 +45,13 @@ final readonly class TurnEnvelope
             'usage' => [
                 'input_tokens' => $this->inputTokens,
                 'output_tokens' => $this->outputTokens,
+                'cache_read' => $this->cacheReadTokens,
+                'cache_write' => $this->cacheWriteTokens,
+                'reasoning' => $this->reasoningTokens,
             ],
+            'served_model' => $this->servedModel,
+            'steps' => $this->steps,
+            'retries' => $this->retries,
             'duration_ms' => $this->durationMs,
             'error' => $this->error,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);

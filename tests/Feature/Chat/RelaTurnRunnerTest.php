@@ -122,6 +122,27 @@ it('lists the rendered row ids of each tool call in the envelope', function (): 
         ->and($envelope->durationMs)->toBe(450);
 });
 
+it('reads the served model, cache legs, reasoning and step count from the stored row', function (): void {
+    $row = assistantRowWithResults(
+        EvalWorkspace::seed(),
+        [],
+        ['input_tokens' => 900, 'output_tokens' => 40, 'cache_read_input_tokens' => 600, 'cache_write_input_tokens' => 200, 'reasoning_tokens' => 12],
+        ['duration_ms' => 450, 'model' => 'claude-sonnet-5'],
+    );
+
+    $envelope = RelaTurn::envelopeFromRow($row);
+    $json = json_decode($envelope->toJson(), true);
+
+    expect($envelope->servedModel)->toBe('claude-sonnet-5')
+        ->and($envelope->cacheReadTokens)->toBe(600)
+        ->and($envelope->cacheWriteTokens)->toBe(200)
+        ->and($envelope->reasoningTokens)->toBe(12)
+        ->and($envelope->steps)->toBe(1)
+        ->and($envelope->retries)->toBe(0)
+        ->and($json['served_model'])->toBe('claude-sonnet-5')
+        ->and($json['usage']['cache_read'])->toBe(600);
+});
+
 it('keeps the retry cause and retries a rate limited turn three times', function (): void {
     Sleep::fake();
     CrmAssistant::fake(fn () => throw RateLimitedException::forProvider('anthropic'));

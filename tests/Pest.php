@@ -93,9 +93,10 @@ pest()->afterEach(function (): void {
     }
 
     $failure = $status->isSuccess() ? null : $status->message();
+    $split = current(array_intersect($this->groups(), ['train', 'test', 'guard'])) ?: null;
 
     if (! RelaTurn::$last instanceof TurnEnvelope) {
-        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')]);
+        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], file: basename(self::$__filename, '.php'), split: $split);
         EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
 
         return;
@@ -107,6 +108,10 @@ pest()->afterEach(function (): void {
         RelaTurn::$last,
         array_values(array_filter([$failure, RelaTurn::$last->error])),
         count(RelaTurn::$turns),
+        false,
+        RelaTurn::$turns,
+        basename(self::$__filename, '.php'),
+        $split,
     );
     EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
     RelaTurn::forget();

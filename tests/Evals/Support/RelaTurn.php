@@ -119,6 +119,11 @@ final class RelaTurn
             durationMs: (int) ($meta['duration_ms'] ?? 0),
             error: null,
             stepsText: self::stepsTextOf($row->steps),
+            servedModel: (string) ($meta['model'] ?? ''),
+            cacheReadTokens: (int) ($usage['cache_read_input_tokens'] ?? 0),
+            cacheWriteTokens: (int) ($usage['cache_write_input_tokens'] ?? 0),
+            reasoningTokens: (int) ($usage['reasoning_tokens'] ?? 0),
+            steps: count(self::decodeList($row->steps)),
         );
     }
 
@@ -127,12 +132,20 @@ final class RelaTurn
      */
     private static function stepsTextOf(mixed $steps): array
     {
-        $decoded = is_array($steps) ? $steps : json_decode((string) ($steps ?: '[]'), true);
-
         return array_values(array_map(
             fn (mixed $step): string => is_array($step) ? (string) ($step['content'] ?? '') : '',
-            is_array($decoded) ? $decoded : [],
+            self::decodeList($steps),
         ));
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private static function decodeList(mixed $value): array
+    {
+        $decoded = is_array($value) ? $value : json_decode((string) ($value ?: '[]'), true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**
