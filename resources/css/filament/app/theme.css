@@ -248,8 +248,10 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
     }
 
     .fi-sidebar:not(.fi-sidebar-open) {
+        /* Filament's `scrollbar-gutter: stable` spends 15px of the 48px rail on an always-visible
+           scrollbar and clips every icon. The rail still scrolls by wheel and touch. */
         .fi-sidebar-nav {
-            @apply px-4;
+            @apply px-4 [scrollbar-width:none];
         }
 
         .fi-sidebar-nav-groups {
