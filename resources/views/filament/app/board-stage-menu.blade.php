@@ -9,7 +9,7 @@
             >
                 <button
                     type="button"
-                    class="size-3 shrink-0 rounded-full"
+                    class="size-3.5 shrink-0 rounded-full"
                     style="{{ $dot }}; background-color: var(--color-500)"
                     data-stage-color-trigger
                     x-ref="colorTrigger"
@@ -56,7 +56,7 @@
     @else
         <div class="flex items-center gap-2.5 text-sm font-semibold text-gray-950 dark:text-white" data-stage-name>
             @if ($dot)
-                <span class="size-3 shrink-0 rounded-full" style="{{ $dot }}; background-color: var(--color-500)"></span>
+                <span class="size-3.5 shrink-0 rounded-full" style="{{ $dot }}; background-color: var(--color-500)"></span>
             @endif
             <span class="min-w-0 truncate">{{ $name }}</span>
         </div>

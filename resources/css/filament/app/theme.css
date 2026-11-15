@@ -954,14 +954,6 @@ a.fi-linked-records-chip {
     @apply text-gray-400 hover:text-gray-700 [@media(hover:hover)]:aria-expanded:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 dark:[@media(hover:hover)]:aria-expanded:text-gray-200;
 }
 
-.ff-column-header .fi-icon-btn {
-    @apply size-6;
-
-    & .fi-icon {
-        @apply size-4;
-    }
-}
-
 @media (hover: hover) {
     .fi-ta-row.fi-clickable:has([aria-expanded='true']) {
         @apply bg-gray-50 dark:bg-white/5;
@@ -2094,6 +2086,10 @@ html.fi-record-stacked .fi-record-layout {
     & .fi-dropdown-list {
         @apply min-h-0 overflow-y-auto sm:p-1;
     }
+
+    & .fi-dropdown-list-item:not(.fi-color-danger) :is(.fi-dropdown-list-item-label, .fi-icon) {
+        @apply text-gray-950 dark:text-white;
+    }
 }
 
 .ff-column-menu-block {
@@ -2366,7 +2362,6 @@ html.fi-record-stacked .fi-record-layout {
 .ff-board {
     --ff-surface: #fff;
     --ff-tray-bg: var(--gray-50);
-    --ff-tray-radius: 1rem;
     --ff-card-bg: var(--surface-block-bg);
     --ff-card-ring: var(--surface-block-border);
     --ff-gap: 0.75rem;
@@ -2374,7 +2369,6 @@ html.fi-record-stacked .fi-record-layout {
     --ff-card-gap: 0.5rem;
     --ff-card-label: 6.5rem;
     --ff-card-padding: 0.75rem;
-    --ff-dot-size: 0.75rem;
     --ff-overlay-radius: var(--radius-menu);
     --ff-overlay-shadow: 0 0 0 1px color-mix(in oklab, var(--gray-950) 5%, transparent), 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
@@ -2401,68 +2395,16 @@ html.fi-record-stacked .fi-record-layout {
     padding-inline: var(--ff-inset);
 }
 
-/* On a flat board the header sits inside its column's surface, so the drop states move from the tray to the column. */
-.ff-board .ff-columns > .ff-column:not([data-collapsed]) {
-    background-color: var(--ff-tray-bg);
-    border-radius: var(--ff-tray-radius);
-    transition: background-color 150ms, box-shadow 150ms;
-
-    & > .ff-tray {
-        background-color: transparent;
-        box-shadow: none;
-    }
-
-    & > .ff-column-header {
-        padding-top: var(--ff-inset);
-    }
-
-    &[data-drop='active'] {
-        background-color: var(--primary-50);
-        box-shadow: inset 0 0 0 1px var(--primary-500);
-    }
-
-    &[data-drop='blocked'] {
-        box-shadow: inset 0 0 0 1px var(--danger-500);
-    }
-}
-
-.dark .ff-board .ff-columns > .ff-column:not([data-collapsed])[data-drop='active'] {
-    background-color: color-mix(in oklab, var(--primary-500) 10%, transparent);
-}
-
-.ff-board .ff-column-title {
-    @apply font-semibold;
-}
-
-.ff-board .ff-column .ff-count {
-    @apply rounded-md bg-gray-200/70 px-1.5 text-xs/5 font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300;
-}
-
-/* Every column but the no-value one drags by its header (board-stage-order.js). Lucide grip-vertical, drawn as a mask. */
-.ff-board .ff-column:not([data-collapsed], [data-column-root='__none__']) > .ff-column-header::after {
-    content: '';
-    flex-shrink: 0;
-    width: 1rem;
-    height: 1rem;
-    cursor: grab;
-    background-color: var(--gray-400);
-    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ccircle cx='9' cy='5' r='1.9'/%3E%3Ccircle cx='9' cy='12' r='1.9'/%3E%3Ccircle cx='9' cy='19' r='1.9'/%3E%3Ccircle cx='15' cy='5' r='1.9'/%3E%3Ccircle cx='15' cy='12' r='1.9'/%3E%3Ccircle cx='15' cy='19' r='1.9'/%3E%3C/svg%3E") center / contain no-repeat;
-}
-
-.dark .ff-board .ff-column:not([data-collapsed], [data-column-root='__none__']) > .ff-column-header::after {
-    background-color: var(--gray-500);
-}
-
-.ff-board :is(.ff-add-slot .ff-add-row, .ff-add-column-button) {
-    @apply rounded-lg border border-dashed border-gray-300 bg-transparent text-gray-500 hover:bg-gray-100 dark:border-white/15 dark:text-gray-400 dark:hover:bg-white/5;
-}
-
 .ff-board .ff-add-slot .ff-add-row {
-    @apply justify-center px-3 py-1.5;
+    @apply justify-center rounded-lg border border-dashed border-gray-200 bg-gray-100/70 px-3 py-1.5 text-gray-500 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10;
 }
 
 .ff-board .ff-add-column-button {
-    @apply focus-visible:bg-gray-100 dark:focus-visible:bg-white/5;
+    @apply rounded-lg border border-dashed border-gray-300 bg-transparent text-gray-500 hover:bg-gray-100 dark:border-white/15 dark:text-gray-400 dark:hover:bg-white/5 focus-visible:bg-gray-100 dark:focus-visible:bg-white/5;
+}
+
+.ff-board .ff-add-column-dot {
+    @apply size-3.5;
 }
 
 .ff-board .ff-cell {

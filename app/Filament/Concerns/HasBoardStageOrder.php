@@ -288,7 +288,7 @@ trait HasBoardStageOrder
         return [
             Action::make('collapseStage')
                 ->label(fn (): string => __('filament/pages/boards.stage_menu.collapse', ['noun' => $this->boardStageNoun()]))
-                ->icon('lucide-fold-horizontal')
+                ->icon('lucide-square-arrow-left')
                 ->action(fn (array $arguments) => $this->setBoardColumnCollapsed($arguments['column'] ?? null, true)),
             Action::make('hideStage')
                 ->label(fn (): string => __('filament/pages/boards.stage_menu.hide', ['noun' => $this->boardStageNoun()]))
