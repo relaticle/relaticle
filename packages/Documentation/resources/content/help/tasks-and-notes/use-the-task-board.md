@@ -19,7 +19,7 @@ date approaches. Choose what a card shows under **Visible attributes** in **View
 
 Click **Filter** to narrow the whole board by most attributes. Filter by **Assignees** to see one person's plate. Click **Sort** to order the cards in every column. Open **View settings** and pick **Assignee** under **Lanes** to split the board into a lane per assignee. A **Sort** orders the cards inside each lane too.
 
-Without a sort, cards keep the order you dragged them into. With a sort set, you can still drag a card to another column but not reorder it by hand. The two buttons at the end of the filter row switch the columns between narrow and wide and the cards between compact and full.
+Without a sort, cards keep the order you dragged them into. With a sort set, you can still drag a card to another column but not reorder it by hand. The buttons at the end of the filter row collapse or expand every column, and switch the cards between compact and full. To collapse one column, double-click an empty part of it, or click its header and choose **Collapse status**. Click its collapsed rail to expand it again.
 
 ![The task board with To do, In progress, and Done columns, cards showing priority flags, due-date badges, and assignee avatars](/help-assets/tasks-and-notes/use-the-task-board-1.png)
 
@@ -42,6 +42,8 @@ for tasks with no status. The order is saved
 for you alone, so teammates keep theirs. The board also remembers your filters,
 sort and lanes. Choose **Create new view** in the view switcher to save it as a view only you see. It leaves the **Status** field's own
 order untouched, and a status added later joins the end of your order.
+
+Owners and Admins can switch on **Confetti** in a status's header menu, for example on **Done**. Anyone who then moves a task into that status sees confetti on their own screen. Members and viewers don't see the switch, and the setting applies to the whole workspace.
 
 ## The columns are yours
 

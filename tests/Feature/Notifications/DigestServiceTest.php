@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Data\DigestRecord;
 use App\Enums\CrmEntity;
+use App\Enums\OptionColor;
 use App\Features\OnboardSeed;
 use App\Filament\Resources\TaskResource;
 use App\Models\Company;
@@ -175,7 +176,7 @@ it('carries each digest task priority and its option color', function (): void {
     $overdue = collect(resolve(DigestService::class)->forWorkspace($user, $workspace)->overdue)->keyBy('title');
 
     expect($overdue['urgent']->priority)->toBe('High')
-        ->and($overdue['urgent']->priorityColor)->toBe('#dc2626')
+        ->and($overdue['urgent']->priorityColor)->toBe(OptionColor::Red->value)
         ->and($overdue['plain']->priority)->toBeNull();
 });
 

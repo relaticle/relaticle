@@ -1,5 +1,7 @@
-// Board pieces: the View settings panel and the column drag by header. The package renders the
+// Board pieces: the View settings panel and the column drag by header, empty tray or collapsed rail. The package renders the
 // columns, so the drag finds its containers by the documented ff-* classes and re-binds after a morph.
+
+const COLUMN_DRAG_IGNORED = '.ff-card, [data-card-id], .ff-add-slot, .ff-column-actions, .ff-column:not([data-collapsed]) .ff-count, button, a, input, textarea, select, [contenteditable]'
 
 document.addEventListener('alpine:init', () => {
     window.Alpine.data('boardViewSettings', () => ({
@@ -185,8 +187,7 @@ document.addEventListener('alpine:init', () => {
                 window.Sortable.create(container, {
                     group: { name: 'board-columns', pull: false, put: false },
                     draggable: `.ff-column:not([data-column-root="${CSS.escape(this.$el.dataset.boardNoValueColumn)}"])`,
-                    handle: '.ff-column-header',
-                    filter: '.ff-column-actions, .ff-count, .ff-column-header button',
+                    filter: COLUMN_DRAG_IGNORED,
                     preventOnFilter: false,
                     direction: 'horizontal',
                     forceFallback: true,

@@ -218,9 +218,8 @@ it('gives cards the same inset and gap in a flat column and in a lane cell', fun
             const tray = rect(column.querySelector('.ff-tray'));
             const [first, second] = [...column.querySelectorAll('.ff-card')].map(rect);
             const heading = rect(column.querySelector('.ff-column-heading').firstElementChild);
-            const actions = rect(column.querySelector('.ff-column-actions'));
-            const addIcon = rect(column.querySelector('.ff-add-row-icon'));
-            const cardPadding = parseFloat(getComputedStyle(column.querySelector('.ff-card-body')).paddingLeft);
+            const header = column.querySelector('.ff-column-header');
+            const addRow = rect(column.querySelector('.ff-add-slot .ff-add-row'));
 
             return {
                 left: round(first.left - tray.left),
@@ -228,8 +227,8 @@ it('gives cards the same inset and gap in a flat column and in a lane cell', fun
                 top: round(first.top - tray.top),
                 gap: round(second.top - first.bottom),
                 headerLeft: round(heading.left - first.left),
-                headerRight: round(actions.right - first.right),
-                addIcon: round(addIcon.left - first.left - cardPadding),
+                headerRight: round(rect(header).right - parseFloat(getComputedStyle(header).paddingRight) - first.right),
+                addEdges: [round(addRow.left - first.left), round(first.right - addRow.right)],
             };
         })();
     JS;
@@ -264,7 +263,7 @@ it('gives cards the same inset and gap in a flat column and in a lane cell', fun
         ->and($column['top'])->toBe($column['left'])
         ->and($column['headerLeft'])->toBe(0)
         ->and($column['headerRight'])->toBe(0)
-        ->and($column['addIcon'])->toBe(0);
+        ->and($column['addEdges'])->toBe([0, 0]);
 
     $page->navigate("/app/{$workspace->slug}/{$path}/board?groupBy={$groupBy}")
         ->assertVisible('.ff-cell .ff-card >> nth=1')
@@ -414,7 +413,6 @@ it('gives an empty attribute its own line and labelled rows one gap, one line an
         ->and(array_unique($rows['gaps']))->toEqual([8]);
 
     $page->click('.fi-topbar-page-title');
-    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
 
     $labelled = $page->script(<<<JS
         (() => {

@@ -2041,7 +2041,16 @@ html.fi-record-stacked .fi-record-layout {
     .fi-view-settings-row .fi-icon-btn,
     .fi-ta-views-row-actions .fi-icon-btn,
     .fi-bulk-bar-selection,
-    .fi-board-layout-option
+    .fi-board-layout-option,
+    .ff-column-header .fi-icon-btn,
+    .ff-column-menu .ff-column-heading[role='button'],
+    .ff-column[data-collapsed][role='button'],
+    .ff-add-column-button,
+    .ff-add-column-dot,
+    .ff-add-row,
+    .ff-lane-toggle,
+    .ff-swatch,
+    [data-stage-color-trigger]
 ):focus-visible {
     @apply outline-2 outline-solid outline-primary-500;
 }
@@ -2066,6 +2075,36 @@ html.fi-record-stacked .fi-record-layout {
 /* The one line a menu shows when its search or list matches nothing. */
 .fi-menu-empty {
     @apply px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400;
+}
+
+/* The stage menu on a board header: a name block over the actions, rules running edge to edge. */
+.ff-column-menu .fi-dropdown-panel {
+    @apply sm:p-0;
+
+    &:not([x-cloak], [style*='display: none']) {
+        @apply flex! flex-col;
+    }
+
+    & .fi-dropdown-list {
+        @apply min-h-0 overflow-y-auto sm:p-1;
+    }
+
+    & .fi-dropdown-list-item:not(.fi-color-danger) :is(.fi-dropdown-list-item-label, .fi-icon) {
+        @apply text-gray-950 dark:text-white;
+    }
+}
+
+.ff-column-menu-block {
+    @apply p-3;
+}
+
+/* The header sits above its tray, so the panel rises until the name field lies over the title it replaces. */
+.ff-board .ff-column-menu > .fi-dropdown-panel {
+    @apply sm:-mt-5;
+}
+
+.fi-board-stage-confetti {
+    @apply -mx-3 -mb-3 border-t border-gray-100 p-1 dark:border-white/5;
 }
 
 .fi-dropdown-list-item-label {
@@ -2341,6 +2380,8 @@ html.fi-record-stacked .fi-record-layout {
     --ff-card-gap: 0.5rem;
     --ff-card-label: 6.5rem;
     --ff-card-padding: 0.75rem;
+    --ff-overlay-radius: var(--radius-menu);
+    --ff-overlay-shadow: 0 0 0 1px color-mix(in oklab, var(--gray-950) 5%, transparent), 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
     @media (width < 40rem) {
         --ff-column-width: min(300px, calc(100vw - 3.5rem));
@@ -2365,8 +2406,16 @@ html.fi-record-stacked .fi-record-layout {
     padding-inline: var(--ff-inset);
 }
 
-.ff-board .ff-add-row {
-    padding-inline: var(--ff-card-padding);
+.ff-board .ff-add-slot .ff-add-row {
+    @apply justify-center rounded-lg border border-dashed border-gray-200 bg-gray-100/70 px-3 py-1.5 text-gray-500 hover:bg-gray-100 dark:border-white/10 dark:bg-white/5 dark:text-gray-400 dark:hover:bg-white/10;
+}
+
+.ff-board .ff-add-column-button {
+    @apply rounded-lg border border-dashed border-gray-300 bg-transparent text-gray-500 hover:bg-gray-100 dark:border-white/15 dark:text-gray-400 dark:hover:bg-white/5 focus-visible:bg-gray-100 dark:focus-visible:bg-white/5;
+}
+
+.ff-board .ff-add-column-dot {
+    @apply size-3.5;
 }
 
 .ff-board .ff-cell {
@@ -2385,13 +2434,6 @@ html.fi-record-stacked .fi-record-layout {
 /* The schema's own 1.5rem gap is not a row gap; its entries take the card body's gap instead. */
 .ff-board .ff-card-body > .fi-sc {
     display: contents;
-}
-
-.fi-page:has(.fi-board-header[data-board-column-width='narrow']) .ff-board {
-    @media (width >= 40rem) {
-        --ff-column-width: 15rem;
-        --ff-card-label: 4.5rem;
-    }
 }
 
 /* Flowforge wraps every card item, so a labelled row takes its own line through that wrapper. */
@@ -2416,6 +2458,7 @@ html.fi-record-stacked .fi-record-layout {
 
 .dark .ff-board {
     --ff-surface: var(--gray-900);
+    --ff-overlay-shadow: 0 0 0 1px color-mix(in oklab, #fff 10%, transparent), 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --ff-tray-bg: color-mix(in oklab, var(--gray-950) 50%, transparent);
 }
 

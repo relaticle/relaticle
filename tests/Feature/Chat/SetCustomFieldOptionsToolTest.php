@@ -3,18 +3,23 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\SetCustomFieldOptions;
+use App\Enums\OptionColor;
+use App\Exceptions\OptionsChangedException;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\CustomFieldValue;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CustomFieldOptionPlan;
 use Filament\Facades\Filament;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Tools\Request;
+use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Models\PendingAction;
@@ -22,6 +27,8 @@ use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Spatie\Activitylog\Support\CauserResolver;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SetCustomFieldOptionsTool::class, SetCustomFieldOptions::class, CustomFieldOptionPlan::class);
 
@@ -518,7 +525,7 @@ it('locks the field row before it writes any option', function (): void {
     resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
 
     $queries = array_column(DB::getQueryLog(), 'query');
-    $lock = array_search(true, array_map(fn (string $query): bool => str_contains($query, 'from "custom_fields"') && str_contains($query, 'for update'), $queries), true);
+    $lock = array_search(true, array_map(fn (string $query): bool => str_contains($query, 'from "custom_fields"') && str_contains($query, 'for no key update'), $queries), true);
     $write = array_search(true, array_map(fn (string $query): bool => str_starts_with($query, 'update "custom_field_options"'), $queries), true);
 
     expect($lock)->toBeInt()
@@ -619,4 +626,531 @@ it('refuses approval when an option it keeps was renamed after the proposal', fu
         ->toThrow(ValidationException::class, 'changed after this proposal');
 
     expect(setOptionsNames($this->lifecycle))->toBe(['Prospect', 'Customer', 'Churned']);
+});
+
+it('sets an option color from the palette and turns option colors on', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'color' => OptionColor::Blue->value], ['name' => 'Customer', 'color' => OptionColor::Green->value], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['data']['options'][0])->toBe(['id' => $leadId, 'name' => 'Lead', 'was' => 'Lead', 'color' => OptionColor::Blue->value])
+        ->and($decoded['data']['options'][2])->not->toHaveKey('color')
+        ->and($decoded['display']['fields'])->toContain(['label' => 'Color', 'value' => 'Lead: Blue']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $colors = CustomFieldOption::query()->withoutGlobalScopes()->where('custom_field_id', $this->lifecycle->getKey())->get()->mapWithKeys(fn (CustomFieldOption $option): array => [(string) $option->name => $option->settings->color]);
+
+    expect($colors->all())->toEqual(['Lead' => OptionColor::Blue->value, 'Customer' => OptionColor::Green->value, 'Churned' => null])
+        ->and($this->lifecycle->refresh()->settings->enable_option_colors)->toBeTrue();
+});
+
+it('adds an option with a color', function (): void {
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer'], ['name' => 'Churned'], ['name' => 'Partner', 'color' => OptionColor::Purple->value]],
+    ]]);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->where('name', 'Partner')->sole()->settings->color)->toBe(OptionColor::Purple->value);
+});
+
+it('keeps the current color when an option carries none', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value]]);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Prospect', 'current' => 'Lead'], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings->color)->toBe(OptionColor::Red->value);
+});
+
+it('turns confetti on for a stage, shows it in the proposal and keeps its color', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value]]);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'celebrate' => true], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['data']['options'][0])->toBe(['id' => $leadId, 'name' => 'Lead', 'was' => 'Lead', 'celebrate' => true])
+        ->and($decoded['display']['fields'])->toContain(['label' => 'Confetti', 'value' => 'Lead: On']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $settings = CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings;
+
+    expect($settings->celebrate)->toBeTrue()
+        ->and($settings->color)->toBe(OptionColor::Red->value);
+});
+
+it('keeps confetti when the proposal recolors another option', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value, 'celebrate' => true]]);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer', 'color' => OptionColor::Blue->value], ['name' => 'Churned']],
+    ]]);
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings->celebrate)->toBeTrue();
+});
+
+it('turns confetti off and recolors the same option in one proposal', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value, 'celebrate' => true]]);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'color' => OptionColor::Green->value, 'celebrate' => false], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Confetti', 'value' => 'Lead: Off']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $settings = CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings;
+
+    expect($settings->celebrate)->toBeFalse()
+        ->and($settings->color)->toBe(OptionColor::Green->value);
+});
+
+it('refuses a proposal that changes nothing when confetti already has the asked state', function (): void {
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'celebrate' => false], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['error'])->toContain('Nothing to change');
+});
+
+it('refuses a color outside the palette', function (): void {
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Prospect', 'current' => 'Lead', 'color' => 'teal'], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['error'])->toContain('color');
+    expect(PendingAction::query()->count())->toBe(0);
+});
+
+it('lets the action set a color through the same validation as the proposal', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    $options = collect(['Lead', 'Customer', 'Churned'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $options[0]['color'] = OptionColor::Orange->value;
+
+    resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings->color)->toBe(OptionColor::Orange->value);
+
+    $options[0]['color'] = '#000000';
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]))->toThrow(ValidationException::class);
+});
+
+it('refuses a palette name as a color', function (): void {
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'color' => 'Blue'], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['error'])->toContain('color');
+});
+
+it('proposes a color the option already stores when option colors are off', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Blue->value]]);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'color' => OptionColor::Blue->value], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded)->not->toHaveKey('error');
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect($this->lifecycle->refresh()->settings->enable_option_colors)->toBeTrue();
+});
+
+it('clears the values of a removed select option when the replacement is null and states the count on the card', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    $first = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    $second = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    $kept = setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Lead'));
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded)->not->toHaveKey('error')
+        ->and($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned (2 records lose their value)']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $logged = Activity::withoutGlobalScopes()
+        ->where('event', 'custom_field_changes')
+        ->where('subject_id', $first->getKey())
+        ->get()
+        ->map(fn (Activity $activity): string => $activity->properties['custom_field_changes'][0]['old']['label'])
+        ->all();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($churnedId))->toBeNull()
+        ->and(setOptionsStoredValue($first, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($second, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($kept, $this->lifecycle))->toBe(setOptionsId($this->lifecycle, 'Lead'))
+        ->and($logged)->toContain('Churned');
+});
+
+it('removes only the cleared option from multi-select values', function (): void {
+    $enterpriseId = setOptionsId($this->segments, 'Enterprise');
+    $smbId = setOptionsId($this->segments, 'SMB');
+    $startupId = setOptionsId($this->segments, 'Startup');
+    $only = setOptionsCompany($this->workspace, $this->segments, [$smbId]);
+    $mixed = setOptionsCompany($this->workspace, $this->segments, [$enterpriseId, $smbId, $startupId]);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'segments',
+        'options' => [['name' => 'Enterprise'], ['name' => 'Startup']],
+        'replacements' => ['SMB' => null],
+    ]]);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(setOptionsStoredValue($only, $this->segments))->toBe([])
+        ->and(setOptionsStoredValue($mixed, $this->segments))->toBe([$enterpriseId, $startupId])
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->find($smbId))->toBeNull();
+});
+
+it('shows the plain option name on the card when a cleared option holds no records', function (): void {
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned']);
+});
+
+it('still refuses a removal of a used option that carries neither a replacement nor the clear marker', function (): void {
+    setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Churned'));
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => [],
+    ]]);
+
+    expect($decoded['error'])->toContain('Records still use "Churned"');
+});
+
+it('clears values through the action and refuses a member', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    $company = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    $options = collect(['Lead', 'Customer'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $data = ['options' => $options, 'replacements' => [$churnedId => null], 'removed' => [$churnedId]];
+
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $member->switchWorkspace($this->workspace);
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($member, $this->lifecycle, $data))->toThrow(HttpException::class);
+    expect(setOptionsStoredValue($company, $this->lifecycle))->toBe($churnedId);
+
+    resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, $data);
+
+    expect(setOptionsStoredValue($company, $this->lifecycle))->toBeNull();
+});
+
+it('names the clear marker in the assistant instructions', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())->toContain('pass where they move in `replacements`, or null to clear their value');
+});
+
+it('counts only live records in the clear count on the card', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned (1 record loses its value)']);
+});
+
+it('shows no count when only trashed records hold the cleared option', function (): void {
+    setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Churned'))->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned']);
+});
+
+it('says records lose the option, not their value, on a multi-select field', function (): void {
+    $smbId = setOptionsId($this->segments, 'SMB');
+    setOptionsCompany($this->workspace, $this->segments, [$smbId]);
+    setOptionsCompany($this->workspace, $this->segments, [$smbId, setOptionsId($this->segments, 'Startup')]);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'segments',
+        'options' => [['name' => 'Enterprise'], ['name' => 'Startup']],
+        'replacements' => ['SMB' => null],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'SMB (2 records lose this option)']);
+});
+
+it('refuses at proposal to clear more records than the cap allows, trashed ones counted', function (): void {
+    config(['chat.max_option_value_moves' => 2]);
+
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    expect($decoded['error'])->toContain('"Churned" would be cleared on 3 records. This assistant clears or moves at most 2 records in one approval.')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('refuses at approval to clear more records than the cap allows', function (): void {
+    config(['chat.max_option_value_moves' => 2]);
+
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+        'replacements' => ['Churned' => null],
+    ]]);
+
+    $late = [setOptionsCompany($this->workspace, $this->lifecycle, $churnedId), setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)];
+
+    expect(fn (): PendingAction => resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner))
+        ->toThrow(ValidationException::class, 'This assistant clears or moves at most 2 records in one approval.');
+
+    expect(setOptionsStoredValue($late[0], $this->lifecycle))->toBe($churnedId);
+});
+
+it('lets a caller that opts out clear more records than the cap', function (): void {
+    config(['chat.max_option_value_moves' => 1]);
+
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    $companies = [setOptionsCompany($this->workspace, $this->lifecycle, $churnedId), setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)];
+    $options = collect(['Lead', 'Customer'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $data = ['options' => $options, 'replacements' => [$churnedId => null], 'removed' => [$churnedId]];
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, $data))->toThrow(ValidationException::class);
+
+    resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, $data, capsClears: false);
+
+    expect(setOptionsStoredValue($companies[0], $this->lifecycle))->toBeNull();
+});
+
+it('raises a distinct exception when the options changed under the caller', function (): void {
+    $options = collect(['Lead', 'Customer', 'Churned'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $options[0]['was'] = 'Other';
+    $options[0]['name'] = 'Renamed';
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]))
+        ->toThrow(OptionsChangedException::class);
+});
+
+function setOptionsActivityRow(Company $company): array
+{
+    return Arr::except(
+        Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $company->getKey())->orderByDesc('id')->firstOrFail()->toArray(),
+        ['id', 'subject_id', 'created_at', 'updated_at'],
+    );
+}
+
+function setOptionsClearTheOldWay(Company $company, CustomField $field): void
+{
+    $column = $field->type === 'multi-select' ? 'json_value' : 'string_value';
+    $removing = $field->type === 'multi-select' ? 'SMB' : 'Churned';
+    $value = CustomFieldValue::query()->where('entity_id', $company->getKey())->where('custom_field_id', $field->getKey())->sole();
+    $value->setAttribute($column, $column === 'json_value'
+        ? collect($value->json_value)->reject(fn (string $id): bool => $id === setOptionsId($field, $removing))->values()
+        : null);
+    $value->save();
+}
+
+function setOptionsClearWithNull(object $test, CustomField $field, array $keep, string $removing): void
+{
+    $options = collect($keep)->map(fn (string $name): array => ['id' => setOptionsId($field, $name), 'name' => $name, 'was' => $name])->all();
+    $id = setOptionsId($field, $removing);
+
+    resolve(SetCustomFieldOptions::class)->execute($test->owner, $field, ['options' => $options, 'replacements' => [$id => null], 'removed' => [$id]], capsClears: false);
+}
+
+it('writes the same activity row in bulk as the per-record save wrote, for a single choice field', function (): void {
+    $churned = setOptionsId($this->lifecycle, 'Churned');
+    $twin = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    setOptionsClearTheOldWay($twin, $this->lifecycle);
+    $expected = setOptionsActivityRow($twin);
+
+    $live = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    $trashed = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    $trashed->delete();
+    $untouched = setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Lead'));
+    $otherField = setOptionsCompany($this->workspace, $this->segments, [setOptionsId($this->segments, 'SMB')]);
+    $untouchedLogs = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->whereIn('subject_id', [$untouched->getKey(), $otherField->getKey()])->count();
+
+    $intruder = User::factory()->withPersonalWorkspace()->create();
+    $foreignField = setOptionsChoiceField($intruder->currentWorkspace, 'lifecycle', 'Lifecycle', 'select', ['Lead', 'Customer', 'Churned']);
+    TenantContextService::setTenantId($intruder->currentWorkspace->getKey());
+    $foreign = setOptionsCompany($intruder->currentWorkspace, $foreignField, setOptionsId($foreignField, 'Churned'));
+    TenantContextService::setTenantId($this->workspace->getKey());
+    $foreignLogs = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $foreign->getKey())->count();
+
+    setOptionsClearWithNull($this, $this->lifecycle, ['Lead', 'Customer'], 'Churned');
+
+    expect($expected['workspace_id'])->toBe($this->workspace->getKey())
+        ->and(setOptionsActivityRow($live))->toEqual($expected)
+        ->and(setOptionsActivityRow($trashed))->toEqual($expected)
+        ->and(setOptionsStoredValue($live, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($trashed, $this->lifecycle))->toBeNull()
+        ->and(setOptionsStoredValue($untouched, $this->lifecycle))->toBe(setOptionsId($this->lifecycle, 'Lead'))
+        ->and(setOptionsStoredValue($otherField, $this->segments))->toBe([setOptionsId($this->segments, 'SMB')])
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->whereIn('subject_id', [$untouched->getKey(), $otherField->getKey()])->count())->toBe($untouchedLogs)
+        ->and(setOptionsStoredValue($foreign, $foreignField))->toBe(setOptionsId($foreignField, 'Churned'))
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $foreign->getKey())->count())->toBe($foreignLogs);
+});
+
+it('writes the same activity row in bulk as the per-record save wrote, for a multi choice field', function (): void {
+    [$enterprise, $smb, $startup] = array_map(fn (string $name): string => setOptionsId($this->segments, $name), ['Enterprise', 'SMB', 'Startup']);
+    $twin = setOptionsCompany($this->workspace, $this->segments, [$enterprise, $smb]);
+    setOptionsClearTheOldWay($twin, $this->segments);
+    $expected = setOptionsActivityRow($twin);
+
+    $mixed = setOptionsCompany($this->workspace, $this->segments, [$enterprise, $smb]);
+    $only = setOptionsCompany($this->workspace, $this->segments, [$smb]);
+    $trashed = setOptionsCompany($this->workspace, $this->segments, [$smb, $startup]);
+    $trashed->delete();
+    $other = setOptionsCompany($this->workspace, $this->segments, [$enterprise, $startup]);
+    $otherLogs = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $other->getKey())->count();
+
+    setOptionsClearWithNull($this, $this->segments, ['Enterprise', 'Startup'], 'SMB');
+
+    $onlyRow = setOptionsActivityRow($only);
+
+    expect(setOptionsActivityRow($mixed))->toEqual($expected)
+        ->and($onlyRow['properties']['custom_field_changes'][0]['new'])->toBe(['value' => null, 'label' => '—'])
+        ->and(setOptionsStoredValue($mixed, $this->segments))->toBe([$enterprise])
+        ->and(setOptionsStoredValue($only, $this->segments))->toBe([])
+        ->and(setOptionsStoredValue($trashed, $this->segments))->toBe([$startup])
+        ->and(setOptionsStoredValue($other, $this->segments))->toBe([$enterprise, $startup])
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $other->getKey())->count())->toBe($otherLogs);
+});
+
+it('clears a multi-select value stored as a bare json string and logs it', function (): void {
+    $smb = setOptionsId($this->segments, 'SMB');
+    $scalar = setOptionsCompany($this->workspace, $this->segments, [$smb]);
+    $array = setOptionsCompany($this->workspace, $this->segments, [$smb, setOptionsId($this->segments, 'Startup')]);
+    DB::table('custom_field_values')->where('entity_id', $scalar->getKey())->where('custom_field_id', $this->segments->getKey())->update(['json_value' => json_encode($smb)]);
+
+    setOptionsClearWithNull($this, $this->segments, ['Enterprise', 'Startup'], 'SMB');
+
+    expect(setOptionsStoredValue($scalar, $this->segments))->toBe([])
+        ->and(setOptionsStoredValue($array, $this->segments))->toBe([setOptionsId($this->segments, 'Startup')])
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $scalar->getKey())->count())->toBe(2);
+});
+
+it('leaves a card that moved out of the stage after the chunk was read untouched and unlogged', function (string $kind): void {
+    $multi = $kind === 'multi';
+    $field = $multi ? $this->segments : $this->lifecycle;
+    $removing = setOptionsId($field, $multi ? 'SMB' : 'Churned');
+    $staying = setOptionsId($field, $multi ? 'Startup' : 'Lead');
+    $make = fn (): Company => setOptionsCompany($this->workspace, $field, $multi ? [$removing] : $removing);
+    $cleared = $make();
+    $moved = $make();
+    $logsBefore = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $moved->getKey())->count();
+    $armed = true;
+
+    DB::listen(function ($query) use (&$armed, $moved, $field, $multi, $staying): void {
+        if ($armed && str_starts_with($query->sql, 'select') && str_contains($query->sql, 'custom_field_values') && str_contains($query->sql, 'order by')) {
+            $armed = false;
+            DB::table('custom_field_values')->where('entity_id', $moved->getKey())->where('custom_field_id', $field->getKey())->update([$multi ? 'json_value' : 'string_value' => $multi ? json_encode([$staying]) : $staying]);
+        }
+    });
+
+    setOptionsClearWithNull($this, $field, $multi ? ['Enterprise', 'Startup'] : ['Lead', 'Customer'], $multi ? 'SMB' : 'Churned');
+
+    expect(setOptionsStoredValue($moved, $field))->toBe($multi ? [$staying] : $staying)
+        ->and(setOptionsStoredValue($cleared, $field))->toBe($multi ? [] : null)
+        ->and(Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $moved->getKey())->count())->toBe($logsBefore);
+})->with(['single', 'multi']);
+
+it('writes no activity rows while the activity log is disabled and still clears the values', function (): void {
+    $company = setOptionsCompany($this->workspace, $this->lifecycle, setOptionsId($this->lifecycle, 'Churned'));
+    $logs = fn (): int => Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $company->getKey())->count();
+    $before = $logs();
+
+    activity()->withoutLogging(fn () => setOptionsClearWithNull($this, $this->lifecycle, ['Lead', 'Customer'], 'Churned'));
+
+    expect(setOptionsStoredValue($company, $this->lifecycle))->toBeNull()
+        ->and($logs())->toBe($before);
+});
+
+it('takes the causer from the causer resolver when nobody is signed in', function (): void {
+    $churned = setOptionsId($this->lifecycle, 'Churned');
+    $company = setOptionsCompany($this->workspace, $this->lifecycle, $churned);
+    Auth::guard('web')->forgetUser();
+
+    resolve(CauserResolver::class)->withCauser($this->owner, fn () => setOptionsClearWithNull($this, $this->lifecycle, ['Lead', 'Customer'], 'Churned'));
+
+    $row = Activity::withoutGlobalScopes()->where('event', 'custom_field_changes')->where('subject_id', $company->getKey())->orderByDesc('id')->first();
+
+    expect($row->causer_id)->toBe((string) $this->owner->getKey());
+});
+
+it('raises the changed exception when a kept option vanished before the write', function (): void {
+    $options = collect(['Lead', 'Customer'])->map(fn (string $name): array => ['id' => setOptionsId($this->lifecycle, $name), 'name' => $name, 'was' => $name])->all();
+    $options[] = ['id' => '01jzzzzzzzzzzzzzzzzzzzzzzz', 'name' => 'Ghost', 'was' => 'Ghost'];
+
+    expect(fn (): CustomField => resolve(SetCustomFieldOptions::class)->execute($this->owner, $this->lifecycle, ['options' => $options, 'removed' => []]))
+        ->toThrow(OptionsChangedException::class);
 });

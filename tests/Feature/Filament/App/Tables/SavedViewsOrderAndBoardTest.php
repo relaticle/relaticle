@@ -13,7 +13,6 @@ use App\Actions\Views\UpdateSavedView;
 use App\Data\BoardStateData;
 use App\Data\TableStateData;
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
@@ -483,7 +482,15 @@ function openPlainBoard(): Testable
 
 function switcherRowHtml(string $html, string $key): string
 {
-    return preg_match('/data-view-key="'.preg_quote($key, '/').'".*?(?=data-view-key=|$)/s', $html, $match) === 1 ? $match[0] : '';
+    $start = strpos($html, 'data-view-key="'.$key.'"');
+
+    if ($start === false) {
+        return '';
+    }
+
+    $end = strpos($html, 'data-view-key=', $start + 1);
+
+    return substr($html, $start, $end === false ? null : $end - $start);
 }
 
 it('saves the current board as a view and opens it', function (): void {
@@ -540,13 +547,14 @@ it('merges a closure change under the lock and refuses an unknown key from it', 
 });
 
 it('saves every Part 2 setting with a new board view and reopens it', function (): void {
-    plainBoardState(new BoardStateData(cardAttributes: ['company'], columnWidth: BoardColumnWidth::Narrow, cardSize: BoardCardSize::Compact));
+    plainBoardState(new BoardStateData(cardAttributes: ['company'], collapsedColumns: ['a'], columnsCollapsed: true, cardSize: BoardCardSize::Compact));
 
     livewire(OpportunitiesBoard::class)->callAction('saveSavedViewAs', ['name' => 'Dense']);
 
     $state = SavedView::query()->withoutGlobalScopes()->sole()->boardState();
     expect($state->cardAttributes)->toBe(['company'])
-        ->and($state->columnWidth)->toBe(BoardColumnWidth::Narrow)
+        ->and($state->collapsedColumns)->toBe(['a'])
+        ->and($state->columnsCollapsed)->toBeTrue()
         ->and($state->cardSize)->toBe(BoardCardSize::Compact);
 });
 

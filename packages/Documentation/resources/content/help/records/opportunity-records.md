@@ -42,11 +42,16 @@ orders the cards inside each lane too.
 
 Under **Visible attributes**, choose what each card shows, reorder it, and add
 more with **Add attribute to view**. **Show attribute labels** and **Hide empty
-attributes** adjust how the card reads. The two buttons at the end of the
-filter row switch the columns between narrow and wide and the cards between
-compact and full. The board remembers these settings, your filters and your
-sort for you alone, and the stage field's settings stay as they are. Choose
+attributes** adjust how the card reads. The buttons at the end of the filter
+row collapse or expand every column, and switch the cards between compact and
+full. To collapse one stage, double-click an empty part of its column, or
+click its header and choose **Collapse stage**. Click its collapsed rail to
+expand it again. The board remembers these settings, your
+filters and your sort for you alone, and the stage field's settings stay as
+they are. Choose
 **Create new view** in the view switcher to save the board as a view only you see.
+
+Owners and Admins can switch on **Confetti** in a stage's header menu. Anyone who then moves a deal into that stage sees confetti on their own screen. Members and viewers don't see the switch, and the setting applies to the whole workspace.
 
 The **New opportunity** button in the header creates a deal in the first visible
 column. Every column also has its own add button for creating a deal directly

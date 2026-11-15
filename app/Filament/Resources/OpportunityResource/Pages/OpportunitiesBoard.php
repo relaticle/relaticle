@@ -8,6 +8,7 @@ use App\Actions\Opportunity\UpdateOpportunity;
 use App\Contracts\OrdersBoardStages;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField as OpportunityCustomField;
+use App\Enums\OptionColor;
 use App\Filament\Actions\MoveCardAction;
 use App\Filament\Actions\PreviewRecordAction;
 use App\Filament\Components\Forms\RecordSelect;
@@ -36,6 +37,7 @@ use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Enums\FiltersLayout;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Gate;
@@ -77,6 +79,16 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->columnIdentifier($this->boardColumnIdentifier())
             ->positionIdentifier('order_column')
             ->columns($this->boardColumns())
+            ->collapsedColumns(fn (): array => $this->collapsedBoardColumnIds())
+            ->collapseAllColumns(fn (): bool => $this->storedBoardState()->columnsCollapsed)
+            ->collapsibleColumns(fn (string $columnId, bool $collapsed, bool $alone) => $this->setBoardColumnCollapsed($columnId, $collapsed, $alone))
+            ->columnActions($this->boardStageActions())
+            ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
+            ->addColumnUsing($this->addBoardStageUsing())
+            ->addColumnColors(fn (): array => $this->boardStageColors())
+            ->addColumnDefaultColor(OptionColor::Gray->value)
+            ->addColumnLabel(fn (): string => __('filament/pages/boards.stage_menu.add', ['noun' => $this->boardStageNoun()]))
+            ->addColumnPlaceholder(fn (): string => __('filament/pages/boards.stage_menu.add_placeholder', ['noun' => $this->boardStageNoun()]))
             ->cardSchema(fn (Schema $schema): Schema => $schema->components($card))
             ->createCardAction($this->cardCreation())
             ->cardAction('edit')

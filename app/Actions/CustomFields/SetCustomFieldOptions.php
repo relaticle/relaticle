@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Actions\CustomFields;
 
+use App\Data\StageOptionSettings;
 use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\User;
+use App\Support\ActivityLog\CustomFieldChangeLog;
 use App\Support\CustomFieldOptionPlan;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
@@ -18,10 +21,14 @@ use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class SetCustomFieldOptions
 {
+    private const int CLEAR_CHUNK = 1000;
+
+    public function __construct(private CustomFieldChangeLog $changeLog) {}
+
     /**
      * @param  array<string, mixed>  $data
      */
-    public function execute(User $user, CustomField $field, array $data): CustomField
+    public function execute(User $user, CustomField $field, array $data, bool $capsClears = true, bool $keepsColors = false): CustomField
     {
         abort_unless(
             $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage),
@@ -37,10 +44,11 @@ final readonly class SetCustomFieldOptions
         TenantContextService::setTenantId($workspaceId);
 
         try {
-            DB::transaction(function () use ($field, $data): void {
-                $field = CustomField::query()->withoutGlobalScopes()->whereKey($field->getKey())->lockForUpdate()->sole();
-                $plan = CustomFieldOptionPlan::validated($field, $data);
+            DB::transaction(function () use ($field, $data, $capsClears, $keepsColors): void {
+                $field = CustomField::query()->withoutGlobalScopes()->whereKey($field->getKey())->lock('for no key update')->sole();
+                $plan = CustomFieldOptionPlan::validated($field, $data, $capsClears, $keepsColors);
                 $options = $this->writeOptions($field, $plan);
+                $this->enableOptionColors($field, $plan);
                 $removed = array_column($plan->removals, 'option');
 
                 // The change log labels moved values from this relation; a reload would read the temporary names.
@@ -49,6 +57,10 @@ final readonly class SetCustomFieldOptions
                 foreach ($plan->removals as $removal) {
                     if ($removal['replacement'] !== null) {
                         $this->moveValues($field, $removal['option'], $options[$removal['replacement']]);
+                    }
+
+                    if ($removal['clears']) {
+                        $this->clearValues($field, $removal['option']);
                     }
 
                     $this->assertUnused($field, $removal['option']);
@@ -96,13 +108,19 @@ final readonly class SetCustomFieldOptions
                     'custom_field_id' => $field->getKey(),
                     'name' => $target['name'],
                     'sort_order' => $sortOrder,
+                    'settings' => new StageOptionSettings(color: $target['color'], celebrate: $target['celebrate']),
                 ]);
 
                 continue;
             }
 
-            if ($option->name !== $target['name']) {
-                $option->update(['name' => $target['name']]);
+            $changes = array_filter([
+                'name' => $option->name !== $target['name'] ? $target['name'] : null,
+                'settings' => $this->mergedSettings($option, $target),
+            ]);
+
+            if ($changes !== []) {
+                $option->update($changes);
             }
 
             if ($option->sort_order !== $sortOrder) {
@@ -113,6 +131,30 @@ final readonly class SetCustomFieldOptions
         }
 
         return $options;
+    }
+
+    /**
+     * @param  array{color: ?string, celebrate: ?bool}  $target
+     */
+    private function mergedSettings(CustomFieldOption $option, array $target): ?StageOptionSettings
+    {
+        $changes = array_filter([
+            'color' => $target['color'] !== null && $target['color'] !== $option->settings->color ? $target['color'] : null,
+            'celebrate' => $target['celebrate'] !== null && $target['celebrate'] !== $option->celebrates() ? $target['celebrate'] : null,
+        ], static fn (mixed $value): bool => $value !== null);
+
+        return $changes === [] ? null : StageOptionSettings::from([...$option->settings->toArray(), ...$changes]);
+    }
+
+    private function enableOptionColors(CustomField $field, CustomFieldOptionPlan $plan): void
+    {
+        if (! $plan->enablesColors) {
+            return;
+        }
+
+        $settings = $field->settings;
+        $settings->enable_option_colors = true;
+        $field->update(['settings' => $settings]);
     }
 
     private function freeTargetNames(CustomFieldOptionPlan $plan): void
@@ -158,5 +200,61 @@ final readonly class SetCustomFieldOptions
 
                 $value->save();
             });
+    }
+
+    private function clearValues(CustomField $field, CustomFieldOption $option): void
+    {
+        $optionId = (string) $option->getKey();
+        $column = $field->getValueColumn();
+
+        CustomFieldValue::query()
+            ->holdingOption($field, $optionId)
+            ->with(['entity' => function (MorphTo $entity): void {
+                $entity->withTrashed();
+            }])
+            ->chunkById(self::CLEAR_CHUNK, function (EloquentCollection $values) use ($field, $column, $optionId): void {
+                $cleared = $this->clearColumn(array_values($values->modelKeys()), $column, $optionId);
+
+                $this->changeLog->recordMany($field, $values
+                    ->filter(fn (CustomFieldValue $value): bool => in_array((string) $value->getKey(), $cleared, true))
+                    ->map(fn (CustomFieldValue $value): ?array => $this->clearedChange($value, $column, $optionId))
+                    ->filter()
+                    ->all());
+            });
+    }
+
+    /**
+     * @return ?array{0: Model, 1: mixed, 2: mixed}
+     */
+    private function clearedChange(CustomFieldValue $value, string $column, string $optionId): ?array
+    {
+        $entity = $value->ownRecord();
+
+        if (! $entity instanceof Model) {
+            return null;
+        }
+
+        return $column === 'json_value'
+            ? [$entity, $value->json_value, collect($value->json_value)->reject(fn (mixed $id): bool => (string) $id === $optionId)->values()]
+            : [$entity, $value->getAttribute($column), null];
+    }
+
+    /**
+     * @param  list<mixed>  $valueIds
+     * @return list<string>
+     */
+    private function clearColumn(array $valueIds, string $column, string $optionId): array
+    {
+        $table = (new CustomFieldValue)->getTable();
+        $marks = implode(',', array_fill(0, count($valueIds), '?'));
+
+        $rows = $column === 'json_value'
+            ? DB::select(
+                "update {$table} set json_value = case json_typeof(json_value) when 'array' then coalesce((select json_agg(element) from json_array_elements(json_value) as element where element #>> '{}' <> ?), '[]'::json) else '[]'::json end where id in ({$marks}) and json_value::jsonb @> ?::jsonb returning id",
+                [$optionId, ...$valueIds, json_encode($optionId)],
+            )
+            : DB::select("update {$table} set {$column} = null where id in ({$marks}) and {$column} = ? returning id", [...$valueIds, $optionId]);
+
+        return array_values(array_map(fn (object $row): string => (string) data_get($row, 'id'), $rows));
     }
 }

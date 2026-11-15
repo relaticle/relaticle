@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Enums\CustomFields;
 
 use App\Enums\CustomFieldType;
+use App\Enums\OptionColor;
 use App\Support\ChecklistHtml;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
 
@@ -129,26 +130,20 @@ enum TaskField: string
     }
 
     /**
-     * Get color mapping for select field options
-     *
-     * 2024 sophisticated color psychology system - completely unique colors designed for
-     * emotional resonance and semantic meaning. Based on latest color trends including
-     * Digital Lavender, Mocha Mousse sophistication, and retro-futuristic aesthetics.
-     *
-     * @return array<string, string>|null Array of option => color mappings or null if not applicable
+     * @return array<string, string>|null
      */
     public function getOptionColors(): ?array
     {
         return match ($this) {
             self::STATUS => [
-                'To do' => '#c4b5fd',       // Soft Periwinkle - Digital Lavender inspired calm potential
-                'In progress' => '#0A80EA', // Professional Blue - Clear active progress state
-                self::DONE_STATUS => '#2A9764',        // Success Green - Confident completion achievement
+                'To do' => OptionColor::Purple->value,
+                'In progress' => OptionColor::Blue->value,
+                self::DONE_STATUS => OptionColor::Green->value,
             ],
             self::PRIORITY => [
-                'Low' => '#94a3b8',         // Sage Whisper - Natural earth tone, subtle presence
-                'Medium' => '#d4a574',      // Burnished Gold - Mocha Mousse warmth & confidence
-                'High' => '#dc2626',        // Crimson Velvet - Sophisticated urgent command
+                'Low' => OptionColor::Gray->value,
+                'Medium' => OptionColor::Amber->value,
+                'High' => OptionColor::Red->value,
             ],
             default => null,
         };

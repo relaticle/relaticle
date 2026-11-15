@@ -1290,3 +1290,8 @@ it('states the shared filter rules once in the cached prefix and not in any list
         }
     }
 });
+
+it('tells the assistant to recolor an option with a palette color', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('SetCustomFieldOptionsTool renames, reorders, recolors, adds and removes options in one proposal. Set a palette `color` on an option to recolor it.');
+});

@@ -12,6 +12,7 @@ use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Activity as SpatieActivity;
 
@@ -87,13 +88,18 @@ final class Activity extends SpatieActivity
                 return;
             }
 
-            $workspaceId = $activity->subject?->getAttribute('workspace_id')
-                ?? $activity->subject?->getAttribute('tenant_id')
-                ?? Filament::getTenant()?->getKey();
+            $workspaceId = self::workspaceIdFor($activity->subject);
 
             if ($workspaceId !== null) {
                 $activity->workspace_id = $workspaceId;
             }
         });
+    }
+
+    public static function workspaceIdFor(?Model $subject): mixed
+    {
+        return $subject?->getAttribute('workspace_id')
+            ?? $subject?->getAttribute('tenant_id')
+            ?? Filament::getTenant()?->getKey();
     }
 }

@@ -28,6 +28,7 @@ use Filament\Support\Facades\FilamentView;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\Url;
@@ -52,6 +53,9 @@ trait HasBoardViews
     private ?BoardStateData $storedBoardState = null;
 
     private ?CustomField $resolvedBoardColumnField = null;
+
+    /** @var Collection<int, array{id: string, name: string, color: string, stored: ?string, celebrate: bool}>|null */
+    private ?Collection $resolvedBoardColumnOptions = null;
 
     public function mountHasBoardViews(): void
     {
@@ -286,6 +290,7 @@ trait HasBoardViews
         $this->storedBoardState = null;
         $this->forgetStoredTablePreference();
         $this->resolvedBoardColumnField = null;
+        $this->resolvedBoardColumnOptions = null;
         $this->visibleSavedViews = null;
         $this->forgetBoardCards();
     }

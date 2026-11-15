@@ -4,27 +4,34 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Actions\CustomFields\SetCustomFieldOptions;
+use App\Actions\Views\ExpandBoardColumns;
 use App\Actions\Views\MoveBoardCard;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
 use App\Actions\Views\SaveBoardState;
+use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CustomFieldType;
+use App\Enums\OptionColor;
+use App\Enums\WorkspaceCapability;
+use App\Exceptions\OptionsChangedException;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use App\Models\SavedView;
 use App\Models\Workspace;
 use App\Queries\Views\BoardColumnFieldsQuery;
+use App\Support\CustomFieldOptionPlan;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Schema;
+use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -32,10 +39,12 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
+use Illuminate\Validation\ValidationException;
 use LogicException;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\Flowforge\Column;
 use Relaticle\Flowforge\Exceptions\CardMoveRejectedException;
+use Relaticle\Flowforge\Support\ColorResolver;
 
 trait HasBoardStageOrder
 {
@@ -121,19 +130,328 @@ trait HasBoardStageOrder
         });
     }
 
-    public function setBoardColumnWidth(mixed $width = null): void
+    public function setBoardColumnCollapsed(mixed $optionId = null, mixed $collapsed = true, mixed $alone = false): void
     {
-        $width = is_string($width) ? BoardColumnWidth::tryFrom($width) : null;
+        $collapsed = filter_var($collapsed, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
 
-        if (! $width instanceof BoardColumnWidth || $width === $this->storedBoardState()->columnWidth) {
+        if (! is_string($optionId) || $collapsed === null || ! $this->ownsCollapsibleColumn($optionId)) {
             return;
         }
 
-        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), ['column_width' => $width->value], $view));
+        $fieldCode = $this->boardColumnField()->code;
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnCollapsed::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $collapsed, $view, $alone === true));
 
         if ($saved instanceof BoardStateData) {
             $this->boardStateWritten($saved);
         }
+    }
+
+    public function setBoardColumnsCollapsed(mixed $collapsed = false): void
+    {
+        $collapsed = filter_var($collapsed, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
+
+        if ($collapsed === null || ($collapsed === $this->storedBoardState()->columnsCollapsed && ($collapsed || $this->collapsedBoardColumnIds() === []))) {
+            return;
+        }
+
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => $collapsed
+            ? resolve(SaveBoardState::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), ['columns_collapsed' => true], $view)
+            : resolve(ExpandBoardColumns::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $this->boardColumnField()->code, $view));
+
+        if ($saved instanceof BoardStateData) {
+            $this->boardStateWritten($saved);
+        }
+    }
+
+    /**
+     * @return list<string>
+     */
+    protected function collapsedBoardColumnIds(): array
+    {
+        $state = $this->storedBoardState();
+        $collapsed = array_values(array_intersect($state->collapsedColumns, $this->boardColumnOptions()->pluck('id')->all()));
+
+        return $this->showsNoValueColumn() && in_array($this->boardColumnField()->code, $state->collapsedNoValueColumns, true)
+            ? [BoardStateData::NO_VALUE_COLUMN, ...$collapsed]
+            : $collapsed;
+    }
+
+    private function ownsCollapsibleColumn(string $optionId): bool
+    {
+        return $optionId === BoardStateData::NO_VALUE_COLUMN
+            ? $this->showsNoValueColumn()
+            : $this->boardColumnOptions()->contains('id', $optionId);
+    }
+
+    public function renameBoardColumn(mixed $optionId = null, mixed $name = null, mixed $was = null): void
+    {
+        $name = is_string($name) ? trim($name) : '';
+
+        $this->writeStageOption($optionId, ['name' => $name, ...(is_string($was) ? ['was' => $was] : [])], fn (array $option): bool => $option['name'] === $name);
+    }
+
+    public function setBoardColumnColor(mixed $optionId = null, mixed $color = null): void
+    {
+        if (! is_string($color) || $color === '') {
+            return;
+        }
+
+        $colorsOn = $this->boardColumnField()->settings->enable_option_colors ?? false;
+
+        $this->writeStageOption($optionId, ['color' => $color], fn (array $option): bool => $colorsOn && strtolower((string) $option['stored']) === strtolower($color));
+    }
+
+    public function setBoardColumnCelebrate(mixed $optionId = null, mixed $on = false): void
+    {
+        $on = filter_var($on, FILTER_VALIDATE_BOOLEAN);
+
+        $this->writeStageOption($optionId, ['celebrate' => $on], fn (array $option): bool => $option['celebrate'] === $on);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function celebratingBoardColumnIds(): array
+    {
+        return array_values($this->boardColumnOptions()->where('celebrate', true)->pluck('id')->all());
+    }
+
+    /**
+     * @param  array{name?: string, was?: string, color?: string, celebrate?: bool}  $change
+     * @param  Closure(array{id: string, name: string, color: string, stored: ?string, celebrate: bool}): bool  $unchanged
+     */
+    private function writeStageOption(mixed $optionId, array $change, Closure $unchanged): void
+    {
+        $option = is_string($optionId) ? $this->boardColumnOptions()->firstWhere('id', $optionId) : null;
+
+        if ($option === null) {
+            return;
+        }
+
+        $this->resetErrorBag("boardStageMenu.{$option['id']}");
+
+        if ($unchanged($option)) {
+            return;
+        }
+
+        $field = $this->boardColumnField();
+        $options = array_map(
+            static fn (array $entry): array => $entry['id'] === $option['id'] ? [...$entry, ...$change] : $entry,
+            $this->stageOptionEntries($field),
+        );
+
+        try {
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
+        } catch (ValidationException $exception) {
+            $this->addError("boardStageMenu.{$option['id']}", $this->stageWriteFailure($exception, $change['name'] ?? null));
+
+            return;
+        }
+
+        $this->refreshBoardAfterStageWrite();
+    }
+
+    private function refreshBoardAfterStageWrite(): void
+    {
+        $this->boardColumnFieldList = null;
+        $this->forgetStoredBoardState();
+        $this->rebuildBoard();
+    }
+
+    /**
+     * @return list<array{id: string, name: string, was: string}>
+     */
+    private function stageOptionEntries(CustomField $field): array
+    {
+        return array_values($field->options->map(static fn (CustomFieldOption $stage): array => [
+            'id' => (string) $stage->getKey(),
+            'name' => (string) $stage->getAttribute('name'),
+            'was' => (string) $stage->getAttribute('name'),
+        ])->all());
+    }
+
+    /**
+     * @param  array<string, mixed>  $column
+     */
+    protected function boardStageMenu(array $column): Htmlable
+    {
+        $id = (string) $column['id'];
+        $stored = $this->boardColumnOptions()->firstWhere('id', $id)['stored'] ?? null;
+
+        return new HtmlString(view('filament.app.board-stage-menu', [
+            'id' => $id,
+            'name' => (string) $column['label'],
+            'noun' => $this->boardStageNoun(),
+            'dot' => ColorResolver::dotStyle($column['color'] ?? null),
+            'swatches' => array_map(fn (OptionColor $color): array => [
+                'value' => $color->value,
+                'label' => $color->label(),
+                'style' => ColorResolver::dotStyle($color->value),
+                'current' => $stored !== null && strtolower($stored) === $color->value,
+            ], OptionColor::cases()),
+            'editable' => $id !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages(),
+            'celebrate' => $this->boardColumnOptions()->firstWhere('id', $id)['celebrate'] ?? false,
+            'locked' => $this->locksStage($id),
+            'error' => $this->getErrorBag()->first("boardStageMenu.{$id}"),
+        ])->render());
+    }
+
+    /**
+     * @return list<Action>
+     */
+    protected function boardStageActions(): array
+    {
+        return [
+            Action::make('collapseStage')
+                ->label(fn (): string => __('filament/pages/boards.stage_menu.collapse', ['noun' => $this->boardStageNoun()]))
+                ->icon('lucide-square-arrow-left')
+                ->action(fn (array $arguments) => $this->setBoardColumnCollapsed($arguments['column'] ?? null, true)),
+            Action::make('hideStage')
+                ->label(fn (): string => __('filament/pages/boards.stage_menu.hide', ['noun' => $this->boardStageNoun()]))
+                ->icon('lucide-eye-off')
+                ->action(fn (array $arguments) => $this->hideStageFromMenu($arguments['column'] ?? null)),
+            Action::make('deleteStage')
+                ->label(fn (): string => __('filament/pages/boards.stage_menu.delete', ['noun' => $this->boardStageNoun()]))
+                ->icon('lucide-trash-2')
+                ->color('danger')
+                ->visible(fn (array $arguments): bool => ($arguments['column'] ?? null) !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages() && ! $this->locksStage($arguments['column'] ?? null))
+                ->modalIcon('lucide-trash-2')
+                ->modalWidth(Width::Medium)
+                ->modalHeading(fn (array $arguments): string => __('filament/pages/boards.stage_menu.delete_heading', ['name' => $this->stageNameFor($arguments['column'] ?? null)]))
+                ->modalDescription(fn (array $arguments): string => $this->deleteStageDescription($arguments['column'] ?? null))
+                ->modalSubmitActionLabel(__('filament/pages/boards.stage_menu.delete_confirm'))
+                ->action(fn (array $arguments) => $this->deleteBoardColumn($arguments['column'] ?? null)),
+        ];
+    }
+
+    private function locksStage(mixed $optionId): bool
+    {
+        return CustomFieldOptionPlan::locksOption($this->boardColumnField(), $this->stageNameFor($optionId));
+    }
+
+    private function stageNameFor(mixed $optionId): string
+    {
+        return is_string($optionId) ? (string) ($this->boardColumnOptions()->firstWhere('id', $optionId)['name'] ?? '') : '';
+    }
+
+    private function deleteStageDescription(mixed $optionId): string
+    {
+        $count = is_string($optionId) ? CustomFieldValue::query()->holdingOptionOnLiveRecord($this->boardColumnField(), $optionId)->count() : 0;
+
+        if ($count === 0) {
+            return '';
+        }
+
+        $entity = $this->viewSwitcherEntity();
+
+        return trans_choice('filament/pages/boards.stage_menu.delete_body', $count, [
+            'count' => number_format($count),
+            'records' => trans_choice('filament/pages/boards.stage_menu.records.'.$entity->value, $count),
+            'attribute' => $this->boardStageNoun(),
+            'column' => $this->noValueColumnLabel(),
+        ]);
+    }
+
+    private function stageWriteFailure(ValidationException $exception, ?string $name = null): string
+    {
+        return match (true) {
+            $exception instanceof OptionsChangedException => __('filament/pages/boards.stage_menu.changed', ['noun' => $this->boardStageNoun()]),
+            $name !== null && $this->failedOnDistinctName($exception) => __('filament/pages/boards.stage_menu.name_taken', ['noun' => $this->boardStageNoun(), 'name' => $name]),
+            default => (string) collect($exception->errors())->flatten()->first(),
+        };
+    }
+
+    private function failedOnDistinctName(ValidationException $exception): bool
+    {
+        return collect($exception->validator->failed())->contains(fn (array $rules): bool => array_key_exists('Distinct', $rules));
+    }
+
+    private function deleteBoardColumn(mixed $optionId): void
+    {
+        if (! is_string($optionId) || ! $this->boardColumnOptions()->contains('id', $optionId)) {
+            return;
+        }
+
+        $noun = $this->boardStageNoun();
+        $field = $this->boardColumnField();
+
+        if ($field->options->count() === 1) {
+            Notification::make()->warning()->title(__('filament/pages/boards.stage_menu.delete_only', ['noun' => $noun]))->send();
+
+            return;
+        }
+
+        if ($this->visibleBoardColumnIds() === [$optionId]) {
+            Notification::make()->warning()->title(__('filament/pages/boards.stage_menu.delete_last_visible', ['noun' => $noun]))->send();
+
+            return;
+        }
+
+        $options = array_values(array_filter($this->stageOptionEntries($field), static fn (array $entry): bool => $entry['id'] !== $optionId));
+
+        try {
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'replacements' => [$optionId => null], 'removed' => [$optionId]], capsClears: false);
+        } catch (ValidationException $exception) {
+            Notification::make()->danger()->title($this->stageWriteFailure($exception))->send();
+
+            return;
+        }
+
+        $this->refreshBoardAfterStageWrite();
+    }
+
+    protected function addBoardStage(string $name, ?string $color = null): void
+    {
+        $name = trim($name);
+        $field = $this->boardColumnField();
+        $options = [...$this->stageOptionEntries($field), ['name' => $name, 'color' => $color ?? OptionColor::Gray->value]];
+
+        try {
+            resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []], keepsColors: $color === null);
+        } catch (ValidationException $exception) {
+            throw ValidationException::withMessages(['name' => $this->stageWriteFailure($exception, $name)]);
+        }
+
+        $this->refreshBoardAfterStageWrite();
+    }
+
+    protected function addBoardStageUsing(): ?Closure
+    {
+        return $this->canEditStages() ? fn (string $name, ?string $color) => $this->addBoardStage($name, $color) : null;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function boardStageColors(): array
+    {
+        return collect(OptionColor::cases())->mapWithKeys(fn (OptionColor $color): array => [$color->value => $color->label()])->all();
+    }
+
+    private function hideStageFromMenu(mixed $optionId): void
+    {
+        if (is_string($optionId) && $this->visibleBoardColumnIds() === [$optionId]) {
+            Notification::make()->warning()->title(__('filament/pages/boards.stage_menu.last_visible', ['noun' => $this->boardStageNoun()]))->send();
+
+            return;
+        }
+
+        $this->setBoardColumnVisible($optionId, false);
+    }
+
+    private function canEditStages(): bool
+    {
+        $user = $this->viewSwitcherUser();
+
+        return $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage);
+    }
+
+    private function boardStageNoun(): string
+    {
+        $entity = $this->viewSwitcherEntity();
+        $key = $this->boardColumnField()->code === $entity->boardFieldCode() ? $entity->boardStageNounKey() : null;
+
+        return __('filament/pages/boards.stage_menu.nouns.'.($key ?? 'option'));
     }
 
     public function boardLayoutToggles(): Htmlable
@@ -141,7 +459,7 @@ trait HasBoardStageOrder
         $state = $this->storedBoardState();
 
         return new HtmlString(view('filament.app.board-layout-toggles', [
-            'columnWidth' => $state->columnWidth,
+            'columnsCollapsed' => $state->columnsCollapsed,
             'cardSize' => $state->cardSize,
         ])->render());
     }
@@ -202,9 +520,17 @@ trait HasBoardStageOrder
     }
 
     /**
-     * @return Collection<int, array{id: string, name: string, color: string}>
+     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string, celebrate: bool}>
      */
     protected function boardColumnOptions(): Collection
+    {
+        return $this->resolvedBoardColumnOptions ??= $this->resolveBoardColumnOptions();
+    }
+
+    /**
+     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string, celebrate: bool}>
+     */
+    private function resolveBoardColumnOptions(): Collection
     {
         $field = $this->boardColumnField();
         $colorsEnabled = $field->settings->enable_option_colors ?? false;
@@ -213,12 +539,14 @@ trait HasBoardStageOrder
             'id' => (string) $option->getKey(),
             'name' => (string) $option->getAttribute('name'),
             'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
+            'stored' => $option->settings->color,
+            'celebrate' => (bool) $option->celebrates(),
         ]);
 
-        $order = $this->storedBoardState()->orderStages(array_column($options->all(), 'id'));
+        $position = array_flip($this->storedBoardState()->orderStages(array_column($options->all(), 'id')));
 
         return $options
-            ->sortBy(static fn (array $option): int|false => array_search($option['id'], $order, true))
+            ->sortBy(static fn (array $option): int|false => $position[$option['id']] ?? false)
             ->values();
     }
 

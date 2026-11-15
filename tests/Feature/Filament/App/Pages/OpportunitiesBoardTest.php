@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
+use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\SavedViewType;
@@ -48,7 +48,7 @@ use Relaticle\Flowforge\Lane;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnCollapsed::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function () {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1038,7 +1038,7 @@ it('keeps the member\'s stored filters and lanes when stages are reordered', fun
 it('keeps every board setting when stages are reordered', function (): void {
     $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
     $tierIds = $tier->options->pluck('id')->map(strval(...))->all();
-    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(stageOrder: array_reverse($tierIds), hiddenColumns: [$tierIds[0]], noValueColumns: ['stage'], cardAttributes: ['company'], showLabels: true, hideEmpty: false, columnWidth: BoardColumnWidth::Narrow, cardSize: BoardCardSize::Compact));
+    rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(stageOrder: array_reverse($tierIds), hiddenColumns: [$tierIds[0]], noValueColumns: ['stage'], cardAttributes: ['company'], showLabels: true, hideEmpty: false, collapsedColumns: [$tierIds[1]], columnsCollapsed: true, cardSize: BoardCardSize::Compact));
     $reversed = array_reverse(stageIds($this->stageField));
 
     livewire(OpportunitiesBoard::class)->call('reorderBoardStages', $reversed);
@@ -1051,7 +1051,8 @@ it('keeps every board setting when stages are reordered', function (): void {
         ->and($stored->cardAttributes)->toBe(['company'])
         ->and($stored->showLabels)->toBeTrue()
         ->and($stored->hideEmpty)->toBeFalse()
-        ->and($stored->columnWidth)->toBe(BoardColumnWidth::Narrow)
+        ->and($stored->collapsedColumns)->toBe([$tierIds[1]])
+        ->and($stored->columnsCollapsed)->toBeTrue()
         ->and($stored->cardSize)->toBe(BoardCardSize::Compact);
 });
 
@@ -1090,7 +1091,7 @@ it('stores a sort change that arrives in the same request as a stage reorder', f
 });
 
 it('writes nothing on arrival when Part 2 settings are stored', function (): void {
-    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company'], showLabels: true, columnWidth: BoardColumnWidth::Narrow));
+    $preference = rememberedBoard($this, CrmEntity::Opportunity, new BoardStateData(cardAttributes: ['company'], showLabels: true, columnsCollapsed: true));
     $updatedAt = $preference->updated_at;
     $this->travelTo(now()->addHour());
 

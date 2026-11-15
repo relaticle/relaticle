@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Data;
 
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use Spatie\LaravelData\Attributes\MapName;
 use Spatie\LaravelData\Data;
 use Spatie\LaravelData\Mappers\SnakeCaseMapper;
@@ -20,6 +19,8 @@ final class BoardStateData extends Data
      * @param  array<string, mixed>  $filters
      * @param  list<string>  $hiddenColumns
      * @param  list<string>  $noValueColumns
+     * @param  list<string>  $collapsedColumns
+     * @param  list<string>  $collapsedNoValueColumns
      * @param  list<string>|null  $cardAttributes
      */
     public function __construct(
@@ -33,7 +34,9 @@ final class BoardStateData extends Data
         public readonly ?array $cardAttributes = null,
         public readonly bool $showLabels = false,
         public readonly bool $hideEmpty = true,
-        public readonly BoardColumnWidth $columnWidth = BoardColumnWidth::Wide,
+        public readonly array $collapsedColumns = [],
+        public readonly array $collapsedNoValueColumns = [],
+        public readonly bool $columnsCollapsed = false,
         public readonly BoardCardSize $cardSize = BoardCardSize::Full,
     ) {}
 
@@ -46,6 +49,22 @@ final class BoardStateData extends Data
     public static function withColumnIds(array $current, array $fieldOptionIds, array $ids): array
     {
         return [...array_values(array_diff($current, $fieldOptionIds)), ...$ids];
+    }
+
+    /**
+     * @param  list<string>  $fieldOptionIds
+     * @return array<string, mixed>
+     */
+    public function expandingColumns(string $fieldCode, array $fieldOptionIds, ?string $openOnly = null): array
+    {
+        $noValue = array_values(array_diff($this->collapsedNoValueColumns, [$fieldCode]));
+        $collapsed = $openOnly === null ? [] : array_values(array_diff($fieldOptionIds, [$openOnly]));
+
+        return [
+            'columns_collapsed' => false,
+            'collapsed_columns' => self::withColumnIds($this->collapsedColumns, $fieldOptionIds, $collapsed),
+            'collapsed_no_value_columns' => $openOnly === null || $openOnly === self::NO_VALUE_COLUMN ? $noValue : [...$noValue, $fieldCode],
+        ];
     }
 
     /**

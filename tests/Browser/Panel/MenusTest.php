@@ -119,6 +119,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'filter deleted mode' => ['[data-deleted-mode-trigger]', '[data-filter-deleted] .fi-filter-pop', '.fi-filter-item', '.fi-filter-item > svg', 'companies', [DELETED_CHIP]],
     'views row menu' => ['.fi-ta-views-row[data-view-kind=list] [data-view-actions]', '.fi-ta-views-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-switcher .fi-dropdown-trigger button']],
     'view settings row menu' => ['[data-view-settings-menu] >> nth=0', '.fi-view-settings-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'companies', ['.fi-view-settings-trigger'], ['pitch' => []]],
+    'board stage menu' => ['[data-column-root] .ff-column-heading >> nth=1', '.ff-column-menu > .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board'],
     'board stage row menu' => ['[data-stage-actions] >> nth=0', '.fi-board-stages-row-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg', 'opportunities/board', ['.fi-view-settings-trigger', '[data-board-columns-trigger]']],
 ]);
 
@@ -324,3 +325,16 @@ it('keeps the board view settings above the window edge', function (array $steps
     'main panel' => [['.fi-view-settings-trigger'], '.fi-board-attributes-scroll', true],
     'add attribute panel' => [['.fi-view-settings-trigger', '[data-board-add-attribute]'], '[data-board-panel="add"] .fi-view-settings-scroll', true],
 ]);
+
+it('keeps the board stage menu above the window edge', function (): void {
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/opportunities/board", 1440, 320)
+        ->click('[data-column-root] .ff-column-heading >> nth=1')
+        ->assertVisible('.ff-column-menu > .fi-dropdown-panel:not([style*="display: none"])');
+
+    expect($page->script(menuRoom('.ff-column-menu > .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list')))->toMatchArray([
+        'height' => true,
+        'bottom' => true,
+        'panelScrolls' => false,
+    ]);
+    $page->assertNoJavaScriptErrors();
+});

@@ -95,6 +95,14 @@ final class CustomFieldValue extends BaseCustomFieldValue
 
     /** @param Builder<self> $query */
     #[Scope]
+    protected function holdingOptionOnLiveRecord(Builder $query, CustomField $field, string $optionId): void
+    {
+        $query->holdingOption($field, $optionId)
+            ->whereHasMorph('entity', [$field->entity_type], fn (Builder $entity): Builder => $entity->withoutGlobalScope(WorkspaceScope::class));
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
     protected function containingText(Builder $query, CustomField $field, string $search): void
     {
         $query->where('custom_field_id', $field->getKey());

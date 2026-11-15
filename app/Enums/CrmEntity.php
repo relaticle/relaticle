@@ -153,6 +153,15 @@ enum CrmEntity: string
         };
     }
 
+    public function boardStageNounKey(): ?string
+    {
+        return match ($this) {
+            self::Opportunity => 'stage',
+            self::Task => 'status',
+            self::Company, self::People, self::Note => null,
+        };
+    }
+
     /** @return list<string> */
     public function nativeCardAttributes(): array
     {

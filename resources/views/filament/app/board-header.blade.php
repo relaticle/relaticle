@@ -1,4 +1,4 @@
-<div class="fi-board-header" data-board-column-width="{{ $columnWidth->value }}" data-board-card-size="{{ $cardSize->value }}">
+<div class="fi-board-header" data-board-columns="{{ $columnsCollapsed ? 'collapsed' : 'expanded' }}" data-board-card-size="{{ $cardSize->value }}" data-board-celebrate="{{ json_encode($celebrating) }}">
     <div class="fi-board-header-row">
         @include('filament.app.topbar-page-heading', ['heading' => $heading])
 

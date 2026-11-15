@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Enums\CustomFields;
 
 use App\Enums\CustomFieldType;
+use App\Enums\OptionColor;
 
 enum OpportunityField: string
 {
@@ -60,29 +61,22 @@ enum OpportunityField: string
     }
 
     /**
-     * Get color mapping for select field options
-     *
-     * 2024 Sophisticated Sales Journey - A unique emotional progression through the
-     * pipeline using earth-inspired, professional colors that tell the story of
-     * building energy, trust, and momentum from first contact to final outcome.
-     * Based on latest color psychology and 2024 design sophistication trends.
-     *
-     * @return array<string, string>|null Array of option => color mappings or null if not applicable
+     * @return array<string, string>|null
      */
     public function getOptionColors(): ?array
     {
         return match ($this) {
             self::STAGE => [
-                'Prospecting' => '#a5b4fc',           // Misty Dawn - Soft exploration of possibilities
-                'Qualification' => '#1e40af',         // Ocean Depth - Deep analytical thinking
-                'Needs Analysis' => '#0d9488',        // Teal Understanding - Empathy & insight
-                'Value Proposition' => '#eab308',     // Golden Clarity - Bright ideas & value
-                'Id. Decision Makers' => '#7c3aed',   // Royal Authority - Power & influence
-                'Perception Analysis' => '#f59e0b',   // Warm Amber - Comfortable evaluation
-                'Proposal/Price Quote' => '#1e293b',  // Professional Navy - Serious business
-                'Negotiation/Review' => '#f97316',    // Electric Coral - Dynamic energy
-                'Closed Won' => '#059669',            // Victory Emerald - Success celebration
-                'Closed Lost' => '#6b7280',           // Silver Acceptance - Respectful closure
+                'Prospecting' => OptionColor::Purple->value,
+                'Qualification' => OptionColor::Blue->value,
+                'Needs Analysis' => OptionColor::Cyan->value,
+                'Value Proposition' => OptionColor::Olive->value,
+                'Id. Decision Makers' => OptionColor::Magenta->value,
+                'Perception Analysis' => OptionColor::Amber->value,
+                'Proposal/Price Quote' => OptionColor::Pink->value,
+                'Negotiation/Review' => OptionColor::Orange->value,
+                'Closed Won' => OptionColor::Green->value,
+                'Closed Lost' => OptionColor::Gray->value,
             ],
             default => null,
         };

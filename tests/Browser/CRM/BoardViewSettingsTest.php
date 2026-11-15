@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\CustomFields\CreateCustomField;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
@@ -176,7 +175,7 @@ function boardSize(string $column, string $card): string
     return "(async () => { await new Promise((resolve) => setTimeout(resolve, 300)); return { column: Math.round(document.querySelector('{$column}').getBoundingClientRect().width), card: Math.round(document.querySelector('{$card}').getBoundingClientRect().height) }; })()";
 }
 
-it('narrows columns and compacts cards flat and with lanes, every time it is pressed, and keeps phones wide', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
+it('compacts cards flat and with lanes, every time it is pressed, and keeps phones at their own width', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -202,30 +201,14 @@ it('narrows columns and compacts cards flat and with lanes, every time it is pre
     $phone = $page->script($flat);
 
     $page->resize(1440, 900)->assertVisible('.ff-card');
-    $wide = $page->script($flat);
-
-    $page->script('(() => { const press = (value) => document.querySelector(`[data-board-column-width-option="${value}"]`).click(); press("narrow"); setTimeout(() => press("wide"), 60); })()');
-    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->columnWidth === BoardColumnWidth::Wide);
-    expect(storedBoardState($user, $entity)?->columnWidth)->toBe(BoardColumnWidth::Wide);
-    $page->assertScript(boardLayoutIs('boardColumnWidth', 'wide'), true);
-    expect($page->script($flat))->toBe($wide);
-
-    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
-    $narrow = $page->script($flat);
-    expect($narrow['column'])->toBeLessThan($wide['column']);
-
-    pressLayout($page, 'column-width', 'wide', 'boardColumnWidth');
-    expect($page->script($flat))->toBe($wide);
-
-    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
-    expect($page->script($flat))->toBe($narrow);
+    $full = $page->script($flat);
 
     pressLayout($page, 'card-size', 'compact', 'boardCardSize');
     $compact = $page->script($flat);
-    expect($compact['card'])->toBeLessThan($narrow['card'])->and($compact['column'])->toBe($narrow['column']);
+    expect($compact['card'])->toBeLessThan($full['card'])->and($compact['column'])->toBe($full['column']);
 
     pressLayout($page, 'card-size', 'full', 'boardCardSize');
-    expect($page->script($flat))->toBe($narrow);
+    expect($page->script($flat))->toBe($full);
 
     pressLayout($page, 'card-size', 'compact', 'boardCardSize');
     expect($page->script($flat))->toBe($compact);
@@ -235,20 +218,13 @@ it('narrows columns and compacts cards flat and with lanes, every time it is pre
     closeViewSettings($page);
 
     $laneCompact = $page->script($lanes);
-    expect($laneCompact['column'])->toBe($narrow['column']);
-
-    pressLayout($page, 'column-width', 'wide', 'boardColumnWidth');
-    $laneWide = $page->script($lanes);
-    expect($laneWide['column'])->toBe($wide['column']);
-
-    pressLayout($page, 'column-width', 'narrow', 'boardColumnWidth');
-    expect($page->script($lanes))->toBe($laneCompact);
+    expect($laneCompact['column'])->toBe($full['column']);
 
     pressLayout($page, 'card-size', 'full', 'boardCardSize');
     expect($page->script($lanes)['card'])->toBeGreaterThan($laneCompact['card']);
 
     $page->resize(390, 844)->navigate("/app/{$workspace->slug}/{$path}")->assertVisible('.ff-column >> nth=0');
-    $page->assertScript(boardLayoutIs('boardColumnWidth', 'narrow'), true);
+    $page->assertScript(boardLayoutIs('boardCardSize', 'full'), true);
     expect($page->script('Math.round(document.querySelector(".ff-lanes-heads > .ff-column, .ff-columns > .ff-column").getBoundingClientRect().width)'))->toBe($phone['column']);
     expect($page->script('Math.round(document.querySelectorAll(".ff-lanes-heads > .ff-column, .ff-columns > .ff-column")[1].getBoundingClientRect().left)'))->toBeLessThan(390);
     $page->assertNoJavaScriptErrors();
@@ -256,3 +232,18 @@ it('narrows columns and compacts cards flat and with lanes, every time it is pre
     'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task, 'assignee'],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity, 'company'],
 ]);
+
+it('keeps the add row in place when the cards switch between compact and full', function (string $model, string $fieldCode, string $path): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $addRow = 'JSON.stringify((() => { const row = document.querySelector(".ff-columns > .ff-column .ff-add-slot .ff-add-row"); const box = row.getBoundingClientRect(); const icon = row.querySelector(".ff-add-row-icon").getBoundingClientRect(); return [box.left, box.top, box.width, box.height, icon.left]; })())';
+
+    $page = openBoard($user, $path);
+    $full = $page->script($addRow);
+
+    pressLayout($page, 'card-size', 'compact', 'boardCardSize');
+
+    expect($page->script($addRow))->toBe($full);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');

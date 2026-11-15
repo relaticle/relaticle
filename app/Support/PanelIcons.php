@@ -14,6 +14,7 @@ use Filament\Support\View\SupportIconAlias;
 use Filament\Tables\View\TablesIconAlias;
 use Filament\View\PanelsIconAlias;
 use Filament\Widgets\View\WidgetsIconAlias;
+use Relaticle\Flowforge\View\FlowforgeIconAlias;
 
 final readonly class PanelIcons
 {
@@ -31,6 +32,7 @@ final readonly class PanelIcons
             ...self::tables(),
             ...self::support(),
             ...self::components(),
+            ...self::flowforge(),
         ];
     }
 
@@ -330,6 +332,22 @@ final readonly class PanelIcons
             SchemasIconAlias::COMPONENTS_WIZARD_COMPLETED_STEP => 'lucide-check',
             WidgetsIconAlias::CHART_WIDGET_EMPTY_STATE => 'lucide-x',
             WidgetsIconAlias::CHART_WIDGET_FILTER => 'lucide-funnel',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function flowforge(): array
+    {
+        return [
+            FlowforgeIconAlias::ADD_CARD => 'lucide-plus',
+            FlowforgeIconAlias::ADD_COLUMN => 'lucide-plus',
+            FlowforgeIconAlias::EMPTY_COLUMN => 'lucide-archive',
+            FlowforgeIconAlias::GROUPING_CHECK => 'lucide-check',
+            FlowforgeIconAlias::GROUPING_CHEVRON => 'lucide-chevron-down',
+            FlowforgeIconAlias::GROUPING_TRIGGER => 'lucide-layers',
+            FlowforgeIconAlias::LANE_TOGGLE => 'lucide-chevron-down',
         ];
     }
 }

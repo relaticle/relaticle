@@ -6,14 +6,15 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\DeleteCustomField;
 use App\Actions\Views\PlaceBoardCard;
 use App\Actions\Views\ReorderBoardStages;
+use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Actions\Views\SetCardAttributes;
 use App\Data\BoardStateData;
 use App\Enums\BoardCardSize;
-use App\Enums\BoardColumnWidth;
 use App\Enums\CrmEntity;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\OptionColor;
 use App\Enums\SavedViewType;
 use App\Enums\WorkspaceRole;
 use App\Filament\Actions\CreateTaskAction;
@@ -42,6 +43,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Once;
@@ -55,7 +57,7 @@ use Relaticle\Flowforge\Services\DecimalPosition;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
+mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnCollapsed::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, TasksBoard::class, CreateTaskAction::class, ChecklistHtml::class, MoveCardAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -1730,6 +1732,8 @@ it('exports the tasks the bar\'s filters match from the board, hidden statuses a
     taskInStatus($this, 'Globex brief', 'In progress');
     $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
 
+    Auth::guard('web')->login($this->user);
+
     $component = livewire(TasksBoard::class)->call('setBoardColumnVisible', $todo, false);
 
     if ($noValueColumn) {
@@ -1740,7 +1744,8 @@ it('exports the tasks the bar\'s filters match from the board, hidden statuses a
         ->call('setFilterRules', [['field' => 'title', 'condition' => 'contains', 'value' => 'Acme']])
         ->callAction('export');
 
-    expect(Export::query()->sole()->total_rows)->toBe(3);
+    expect(Export::query()->sole()->total_rows)->toBe(3)
+        ->and(Export::query()->sole()->processed_rows)->toBe(3);
 })->with([
     'no status column off' => [false],
     'no status column on' => [true],
@@ -1824,19 +1829,19 @@ it('draws a compact task card with its title only', function (): void {
         ->assertDontSee('1/2');
 });
 
-it('marks the task board narrow and compact once both toggles are set', function (): void {
+it('marks the task board collapsed and compact once both toggles are set', function (): void {
     $component = livewire(TasksBoard::class)
-        ->call('setBoardColumnWidth', 'narrow')
+        ->call('setBoardColumnsCollapsed', true)
         ->call('setBoardCardSize', 'compact')
-        ->assertSeeHtml('data-board-column-width="narrow"')
+        ->assertSeeHtml('data-board-columns="collapsed"')
         ->assertSeeHtml('data-board-card-size="compact"');
 
     expect($component->html())
-        ->toMatch('/data-board-column-width-option="narrow"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-column-width-option="narrow"/');
+        ->toMatch('/data-board-columns-option="collapsed"[^>]*aria-pressed="true"|aria-pressed="true"[^>]*data-board-columns-option="collapsed"/');
 
     $state = TablePreference::query()->sole()->board_state;
 
-    expect($state->columnWidth)->toBe(BoardColumnWidth::Narrow)
+    expect($state->columnsCollapsed)->toBeTrue()
         ->and($state->cardSize)->toBe(BoardCardSize::Compact);
 });
 
@@ -1980,4 +1985,328 @@ it('says a text attribute was added and a rich text attribute was only created',
         ->assertNotified('Plan notes created. This type of attribute does not show on a card.');
 
     expect(TablePreference::query()->sole()->board_state->cardAttributes)->toContain('custom_fields.effort')->not->toContain('custom_fields.plan_notes');
+});
+
+it('collapses a task stage for the member and expands it again', function (): void {
+    $ids = statusIds($this->statusField);
+    $component = livewire(TasksBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([$ids[1]])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[1]]);
+
+    $component->call('toggleBoardColumnCollapse', $ids[1]);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedColumns)->toBe([])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+});
+
+it('collapses the task no-value column', function (): void {
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
+
+it('keeps another member\'s task board expanded', function (): void {
+    livewire(TasksBoard::class)->call('setBoardColumnCollapsed', statusIds($this->statusField)[1], true);
+
+    $colleague = User::factory()->create();
+    $this->workspace->users()->attach($colleague, ['role' => WorkspaceRole::Member->value]);
+    $colleague->switchWorkspace($this->workspace);
+    $this->actingAs($colleague);
+
+    expect(livewire(TasksBoard::class)->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+});
+
+it('keeps a collapsed task stage across regrouping by another attribute', function (): void {
+    $ids = statusIds($this->statusField);
+    $component = livewire(TasksBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    $component->call('setBoardColumnField', 'priority');
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnField', $this->statusField->code);
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[1]]);
+});
+
+it('stores collapsed task stages inside an open board view only', function (): void {
+    $ids = statusIds($this->statusField);
+    $plain = rememberedTaskBoard($this, new BoardStateData(sort: 'title:asc'));
+    $view = taskBoardView($this);
+    $plainHash = $plain->board_state->hash();
+
+    $component = Livewire::withQueryParams(['view' => $view->getKey()])->test(TasksBoard::class)
+        ->call('setBoardColumnCollapsed', $ids[0], true);
+
+    expect($view->refresh()->boardState()->collapsedColumns)->toBe([$ids[0]])
+        ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]])
+        ->and($plain->refresh()->board_state->hash())->toBe($plainHash);
+});
+
+it('collapses every task column from the bar and keeps it after a reload', function (): void {
+    livewire(TasksBoard::class)->call('setBoardColumnsCollapsed', true);
+
+    expect(TablePreference::query()->sole()->board_state->columnsCollapsed)->toBeTrue()
+        ->and(freshTasksBoard()->instance()->getBoard()->collapsesAllColumns())->toBeTrue();
+
+    $component = freshTasksBoard()->call('setBoardColumnsCollapsed', false);
+
+    expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse();
+});
+
+it('renders a collapsed task stage that was then deleted or hidden without error', function (string $case): void {
+    $ids = statusIds($this->statusField);
+    livewire(TasksBoard::class)->call('setBoardColumnCollapsed', $ids[1], true);
+
+    if ($case === 'deleted') {
+        CustomFieldOption::query()->withoutGlobalScopes()->whereKey($ids[1])->delete();
+    } else {
+        livewire(TasksBoard::class)->call('setBoardColumnVisible', $ids[1], false);
+    }
+
+    $component = freshTasksBoard()->assertOk();
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([])
+        ->and(taskBoardColumnOrder($component))->not->toContain($ids[1]);
+
+    $component->call('setBoardColumnCollapsed', $ids[0], true)->assertOk();
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]]);
+})->with(['deleted', 'hidden']);
+
+it('refuses a task collapse of an option of another attribute or workspace', function (string $case): void {
+    $foreign = User::factory()->withWorkspace()->create();
+    $priority = taskPriority();
+    $foreignStatus = CustomField::query()->withoutGlobalScopes()->where('tenant_id', $foreign->currentWorkspace->getKey())->where('entity_type', 'task')->where('code', TaskField::STATUS)->firstOrFail();
+
+    $optionId = match ($case) {
+        'another attribute' => (string) $priority->options->first()->getKey(),
+        'another workspace' => statusIds($foreignStatus)[0],
+        'unknown' => 'not-an-option',
+    };
+
+    expect(fn () => resolve(SetBoardColumnCollapsed::class)->execute($this->user, $this->workspace, CrmEntity::Task, TaskField::STATUS->value, $optionId, true))
+        ->toThrow(HttpException::class);
+
+    expect(TablePreference::query()->withoutGlobalScopes()->count())->toBe(0);
+})->with(['another attribute', 'another workspace', 'unknown']);
+
+it('reads a stored task board state that still carries the retired column width', function (): void {
+    $preference = rememberedTaskBoard($this, new BoardStateData);
+    DB::table('table_preferences')->where('id', $preference->getKey())->update(['board_state' => json_encode(['column_width' => 'narrow', 'card_size' => 'compact'])]);
+
+    $component = freshTasksBoard()->assertOk();
+
+    expect($component->instance()->getBoard()->collapsesAllColumns())->toBeFalse();
+});
+
+it('keeps the task no-value collapse with the attribute it was set on', function (): void {
+    $component = livewire(TasksBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnField', 'priority')
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
+
+    $component->call('setBoardColumnField', $this->statusField->code);
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
+});
+
+it('renames a task status from its header menu and names the attribute status', function (): void {
+    $id = statusIds($this->statusField)[1];
+
+    $component = livewire(TasksBoard::class)
+        ->call('renameBoardColumn', $id, 'Blocked')
+        ->assertHasNoErrors();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($id)->name)->toBe('Blocked')
+        ->and($component->html())->toContain('Collapse status')->toContain('Hide status')->not->toContain('Collapse stage');
+});
+
+it('refuses to rename the Done status and a taken status name in the menu', function (): void {
+    $done = $this->statusField->options->firstWhere('name', 'Done');
+    $todo = $this->statusField->options->firstWhere('name', 'To do');
+
+    livewire(TasksBoard::class)
+        ->call('renameBoardColumn', (string) $done->getKey(), 'Finished')
+        ->assertHasErrors(['boardStageMenu.'.$done->getKey()])
+        ->call('renameBoardColumn', (string) $todo->getKey(), 'DONE')
+        ->assertHasErrors(['boardStageMenu.'.$todo->getKey()]);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail((string) $done->getKey())->name)->toBe('Done')
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail((string) $todo->getKey())->name)->toBe('To do');
+});
+
+it('turns confetti on for the Done status and keeps it through a rename of another status', function (): void {
+    $done = (string) $this->statusField->options->firstWhere('name', 'Done')->getKey();
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnCelebrate', $done, true)->assertHasNoErrors();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->settings->celebrate)->toBeTrue()
+        ->and($component->html())->toContain('data-board-celebrate="'.e(json_encode([$done])).'"');
+
+    $component->call('renameBoardColumn', $todo, 'Backlog');
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->settings->celebrate)->toBeTrue()
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->name)->toBe('Done');
+
+    $component->call('setBoardColumnCelebrate', $done, false);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->settings->celebrate)->toBeFalse();
+});
+
+it('refuses a forged task status confetti toggle from a member and shows no row', function (): void {
+    $id = statusIds($this->statusField)[1];
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+
+    $component = livewire(TasksBoard::class);
+
+    expect($component->html())->not->toContain('data-stage-confetti');
+
+    $component->call('setBoardColumnCelebrate', $id, true)->assertForbidden();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($id)->settings->celebrate)->toBeNull();
+});
+
+it('sets a task status color from the palette', function (): void {
+    $id = statusIds($this->statusField)[1];
+
+    livewire(TasksBoard::class)->call('setBoardColumnColor', $id, OptionColor::Cyan->value)->assertHasNoErrors();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($id)->settings->color)->toBe(OptionColor::Cyan->value);
+});
+
+it('refuses a forged task status rename from a member and shows no edit block', function (): void {
+    $id = statusIds($this->statusField)[1];
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+
+    livewire(TasksBoard::class)->call('renameBoardColumn', $id, 'Forged')->assertForbidden();
+    livewire(TasksBoard::class)->call('setBoardColumnColor', $id, OptionColor::Red->value)->assertForbidden();
+
+    $html = livewire(TasksBoard::class)->html();
+
+    expect($html)->not->toContain('data-stage-edit')->not->toContain('data-stage-swatch')->toContain('Collapse status');
+});
+
+it('collapses and hides a task status from the menu actions and refuses the last one', function (): void {
+    $ids = statusIds($this->statusField);
+    $component = livewire(TasksBoard::class)
+        ->callAction(TestAction::make('collapseStage')->arguments(['column' => $ids[0]]))
+        ->callAction(TestAction::make('hideStage')->arguments(['column' => $ids[1]]));
+
+    expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([$ids[0]])
+        ->and(TablePreference::query()->sole()->board_state->hiddenColumns)->toBe([$ids[1]]);
+
+    foreach (array_slice($ids, 2) as $id) {
+        $component->call('setBoardColumnVisible', $id, false);
+    }
+
+    $component->callAction(TestAction::make('hideStage')->arguments(['column' => $ids[0]]))
+        ->assertNotified(__('filament/pages/boards.stage_menu.last_visible', ['noun' => 'status']));
+});
+
+it('deletes a task status, clears its tasks and names the attribute status', function (): void {
+    $ids = statusIds($this->statusField);
+    $name = CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($ids[0])->name;
+    $task = taskInStatus($this, 'Acme brief', $name);
+    $action = TestAction::make('deleteStage')->arguments(['column' => $ids[0]]);
+
+    $component = livewire(TasksBoard::class)->mountAction($action);
+    $mounted = $component->instance()->getMountedAction();
+
+    expect($mounted->getModalHeading())->toBe('Delete "'.$name.'"?')
+        ->and($mounted->getModalDescription())->toBe('1 task will have no status. It shows in the No Status column when it is on in View settings.');
+
+    $component->callMountedAction();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($ids[0]))->toBeNull()
+        ->and($task->refresh()->customFieldValues()->where('custom_field_id', $this->statusField->getKey())->value('string_value'))->toBeNull()
+        ->and($component->html())->toContain('Delete status');
+});
+
+it('hides delete for the Done status, locks its name and refuses a forged delete', function (): void {
+    $done = (string) $this->statusField->options->firstWhere('name', 'Done')->getKey();
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+
+    $component = livewire(TasksBoard::class)
+        ->assertActionHidden(TestAction::make('deleteStage')->arguments(['column' => $done]))
+        ->assertActionVisible(TestAction::make('deleteStage')->arguments(['column' => $todo]))
+        ->assertSeeHtml('data-stage-name-locked="'.$done.'"')
+        ->assertDontSeeHtml('data-stage-name-locked="'.$todo.'"')
+        ->call('mountAction', 'deleteStage', ['column' => $done])
+        ->call('callMountedAction');
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($done))->not->toBeNull()
+        ->and($component->html())->toContain('data-stage-swatch');
+});
+
+it('hides delete from a member and refuses a forged task status delete', function (): void {
+    $id = statusIds($this->statusField)[1];
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+    $action = TestAction::make('deleteStage')->arguments(['column' => $id]);
+
+    $component = livewire(TasksBoard::class)
+        ->assertActionHidden($action)
+        ->call('mountAction', 'deleteStage', ['column' => $id])
+        ->call('callMountedAction');
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($id))->not->toBeNull()
+        ->and($component->html())->not->toContain('Delete status');
+});
+
+it('adds a gray task status after the last one and words the tile status', function (): void {
+    $before = statusIds($this->statusField);
+
+    $component = livewire(TasksBoard::class)
+        ->assertSee('Add status')
+        ->call('addBoardColumn', 'Blocked')
+        ->assertHasNoErrors();
+
+    $added = array_values(array_diff(statusIds($this->statusField), $before));
+
+    expect($added)->toHaveCount(1)
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($added[0])->settings->color)->toBe(OptionColor::Gray->value)
+        ->and(statusIds($this->statusField))->toBe([...$before, $added[0]])
+        ->and(array_slice($component->instance()->getBoard()->getColumnIdentifiers(), -1))->toBe($added);
+});
+
+it('shows a taken task status name under the add input', function (): void {
+    $count = count(statusIds($this->statusField));
+
+    livewire(TasksBoard::class)->call('addBoardColumn', 'DONE')->assertHasErrors(['boardNewColumn']);
+
+    expect(statusIds($this->statusField))->toHaveCount($count);
+});
+
+it('offers no add tile to a member and refuses a forged task status add', function (): void {
+    $count = count(statusIds($this->statusField));
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+
+    $component = livewire(TasksBoard::class)->call('addBoardColumn', 'Forged');
+
+    expect($component->instance()->getBoard()->canAddColumns())->toBeFalse()
+        ->and(statusIds($this->statusField))->toHaveCount($count);
+});
+
+it('words the task add input placeholder and a taken status name', function (): void {
+    $component = livewire(TasksBoard::class)->call('addBoardColumn', 'done');
+
+    expect($component->instance()->getBoard()->getAddColumnPlaceholder())->toBe('New status name')
+        ->and($component->errors()->get('boardNewColumn'))->toBe(['A status named "done" already exists.']);
 });

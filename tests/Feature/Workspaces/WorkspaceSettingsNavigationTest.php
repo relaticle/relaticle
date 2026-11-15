@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Contracts\Billing as BillingContract;
+use App\Data\StageOptionSettings;
+use App\Enums\CustomFields\OpportunityField;
 use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\EditWorkspace;
@@ -12,6 +14,7 @@ use App\Filament\Pages\Workspace\Members;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
+use App\Models\Opportunity;
 use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
@@ -259,6 +262,36 @@ test('the custom fields edit form offers no searchable toggle and keeps a stored
     expect($settings->visible_in_list)->toBeFalse()
         ->and($settings->searchable)->toBeTrue();
 });
+
+test('the custom fields edit form keeps a stage celebration while it saves colors and names', function (bool $colorsOn): void {
+    $field = CustomField::query()->forEntity(Opportunity::class)->where('code', OpportunityField::STAGE)->sole();
+    $field->update(['settings' => [...$field->settings->toArray(), 'enable_option_colors' => $colorsOn]]);
+    $option = $field->options->first();
+    $option->update(['settings' => new StageOptionSettings(color: '#ef4444', celebrate: true)]);
+
+    $table = livewire(ManageFieldsTable::class, ['entityType' => 'opportunity'])
+        ->mountAction('editField', ['fieldId' => $field->getKey()])
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+
+    $stored = fn (): StageOptionSettings => $option->fresh()->settings;
+
+    expect($stored()->celebrate)->toBeTrue()
+        ->and($stored()->color)->toBe('#ef4444');
+
+    if ($colorsOn) {
+        $table->mountAction('editField', ['fieldId' => $field->getKey()])
+            ->fillForm(['options' => $field->options->mapWithKeys(fn ($item): array => ["record-{$item->getKey()}" => [
+                'name' => $item->name,
+                'settings' => ['color' => $item->is($option) ? '#22c55e' : $item->settings->color],
+            ]])->all()])
+            ->callMountedAction()
+            ->assertHasNoActionErrors();
+
+        expect($stored()->color)->toBe('#22c55e')
+            ->and($stored()->celebrate)->toBeTrue();
+    }
+})->with(['option colors off' => [false], 'option colors on' => [true]]);
 
 function mountFieldsTableThenDemoteAdmin(object $test): array
 {

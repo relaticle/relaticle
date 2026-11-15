@@ -6,6 +6,8 @@ use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Support\PanelIcons;
 use Filament\Facades\Filament;
+use Filament\Support\Facades\FilamentIcon;
+use Relaticle\Flowforge\View\FlowforgeIconAlias;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard as SystemAdminDashboard;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Symfony\Component\DomCrawler\Crawler;
@@ -51,4 +53,14 @@ it('draws the system admin panel theme switcher with Lucide icons', function ():
 
     expect(themeSwitcherShapes((string) $response->getContent()))
         ->toBe(lucideShapes('lucide-sun', 'lucide-moon', 'lucide-monitor'));
+});
+
+it('maps every Flowforge icon alias to Lucide', function (): void {
+    $aliases = (new ReflectionClass(FlowforgeIconAlias::class))->getConstants();
+
+    expect($aliases)->not->toBeEmpty();
+
+    foreach ($aliases as $alias) {
+        expect(FilamentIcon::resolve($alias))->toStartWith('lucide-');
+    }
 });
