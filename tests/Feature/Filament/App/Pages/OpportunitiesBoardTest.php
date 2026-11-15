@@ -1665,6 +1665,37 @@ it('keeps the no-value collapse with the attribute it was set on', function (): 
     expect($component->instance()->getBoard()->getCollapsedColumns())->toBe([BoardStateData::NO_VALUE_COLUMN]);
 });
 
+it('keeps the no-value collapse of another attribute when the bar opens every column', function (): void {
+    $tier = opportunitySelectField($this, 'Tier', ['Gold', 'Silver']);
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnField', $tier->code)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnField', $this->stageField->code)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true)
+        ->call('setBoardColumnsCollapsed', false);
+
+    expect(TablePreference::query()->sole()->board_state->collapsedNoValueColumns)->toBe([$tier->code]);
+});
+
+it('writes nothing when the bar sets the collapse state the board already has', function (bool $collapsed): void {
+    $component = livewire(OpportunitiesBoard::class);
+
+    if ($collapsed) {
+        $component->call('setBoardColumnsCollapsed', true);
+    }
+
+    $writes = 0;
+    DB::listen(function (QueryExecuted $query) use (&$writes): void {
+        $writes += preg_match('/^(insert into|update) "table_preferences"/', $query->sql);
+    });
+
+    $component->call('setBoardColumnsCollapsed', $collapsed);
+
+    expect($writes)->toBe(0);
+})->with(['collapsed' => true, 'expanded' => false]);
+
 it('opens a new attribute with its no-value column expanded', function (): void {
     livewire(OpportunitiesBoard::class)
         ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
