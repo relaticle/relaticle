@@ -287,7 +287,7 @@
                                  bubble changes height mid-turn. --}}
                             <template x-if="!msg.editing">
                                 <div
-                                    class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100"
+                                    class="flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
                                     :class="{ 'invisible': isStreaming }"
                                 >
                                     <button
@@ -434,7 +434,7 @@
 
                         <template x-if="msg.content">
                             <div
-                                class="mt-1 flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100"
+                                class="mt-1 flex items-center gap-1 px-1 opacity-0 transition group-hover/message:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100"
                                 :class="{ 'invisible': !msg.rendered }"
                             >
                                 <button
