@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\Opportunity;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
@@ -69,6 +70,14 @@ it('includes opportunities created long ago with no recent activity when stale_d
 
     expect($items)->toHaveCount(1)
         ->and($items[0]['attributes']['name'])->toBe('Never Active');
+});
+
+it('does not call an opportunity created today stale when nothing logged its creation', function (): void {
+    Model::withoutEvents(fn (): Opportunity => Opportunity::factory()->for($this->workspace)->create(['name' => 'Seeded Today']));
+
+    $response = (new ListOpportunitiesTool)->handle(new Request(['filter' => ['stale_days' => ['$gte' => 30]]]));
+
+    expect(json_decode($response, true)['data'])->toBe([]);
 });
 
 it('still treats an opportunity as stale when a different workspace has a recent activity_log entry for the same subject_id', function (): void {
