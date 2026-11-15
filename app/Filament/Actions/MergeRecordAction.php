@@ -100,8 +100,8 @@ final class MergeRecordAction extends Action
     private function merge(array $data): Company|People
     {
         $current = $this->subject();
-        $id = $data['picked_id'] ?? null;
-        $picked = is_string($id) ? $current::query()->whereKey($id)->first() : null;
+        $pickedId = $data['picked_id'] ?? null;
+        $picked = is_string($pickedId) ? $current::query()->whereKey($pickedId)->first() : null;
 
         if ($picked === null || $current->is($picked)) {
             throw ValidationException::withMessages(['picked_id' => __('filament/record-page.merge.unavailable')]);
