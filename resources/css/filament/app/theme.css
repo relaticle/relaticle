@@ -2098,6 +2098,11 @@ html.fi-record-stacked .fi-record-layout {
     @apply p-3;
 }
 
+/* The header sits above its tray, so the panel rises until the name field lies over the title it replaces. */
+.ff-board .ff-column-menu > .fi-dropdown-panel {
+    @apply sm:-mt-5;
+}
+
 .fi-board-stage-confetti {
     @apply -mx-3 -mb-3 border-t border-gray-100 p-1 dark:border-white/5;
 }
