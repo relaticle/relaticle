@@ -1031,6 +1031,29 @@ it('opens the stage menu on a header click, renames on Enter and recolors from t
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
 
+it('moves focus into the swatch grid when the stage menu dot opens it, so arrow keys recolor', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $menu = "[data-stage-menu=\"{$ids[1]}\"]";
+    $option = fn (): CustomFieldOption => CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($ids[1]);
+    $before = $option()->settings->color;
+
+    $page = openBoard($user, $path);
+
+    $page->page()->locator(boardHeaderTitle($ids[1]))->click();
+    $page->page()->locator("{$menu} [data-stage-color-trigger]")->click();
+    $page->assertScript(boardWaitFor("document.activeElement?.closest('{$menu} [data-stage-swatches]') !== null"), true);
+
+    $page->keys("{$menu} .ff-swatch[tabindex=\"0\"]", 'ArrowRight');
+    $page->keys("{$menu} .ff-swatch[tabindex=\"0\"]", 'Enter');
+    waitForPage($page, fn (): bool => $option()->settings->color !== $before);
+
+    expect($option()->settings->color)->not->toBe($before);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
 it('keeps the stage open and its menu up on a double-click on its header, with the name focused', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
     $this->withVite();
 
