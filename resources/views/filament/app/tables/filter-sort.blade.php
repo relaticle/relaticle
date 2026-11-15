@@ -12,7 +12,7 @@
         aria-haspopup="dialog"
         x-on:click="isOpen('sort', 'pick') ? close(false) : toggle('sort', 'main', $event)"
     >
-        <x-filament::icon icon="lucide-arrow-up-down" x-show="sorts.length === 0" />
+        <x-filament::icon icon="lucide-arrow-down-wide-narrow" x-show="sorts.length === 0" />
         <x-filament::icon icon="lucide-arrow-up-narrow-wide" x-show="sorts[0]?.direction === 'asc'" />
         <x-filament::icon icon="lucide-arrow-down-wide-narrow" x-show="sorts[0]?.direction === 'desc'" />
         <template x-if="sorts.length === 0"><span class="max-sm:hidden">{{ __('filament/panel.tables.filters.sort') }}</span></template>

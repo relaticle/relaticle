@@ -404,12 +404,12 @@ it('marks the current field in the field list of a chip', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('draws the unsorted sort control with a two-way arrow at every width', function (int $width): void {
+it('draws the unsorted sort control with its own sort arrow at every width', function (int $width): void {
     $page = ($this->open)($width);
     $paths = fn (string $html): array => (preg_match_all('/ d="([^"]+)"/', $html, $matches) ? $matches[1] : []);
     $shown = $page->script('[...document.querySelectorAll("[data-filter-sort] svg:not(.fi-filter-sorted-icon)")].filter((svg) => svg.checkVisibility()).map((svg) => [...svg.querySelectorAll("path")].map((path) => path.getAttribute("d")))[0]');
 
-    expect($shown)->toBe($paths(svg('lucide-arrow-up-down')->toHtml()));
+    expect($shown)->toBe($paths(svg('lucide-arrow-down-wide-narrow')->toHtml()));
     $page->assertNoJavaScriptErrors();
 })->with([390, 1440]);
 
