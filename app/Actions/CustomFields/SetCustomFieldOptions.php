@@ -59,7 +59,7 @@ final readonly class SetCustomFieldOptions
                         $this->moveValues($field, $removal['option'], $options[$removal['replacement']]);
                     }
 
-                    if ($removal['clears'] !== null) {
+                    if ($removal['clears']) {
                         $this->clearValues($field, $removal['option']);
                     }
 

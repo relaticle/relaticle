@@ -21,13 +21,14 @@ final readonly class CustomFieldOptionPlan
 {
     /**
      * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
-     * @param  list<array{option: CustomFieldOption, replacement: ?int, clears: ?int}>  $removals
+     * @param  list<array{option: CustomFieldOption, replacement: ?int, clears: bool}>  $removals
      */
     private function __construct(
         public array $targets,
         public array $removals,
         public bool $enablesColors,
         public bool $multiValued,
+        private CustomField $field,
     ) {}
 
     /**
@@ -210,7 +211,7 @@ final readonly class CustomFieldOptionPlan
                 $errors[] = __('Records still use ":name", so it needs a replacement from the new list.', ['name' => $option->name]);
             }
 
-            $removals[] = self::removalEntry($field, $option, $replacement, $clears);
+            $removals[] = self::removalEntry($option, $replacement, $clears);
 
             if ($clears && $capsClears) {
                 $cleared[(string) $option->name] = CustomFieldValue::query()->holdingOption($field, $id)->count();
@@ -231,18 +232,18 @@ final readonly class CustomFieldOptionPlan
             throw ValidationException::withMessages(['options' => $errors]);
         }
 
-        return new self($targets, $removals, ! $keepsColors && self::turnsOnColors($field, $targets), $field->getValueColumn() === 'json_value');
+        return new self($targets, $removals, ! $keepsColors && self::turnsOnColors($field, $targets), $field->getValueColumn() === 'json_value', $field);
     }
 
     /**
-     * @return array{option: CustomFieldOption, replacement: ?int, clears: ?int}
+     * @return array{option: CustomFieldOption, replacement: ?int, clears: bool}
      */
-    private static function removalEntry(CustomField $field, CustomFieldOption $option, ?int $replacement, bool $clears): array
+    private static function removalEntry(CustomFieldOption $option, ?int $replacement, bool $clears): array
     {
         return [
             'option' => $option,
             'replacement' => $replacement,
-            'clears' => $clears ? CustomFieldValue::query()->holdingOptionOnLiveRecord($field, (string) $option->getKey())->count() : null,
+            'clears' => $clears,
         ];
     }
 
@@ -353,7 +354,7 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @param  array{option: CustomFieldOption, replacement: ?int, clears: ?int}  $removal
+     * @param  array{option: CustomFieldOption, replacement: ?int, clears: bool}  $removal
      */
     private function removalText(array $removal): string
     {
@@ -363,13 +364,15 @@ final readonly class CustomFieldOptionPlan
             return __(':option (records move to :replacement)', ['option' => $name, 'replacement' => $this->targets[$removal['replacement']]['name']]);
         }
 
-        if ($removal['clears'] === null || $removal['clears'] === 0) {
+        $count = $removal['clears'] ? CustomFieldValue::query()->holdingOptionOnLiveRecord($this->field, (string) $removal['option']->getKey())->count() : 0;
+
+        if ($count === 0) {
             return $name;
         }
 
         $loss = $this->multiValued
-            ? trans_choice(':count record loses this option|:count records lose this option', $removal['clears'])
-            : trans_choice(':count record loses its value|:count records lose their value', $removal['clears']);
+            ? trans_choice(':count record loses this option|:count records lose this option', $count)
+            : trans_choice(':count record loses its value|:count records lose their value', $count);
 
         return "{$name} ({$loss})";
     }
