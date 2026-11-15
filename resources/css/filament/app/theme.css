@@ -2047,7 +2047,16 @@ html.fi-record-stacked .fi-record-layout {
     .fi-view-settings-row .fi-icon-btn,
     .fi-ta-views-row-actions .fi-icon-btn,
     .fi-bulk-bar-selection,
-    .fi-board-layout-option
+    .fi-board-layout-option,
+    .ff-column-header .fi-icon-btn,
+    .ff-column-menu .ff-column-heading[role='button'],
+    .ff-column[data-collapsed][role='button'],
+    .ff-add-column-button,
+    .ff-add-column-dot,
+    .ff-add-row,
+    .ff-lane-toggle,
+    .ff-swatch,
+    [data-stage-color-trigger]
 ):focus-visible {
     @apply outline-2 outline-solid outline-primary-500;
 }
