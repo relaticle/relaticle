@@ -1,23 +1,59 @@
 // Confetti for a card moved into a stage that celebrates. Flowforge dispatches kanban-card-moved from the mover's component
 // only after the server accepted the move, so the burst never reaches another browser or a refused move.
 
-const PALETTE = ['#5d54e8', '#a78bfa', '#34d399', '#fbbf24', '#38bdf8', '#f472b6']
+const PALETTE = ['#ff4d6d', '#ffb703', '#3ddc97', '#4cc9f0', '#7b5cff', '#ff7ab6', '#ff8a3d']
+const STAGE_SHARE = 0.25
 const GRAVITY = 1000
 const MAX_DT = 0.05
 const MAX_LIFETIME = 6
 const SHADES = 8
-const BACK_SHADE = 0.78
+const BACK_SHADE = 0.88
+const EDGE_SHADE = 0.82
 const PUSH_RADIUS = 120
 const PUSH_GAIN = 0.35
 const MAX_CURSOR_SPEED = 3000
 
-const rgbOf = (css) => {
-    const probe = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+const hexRgb = (hex) => {
+    return [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16))
+}
 
-    probe.fillStyle = css
-    probe.fillRect(0, 0, 1, 1)
+const linearToSrgb = (v) => Math.round(255 * Math.min(1, Math.max(0, v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055)))
 
-    return [...probe.getImageData(0, 0, 1, 1).data.slice(0, 3)]
+const oklchRgb = (l, c, hue) => {
+    const a = c * Math.cos(hue)
+    const b = c * Math.sin(hue)
+    const l_ = (l + 0.3963377774 * a + 0.2158037573 * b) ** 3
+    const m_ = (l - 0.1055613458 * a - 0.0638541728 * b) ** 3
+    const s_ = (l - 0.0894841775 * a - 1.291485548 * b) ** 3
+
+    return [
+        linearToSrgb(4.0767416621 * l_ - 3.3077115913 * m_ + 0.2309699292 * s_),
+        linearToSrgb(-1.2684380046 * l_ + 2.6097574011 * m_ - 0.3413193965 * s_),
+        linearToSrgb(-0.0041960863 * l_ - 0.7034186147 * m_ + 1.707614701 * s_),
+    ]
+}
+
+// A custom property computes to the written color, so hex, rgb(), color(srgb) and oklch() are read without a canvas or a probe element.
+const parseColor = (css) => {
+    if (/^#[0-9a-f]{6}$/i.test(css)) {
+        return hexRgb(css)
+    }
+
+    const numbers = (css.match(/-?\d*\.?\d+(?:e-?\d+)?%?/g) ?? []).map((n) => (n.endsWith('%') ? parseFloat(n) / 100 : parseFloat(n)))
+
+    if (css.startsWith('rgb')) {
+        return numbers.slice(0, 3)
+    }
+
+    if (css.startsWith('color(srgb')) {
+        return numbers.slice(0, 3).map((n) => Math.round(n * 255))
+    }
+
+    if (css.startsWith('oklch')) {
+        return oklchRgb(numbers[0], numbers[1], (numbers[2] * Math.PI) / 180)
+    }
+
+    return null
 }
 
 const stageColor = (columnId) => {
@@ -27,23 +63,9 @@ const stageColor = (columnId) => {
         return null
     }
 
-    const swatch = document.createElement('span')
+    const color = getComputedStyle(dot).getPropertyValue('--color-500').trim()
 
-    swatch.style.color = 'var(--color-500)'
-    dot.appendChild(swatch)
-
-    const color = getComputedStyle(swatch).color
-
-    swatch.remove()
-
-    return color
-}
-
-const colorsFor = (columnId) => {
-    const stage = stageColor(columnId)
-    const colors = PALETTE.map(rgbOf)
-
-    return stage ? [...colors, ...Array(PALETTE.length).fill(rgbOf(stage))] : colors
+    return parseColor(color)
 }
 
 // Front and back faces in SHADES brightness steps each, so a frame only picks a string.
@@ -52,7 +74,7 @@ const stylesFor = (rgb) => {
 
     for (const face of [1, BACK_SHADE]) {
         for (let level = 0; level < SHADES; level++) {
-            const shade = face * (0.55 + 0.45 * (level / (SHADES - 1)))
+            const shade = face * (EDGE_SHADE + (1 - EDGE_SHADE) * (level / (SHADES - 1)))
 
             styles.push(`rgb(${rgb.map((channel) => Math.round(channel * shade)).join(',')})`)
         }
@@ -61,7 +83,16 @@ const stylesFor = (rgb) => {
     return styles
 }
 
-const piece = (x, y, angle, spread, speedMin, speedMax, colors, delay = 0) => {
+const stylesForBurst = (columnId) => {
+    const stage = stageColor(columnId)
+
+    return {
+        palette: PALETTE.map((hex) => stylesFor(hexRgb(hex))),
+        stage: stage ? stylesFor(stage) : null,
+    }
+}
+
+const piece = (x, y, angle, spread, speedMin, speedMax, styles, delay = 0) => {
     const direction = angle + (Math.random() - 0.5) * spread
     const speed = speedMin + Math.random() * (speedMax - speedMin)
     const kind = Math.random()
@@ -82,16 +113,16 @@ const piece = (x, y, angle, spread, speedMin, speedMax, colors, delay = 0) => {
         wobble: 60 + Math.random() * 80,
         size: 0.8 + Math.random() * 0.5,
         shape,
-        width: shape === 1 ? 3 + Math.random() * 2 : 7 + Math.random() * 7,
-        height: shape === 1 ? 14 + Math.random() * 8 : 5 + Math.random() * 5,
-        styles: stylesFor(colors[(Math.random() * colors.length) | 0]),
+        width: shape === 1 ? 4 + Math.random() : shape === 2 ? 7 + Math.random() : 8 + Math.random() * 2,
+        height: shape === 1 ? 14 + Math.random() * 2 : 11 + Math.random() * 2,
+        styles: styles.stage && Math.random() < STAGE_SHARE ? styles.stage : styles.palette[(Math.random() * styles.palette.length) | 0],
         age: -delay,
         ttl: 2.6 + Math.random() * 1.4,
         alive: true,
     }
 }
 
-const build = (colors, width, height) => {
+const build = (styles, width, height) => {
     const cap = width < 640 ? 80 : 150
     const cannon = Math.floor(cap * 0.4)
     const pieces = []
@@ -100,12 +131,12 @@ const build = (colors, width, height) => {
         const angle = fromLeft ? -Math.PI / 3.4 : Math.PI - Math.PI / 3.4
 
         for (let i = 0; i < cannon; i++) {
-            pieces.push(piece(fromLeft ? -20 : width + 20, height * 0.62, angle, Math.PI / 4, 1300, 2600, colors))
+            pieces.push(piece(fromLeft ? -20 : width + 20, height * 0.62, angle, Math.PI / 4, 1300, 2600, styles))
         }
     }
 
     for (let i = pieces.length; i < cap; i++) {
-        pieces.push(piece(Math.random() * width, -20, Math.PI / 2, Math.PI / 8, 80, 260, colors, 0.28 + Math.random() * 0.3))
+        pieces.push(piece(Math.random() * width, -20, Math.PI / 2, Math.PI / 8, 80, 260, styles, 0.28 + Math.random() * 0.3))
     }
 
     return pieces
@@ -168,6 +199,8 @@ const fire = (columnId) => {
         return
     }
 
+    // Read the stage color before the canvas lands: appending it first makes this read recalculate the whole board.
+    const pieces = build(stylesForBurst(columnId), window.innerWidth, window.innerHeight)
     const canvas = document.createElement('canvas')
 
     canvas.dataset.boardConfetti = ''
@@ -176,8 +209,7 @@ const fire = (columnId) => {
     document.body.appendChild(canvas)
 
     const ctx = canvas.getContext('2d')
-    const dpr = Math.min(window.devicePixelRatio || 1, 2)
-    const pieces = build(colorsFor(columnId), window.innerWidth, window.innerHeight)
+    const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
     const cursor = { x: 0, y: 0, time: 0, seen: false }
     const start = performance.now()
     let last = start
