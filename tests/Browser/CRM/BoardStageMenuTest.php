@@ -55,6 +55,24 @@ it('opens the stage menu on a header click, renames on Enter and recolors from t
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
 
+it('keeps every board menu hidden while it is still cloaked, before alpine starts it', function (): void {
+    $this->withVite();
+
+    $page = openBoard(User::factory()->withWorkspace()->create(), 'opportunities/board');
+
+    $displays = $page->script(<<<'JS'
+        [...document.querySelectorAll('.ff-column-menu > .fi-dropdown-panel, :is(.fi-view-switcher, .fi-view-settings) > .fi-dropdown-panel')].map((panel) => {
+            panel.removeAttribute('style');
+            panel.setAttribute('x-cloak', '');
+
+            return getComputedStyle(panel).display;
+        })
+    JS);
+
+    expect($displays)->not->toBeEmpty()
+        ->each->toBe('none');
+});
+
 it('moves focus into the swatch grid when the stage menu dot opens it, so arrow keys recolor', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
     $this->withVite();
 
