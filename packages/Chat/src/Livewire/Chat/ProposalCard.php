@@ -29,6 +29,7 @@ use Relaticle\Chat\Enums\WebSearchPreference;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ProposalConflictsQuery;
 use Relaticle\Chat\Queries\ProposalReceiptsQuery;
+use Relaticle\Chat\Queries\ProposalRepeatsQuery;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\ProposalEditor;
 use Relaticle\Chat\Services\ProposalPlanService;
@@ -525,6 +526,9 @@ final class ProposalCard extends BaseLivewireComponent
     /** @var array<string, array<int, non-empty-list<ProposalConflict>>>|null */
     private ?array $overwritesCache = null;
 
+    /** @var array<string, array<int, array{name: string, url: string}>>|null */
+    private ?array $repeatsCache = null;
+
     /**
      * Per-request memo for editableCodes(), keyed by entity type.
      *
@@ -563,6 +567,7 @@ final class ProposalCard extends BaseLivewireComponent
     {
         $this->planAllStepsCache = null;
         $this->overwritesCache = null;
+        $this->repeatsCache = null;
     }
 
     /**
@@ -623,6 +628,7 @@ final class ProposalCard extends BaseLivewireComponent
             'followUpLabel' => $entity->followUpLabel(),
             'refLinks' => $this->refLinksOf($step, $pendingIds),
             'overwriteNotices' => $this->overwriteNoticesOf($step),
+            'repeatNotices' => $this->repeatNoticesOf($step),
         ];
     }
 
@@ -1259,6 +1265,7 @@ final class ProposalCard extends BaseLivewireComponent
     private function refusesUnseenOverwrite(): bool
     {
         $this->overwritesCache = null;
+        $this->repeatsCache = null;
 
         if (array_diff($this->overwriteIds(), $this->shownOverwrites) === []) {
             return false;
@@ -1297,6 +1304,25 @@ final class ProposalCard extends BaseLivewireComponent
 
             return $row;
         }, $rows);
+    }
+
+    /**
+     * @return array<int, array{text: string, url: string}>
+     */
+    private function repeatNoticesOf(PendingAction $step): array
+    {
+        $this->repeatsCache ??= resolve(ProposalRepeatsQuery::class)->forSteps($this->authUser(), $this->stepsStillIn());
+
+        return array_map(
+            static fn (array $repeat): array => [
+                'text' => __('":name" was created earlier in this conversation. Approving adds another :entity with that name.', [
+                    'name' => $repeat['name'],
+                    'entity' => Str::lower($step->entity_type->singularName()),
+                ]),
+                'url' => $repeat['url'],
+            ],
+            $this->repeatsCache[(string) $step->getKey()] ?? [],
+        );
     }
 
     /**

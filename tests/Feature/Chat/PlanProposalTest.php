@@ -541,9 +541,9 @@ it('renders a plan without re-reading the plan or the custom fields once per ste
     $planQueries = $queries->filter(fn (string $q): bool => str_contains($q, 'from "pending_actions"'))->count();
     $customFieldQueries = $queries->filter(fn (string $q): bool => str_contains($q, 'from "custom_fields"'))->count();
 
-    // Five steps over two entity types. One plan read, and one custom-field read
-    // per distinct entity type (plus its options eager load), not per step.
-    expect($planQueries)->toBeLessThanOrEqual(3, "plan re-read per step: {$planQueries} pending_actions queries")
+    // Five steps over two entity types. The plan reads, one read of the conversation's
+    // approved creates, and one custom-field read per distinct entity type, not per step.
+    expect($planQueries)->toBeLessThanOrEqual(4, "plan re-read per step: {$planQueries} pending_actions queries")
         ->and($customFieldQueries)->toBeLessThanOrEqual(4, "custom fields re-read per step: {$customFieldQueries} custom_fields queries");
 });
 
