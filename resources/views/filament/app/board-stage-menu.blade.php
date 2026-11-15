@@ -25,7 +25,12 @@
                     autocomplete="off"
                     class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm font-semibold text-gray-950 outline-none focus:ring-0 dark:text-white"
                     data-stage-name-input
-                    data-autofocus
+                    @if ($locked)
+                        readonly
+                        data-stage-name-locked="{{ $id }}"
+                    @else
+                        data-autofocus
+                    @endif
                     aria-label="{{ __('filament/pages/boards.stage_menu.name', ['noun' => $noun]) }}"
                     x-on:keydown.enter.prevent="$el.blur()"
                     x-on:dropdown-escape="$el.value = $el.defaultValue"

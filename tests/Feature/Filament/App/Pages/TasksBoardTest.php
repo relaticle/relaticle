@@ -2199,14 +2199,20 @@ it('deletes a task status, clears its tasks and names the attribute status', fun
         ->and($component->html())->toContain('Delete status');
 });
 
-it('refuses to delete the Done status', function (): void {
+it('hides delete for the Done status, locks its name and refuses a forged delete', function (): void {
     $done = (string) $this->statusField->options->firstWhere('name', 'Done')->getKey();
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
 
-    livewire(TasksBoard::class)
-        ->callAction(TestAction::make('deleteStage')->arguments(['column' => $done]))
-        ->assertNotified(__('The task Status option "Done" marks a task complete, so it cannot be renamed or removed.'));
+    $component = livewire(TasksBoard::class)
+        ->assertActionHidden(TestAction::make('deleteStage')->arguments(['column' => $done]))
+        ->assertActionVisible(TestAction::make('deleteStage')->arguments(['column' => $todo]))
+        ->assertSeeHtml('data-stage-name-locked="'.$done.'"')
+        ->assertDontSeeHtml('data-stage-name-locked="'.$todo.'"')
+        ->call('mountAction', 'deleteStage', ['column' => $done])
+        ->call('callMountedAction');
 
-    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($done))->not->toBeNull();
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($done))->not->toBeNull()
+        ->and($component->html())->toContain('data-stage-swatch');
 });
 
 it('hides delete from a member and refuses a forged task status delete', function (): void {

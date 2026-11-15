@@ -505,6 +505,11 @@ final readonly class CustomFieldOptionPlan
         return null;
     }
 
+    public static function locksOption(CustomField $field, string $name): bool
+    {
+        return self::isTaskStatus($field) && $name === TaskField::DONE_STATUS;
+    }
+
     private static function isTaskStatus(CustomField $field): bool
     {
         return $field->entity_type === CrmEntity::Task->value && $field->code === TaskField::STATUS->value;

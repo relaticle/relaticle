@@ -24,6 +24,7 @@ use App\Models\CustomFieldValue;
 use App\Models\SavedView;
 use App\Models\Workspace;
 use App\Queries\Views\BoardColumnFieldsQuery;
+use App\Support\CustomFieldOptionPlan;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -274,6 +275,7 @@ trait HasBoardStageOrder
                 'current' => $stored !== null && strtolower($stored) === $color->value,
             ], OptionColor::cases()),
             'editable' => $id !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages(),
+            'locked' => $this->locksStage($id),
             'error' => $this->getErrorBag()->first("boardStageMenu.{$id}"),
         ])->render());
     }
@@ -286,7 +288,7 @@ trait HasBoardStageOrder
         return [
             Action::make('collapseStage')
                 ->label(fn (): string => __('filament/pages/boards.stage_menu.collapse', ['noun' => $this->boardStageNoun()]))
-                ->icon('lucide-square-arrow-left')
+                ->icon('lucide-fold-horizontal')
                 ->action(fn (array $arguments) => $this->setBoardColumnCollapsed($arguments['column'] ?? null, true)),
             Action::make('hideStage')
                 ->label(fn (): string => __('filament/pages/boards.stage_menu.hide', ['noun' => $this->boardStageNoun()]))
@@ -296,7 +298,7 @@ trait HasBoardStageOrder
                 ->label(fn (): string => __('filament/pages/boards.stage_menu.delete', ['noun' => $this->boardStageNoun()]))
                 ->icon('lucide-trash-2')
                 ->color('danger')
-                ->visible(fn (array $arguments): bool => ($arguments['column'] ?? null) !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages())
+                ->visible(fn (array $arguments): bool => ($arguments['column'] ?? null) !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages() && ! $this->locksStage($arguments['column'] ?? null))
                 ->modalIcon('lucide-trash-2')
                 ->modalWidth(Width::Medium)
                 ->modalHeading(fn (array $arguments): string => __('filament/pages/boards.stage_menu.delete_heading', ['name' => $this->stageNameFor($arguments['column'] ?? null)]))
@@ -304,6 +306,11 @@ trait HasBoardStageOrder
                 ->modalSubmitActionLabel(__('filament/pages/boards.stage_menu.delete_confirm'))
                 ->action(fn (array $arguments) => $this->deleteBoardColumn($arguments['column'] ?? null)),
         ];
+    }
+
+    private function locksStage(mixed $optionId): bool
+    {
+        return CustomFieldOptionPlan::locksOption($this->boardColumnField(), $this->stageNameFor($optionId));
     }
 
     private function stageNameFor(mixed $optionId): string
