@@ -66,7 +66,6 @@ return [
         'records' => [
             'opportunity' => 'opportunity|opportunities',
             'task' => 'task|tasks',
-            'record' => 'record|records',
         ],
     ],
 
