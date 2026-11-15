@@ -201,9 +201,24 @@ trait HasBoardStageOrder
         $this->writeStageOption($optionId, ['color' => $color], fn (array $option): bool => $colorsOn && strtolower((string) $option['stored']) === strtolower($color));
     }
 
+    public function setBoardColumnCelebrate(mixed $optionId = null, mixed $on = false): void
+    {
+        $on = filter_var($on, FILTER_VALIDATE_BOOLEAN);
+
+        $this->writeStageOption($optionId, ['celebrate' => $on], fn (array $option): bool => $option['celebrate'] === $on);
+    }
+
     /**
-     * @param  array{name?: string, was?: string, color?: string}  $change
-     * @param  Closure(array{id: string, name: string, color: string, stored: ?string}): bool  $unchanged
+     * @return list<string>
+     */
+    public function celebratingBoardColumnIds(): array
+    {
+        return array_values($this->boardColumnOptions()->where('celebrate', true)->pluck('id')->all());
+    }
+
+    /**
+     * @param  array{name?: string, was?: string, color?: string, celebrate?: bool}  $change
+     * @param  Closure(array{id: string, name: string, color: string, stored: ?string, celebrate: bool}): bool  $unchanged
      */
     private function writeStageOption(mixed $optionId, array $change, Closure $unchanged): void
     {
@@ -275,6 +290,7 @@ trait HasBoardStageOrder
                 'current' => $stored !== null && strtolower($stored) === $color->value,
             ], OptionColor::cases()),
             'editable' => $id !== BoardStateData::NO_VALUE_COLUMN && $this->canEditStages(),
+            'celebrate' => $this->boardColumnOptions()->firstWhere('id', $id)['celebrate'] ?? false,
             'locked' => $this->locksStage($id),
             'error' => $this->getErrorBag()->first("boardStageMenu.{$id}"),
         ])->render());
@@ -504,7 +520,7 @@ trait HasBoardStageOrder
     }
 
     /**
-     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string}>
+     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string, celebrate: bool}>
      */
     protected function boardColumnOptions(): Collection
     {
@@ -512,7 +528,7 @@ trait HasBoardStageOrder
     }
 
     /**
-     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string}>
+     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string, celebrate: bool}>
      */
     private function resolveBoardColumnOptions(): Collection
     {
@@ -524,6 +540,7 @@ trait HasBoardStageOrder
             'name' => (string) $option->getAttribute('name'),
             'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
             'stored' => $option->settings->color,
+            'celebrate' => (bool) $option->settings->celebrate,
         ]);
 
         $position = array_flip($this->storedBoardState()->orderStages(array_column($options->all(), 'id')));

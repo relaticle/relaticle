@@ -13,6 +13,11 @@ interface OrdersBoardStages
      */
     public function reorderBoardStages(array $optionIds): void;
 
+    /**
+     * @return list<string>
+     */
+    public function celebratingBoardColumnIds(): array;
+
     public function boardViewSettings(): Htmlable;
 
     public function boardLayoutToggles(): Htmlable;

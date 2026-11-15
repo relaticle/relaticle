@@ -1,6 +1,6 @@
 @use('Illuminate\Support\Js')
 
-<div class="fi-board-stage-menu flex flex-col gap-2" data-stage-menu="{{ $id }}" x-data="{ swatches: false }">
+<div class="fi-board-stage-menu flex flex-col gap-2" data-stage-menu="{{ $id }}" x-data="{ swatches: false, syncSwitch(wrapper) { const toggle = wrapper.querySelector('[data-visible]'); if (toggle) { window.Alpine.$data(toggle).state = toggle.dataset.visible === 'true' } } }">
     @if ($editable)
         <div class="relative" data-stage-edit="{{ $id }}">
             <div
@@ -53,6 +53,21 @@
         @if (filled($error))
             <p class="text-xs text-danger-600 dark:text-danger-400" role="alert" data-stage-error>{{ $error }}</p>
         @endif
+
+        <div class="fi-board-stage-confetti">
+            <div class="fi-board-switch-row" data-stage-confetti="{{ $id }}" x-on:click="$wire.setBoardColumnCelebrate({{ Js::from($id) }}, {{ $celebrate ? 'false' : 'true' }}).finally(() => syncSwitch($el))">
+                <x-filament::icon icon="lucide-party-popper" />
+                <span class="fi-board-switch-label">{{ __('filament/pages/boards.stage_menu.confetti') }}</span>
+                <span class="fi-board-stage-switch">
+                    <x-filament::toggle
+                        :state="$celebrate ? 'true' : 'false'"
+                        :aria-label="__('filament/pages/boards.stage_menu.confetti_label', ['noun' => $noun])"
+                        data-stage-confetti-toggle
+                        :data-visible="$celebrate ? 'true' : 'false'"
+                    />
+                </span>
+            </div>
+        </div>
     @else
         <div class="flex items-center gap-2.5 text-sm font-semibold text-gray-950 dark:text-white" data-stage-name>
             @if ($dot)

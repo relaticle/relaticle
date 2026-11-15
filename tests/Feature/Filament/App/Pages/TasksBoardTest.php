@@ -2140,6 +2140,41 @@ it('refuses to rename the Done status and a taken status name in the menu', func
         ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail((string) $todo->getKey())->name)->toBe('To do');
 });
 
+it('turns confetti on for the Done status and keeps it through a rename of another status', function (): void {
+    $done = (string) $this->statusField->options->firstWhere('name', 'Done')->getKey();
+    $todo = (string) $this->statusField->options->firstWhere('name', 'To do')->getKey();
+
+    $component = livewire(TasksBoard::class)->call('setBoardColumnCelebrate', $done, true)->assertHasNoErrors();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->settings->celebrate)->toBeTrue()
+        ->and($component->html())->toContain('data-board-celebrate="'.e(json_encode([$done])).'"');
+
+    $component->call('renameBoardColumn', $todo, 'Backlog');
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->settings->celebrate)->toBeTrue()
+        ->and(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->name)->toBe('Done');
+
+    $component->call('setBoardColumnCelebrate', $done, false);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($done)->settings->celebrate)->toBeFalse();
+});
+
+it('refuses a forged task status confetti toggle from a member and shows no row', function (): void {
+    $id = statusIds($this->statusField)[1];
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+
+    $component = livewire(TasksBoard::class);
+
+    expect($component->html())->not->toContain('data-stage-confetti');
+
+    $component->call('setBoardColumnCelebrate', $id, true)->assertForbidden();
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($id)->settings->celebrate)->toBeNull();
+});
+
 it('sets a task status color from the palette', function (): void {
     $id = statusIds($this->statusField)[1];
 

@@ -500,6 +500,75 @@ it('refuses a forged rename or color from a member and from a viewer', function 
         ->and(stageOption($id)->settings->color)->toBe($color);
 })->with([WorkspaceRole::Member, WorkspaceRole::Viewer]);
 
+it('turns confetti on and off for a stage and keeps it for the whole workspace', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect(stageOption($id)->settings->celebrate)->toBeNull()
+        ->and($component->html())->toContain('data-board-celebrate="[]"')
+        ->and(stageMenuOf($component, $id))->toContain('data-stage-confetti="'.$id.'"')->toContain('data-visible="false"');
+
+    $component->call('setBoardColumnCelebrate', $id, true)->assertHasNoErrors();
+
+    expect(stageOption($id)->settings->celebrate)->toBeTrue()
+        ->and($component->html())->toContain('data-board-celebrate="'.e(json_encode([$id])).'"')
+        ->and(stageMenuOf($component, $id))->toContain('data-visible="true"')
+        ->and(stageMenuOf(livewire(OpportunitiesBoard::class), $id))->toContain('data-visible="true"');
+
+    $component->call('setBoardColumnCelebrate', $id, false);
+
+    expect(stageOption($id)->settings->celebrate)->toBeFalse()
+        ->and($component->html())->toContain('data-board-celebrate="[]"');
+});
+
+it('keeps confetti through a rename and a recolor, and the color through toggling it', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    $component = livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnColor', $id, OptionColor::Red->value)
+        ->call('setBoardColumnCelebrate', $id, true);
+
+    expect(stageOption($id)->settings->color)->toBe(OptionColor::Red->value);
+
+    $component->call('renameBoardColumn', $id, 'Renamed stage')->call('setBoardColumnColor', $id, OptionColor::Blue->value);
+
+    expect(stageOption($id)->name)->toBe('Renamed stage')
+        ->and(stageOption($id)->settings->color)->toBe(OptionColor::Blue->value)
+        ->and(stageOption($id)->settings->celebrate)->toBeTrue();
+});
+
+it('writes nothing when confetti already has the asked state', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    livewire(OpportunitiesBoard::class)->call('setBoardColumnCelebrate', $id, false);
+
+    expect(Activity::query()->where('subject_type', (new CustomFieldOption)->getMorphClass())->count())->toBe(0);
+});
+
+it('refuses a forged confetti toggle from a member and from a viewer and shows them no row', function (WorkspaceRole $role): void {
+    $id = stageIds($this->stageField)[1];
+    $this->actingAs(makeBoardMember($this, $role));
+
+    $component = livewire(OpportunitiesBoard::class);
+
+    expect(stageMenuOf($component, $id))->not->toContain('data-stage-confetti');
+
+    $component->call('setBoardColumnCelebrate', $id, true)->assertForbidden();
+
+    expect(stageOption($id)->settings->celebrate)->toBeNull();
+})->with([WorkspaceRole::Member, WorkspaceRole::Viewer]);
+
+it('gives the no-value column no confetti row and ignores a toggle for it', function (): void {
+    $component = livewire(OpportunitiesBoard::class)->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true);
+
+    expect(stageMenuOf($component, BoardStateData::NO_VALUE_COLUMN))->not->toContain('data-stage-confetti');
+
+    $component->call('setBoardColumnCelebrate', BoardStateData::NO_VALUE_COLUMN, true)->assertHasNoErrors();
+
+    expect($component->html())->toContain('data-board-celebrate="[]"');
+});
+
 it('renders the edit block for an admin and plain text with collapse and hide for a member', function (): void {
     $id = stageIds($this->stageField)[1];
 

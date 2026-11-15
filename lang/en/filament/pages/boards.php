@@ -55,6 +55,8 @@ return [
         'name' => 'Name of this :noun',
         'color' => 'Change the color of this :noun',
         'set_color' => 'Set color to :color',
+        'confetti' => 'Confetti',
+        'confetti_label' => 'Fire confetti when a card moves into this :noun',
         'last_visible' => 'One :noun stays visible. Show another before hiding this one.',
         'delete' => 'Delete :noun',
         'delete_heading' => 'Delete ":name"?',

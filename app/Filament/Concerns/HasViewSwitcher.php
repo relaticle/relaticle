@@ -66,6 +66,7 @@ trait HasViewSwitcher
             'viewSwitcher' => $this->getViewSwitcher(),
             'viewSettings' => $this->getViewSettings(),
             'layoutToggles' => $hasLayout ? $this->boardLayoutToggles() : null,
+            'celebrating' => $this instanceof OrdersBoardStages ? $this->celebratingBoardColumnIds() : [],
             'columnsCollapsed' => $hasLayout && $this->storedBoardState()->columnsCollapsed,
             'cardSize' => $hasLayout ? $this->storedBoardState()->cardSize : BoardCardSize::Full,
             'actions' => $this->getCachedHeaderActions(),

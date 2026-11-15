@@ -54,7 +54,7 @@ trait HasBoardViews
 
     private ?CustomField $resolvedBoardColumnField = null;
 
-    /** @var Collection<int, array{id: string, name: string, color: string, stored: ?string}>|null */
+    /** @var Collection<int, array{id: string, name: string, color: string, stored: ?string, celebrate: bool}>|null */
     private ?Collection $resolvedBoardColumnOptions = null;
 
     public function mountHasBoardViews(): void

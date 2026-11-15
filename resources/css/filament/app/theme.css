@@ -2098,6 +2098,10 @@ html.fi-record-stacked .fi-record-layout {
     @apply p-3;
 }
 
+.fi-board-stage-confetti {
+    @apply -mx-3 -mb-3 border-t border-gray-100 p-1 dark:border-white/5;
+}
+
 .fi-dropdown-list-item-label {
     @apply min-w-0 flex-1 text-start;
 }
