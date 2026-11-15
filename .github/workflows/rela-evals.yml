@@ -116,4 +116,3 @@ jobs:
             if ($ran === []) { fwrite(STDERR, "every case reported no turn ran: the harness is broken\n"); exit(1); }
             echo count($ran), " of ", count($report["cases"]), " cases ran a turn\n";
           '
-          if-no-files-found: warn

@@ -131,7 +131,7 @@ it('reads the served model, cache legs, reasoning and step count from the stored
     );
 
     $envelope = RelaTurn::envelopeFromRow($row);
-    $json = json_decode($envelope->toJson(), true);
+    $json = $envelope->toTrace();
 
     expect($envelope->servedModel)->toBe('claude-sonnet-5')
         ->and($envelope->cacheReadTokens)->toBe(600)

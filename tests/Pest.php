@@ -63,6 +63,7 @@ use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Tests\Evals\EvalTestCase;
 use Tests\Evals\Support\EvalReport;
+use Tests\Evals\Support\RecordingJudge;
 use Tests\Evals\Support\RelaTurn;
 use Tests\Evals\Support\TurnEnvelope;
 use Tests\Helpers\ChatCatalog;
@@ -79,7 +80,7 @@ pest()->extend(EvalTestCase::class)
     ->use(LazilyRefreshDatabase::class)
     ->in('Evals');
 
-pest()->evals()->judgeUsing(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL));
+pest()->evals()->judgeUsing(new RecordingJudge(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL)));
 
 pest()->afterEach(function (): void {
     if (! Plugin::isEvalMode()) {
@@ -87,6 +88,8 @@ pest()->afterEach(function (): void {
     }
 
     $status = $this->status();
+    $judged = RecordingJudge::$used;
+    RecordingJudge::$used = false;
 
     if ($status->isSkipped()) {
         return;
@@ -96,7 +99,7 @@ pest()->afterEach(function (): void {
     $split = current(array_intersect($this->groups(), ['train', 'test', 'guard'])) ?: null;
 
     if (! RelaTurn::$last instanceof TurnEnvelope) {
-        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], file: basename(self::$__filename, '.php'), split: $split);
+        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], judged: $judged, file: basename(self::$__filename, '.php'), split: $split);
         EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
 
         return;
@@ -108,7 +111,7 @@ pest()->afterEach(function (): void {
         RelaTurn::$last,
         array_values(array_filter([$failure, RelaTurn::$last->error])),
         count(RelaTurn::$turns),
-        false,
+        $judged,
         RelaTurn::$turns,
         basename(self::$__filename, '.php'),
         $split,

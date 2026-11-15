@@ -7,6 +7,7 @@ namespace Tests\Evals\Support;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Services\ModelRegistry;
+use RuntimeException;
 
 final class EvalReport
 {
@@ -30,7 +31,7 @@ final class EvalReport
     /** @var array<string, int> */
     private static array $repetitions = [];
 
-    /** @var list<array{passed: bool, split: ?string, cost_usd: ?float, duration_ms: int, retries: int}> */
+    /** @var list<array{passed: bool, split: ?string, cost_usd: ?float, turn_durations: list<int>, retries: int}> */
     private static array $lines = [];
 
     /**
@@ -40,7 +41,6 @@ final class EvalReport
     public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null): void
     {
         self::$startedAt ??= now();
-        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split);
 
         self::$cases[] = [
             'name' => $testName,
@@ -55,6 +55,8 @@ final class EvalReport
             'steps_text' => $envelope instanceof TurnEnvelope ? array_map(mb_strlen(...), $envelope->stepsText) : [],
             'reasons' => $reasons,
         ];
+
+        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split);
     }
 
     public static function flush(string $model, string $judge): ?string
@@ -117,7 +119,7 @@ final class EvalReport
     private static function writeRepetition(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons, int $samples, bool $judged, array $turns, string $file, ?string $split): void
     {
         $turns = $turns === [] && $envelope instanceof TurnEnvelope ? [$envelope] : $turns;
-        $rep = self::$repetitions[$testName] = (self::$repetitions[$testName] ?? 0) + 1;
+        $rep = self::$repetitions[$file.'|'.$testName] = (self::$repetitions[$file.'|'.$testName] ?? 0) + 1;
         $runDirectory = self::runDirectory();
         $usage = self::usageOf($turns);
         $cost = self::costOf($turns);
@@ -126,17 +128,16 @@ final class EvalReport
         $served = $turns === [] ? '' : $turns[array_key_last($turns)]->servedModel;
         $effort = self::effort();
 
-        self::$lines[] = ['passed' => $passed, 'split' => $split, 'cost_usd' => $cost, 'duration_ms' => $durationMs, 'retries' => $retries];
+        self::$lines[] = ['passed' => $passed, 'split' => $split, 'cost_usd' => $cost, 'turn_durations' => self::healthyDurations($turns), 'retries' => $retries];
 
-        self::ensureDirectory($runDirectory.'/traces');
-        $slug = Str::slug($testName) ?: 'case';
-        file_put_contents(
-            "{$runDirectory}/traces/{$slug}_rep{$rep}.json",
-            '['.implode(',', array_map(fn (TurnEnvelope $turn): string => $turn->toJson(), $turns)).']'."\n",
-        );
+        $traceDirectory = $runDirectory.'/traces/'.(Str::slug($file) ?: 'no-file');
+        $slug = (Str::slug($testName) ?: 'case').'-'.substr(md5($testName), 0, 8);
+        self::write("{$traceDirectory}/{$slug}_rep{$rep}.json", json_encode(
+            array_map(fn (TurnEnvelope $turn): array => $turn->toTrace(), $turns),
+            JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR,
+        )."\n");
 
-        $handle = fopen($runDirectory.'/results.jsonl', 'ab');
-        fwrite($handle, json_encode([
+        self::write($runDirectory.'/results.jsonl', json_encode([
             'case' => $testName,
             'file' => $file,
             'split' => $split,
@@ -154,8 +155,28 @@ final class EvalReport
             'tool_calls' => array_sum(array_map(fn (TurnEnvelope $turn): int => count($turn->toolCalls), $turns)),
             'retries' => $retries,
             'turns' => $samples,
-        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n");
-        fclose($handle);
+        ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n", append: true);
+    }
+
+    private static function write(string $path, string $contents, bool $append = false): void
+    {
+        self::ensureDirectory(dirname($path));
+
+        if (@file_put_contents($path, $contents, $append ? FILE_APPEND : 0) === false) {
+            throw new RuntimeException("The eval report cannot write {$path}.");
+        }
+    }
+
+    /**
+     * @param  list<TurnEnvelope>  $turns
+     * @return list<int>
+     */
+    private static function healthyDurations(array $turns): array
+    {
+        return array_values(array_map(
+            fn (TurnEnvelope $turn): int => $turn->durationMs,
+            array_filter($turns, fn (TurnEnvelope $turn): bool => $turn->error === null),
+        ));
     }
 
     /**
@@ -183,7 +204,8 @@ final class EvalReport
         $total = 0.0;
 
         foreach ($turns as $turn) {
-            $cost = Prices::cost(
+            $spent = $turn->inputTokens + $turn->outputTokens + $turn->cacheReadTokens + $turn->cacheWriteTokens + $turn->reasoningTokens;
+            $cost = $spent === 0 ? 0.0 : Prices::cost(
                 $turn->servedModel,
                 max(0, $turn->inputTokens - $turn->cacheReadTokens - $turn->cacheWriteTokens),
                 $turn->cacheReadTokens,
@@ -198,7 +220,7 @@ final class EvalReport
             $total += $cost;
         }
 
-        return $turns === [] ? null : round($total, 6);
+        return round($total, 6);
     }
 
     private static function effort(): string
@@ -233,8 +255,8 @@ final class EvalReport
 
     private static function ensureDirectory(string $directory): void
     {
-        if (! is_dir($directory)) {
-            mkdir($directory, 0777, true);
+        if (! is_dir($directory) && ! @mkdir($directory, 0777, true) && ! is_dir($directory)) {
+            throw new RuntimeException("The eval report cannot create {$directory}.");
         }
     }
 
@@ -244,7 +266,7 @@ final class EvalReport
     }
 
     /**
-     * @return array{cases: int, passed: int, pass_rate: float, tokens_in_mean: float, replayed_bytes_mean: float, cost_usd: ?float, duration_ms_p50: int, duration_ms_p90: int, retries: int, pass_rate_by_split: array<string, float>}
+     * @return array{cases: int, passed: int, pass_rate: float, tokens_in_mean: float, replayed_bytes_mean: float, cost_usd: ?float, unpriced_lines: int, duration_ms_p50: ?int, duration_ms_p90: ?int, retries: int, pass_rate_by_split: array<string, float>}
      */
     private static function totals(): array
     {
@@ -258,6 +280,7 @@ final class EvalReport
             'tokens_in_mean' => round(array_sum(array_column(self::$cases, 'tokens_in')) / $count, 1),
             'replayed_bytes_mean' => round(array_sum(array_column(self::$cases, 'replayed_bytes')) / $count, 1),
             'cost_usd' => self::totalCost(),
+            'unpriced_lines' => count(array_filter(self::$lines, fn (array $line): bool => $line['cost_usd'] === null)),
             'duration_ms_p50' => self::percentile(50),
             'duration_ms_p90' => self::percentile(90),
             'retries' => array_sum(array_column(self::$lines, 'retries')),
@@ -267,17 +290,17 @@ final class EvalReport
 
     private static function totalCost(): ?float
     {
-        $costs = array_column(self::$lines, 'cost_usd');
+        $costs = array_filter(array_column(self::$lines, 'cost_usd'), fn (?float $cost): bool => $cost !== null);
 
-        return in_array(null, $costs, true) ? null : round(array_sum($costs), 6);
+        return $costs === [] ? null : round(array_sum($costs), 6);
     }
 
-    private static function percentile(int $percent): int
+    private static function percentile(int $percent): ?int
     {
-        $durations = array_column(self::$lines, 'duration_ms');
+        $durations = array_merge(...array_column(self::$lines, 'turn_durations'));
         sort($durations);
 
-        return $durations === [] ? 0 : $durations[(int) max(0, ceil(count($durations) * $percent / 100) - 1)];
+        return $durations === [] ? null : $durations[(int) max(0, ceil(count($durations) * $percent / 100) - 1)];
     }
 
     /**

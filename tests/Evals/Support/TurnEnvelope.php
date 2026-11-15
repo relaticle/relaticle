@@ -45,15 +45,28 @@ final readonly class TurnEnvelope
             'usage' => [
                 'input_tokens' => $this->inputTokens,
                 'output_tokens' => $this->outputTokens,
-                'cache_read' => $this->cacheReadTokens,
-                'cache_write' => $this->cacheWriteTokens,
-                'reasoning' => $this->reasoningTokens,
             ],
-            'served_model' => $this->servedModel,
-            'steps' => $this->steps,
-            'retries' => $this->retries,
             'duration_ms' => $this->durationMs,
             'error' => $this->error,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toTrace(): array
+    {
+        $scored = json_decode($this->toJson(), true, flags: JSON_THROW_ON_ERROR);
+        $scored['usage'] += [
+            'cache_read' => $this->cacheReadTokens,
+            'cache_write' => $this->cacheWriteTokens,
+            'reasoning' => $this->reasoningTokens,
+        ];
+
+        return $scored + [
+            'served_model' => $this->servedModel,
+            'steps' => $this->steps,
+            'retries' => $this->retries,
+        ];
     }
 }

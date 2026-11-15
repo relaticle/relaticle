@@ -3,8 +3,12 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\File;
+use Pest\Evals\Contracts\JudgeDriver;
+use Pest\Evals\Eval\Evaluation;
+use Pest\Evals\Eval\Verdict;
 use Tests\Evals\Support\EvalReport;
 use Tests\Evals\Support\Prices;
+use Tests\Evals\Support\RecordingJudge;
 use Tests\Evals\Support\TurnEnvelope;
 
 beforeEach(function (): void {
@@ -72,6 +76,7 @@ it('writes one file per run with per-case metrics and totals', function (): void
             'tokens_in_mean' => 2000.0,
             'replayed_bytes_mean' => 600.0,
             'cost_usd' => null,
+            'unpriced_lines' => 2,
             'duration_ms_p50' => 900,
             'duration_ms_p90' => 1200,
             'retries' => 0,
@@ -174,7 +179,7 @@ it('prices only the uncached remainder of the prompt', function (): void {
 it('writes a trace per repetition holding every turn', function (): void {
     EvalReport::record('Two turn case', true, cachedEnvelope(), turns: [cachedEnvelope(), reportEnvelope(1, 1, 1, 1, 0)]);
 
-    $trace = json_decode((string) file_get_contents(glob(EvalReport::$directory.'/*/traces/two-turn-case_rep1.json')[0]), true, flags: JSON_THROW_ON_ERROR);
+    $trace = json_decode((string) file_get_contents(glob(EvalReport::$directory.'/*/traces/*/two-turn-case-*_rep1.json')[0]), true, flags: JSON_THROW_ON_ERROR);
 
     expect($trace)->toHaveCount(2)
         ->and($trace[0]['text'])->toBe('ok');
@@ -188,8 +193,94 @@ it('keeps the run summary at its current path and adds cost and split totals', f
     $report = json_decode((string) file_get_contents((string) $path), true, flags: JSON_THROW_ON_ERROR);
 
     expect($path)->toMatch('#/\d{4}-\d{2}-\d{2}-\d{6}-claude-sonnet-5\.json$#')
-        ->and($report['totals'])->toHaveKeys(['cost_usd', 'duration_ms_p50', 'duration_ms_p90', 'retries', 'pass_rate_by_split'])
-        ->and($report['totals']['cost_usd'])->toBeNull()
+        ->and($report['totals'])->toHaveKeys(['cost_usd', 'unpriced_lines', 'duration_ms_p50', 'duration_ms_p90', 'retries', 'pass_rate_by_split'])
+        ->and($report['totals']['cost_usd'])->toBe(0.02216)
+        ->and($report['totals']['unpriced_lines'])->toBe(1)
         ->and($report['totals']['pass_rate_by_split']['none'])->toBe(0.5)
         ->and($report['run_dir'])->toBeDirectory();
+});
+
+it('prices a failed zero-token turn at zero and counts unknown-model lines as unpriced', function (): void {
+    EvalReport::record('priced', true, cachedEnvelope());
+    EvalReport::record('failed', false, TurnEnvelope::failed('provider down'));
+
+    $report = json_decode((string) file_get_contents((string) EvalReport::flush('claude-sonnet-5', 'claude-opus-5-5')), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($report['totals']['cost_usd'])->toBe(0.02216)
+        ->and($report['totals']['unpriced_lines'])->toBe(0);
+
+    EvalReport::record('priced', true, cachedEnvelope());
+    EvalReport::record('unknown', true, reportEnvelope(10, 1, 1, 1, 0));
+
+    $report = json_decode((string) file_get_contents((string) EvalReport::flush('claude-sonnet-5', 'claude-opus-5-5')), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($report['totals']['cost_usd'])->toBe(0.02216)
+        ->and($report['totals']['unpriced_lines'])->toBe(1);
+});
+
+it('keeps the rep counter and trace per file when two files record the same case name', function (): void {
+    EvalReport::record('same name', true, cachedEnvelope(), file: 'ReadsTest');
+    EvalReport::record('same name', true, cachedEnvelope(), file: 'WritesTest');
+
+    expect(array_column(reportResultLines(), 'rep'))->toBe([1, 1])
+        ->and(glob(EvalReport::$directory.'/*/traces/*/same-name-*_rep1.json'))->toHaveCount(2);
+});
+
+it('keeps two case names that share a slug apart', function (): void {
+    EvalReport::record('Does a thing', true, cachedEnvelope(), file: 'ReadsTest');
+    EvalReport::record('does a thing!', true, cachedEnvelope(), file: 'ReadsTest');
+
+    expect(glob(EvalReport::$directory.'/*/traces/*/does-a-thing-*_rep1.json'))->toHaveCount(2);
+});
+
+it('takes duration percentiles from healthy turns only', function (): void {
+    EvalReport::record('first', true, null, turns: [reportEnvelope(1, 1, 1, 100, 0), reportEnvelope(1, 1, 1, 300, 0), TurnEnvelope::failed('x')]);
+    EvalReport::record('second', true, null, turns: [TurnEnvelope::failed('y')]);
+
+    $report = json_decode((string) file_get_contents((string) EvalReport::flush('claude-sonnet-5', 'claude-opus-5-5')), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($report['totals']['duration_ms_p50'])->toBe(100)
+        ->and($report['totals']['duration_ms_p90'])->toBe(300);
+
+    EvalReport::record('only failed', false, null, turns: [TurnEnvelope::failed('z')]);
+    $report = json_decode((string) file_get_contents((string) EvalReport::flush('claude-sonnet-5', 'claude-opus-5-5')), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($report['totals']['duration_ms_p50'])->toBeNull()
+        ->and($report['totals']['duration_ms_p90'])->toBeNull();
+});
+
+it('keeps the served model out of the scored json and in the trace', function (): void {
+    $envelope = cachedEnvelope();
+
+    expect(json_decode($envelope->toJson(), true))->not->toHaveKeys(['served_model', 'steps', 'retries'])
+        ->and(json_decode($envelope->toJson(), true)['usage'])->not->toHaveKey('cache_read')
+        ->and($envelope->toTrace()['served_model'])->toBe('claude-sonnet-5')
+        ->and($envelope->toTrace()['usage']['cache_read'])->toBe(68958);
+});
+
+it('records a judged case and clears the flag when the wrapper is reset', function (): void {
+    RecordingJudge::$used = false;
+    $inner = new class implements JudgeDriver
+    {
+        public function judge(Evaluation $evaluation): Verdict
+        {
+            return new Verdict(1.0, 'fine');
+        }
+    };
+
+    $verdict = (new RecordingJudge($inner))->judge(new Evaluation(['a' => 'b'], 'q', ['bad' => 0.0, 'good' => 1.0]));
+
+    expect($verdict->score)->toBe(1.0)
+        ->and(RecordingJudge::$used)->toBeTrue();
+
+    RecordingJudge::$used = false;
+});
+
+it('reports the path it cannot write', function (): void {
+    $blocker = (string) EvalReport::$directory;
+    file_put_contents($blocker, 'a file where the directory should be');
+
+    expect(fn () => EvalReport::record('blocked', true, cachedEnvelope()))->toThrow(RuntimeException::class, $blocker);
+
+    unlink($blocker);
 });
