@@ -9,14 +9,17 @@ use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Commands\ChatHealthCommand;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ChatHealthQuery;
+use Relaticle\Chat\Queries\ChatSpendQuery;
 use Relaticle\Chat\Support\TurnNotes;
 use Tests\Helpers\ChatDocument;
 
-mutates(ChatHealthQuery::class, ChatHealthCommand::class);
+mutates(ChatHealthQuery::class, ChatSpendQuery::class, ChatHealthCommand::class);
 
 function chatHealthConversation(User $user, ?string $purpose = null, bool $withoutWorkspace = false): string
 {
@@ -299,4 +302,55 @@ it('does not count a setup conversation holding only a resume row as typed', fun
 
     expect($report['setup_conversations'])->toBe(1)
         ->and($report['setup_conversations_typed'])->toBe(0);
+});
+
+/** @param  array{prompt: int, cache_read: int|null, cache_write: int|null}|null  $tokens */
+function chatHealthLedgerRow(User $user, string $model, ?array $tokens, int $outputTokens = 0, AiCreditType $type = AiCreditType::Chat): void
+{
+    AiCreditTransaction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => (string) $user->getKey(),
+        'idempotency_key' => 'health-'.Str::ulid(),
+        'type' => $type,
+        'model' => $model,
+        'input_tokens' => 0,
+        'output_tokens' => $outputTokens,
+        'credits_charged' => 1,
+        'metadata' => $tokens === null ? [] : ['tokens' => $tokens],
+        'created_at' => now(),
+    ]);
+}
+
+it('estimates spend per model from the ledger, with cache reads and writes at their own rate', function (): void {
+    chatHealthLedgerRow($this->user, 'claude-sonnet-5', ['prompt' => 1_000_000, 'cache_read' => 600_000, 'cache_write' => 200_000], 100_000);
+    chatHealthLedgerRow($this->user, 'claude-sonnet-5', ['prompt' => 500_000, 'cache_read' => null, 'cache_write' => null], 0, AiCreditType::Internal);
+    chatHealthLedgerRow($this->user, 'a-model-with-no-price', ['prompt' => 9_000, 'cache_read' => 0, 'cache_write' => 0], 50);
+    chatHealthLedgerRow($this->user, 'claude-sonnet-5', null, 10);
+
+    $spend = resolve(ChatHealthQuery::class)->forWindow(...chatHealthWindow())['spend'];
+
+    expect($spend['by_model']['claude-sonnet-5'])->toBe([
+        'rows' => 2,
+        'prompt_tokens' => 1_500_000,
+        'cache_read_tokens' => 600_000,
+        'cache_write_tokens' => 200_000,
+        'output_tokens' => 100_000,
+        'estimated_cost' => 3.02,
+    ])->and($spend['by_model']['a-model-with-no-price']['estimated_cost'])->toBeNull()
+        ->and($spend['rows_without_tokens'])->toBe(1)
+        ->and($spend['estimated_cost'])->toBe(3.02);
+});
+
+it('lists the workspaces that cost the most, dearest first', function (): void {
+    $heavy = User::factory()->withPersonalWorkspace()->create();
+
+    chatHealthLedgerRow($this->user, 'claude-sonnet-5', ['prompt' => 100_000, 'cache_read' => 0, 'cache_write' => 0]);
+    chatHealthLedgerRow($heavy, 'claude-sonnet-5', ['prompt' => 2_000_000, 'cache_read' => 0, 'cache_write' => 0]);
+
+    $spend = resolve(ChatHealthQuery::class)->forWindow(...chatHealthWindow())['spend'];
+
+    expect($spend['top_workspaces'])->toBe([
+        ['workspace_id' => (string) $heavy->currentWorkspace->getKey(), 'estimated_cost' => 4.0],
+        ['workspace_id' => (string) $this->user->currentWorkspace->getKey(), 'estimated_cost' => 0.2],
+    ]);
 });

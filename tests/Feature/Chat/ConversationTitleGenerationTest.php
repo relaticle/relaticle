@@ -518,6 +518,8 @@ it('books the title call on the ledger without charging credits', function (): v
         ->and($row->credits_charged)->toBe(0)
         ->and($row->model)->toBe(config('ai.providers.anthropic.models.text.cheapest'))
         ->and($row->user_id)->toBe((string) $this->user->getKey())
+        ->and($row->metadata['tokens']['prompt'])->toBeGreaterThanOrEqual($row->input_tokens)
+        ->and($row->metadata['tokens'])->toHaveKeys(['prompt', 'cache_read', 'cache_write'])
         ->and(AiCreditBalance::query()->where('workspace_id', $this->workspace->getKey())->value('credits_remaining'))->toBe(100);
 });
 
