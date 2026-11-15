@@ -15,7 +15,7 @@ final readonly class TurnNotes
 
     public static function timeoutWithProposals(int|string $seconds): string
     {
-        return __('This reply hit the :seconds-second limit before it finished. The steps it proposed before then are below. Approve or discard them, then ask for the rest.', [
+        return __('This reply hit the :seconds-second limit before it finished. The steps it had already proposed were kept. Approve or discard them, then ask for the rest.', [
             'seconds' => $seconds,
         ]);
     }

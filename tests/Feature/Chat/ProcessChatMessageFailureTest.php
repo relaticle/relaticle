@@ -361,7 +361,7 @@ function proposeTaskInTurn(string $conversationId, ?string $turnId, string $titl
         ->sole();
 }
 
-const TIMEOUT_NOTE_WITH_PROPOSALS = 'This reply hit the 120-second limit before it finished. The steps it proposed before then are below. Approve or discard them, then ask for the rest.';
+const TIMEOUT_NOTE_WITH_PROPOSALS = 'This reply hit the 120-second limit before it finished. The steps it had already proposed were kept. Approve or discard them, then ask for the rest.';
 
 it('keeps the proposals a timed-out turn already made and cancels every other one', function (): void {
     Event::fake([ChatStreamFailed::class]);
