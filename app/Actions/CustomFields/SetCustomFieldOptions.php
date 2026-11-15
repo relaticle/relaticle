@@ -228,7 +228,7 @@ final readonly class SetCustomFieldOptions
 
     /**
      * @param  list<mixed>  $valueIds
-     * @return list<string> the ids of the rows that still held the option and were cleared
+     * @return list<string>
      */
     private function clearColumn(array $valueIds, string $column, string $optionId): array
     {

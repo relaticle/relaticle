@@ -31,8 +31,6 @@ final readonly class LabelledChangeLog
     }
 
     /**
-     * Inserts the rows `write()` would save, without a model event or a logger round trip per record.
-     *
      * @param  iterable<array{record: Model, code: string, label: string, type: string, old: array{value: mixed, label: string}, new: array{value: mixed, label: string}}>  $changes
      */
     public static function writeMany(iterable $changes): void
