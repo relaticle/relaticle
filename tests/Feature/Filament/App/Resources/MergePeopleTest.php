@@ -242,7 +242,7 @@ it('repoints record-type attributes on other records to the kept person', functi
         ->and($read($unrelated))->toBe([$other->getKey()]);
 });
 
-it('points the kept person\'s own record attribute at itself instead of the duplicate', function (): void {
+it('drops self links from the kept person\'s own record attribute', function (): void {
     $field = CustomField::factory()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'people',
@@ -257,11 +257,11 @@ it('points the kept person\'s own record attribute at itself instead of the dupl
     $kept = mergePersonRecord($this->workspace, $this->user);
     $duplicate = mergePersonRecord($this->workspace, $this->user);
     $kept->saveCustomFieldValue($field, [$duplicate->getKey(), $partner->getKey()]);
-    $duplicate->saveCustomFieldValue($field, [$supplier->getKey()]);
+    $duplicate->saveCustomFieldValue($field, [$kept->getKey(), $supplier->getKey()]);
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergePersonValue($kept, 'colleagues'))->toBe([$kept->getKey(), $partner->getKey(), $supplier->getKey()]);
+    expect(mergePersonValue($kept, 'colleagues'))->toBe([$partner->getKey(), $supplier->getKey()]);
 });
 
 it('copies a rich-text value with its image from the duplicate', function (): void {

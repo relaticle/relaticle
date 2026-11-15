@@ -33,8 +33,8 @@ final readonly class CombineRecordValues
         foreach ($this->activeFields($kept) as $field) {
             $value = $this->combine(
                 $field,
-                $this->repointedReferences($field, $kept->getCustomFieldValue($field), $kept, $duplicate),
-                $this->repointedReferences($field, $duplicate->getCustomFieldValue($field), $kept, $duplicate),
+                $this->withoutSelfLinks(field: $field, value: $kept->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
+                $this->withoutSelfLinks(field: $field, value: $duplicate->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
             );
 
             $customFields[$field->code] = $value;
@@ -107,18 +107,21 @@ final readonly class CombineRecordValues
             ->get();
     }
 
-    private function repointedReferences(CustomField $field, mixed $value, Company|People $kept, Company|People $duplicate): mixed
+    private function withoutSelfLinks(CustomField $field, mixed $value, Company|People $kept, Company|People $duplicate): mixed
     {
-        if ($field->type !== CustomFieldType::RECORD->value || $field->lookup_type !== $kept->getMorphClass() || ! is_array($value)) {
+        if (! $this->linksToSameEntity($field, $kept) || ! is_array($value)) {
             return $value;
         }
 
-        $repointed = array_map(
-            fn (mixed $id): mixed => $id === $duplicate->getKey() ? $kept->getKey() : $id,
-            $value,
-        );
+        $selfIds = [$kept->getKey(), $duplicate->getKey()];
 
-        return array_values(array_unique($repointed, SORT_REGULAR));
+        return array_values(array_filter($value, fn (mixed $linkedId): bool => ! in_array($linkedId, $selfIds, true)));
+    }
+
+    private function linksToSameEntity(CustomField $field, Company|People $record): bool
+    {
+        return $field->type === CustomFieldType::RECORD->value
+            && $field->lookup_type === $record->getMorphClass();
     }
 
     private function combine(CustomField $field, mixed $kept, mixed $duplicate): mixed

@@ -485,7 +485,7 @@ it('repoints a record-type attribute that also holds a non-string element', func
         ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
 });
 
-it('points the kept company\'s own record attributes at itself instead of the duplicate', function (): void {
+it('drops self links from the kept company\'s own record attributes', function (): void {
     foreach (['related_companies' => true, 'parent_company' => false] as $code => $allowMultiple) {
         CustomField::factory()->create([
             'tenant_id' => $this->workspace->getKey(),
@@ -503,12 +503,32 @@ it('points the kept company\'s own record attributes at itself instead of the du
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
     $kept->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'related_companies'), [$duplicate->getKey(), $partner->getKey()]);
     $kept->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'parent_company'), [$duplicate->getKey()]);
-    $duplicate->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'related_companies'), [$supplier->getKey()]);
+    $duplicate->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'related_companies'), [$kept->getKey(), $supplier->getKey()]);
+    $duplicate->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'parent_company'), [$kept->getKey()]);
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue($kept, 'related_companies'))->toBe([$kept->getKey(), $partner->getKey(), $supplier->getKey()])
-        ->and(mergeCompanyValue($kept, 'parent_company'))->toBe([$kept->getKey()]);
+    expect(mergeCompanyValue($kept, 'related_companies'))->toBe([$partner->getKey(), $supplier->getKey()])
+        ->and(mergeCompanyValue($kept, 'parent_company'))->toBeEmpty();
+});
+
+it('leaves the parent company empty when the duplicate\'s parent is the kept company', function (): void {
+    $parent = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'code' => 'parent_company',
+        'name' => 'Parent Company',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'settings' => new CustomFieldSettingsData(allow_multiple: false),
+    ]);
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate->saveCustomFieldValue($parent, [$kept->getKey()]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergeCompanyValue($kept, 'parent_company'))->toBeEmpty();
 });
 
 it('moves the duplicate\'s people and opportunities to the kept company', function (): void {
