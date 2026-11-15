@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "6a72d92e4c887b8aae51e4da429a83c4",
+    "content-hash": "444bff9a8f47add0fdfd9c120b922fe3",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10635,16 +10635,16 @@
         },
         {
             "name": "relaticle/flowforge",
-            "version": "v4.3.5",
+            "version": "v4.4.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/flowforge.git",
-                "reference": "91dc5f1185f354f42b83ad447fa893f523d6d4c7"
+                "reference": "323e38315631b001d55ae0c8db28a928b984589e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/91dc5f1185f354f42b83ad447fa893f523d6d4c7",
-                "reference": "91dc5f1185f354f42b83ad447fa893f523d6d4c7",
+                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/323e38315631b001d55ae0c8db28a928b984589e",
+                "reference": "323e38315631b001d55ae0c8db28a928b984589e",
                 "shasum": ""
             },
             "require": {
@@ -10720,7 +10720,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-13T12:24:30+00:00"
+            "time": "2026-11-15T11:52:20+00:00"
         },
         {
             "name": "relaticle/ink",
