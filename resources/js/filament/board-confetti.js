@@ -128,7 +128,7 @@ const build = (styles, width, height) => {
     const pieces = []
 
     for (const fromLeft of [true, false]) {
-        const angle = fromLeft ? -Math.PI / 3.4 : Math.PI - Math.PI / 3.4
+        const angle = fromLeft ? -Math.PI / 3.4 : Math.PI + Math.PI / 3.4
 
         for (let i = 0; i < cannon; i++) {
             pieces.push(piece(fromLeft ? -20 : width + 20, height * 0.62, angle, Math.PI / 4, 1300, 2600, styles))

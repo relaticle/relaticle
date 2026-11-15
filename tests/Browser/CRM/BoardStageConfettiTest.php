@@ -19,6 +19,8 @@ pest()->group('webkit');
 
 const CONFETTI_PROBE = 'window.confettiProbe = { moves: [], seen: 0, gone: false }; addEventListener("kanban-card-moved", (event) => window.confettiProbe.moves.push(JSON.parse(JSON.stringify(event.detail)))); new MutationObserver((records) => records.forEach((record) => { record.addedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && window.confettiProbe.seen++); record.removedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && (window.confettiProbe.gone = true)); })).observe(document.body, { childList: true }); true';
 
+const CONFETTI_FILLS_UPPER_HALVES_EVENLY = '(() => { const canvas = document.querySelector("canvas[data-board-confetti]"); const pixels = canvas.getContext("2d").getImageData(0, 0, canvas.width, Math.floor(canvas.height / 2)).data; const painted = [0, 0]; for (let at = 3; at < pixels.length; at += 8) { if (pixels[at] > 0) { painted[((at - 3) / 4) % canvas.width < canvas.width / 2 ? 0 : 1]++; } } return Math.min(...painted) / Math.max(...painted) > 0.4; })()';
+
 /**
  * @return array{0: Task|Opportunity, 1: CustomField}
  */
@@ -79,7 +81,10 @@ it('fires confetti for the mover when a card lands in a stage with confetti on, 
 
     moveCardFromItsMenu($page, $card, $option()->name);
     $page->assertScript(boardWaitFor('window.confettiProbe.seen === 1'), true)
-        ->assertScript('document.querySelectorAll("canvas[data-board-confetti]").length', 1);
+        ->assertScript('document.querySelectorAll("canvas[data-board-confetti]").length', 1)
+        ->wait(0.4);
+
+    expect($page->script(CONFETTI_FILLS_UPPER_HALVES_EVENLY))->toBeTrue();
 
     waitForConfettiToEnd($page);
 
