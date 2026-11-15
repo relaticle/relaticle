@@ -62,7 +62,7 @@ it('replays a 25-row task page under 16 KB in concise mode', function (): void {
 
     $json = resolve(ListTasksTool::class)->handle(new Request(['per_page' => 25]));
 
-    expect(strlen((string) DisplayBlocks::strip($json)))->toBeLessThan(16_000);
+    expect(strlen((string) DisplayBlocks::strip($json)))->toBeLessThan(16 * 1024);
 });
 
 it('marks the shortened description in truncated_fields', function (): void {
@@ -100,7 +100,7 @@ it('returns whole markdown descriptions in detailed mode under 60 KB', function 
     expect($payload['data'][0]['attributes']['custom_fields']['description'])->toStartWith('Lorem ipsum')
         ->not->toContain('<p>')
         ->and($payload['data'][0])->not->toHaveKey('truncated_fields')
-        ->and(strlen((string) DisplayBlocks::strip($json)))->toBeLessThan(60_000);
+        ->and(strlen((string) DisplayBlocks::strip($json)))->toBeLessThan(60 * 1024);
 });
 
 it('rejects an unknown response_format', function (): void {

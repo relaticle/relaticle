@@ -12,10 +12,12 @@ use App\Http\Resources\V1\PeopleResource;
 use App\Http\Resources\V1\TaskResource;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Relaticle\Chat\Tools\BaseReadShowTool;
+use Relaticle\Chat\Tools\Concerns\ReportsTaskAssignees;
 
 final class GetTaskTool extends BaseReadShowTool
 {
     use OperatesOnCrmEntity;
+    use ReportsTaskAssignees;
 
     public function description(): string
     {

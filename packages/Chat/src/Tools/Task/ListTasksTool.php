@@ -12,10 +12,12 @@ use App\Http\Resources\V1\PeopleResource;
 use App\Http\Resources\V1\TaskResource;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Relaticle\Chat\Tools\BaseReadListTool;
+use Relaticle\Chat\Tools\Concerns\ReportsTaskAssignees;
 
 final class ListTasksTool extends BaseReadListTool
 {
     use OperatesOnCrmEntity;
+    use ReportsTaskAssignees;
 
     public function description(): string
     {
@@ -30,6 +32,12 @@ final class ListTasksTool extends BaseReadListTool
     protected function entity(): CrmEntity
     {
         return CrmEntity::Task;
+    }
+
+    /** @return array<int, string> */
+    protected function eagerLoad(): array
+    {
+        return ['assignees'];
     }
 
     /** @return array<string, class-string<JsonResource>> */
