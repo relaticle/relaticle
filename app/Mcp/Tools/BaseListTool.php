@@ -17,6 +17,7 @@ use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
 use App\Queries\FilterErrors;
 use App\Queries\FilterTree;
+use App\Queries\ViewerZone;
 use Closure;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Contracts\Pagination\CursorPaginator;
@@ -105,7 +106,7 @@ abstract class BaseListTool extends Tool
         FilterTree::rejectUnknownArguments($request->all(), self::ARGUMENTS);
 
         try {
-            $results = resolve($this->entity()->query())->paginate($user, $this->listQuery($request, $validated));
+            $results = resolve($this->entity()->query())->paginate($user, $this->listQuery($request, $validated, $user));
         } catch (ValidationException $exception) {
             return Response::error(FilterErrors::located($exception));
         } catch (InvalidQuery $e) {
@@ -183,7 +184,7 @@ abstract class BaseListTool extends Tool
     }
 
     /** @param  array<string, mixed>  $validated */
-    private function listQuery(Request $request, array $validated): ListQuery
+    private function listQuery(Request $request, array $validated, User $user): ListQuery
     {
         return new ListQuery(
             filter: FilterTree::trimmed($request->get('filter')),
@@ -191,6 +192,7 @@ abstract class BaseListTool extends Tool
             include: $validated['include'] ?? null,
             perPage: (int) ($validated['per_page'] ?? 15),
             page: (int) ($validated['page'] ?? 1),
+            viewerZone: ViewerZone::lenient($user->effectiveTimezone()),
         );
     }
 

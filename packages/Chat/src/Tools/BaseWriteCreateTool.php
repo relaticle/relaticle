@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
+use App\Queries\ViewerZone;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
@@ -176,7 +177,7 @@ abstract class BaseWriteCreateTool implements Tool
                 continue;
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false, viewerZone: $user->effectiveTimezone());
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false, viewerZone: ViewerZone::strict($user->effectiveTimezone()));
 
             if ($validation->error !== null) {
                 $skipped[] = $this->skippedRecord($record, $index, $validation->error);

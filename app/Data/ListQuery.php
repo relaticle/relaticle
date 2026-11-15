@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Data;
 
+use App\Queries\ViewerZone;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 
@@ -23,7 +24,7 @@ final readonly class ListQuery
         public int $perPage = 15,
         public ?int $page = null,
         public bool $cursor = false,
-        public ?string $viewerZone = null,
+        public ?ViewerZone $viewerZone = null,
     ) {}
 
     public function toRequest(): Request

@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Queries\Concerns\AppliesFilterNodes;
 use App\Queries\EntityFilters;
 use App\Queries\FilterTree;
+use App\Queries\ViewerZone;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Spatie\QueryBuilder\Filters\Filter;
@@ -23,7 +24,7 @@ final readonly class TreeFilter implements Filter
     public function __construct(
         private CrmEntity $entity,
         private User $user,
-        private ?string $viewerZone,
+        private ?ViewerZone $viewerZone,
     ) {}
 
     /**
