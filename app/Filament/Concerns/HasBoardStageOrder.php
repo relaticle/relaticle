@@ -500,6 +500,14 @@ trait HasBoardStageOrder
      */
     protected function boardColumnOptions(): Collection
     {
+        return $this->resolvedBoardColumnOptions ??= $this->resolveBoardColumnOptions();
+    }
+
+    /**
+     * @return Collection<int, array{id: string, name: string, color: string, stored: ?string}>
+     */
+    private function resolveBoardColumnOptions(): Collection
+    {
         $field = $this->boardColumnField();
         $colorsEnabled = $field->settings->enable_option_colors ?? false;
 
@@ -510,10 +518,10 @@ trait HasBoardStageOrder
             'stored' => $option->settings->color,
         ]);
 
-        $order = $this->storedBoardState()->orderStages(array_column($options->all(), 'id'));
+        $position = array_flip($this->storedBoardState()->orderStages(array_column($options->all(), 'id')));
 
         return $options
-            ->sortBy(static fn (array $option): int|false => array_search($option['id'], $order, true))
+            ->sortBy(static fn (array $option): int|false => $position[$option['id']] ?? false)
             ->values();
     }
 
