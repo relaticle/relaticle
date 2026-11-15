@@ -954,6 +954,14 @@ a.fi-linked-records-chip {
     @apply text-gray-400 hover:text-gray-700 [@media(hover:hover)]:aria-expanded:text-gray-700 dark:text-gray-500 dark:hover:text-gray-200 dark:[@media(hover:hover)]:aria-expanded:text-gray-200;
 }
 
+.ff-column-header .fi-icon-btn {
+    @apply size-6;
+
+    & .fi-icon {
+        @apply size-4;
+    }
+}
+
 @media (hover: hover) {
     .fi-ta-row.fi-clickable:has([aria-expanded='true']) {
         @apply bg-gray-50 dark:bg-white/5;
