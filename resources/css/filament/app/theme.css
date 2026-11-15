@@ -2375,6 +2375,7 @@ html.fi-record-stacked .fi-record-layout {
     --ff-card-gap: 0.5rem;
     --ff-card-label: 6.5rem;
     --ff-card-padding: 0.75rem;
+    --ff-dot-size: 0.75rem;
 
     @media (width < 40rem) {
         --ff-column-width: min(300px, calc(100vw - 3.5rem));
@@ -2428,9 +2429,8 @@ html.fi-record-stacked .fi-record-layout {
     background-color: color-mix(in oklab, var(--primary-500) 10%, transparent);
 }
 
-.ff-board .ff-column-dot {
-    width: 0.75rem;
-    height: 0.75rem;
+.ff-board .ff-column-title {
+    @apply font-semibold;
 }
 
 .ff-board .ff-column:not([data-collapsed]) > .ff-column-header .ff-count {
