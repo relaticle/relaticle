@@ -43,6 +43,8 @@ for you alone, so teammates keep theirs. The board also remembers your filters,
 sort and lanes. Choose **Create new view** in the view switcher to save it as a view only you see. It leaves the **Status** field's own
 order untouched, and a status added later joins the end of your order.
 
+Owners and Admins can switch on **Confetti** in a status's header menu, for example on **Done**. Anyone who then moves a task into that status sees confetti on their own screen. Members and viewers don't see the switch, and the setting applies to the whole workspace.
+
 ## The columns are yours
 
 Columns mirror the task **Status** field's options unless you group the board
