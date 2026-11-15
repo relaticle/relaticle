@@ -219,7 +219,10 @@ trait HasBoardStageOrder
         }
 
         $field = $this->boardColumnField();
-        $options = $this->stageOptionEntries($field, $option['id'], $change);
+        $options = array_map(
+            static fn (array $entry): array => $entry['id'] === $option['id'] ? [...$entry, ...$change] : $entry,
+            $this->stageOptionEntries($field),
+        );
 
         try {
             resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []]);
@@ -240,16 +243,14 @@ trait HasBoardStageOrder
     }
 
     /**
-     * @param  array{name?: string, was?: string, color?: string}  $change
-     * @return list<array{id: string, name: string, was: string, color?: string}>
+     * @return list<array{id: string, name: string, was: string}>
      */
-    private function stageOptionEntries(CustomField $field, string $changedId, array $change): array
+    private function stageOptionEntries(CustomField $field): array
     {
         return array_values($field->options->map(static fn (CustomFieldOption $stage): array => [
             'id' => (string) $stage->getKey(),
             'name' => (string) $stage->getAttribute('name'),
             'was' => (string) $stage->getAttribute('name'),
-            ...((string) $stage->getKey() === $changedId ? $change : []),
         ])->all());
     }
 
@@ -363,7 +364,7 @@ trait HasBoardStageOrder
             return;
         }
 
-        $options = array_values(array_filter($this->stageOptionEntries($field, '', []), static fn (array $entry): bool => $entry['id'] !== $optionId));
+        $options = array_values(array_filter($this->stageOptionEntries($field), static fn (array $entry): bool => $entry['id'] !== $optionId));
 
         try {
             resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'replacements' => [$optionId => null], 'removed' => [$optionId]], capsClears: false);
@@ -380,7 +381,7 @@ trait HasBoardStageOrder
     {
         $name = trim($name);
         $field = $this->boardColumnField();
-        $options = [...$this->stageOptionEntries($field, '', []), ['name' => $name, 'color' => $color ?? OptionColor::Gray->value]];
+        $options = [...$this->stageOptionEntries($field), ['name' => $name, 'color' => $color ?? OptionColor::Gray->value]];
 
         try {
             resolve(SetCustomFieldOptions::class)->execute($this->viewSwitcherUser(), $field, ['options' => $options, 'removed' => []], keepsColors: $color === null);
