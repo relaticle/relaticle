@@ -14,7 +14,6 @@ use App\Actions\Views\SetBoardColumnCollapsed;
 use App\Actions\Views\SetBoardColumnField;
 use App\Actions\Views\SetBoardColumnVisibility;
 use App\Data\BoardStateData;
-use App\Enums\CrmEntity;
 use App\Enums\CustomFieldType;
 use App\Enums\OptionColor;
 use App\Enums\WorkspaceCapability;
@@ -318,7 +317,7 @@ trait HasBoardStageOrder
 
         return trans_choice('filament/pages/boards.stage_menu.delete_body', $count, [
             'count' => number_format($count),
-            'records' => trans_choice('filament/pages/boards.stage_menu.records.'.($entity === CrmEntity::Opportunity || $entity === CrmEntity::Task ? $entity->value : 'record'), $count),
+            'records' => trans_choice('filament/pages/boards.stage_menu.records.'.$entity->value, $count),
             'attribute' => $this->boardStageNoun(),
             'column' => $this->noValueColumnLabel(),
         ]);
@@ -426,13 +425,9 @@ trait HasBoardStageOrder
     private function boardStageNoun(): string
     {
         $entity = $this->viewSwitcherEntity();
-        $isBoardField = $this->boardColumnField()->code === $entity->boardFieldCode();
+        $key = $this->boardColumnField()->code === $entity->boardFieldCode() ? $entity->boardStageNounKey() : null;
 
-        return __('filament/pages/boards.stage_menu.nouns.'.match (true) {
-            $isBoardField && $entity === CrmEntity::Opportunity => 'stage',
-            $isBoardField && $entity === CrmEntity::Task => 'status',
-            default => 'option',
-        });
+        return __('filament/pages/boards.stage_menu.nouns.'.($key ?? 'option'));
     }
 
     public function boardLayoutToggles(): Htmlable
