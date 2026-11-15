@@ -2433,7 +2433,7 @@ html.fi-record-stacked .fi-record-layout {
     @apply font-semibold;
 }
 
-.ff-board .ff-column:not([data-collapsed]) > .ff-column-header .ff-count {
+.ff-board .ff-column .ff-count {
     @apply rounded-md bg-gray-200/70 px-1.5 text-xs/5 font-medium text-gray-600 dark:bg-white/10 dark:text-gray-300;
 }
 
