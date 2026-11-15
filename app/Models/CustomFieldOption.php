@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Data\StageOptionSettings;
 use App\Models\ActivityLog\Activity;
 use App\Support\ActivityLog\ActivityValue;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
@@ -21,6 +22,26 @@ final class CustomFieldOption extends BaseCustomFieldOption
 {
     use HasUlids;
     use LogsActivity;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return ['settings' => StageOptionSettings::class.':default'];
+    }
+
+    protected static function booted(): void
+    {
+        // The package's option repeater submits only the color, so a save from it would drop the stored celebrate flag.
+        self::saving(function (self $option): void {
+            $kept = $option->getOriginal('settings');
+
+            if ($option->isDirty('settings') && $kept instanceof StageOptionSettings && $option->settings->celebrate === null && $kept->celebrate !== null) {
+                $option->settings = StageOptionSettings::from([...$option->settings->toArray(), 'celebrate' => $kept->celebrate]);
+            }
+        });
+    }
 
     public function customField(): BelongsTo
     {
