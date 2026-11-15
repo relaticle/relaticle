@@ -197,12 +197,7 @@ final class ProcessChatMessage implements ShouldQueue
                 resolve(TurnContinuationService::class)->release($this->resumesTurnId);
             }
 
-            $creditService->refundReservation(
-                $this->workspace,
-                RefundCause::NotStarted,
-                resolutionKey: $this->resolutionKey(),
-                conversationId: $this->conversationId,
-            );
+            $this->refundUnstartedTurn($creditService);
             $this->releaseAuth();
             $this->abandonTurn();
 
@@ -254,12 +249,7 @@ final class ProcessChatMessage implements ShouldQueue
             $channel = new PrivateChannel("chat.conversation.{$this->conversationId}");
             $broadcaster = new StreamEventBroadcaster($channel);
         } catch (Throwable $e) {
-            $creditService->refundReservation(
-                $this->workspace,
-                RefundCause::NotStarted,
-                resolutionKey: $this->resolutionKey(),
-                conversationId: $this->conversationId,
-            );
+            $this->refundUnstartedTurn($creditService);
             // The job returns normally from here, so a breadcrumb alone would never
             // reach Sentry: breadcrumbs only ship attached to a captured event. Without
             // report() a broken deploy fails every turn for every tenant in silence.
@@ -644,6 +634,16 @@ final class ProcessChatMessage implements ShouldQueue
         );
 
         return $keepsOwn && resolve(TurnContinuationService::class)->hasPendingProposals($this->conversationId);
+    }
+
+    private function refundUnstartedTurn(CreditService $creditService): void
+    {
+        $creditService->refundReservation(
+            $this->workspace,
+            RefundCause::NotStarted,
+            resolutionKey: $this->resolutionKey(),
+            conversationId: $this->conversationId,
+        );
     }
 
     private function refuseTurn(CreditService $creditService, string $message): void
