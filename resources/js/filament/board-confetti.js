@@ -296,11 +296,19 @@ const fire = (columnId) => {
     frameId = requestAnimationFrame(frame)
 }
 
+// Two frames out: the first renders the board the move just morphed, so the burst never shares a frame with that work.
 window.addEventListener('kanban-card-moved', (event) => {
     const columnId = String(event.detail?.[0]?.columnId ?? '')
-    const celebrating = JSON.parse(document.querySelector('[data-board-celebrate]')?.dataset.boardCelebrate ?? '[]')
 
-    if (columnId !== '' && celebrating.includes(columnId)) {
-        fire(columnId)
+    if (columnId === '') {
+        return
     }
+
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+        const celebrating = JSON.parse(document.querySelector('[data-board-celebrate]')?.dataset.boardCelebrate ?? '[]')
+
+        if (celebrating.includes(columnId)) {
+            fire(columnId)
+        }
+    }))
 })
