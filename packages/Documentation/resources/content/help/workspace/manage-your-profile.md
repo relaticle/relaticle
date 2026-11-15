@@ -83,7 +83,7 @@ The **Notifications** page beside your profile settings controls task
 assignment alerts and the daily digest, described in
 [Work with tasks](/help/tasks-and-notes/work-with-tasks).
 
-## Deleting your account
+## Delete your account
 
 To request account deletion, email [privacy@relaticle.com](mailto:privacy@relaticle.com) or [contact us](/contact).
 For a self-hosted installation, contact the person who manages it.

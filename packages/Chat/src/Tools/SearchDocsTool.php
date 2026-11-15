@@ -12,6 +12,7 @@ use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
+use Relaticle\Documentation\Support\PageSections;
 
 /**
  * Phase 2 of the No Dead Ends contract. GuideToPageTool escorts the user to a
@@ -40,6 +41,9 @@ final readonly class SearchDocsTool implements Tool
      * guide covers connecting anything else.
      */
     private const int MAX_SECTIONS_PER_PAGE = 2;
+
+    /** A heading that names every term in the query is the page that answers it. */
+    private const float SECTION_COVERAGE_BONUS = 1.5;
 
     /** Below this, a term is punctuation noise rather than a word. */
     private const int MIN_TERM_LENGTH = 2;
@@ -92,7 +96,7 @@ final readonly class SearchDocsTool implements Tool
         return [
             'query' => $schema->string()
                 ->required()
-                ->description('What the user wants to know, in their own words.'),
+                ->description('What the user wants to know, as English keywords. Translate a question asked in another language.'),
             'limit' => $schema->integer()
                 ->description('Max documentation sections to return (default '.self::DEFAULT_RESULTS.', max '.self::MAX_RESULTS.').')
                 ->default(self::DEFAULT_RESULTS),
@@ -211,9 +215,14 @@ final readonly class SearchDocsTool implements Tool
     {
         $score = 0.0;
         $matched = 0;
+        $inSection = 0;
 
         foreach ($weights as $term => $weight) {
             $pattern = $this->pattern((string) $term);
+
+            if ($this->matches($pattern, $record['section'])) {
+                $inSection++;
+            }
 
             $hits = ($this->matches($pattern, $record['title']) ? 8 : 0)
                 + ($this->matches($pattern, $record['section']) ? 5 : 0)
@@ -231,7 +240,9 @@ final readonly class SearchDocsTool implements Tool
             return 0.0;
         }
 
-        return $score * (1.0 + ($matched / count($weights)));
+        $coverage = $inSection === count($weights) ? self::SECTION_COVERAGE_BONUS : 1.0;
+
+        return $score * (1.0 + ($matched / count($weights))) * $coverage;
     }
 
     private function matches(string $pattern, string $haystack): bool
@@ -293,8 +304,8 @@ final readonly class SearchDocsTool implements Tool
     }
 
     /**
-     * The slice of raw markdown the index record was flattened from. Splits on
-     * the same heading regex BuildSearchIndex uses, so the two stay aligned.
+     * The slice of raw markdown the index record was flattened from, found by
+     * the record's anchor so it cannot drift from how the index sliced it.
      *
      * @param  array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}  $record
      */
@@ -306,21 +317,9 @@ final readonly class SearchDocsTool implements Tool
             return null;
         }
 
-        $chunks = preg_split('/^##[ \t]+(.+)$/m', $page->body, -1, PREG_SPLIT_DELIM_CAPTURE);
-
-        if ($chunks === false) {
-            return null;
-        }
-
-        if ($record['anchor'] === '') {
-            return $chunks[0] ?? null;
-        }
-
-        $counter = count($chunks);
-
-        for ($i = 1; $i < $counter; $i += 2) {
-            if (trim($chunks[$i]) === $record['section']) {
-                return $chunks[$i + 1] ?? null;
+        foreach ((new PageSections)($page->body) as $section) {
+            if ($section['anchor'] === $record['anchor']) {
+                return $section['markdown'];
             }
         }
 

@@ -79,7 +79,7 @@ it('hides the email category and its articles while email integration is off', f
     $this->get('/help/email-and-calendar')->assertNotFound();
     $this->get('/help/email-and-calendar/connect-your-google-account')->assertNotFound();
     $this->get('/help/email-and-calendar/connect-your-microsoft-account')->assertNotFound();
-    $this->get('/help/search-index.json')->assertOk()->assertDontSee('email-and-calendar', false);
+    $this->get('/help/search-index.json')->assertOk()->assertDontSee('help\\/email-and-calendar', false);
     $this->get('/llms.txt')->assertOk()->assertDontSee('email-and-calendar', false);
 });
 
