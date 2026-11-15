@@ -1061,3 +1061,64 @@ it('accepts a filter at each limit on the api and mcp', function (): void {
         [['opportunities' => ['company' => ['name' => ['$eq' => 'Acme']]]], ['Call']],
     ]);
 });
+
+function mcpTaskTitles(User $user, array $filter): array
+{
+    $titles = [];
+
+    RelaticleServer::actingAs($user)
+        ->tool(ListTasksTool::class, ['filter' => $filter])
+        ->assertOk()
+        ->assertStructuredContent(function (AssertableJson $json) use (&$titles): void {
+            $titles = collect($json->toArray()['items'])->pluck('attributes.title')->sort()->values()->all();
+            $json->etc();
+        });
+
+    return $titles;
+}
+
+function dueOnTheEdgesOfSeptember15(User $user): void
+{
+    $due = WorkspaceCustomField::byCode($user->personalWorkspace()->getKey(), 'task', 'due_date');
+
+    foreach (['Late evening before' => '2026-09-15 03:00:00', 'Late evening of' => '2026-09-16 02:00:00'] as $title => $at) {
+        unlinkedRecord($user, 'tasks', $title)->saveCustomFieldValue($due, $at);
+    }
+}
+
+it('reads a bare date filter on a custom date-time field as a day in the token user timezone on mcp', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    dueOnTheEdgesOfSeptember15($this->user);
+
+    expect(mcpTaskTitles($this->user, ['custom_fields' => ['due_date' => ['$eq' => '2026-09-15']]]))->toBe(['Late evening of'])
+        ->and(mcpTaskTitles($this->user, ['custom_fields' => ['due_date' => ['$lt' => '2026-09-15']]]))->toBe(['Late evening before']);
+});
+
+it('keeps reading a bare date filter as a utc day on the api for a user with a timezone', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    dueOnTheEdgesOfSeptember15($this->user);
+
+    $titles = $this->postJson('/api/v1/tasks/query', ['filter' => ['custom_fields' => ['due_date' => ['$eq' => '2026-09-15']]]])
+        ->assertOk()
+        ->json('data.*.attributes.title');
+
+    expect($titles)->toBe(['Late evening before']);
+});
+
+it('reads a bare date filter on a native date field as a day in the token user timezone on mcp only', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    unlinkedRecord($this->user, 'tasks', 'Created before', ['created_at' => '2026-09-15 03:00:00']);
+    unlinkedRecord($this->user, 'tasks', 'Created on', ['created_at' => '2026-09-16 02:00:00']);
+    $filter = ['created_at' => ['$eq' => '2026-09-15']];
+
+    expect(mcpTaskTitles($this->user, $filter))->toBe(['Created on'])
+        ->and($this->postJson('/api/v1/tasks/query', ['filter' => $filter])->assertOk()->json('data.*.attributes.title'))->toBe(['Created before']);
+});
+
+it('still accepts a date-time filter with no offset on mcp for a user with a timezone', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    dueOnTheEdgesOfSeptember15($this->user);
+
+    expect(mcpTaskTitles($this->user, ['custom_fields' => ['due_date' => ['$eq' => '2026-09-16T02:00:00']]]))->toBe(['Late evening of'])
+        ->and(mcpTaskTitles($this->user, ['created_at' => ['$gte' => '2000-01-01T00:00:00']]))->toBe(['Late evening before', 'Late evening of']);
+});

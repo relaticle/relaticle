@@ -163,3 +163,25 @@ it('reports a viewer\'s wildcard access token as the wildcard', function (): voi
 
     expect(abilitiesReportedTo($viewer, ['*'], $this->workspace))->toBe(['*']);
 });
+
+it('returns the timezone of the token user', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+
+    RelaticleServer::actingAs($this->user->fresh())
+        ->tool(WhoAmiTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('user.timezone', 'America/New_York')
+            ->etc());
+});
+
+it('returns the app timezone for a user with none', function (): void {
+    $this->user->forceFill(['timezone' => null])->save();
+
+    RelaticleServer::actingAs($this->user->fresh())
+        ->tool(WhoAmiTool::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('user.timezone', config('app.timezone'))
+            ->etc());
+});
