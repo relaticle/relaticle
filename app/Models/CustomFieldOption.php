@@ -17,6 +17,9 @@ use Relaticle\CustomFields\Models\Scopes\TenantScope;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
+/**
+ * @property StageOptionSettings $settings
+ */
 #[ScopedBy([TenantScope::class, SortOrderScope::class])]
 final class CustomFieldOption extends BaseCustomFieldOption
 {

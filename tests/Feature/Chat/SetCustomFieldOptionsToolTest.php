@@ -676,6 +676,71 @@ it('keeps the current color when an option carries none', function (): void {
     expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings->color)->toBe(OptionColor::Red->value);
 });
 
+it('turns confetti on for a stage, shows it in the proposal and keeps its color', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value]]);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'celebrate' => true], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['data']['options'][0])->toBe(['id' => $leadId, 'name' => 'Lead', 'was' => 'Lead', 'celebrate' => true])
+        ->and($decoded['display']['fields'])->toContain(['label' => 'Confetti', 'value' => 'Lead: On']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $settings = CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings;
+
+    expect($settings->celebrate)->toBeTrue()
+        ->and($settings->color)->toBe(OptionColor::Red->value);
+});
+
+it('keeps confetti when the proposal recolors another option', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value, 'celebrate' => true]]);
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer', 'color' => OptionColor::Blue->value], ['name' => 'Churned']],
+    ]]);
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings->celebrate)->toBeTrue();
+});
+
+it('turns confetti off and recolors the same option in one proposal', function (): void {
+    $leadId = setOptionsId($this->lifecycle, 'Lead');
+    CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->update(['settings' => ['color' => OptionColor::Red->value, 'celebrate' => true]]);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'color' => OptionColor::Green->value, 'celebrate' => false], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['display']['fields'])->toContain(['label' => 'Confetti', 'value' => 'Lead: Off']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    $settings = CustomFieldOption::query()->withoutGlobalScopes()->findOrFail($leadId)->settings;
+
+    expect($settings->celebrate)->toBeFalse()
+        ->and($settings->color)->toBe(OptionColor::Green->value);
+});
+
+it('refuses a proposal that changes nothing when confetti already has the asked state', function (): void {
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead', 'celebrate' => false], ['name' => 'Customer'], ['name' => 'Churned']],
+    ]]);
+
+    expect($decoded['error'])->toContain('Nothing to change');
+});
+
 it('refuses a color outside the palette', function (): void {
     $decoded = setOptionsPropose($this->convId, [[
         'entity_type' => 'company',

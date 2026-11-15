@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\CustomFields;
 
+use App\Data\StageOptionSettings;
 use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
@@ -16,7 +17,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 final readonly class SetCustomFieldOptions
@@ -108,7 +108,7 @@ final readonly class SetCustomFieldOptions
                     'custom_field_id' => $field->getKey(),
                     'name' => $target['name'],
                     'sort_order' => $sortOrder,
-                    'settings' => new CustomFieldOptionSettingsData(color: $target['color']),
+                    'settings' => new StageOptionSettings(color: $target['color'], celebrate: $target['celebrate']),
                 ]);
 
                 continue;
@@ -116,7 +116,7 @@ final readonly class SetCustomFieldOptions
 
             $changes = array_filter([
                 'name' => $option->name !== $target['name'] ? $target['name'] : null,
-                'settings' => $target['color'] !== null && $target['color'] !== $option->settings->color ? CustomFieldOptionSettingsData::from([...$option->settings->toArray(), 'color' => $target['color']]) : null,
+                'settings' => $this->mergedSettings($option, $target),
             ]);
 
             if ($changes !== []) {
@@ -131,6 +131,19 @@ final readonly class SetCustomFieldOptions
         }
 
         return $options;
+    }
+
+    /**
+     * @param  array{color: ?string, celebrate: ?bool}  $target
+     */
+    private function mergedSettings(CustomFieldOption $option, array $target): ?StageOptionSettings
+    {
+        $changes = array_filter([
+            'color' => $target['color'] !== null && $target['color'] !== $option->settings->color ? $target['color'] : null,
+            'celebrate' => $target['celebrate'] !== null && $target['celebrate'] !== $option->settings->celebrate ? $target['celebrate'] : null,
+        ], static fn (mixed $value): bool => $value !== null);
+
+        return $changes === [] ? null : StageOptionSettings::from([...$option->settings->toArray(), ...$changes]);
     }
 
     private function enableOptionColors(CustomField $field, CustomFieldOptionPlan $plan): void

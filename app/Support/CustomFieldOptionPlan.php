@@ -20,7 +20,7 @@ use Illuminate\Validation\ValidationException;
 final readonly class CustomFieldOptionPlan
 {
     /**
-     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string, celebrate: ?bool}>  $targets
      * @param  list<array{option: CustomFieldOption, replacement: ?int, clears: bool}>  $removals
      */
     private function __construct(
@@ -33,7 +33,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  array<string, mixed>  $input
-     * @return array{options: list<array{id?: string, name: string, was?: string, color?: string}>, replacements: array<string, string|int|null>, removed: list<string>}
+     * @return array{options: list<array{id?: string, name: string, was?: string, color?: string, celebrate?: bool}>, replacements: array<string, string|int|null>, removed: list<string>}
      *
      * @throws ValidationException
      */
@@ -69,7 +69,7 @@ final readonly class CustomFieldOptionPlan
             }
 
             if (! $existing instanceof CustomFieldOption) {
-                $options[] = ['name' => $item['name'], ...self::colorEntry($item['color'])];
+                $options[] = ['name' => $item['name'], ...self::colorEntry($item['color']), ...self::celebrateEntry($item['celebrate'])];
 
                 continue;
             }
@@ -83,7 +83,7 @@ final readonly class CustomFieldOptionPlan
             }
 
             $claimedIds[] = $id;
-            $options[] = ['id' => $id, 'name' => $item['name'], 'was' => (string) $existing->name, ...self::colorEntry($item['color'])];
+            $options[] = ['id' => $id, 'name' => $item['name'], 'was' => (string) $existing->name, ...self::colorEntry($item['color']), ...self::celebrateEntry($item['celebrate'])];
         }
 
         [$replacements, $replacementErrors] = self::toolReplacements($input, $current, $options);
@@ -165,7 +165,7 @@ final readonly class CustomFieldOptionPlan
                 throw OptionsChangedException::withMessages(['options' => self::changedSinceProposal($field)]);
             }
 
-            $targets[] = ['option' => $existing, 'name' => $option['name'], 'color' => filled($option['color'] ?? null) ? $option['color'] : null];
+            $targets[] = ['option' => $existing, 'name' => $option['name'], 'color' => filled($option['color'] ?? null) ? $option['color'] : null, 'celebrate' => isset($option['celebrate']) ? (bool) $option['celebrate'] : null];
         }
 
         if ($vanished !== []) {
@@ -290,7 +290,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  array<string, mixed>  $data
-     * @return list<array{id?: string, name: string, was?: string, color?: string}>
+     * @return list<array{id?: string, name: string, was?: string, color?: string, celebrate?: bool}>
      *
      * @throws ValidationException
      */
@@ -298,7 +298,8 @@ final readonly class CustomFieldOptionPlan
     {
         return Validator::make($data, [
             'options' => ['required', 'array', 'list', 'max:'.CustomFieldDefinitionValidator::maxOptions()],
-            'options.*' => ['array:id,name,was,color'],
+            'options.*' => ['array:id,name,was,color,celebrate'],
+            'options.*.celebrate' => ['nullable', 'boolean'],
             'options.*.color' => ['nullable', 'string', Rule::enum(OptionColor::class)],
             'options.*.id' => ['sometimes', 'string', 'distinct'],
             'options.*.was' => ['required_with:options.*.id', 'string'],
@@ -329,6 +330,10 @@ final readonly class CustomFieldOptionPlan
                     $rows[] = ['label' => __('Color'), 'value' => $this->colorRow($target['name'], $target['color'])];
                 }
 
+                if ($target['celebrate'] === true) {
+                    $rows[] = $this->confettiRow($target['name'], true);
+                }
+
                 continue;
             }
 
@@ -338,6 +343,10 @@ final readonly class CustomFieldOptionPlan
 
             if ($target['color'] !== null && ($this->enablesColors || self::recolors($target))) {
                 $rows[] = ['label' => __('Color'), 'value' => $this->colorRow($target['name'], $target['color'])];
+            }
+
+            if (self::changesCelebration($target)) {
+                $rows[] = $this->confettiRow($target['name'], (bool) $target['celebrate']);
             }
         }
 
@@ -401,19 +410,28 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @return array{name: string, current: string, color: string}
+     * @return array{name: string, current: string, color: string, celebrate: ?bool}
      */
     private static function toolItem(mixed $item): array
     {
         if (! is_array($item)) {
-            return ['name' => self::text($item), 'current' => '', 'color' => ''];
+            return ['name' => self::text($item), 'current' => '', 'color' => '', 'celebrate' => null];
         }
 
         return [
             'name' => self::text($item['name'] ?? null),
             'current' => self::text($item['current'] ?? null),
             'color' => self::text($item['color'] ?? null),
+            'celebrate' => isset($item['celebrate']) ? filter_var($item['celebrate'], FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) : null,
         ];
+    }
+
+    /**
+     * @return array{celebrate?: bool}
+     */
+    private static function celebrateEntry(?bool $celebrate): array
+    {
+        return $celebrate === null ? [] : ['celebrate' => $celebrate];
     }
 
     /**
@@ -425,7 +443,17 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @param  array{option: ?CustomFieldOption, name: string, color: ?string}  $target
+     * @param  array{option: ?CustomFieldOption, name: string, color: ?string, celebrate: ?bool}  $target
+     */
+    private static function changesCelebration(array $target): bool
+    {
+        return $target['option'] instanceof CustomFieldOption
+            && $target['celebrate'] !== null
+            && $target['celebrate'] !== (bool) $target['option']->settings->celebrate;
+    }
+
+    /**
+     * @param  array{option: ?CustomFieldOption, name: string, color: ?string, celebrate: ?bool}  $target
      */
     private static function recolors(array $target): bool
     {
@@ -435,11 +463,19 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string, celebrate: ?bool}>  $targets
      */
     private static function turnsOnColors(CustomField $field, array $targets): bool
     {
         return ! $field->settings->enable_option_colors && array_filter(array_column($targets, 'color')) !== [];
+    }
+
+    /**
+     * @return array{label: string, value: string}
+     */
+    private function confettiRow(string $name, bool $on): array
+    {
+        return ['label' => __('Confetti'), 'value' => $name.': '.($on ? __('On') : __('Off'))];
     }
 
     private function colorRow(string $name, string $color): string
@@ -484,7 +520,7 @@ final readonly class CustomFieldOptionPlan
     }
 
     /**
-     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string, celebrate: ?bool}>  $targets
      */
     private static function targetIndex(array $targets, mixed $reference): ?int
     {
@@ -522,7 +558,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  Collection<string, CustomFieldOption>  $current
-     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string, celebrate: ?bool}>  $targets
      */
     private static function keepsDone(Collection $current, array $targets): bool
     {
@@ -543,7 +579,7 @@ final readonly class CustomFieldOptionPlan
 
     /**
      * @param  Collection<string, CustomFieldOption>  $current
-     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string}>  $targets
+     * @param  list<array{option: ?CustomFieldOption, name: string, color: ?string, celebrate: ?bool}>  $targets
      */
     private static function sameList(CustomField $field, Collection $current, array $targets): bool
     {
@@ -560,6 +596,6 @@ final readonly class CustomFieldOptionPlan
             $targets,
         );
 
-        return $before === $after && array_filter($targets, self::recolors(...)) === [] && ! self::turnsOnColors($field, $targets);
+        return $before === $after && array_filter($targets, self::recolors(...)) === [] && array_filter($targets, self::changesCelebration(...)) === [] && ! self::turnsOnColors($field, $targets);
     }
 }
