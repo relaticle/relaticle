@@ -67,10 +67,10 @@ function mergeCompanyValue(Company $company, string $code): mixed
     return $company->getCustomFieldValue(WorkspaceCustomField::byCode($company->workspace_id, 'company', $code));
 }
 
-function mergeWith(Company $kept, Company $duplicate, string $keep = 'current'): mixed
+function mergeWith(Company $current, Company $picked, bool $keepPicked = false): mixed
 {
-    return livewire(ViewCompany::class, ['record' => $kept->getKey()])
-        ->callAction(mergeRecordAction(), data: ['duplicate_id' => $duplicate->getKey(), 'keep' => $keep]);
+    return livewire(ViewCompany::class, ['record' => $current->getKey()])
+        ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
 }
 
 function mergeMultiSelect(Workspace $workspace): CustomField
@@ -113,7 +113,7 @@ it('keeps the other company when the member swaps the two', function (): void {
     $current = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind'], ['domains' => ['northwind.com']]);
     $other = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind Traders'], ['domains' => ['northwindtraders.com']]);
 
-    mergeWith($current, $other, 'other')
+    mergeWith($current, $other, keepPicked: true)
         ->assertHasNoActionErrors()
         ->assertRedirect(CompanyResource::getUrl('view', ['record' => $other]));
 
@@ -186,7 +186,7 @@ it('refuses the current record, a trashed record and another workspace\'s record
         'other workspace' => Company::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create(),
     };
 
-    mergeWith($kept, $forged)->assertHasActionErrors(['duplicate_id']);
+    mergeWith($kept, $forged)->assertHasActionErrors(['picked_id']);
 
     expect(Company::query()->whereKey($kept->getKey())->exists())->toBeTrue()
         ->and(Company::withTrashed()->withoutGlobalScopes()->find($forged->getKey())->trashed())->toBe($case === 'trashed');
@@ -196,7 +196,7 @@ it('blocks a merge that would give a company more than five domains', function (
     $kept = mergeCompanyRecord($this->workspace, $this->user, [], ['domains' => ['a1.com', 'a2.com', 'a3.com']]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, [], ['domains' => ['b1.com', 'b2.com', 'b3.com']]);
 
-    mergeWith($kept, $duplicate)->assertHasActionErrors(['duplicate_id']);
+    mergeWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
 
     expect(Company::query()->whereKey($duplicate->getKey())->exists())->toBeTrue()
         ->and(mergeCompanyValue($kept, 'domains'))->toHaveCount(3);
@@ -221,8 +221,8 @@ it('refuses a duplicate deleted after the page opened', function (): void {
 
     $page = livewire(ViewCompany::class, ['record' => $kept->getKey()]);
     $duplicate->delete();
-    $page->callAction(mergeRecordAction(), data: ['duplicate_id' => $duplicate->getKey(), 'keep' => 'current'])
-        ->assertHasActionErrors(['duplicate_id']);
+    $page->callAction(mergeRecordAction(), data: ['picked_id' => $duplicate->getKey(), 'keep_picked' => false])
+        ->assertHasActionErrors(['picked_id']);
 
     expect(mergeCompanyValue($kept, 'linkedin'))->toBeNull()
         ->and($kept->refresh()->name)->toBe('Kept');
@@ -234,9 +234,9 @@ it('shows the unavailable error when the duplicate is deleted after it was picke
 
     $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
     $duplicate->delete();
-    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+    $page->callMountedAction()->assertHasActionErrors(['picked_id' => __('filament/record-page.merge.unavailable')]);
 
     expect(mergeCompanyValue($kept, 'linkedin'))->toBeNull()
         ->and($kept->refresh()->name)->toBe('Kept');
@@ -248,9 +248,9 @@ it('shows the unavailable error when the duplicate disappears while the merge st
 
     $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
     Event::listen(TransactionBeginning::class, fn (): int => DB::table('companies')->where('id', $duplicate->getKey())->update(['deleted_at' => now()]));
-    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+    $page->callMountedAction()->assertHasActionErrors(['picked_id' => __('filament/record-page.merge.unavailable')]);
 
     expect(Company::query()->whereKey($kept->getKey())->exists())->toBeTrue()
         ->and(Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->exists())->toBeFalse();
@@ -264,9 +264,9 @@ it('shows the unavailable error when the kept company disappears while the merge
 
     $page = livewire(ViewCompany::class, ['record' => $kept->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
     Event::listen(TransactionBeginning::class, fn (): int => DB::table('companies')->where('id', $kept->getKey())->update(['deleted_at' => now()]));
-    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+    $page->callMountedAction()->assertHasActionErrors(['picked_id' => __('filament/record-page.merge.unavailable')]);
 
     expect(Company::query()->find($duplicate->getKey()))->not->toBeNull()
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
@@ -316,7 +316,7 @@ it('rolls back every moved link and the history when the final write fails valid
     $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->pluck('id');
 
     Event::listen(RecordMerged::class, fn (): int => $this->workspace->users()->detach($member));
-    mergeWith($kept, $duplicate)->assertHasActionErrors(['duplicate_id']);
+    mergeWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
 
     expect($duplicateRows)->not->toBeEmpty()
         ->and(Company::query()->find($duplicate->getKey()))->not->toBeNull()
@@ -380,9 +380,9 @@ it('keeps the current company again when the member picks a different duplicate 
 
     livewire(ViewCompany::class, ['record' => $current->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $first->getKey(), 'keep' => 'other'])
-        ->set('mountedActions.0.data.duplicate_id', $second->getKey())
-        ->assertSet('mountedActions.0.data.keep', 'current');
+        ->setActionData(['picked_id' => $first->getKey(), 'keep_picked' => true])
+        ->set('mountedActions.0.data.picked_id', $second->getKey())
+        ->assertSet('mountedActions.0.data.keep_picked', false);
 });
 
 it('moves the duplicate\'s notes and tasks and keeps a shared one once', function (): void {
@@ -629,14 +629,14 @@ it('locks both companies with one select in id order, whichever one is kept', fu
         }
     });
 
-    foreach (['current', 'other'] as $keep) {
+    foreach (['current' => false, 'picked' => true] as $kept => $keepPicked) {
         $locks = [];
         $current = mergeCompanyRecord($this->workspace, $this->user);
         $other = mergeCompanyRecord($this->workspace, $this->user);
 
-        mergeWith($current, $other, $keep)->assertHasNoActionErrors();
+        mergeWith($current, $other, $keepPicked)->assertHasNoActionErrors();
 
-        expect($locks)->toHaveCount(1, $keep)
+        expect($locks)->toHaveCount(1, $kept)
             ->and($locks[0]->sql)->toStartWith('select * from "companies"')
             ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
             ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());

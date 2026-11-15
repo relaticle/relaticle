@@ -55,7 +55,7 @@ function mergeCommunication(string $type, Model $kept, Model $duplicate): void
     $page = $type === 'company' ? ViewCompany::class : ViewPeople::class;
 
     livewire($page, ['record' => $kept->getKey()])
-        ->callAction(mergeRecordAction(), data: ['duplicate_id' => $duplicate->getKey(), 'keep' => 'current'])
+        ->callAction(mergeRecordAction(), data: ['picked_id' => $duplicate->getKey(), 'keep_picked' => false])
         ->assertHasNoActionErrors();
 }
 

@@ -40,7 +40,7 @@ it('says the picked record is unavailable when it is deleted while the dialog is
 
     $dialog = livewire(ViewCompany::class, ['record' => $kept->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
 
     expect(mergeDialogHtml($dialog))->toContain('Harborline Logistics')
         ->not->toContain($message);

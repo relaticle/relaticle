@@ -26,7 +26,7 @@ use Livewire\Attributes\Renderless;
 
 /**
  * @phpstan-type Card array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
- * @phpstan-type Pairing array{other: Company|People, current: Company|People, values: MergedValues}
+ * @phpstan-type Pairing array{picked: Company|People, current: Company|People, values: MergedValues}
  */
 final class MergeRecordPicker extends Field
 {
@@ -43,7 +43,7 @@ final class MergeRecordPicker extends Field
 
         $this->required()
             ->validationAttribute(__('filament/record-page.merge.record'))
-            ->afterStateUpdated(fn (Set $set): mixed => $set('keep', 'current'));
+            ->afterStateUpdated(fn (Set $set): mixed => $set('keep_picked', false));
     }
 
     /**
@@ -82,9 +82,9 @@ final class MergeRecordPicker extends Field
         return is_string($id) && $id !== '' && $this->pairing() === null;
     }
 
-    public function keepsOther(): bool
+    public function keepsPicked(): bool
     {
-        return $this->pairing() !== null && $this->keep() === 'other';
+        return $this->pairing() !== null && $this->keepPickedState();
     }
 
     /**
@@ -92,7 +92,7 @@ final class MergeRecordPicker extends Field
      */
     public function getLeftCard(): ?array
     {
-        return $this->keepsOther() ? $this->card($this->currentRecord()) : $this->otherCard();
+        return $this->keepsPicked() ? $this->card($this->currentRecord()) : $this->pickedCard();
     }
 
     /**
@@ -100,7 +100,7 @@ final class MergeRecordPicker extends Field
      */
     public function getRightCard(): ?array
     {
-        return $this->keepsOther() ? $this->otherCard() : $this->card($this->currentRecord());
+        return $this->keepsPicked() ? $this->pickedCard() : $this->card($this->currentRecord());
     }
 
     /**
@@ -136,19 +136,19 @@ final class MergeRecordPicker extends Field
         return $this->entity()->icon();
     }
 
-    private function keep(): mixed
+    private function keepPickedState(): bool
     {
-        return ($this->makeGetUtility())('keep');
+        return ($this->makeGetUtility())('keep_picked') === true;
     }
 
     /**
      * @return Card|null
      */
-    private function otherCard(): ?array
+    private function pickedCard(): ?array
     {
         $pairing = $this->pairing();
 
-        return $pairing === null ? null : $this->card($pairing['other']);
+        return $pairing === null ? null : $this->card($pairing['picked']);
     }
 
     /**
@@ -162,12 +162,12 @@ final class MergeRecordPicker extends Field
             return null;
         }
 
-        $keepsOther = $this->keep() === 'other';
+        $keepsPicked = $this->keepPickedState();
 
-        $key = "{$id}|{$keepsOther}";
+        $key = "{$id}|{$keepsPicked}";
 
         if (! array_key_exists($key, $this->pairings)) {
-            $this->pairings[$key] = $this->buildPairing($id, $keepsOther);
+            $this->pairings[$key] = $this->buildPairing($id, $keepsPicked);
         }
 
         return $this->pairings[$key];
@@ -176,19 +176,19 @@ final class MergeRecordPicker extends Field
     /**
      * @return Pairing|null
      */
-    private function buildPairing(string $id, bool $keepsOther): ?array
+    private function buildPairing(string $id, bool $keepsPicked): ?array
     {
         $current = $this->currentRecord();
-        $other = $this->entities()->whereKey($id)->whereKeyNot($current->getKey())->first();
+        $picked = $this->entities()->whereKey($id)->whereKeyNot($current->getKey())->first();
 
-        if ($other === null) {
+        if ($picked === null) {
             return null;
         }
 
         $values = resolve(CombineRecordValues::class)
-            ->execute(...$keepsOther ? [$other, $current] : [$current, $other]);
+            ->execute(...$keepsPicked ? [$picked, $current] : [$current, $picked]);
 
-        return ['other' => $other, 'current' => $current, 'values' => $values];
+        return ['picked' => $picked, 'current' => $current, 'values' => $values];
     }
 
     private function subject(): Company|People
@@ -265,14 +265,14 @@ final class MergeRecordPicker extends Field
     private function resultCard(array $pairing): array
     {
         $values = $pairing['values'];
-        $kept = $this->keep() === 'other' ? $pairing['other'] : $pairing['current'];
-        $dropped = $kept === $pairing['other'] ? $pairing['current'] : $pairing['other'];
+        $kept = $this->keepPickedState() ? $pairing['picked'] : $pairing['current'];
+        $dropped = $kept === $pairing['picked'] ? $pairing['current'] : $pairing['picked'];
 
         return $this->cardData(
             (string) $values->attributes['name'],
             $this->image($kept) ?? $this->image($dropped),
             $this->links($values->customFields[$this->detailCode()] ?? []),
-            fn (string $key): int => (int) $pairing['other']->getAttribute("{$key}_count") + (int) $pairing['current']->getAttribute("{$key}_count"),
+            fn (string $key): int => (int) $pairing['picked']->getAttribute("{$key}_count") + (int) $pairing['current']->getAttribute("{$key}_count"),
         );
     }
 

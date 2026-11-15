@@ -77,13 +77,13 @@ Merge  [Brightline Health]                                              ✕
 ```
 
 - The dialog body is one form field, `MergeRecordPicker`, which `MergeRecordAction` puts in its
-  schema as `duplicate_id` next to a hidden `keep` value (`current` or `other`). The field renders
+  schema as `picked_id` next to a hidden `keep_picked` boolean (false until ⇄). The field renders
   the cards from `resources/views/filament/app/merge-record.blade.php` and its partials (card,
   heading, mark, picker, alert).
 - The record the member opened from sits on the right: the priority slot.
 - The left slot's **+** opens a search list of live records of the same entity in the workspace,
   excluding the current one. It matches the name, and for companies any domain, for people any email.
-  Picking a record sets `duplicate_id` and resets `keep` to `current`.
+  Picking a record sets `picked_id` and resets `keep_picked` to false.
 - Keyboard: the arrow keys move through the list, Enter picks the highlighted record, and Esc closes
   the list without closing the dialog. When focus is not in a field, Enter merges once a record is
   picked. After a pick, focus moves to the clear button on the picked card.

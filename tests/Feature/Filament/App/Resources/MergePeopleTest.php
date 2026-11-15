@@ -60,10 +60,10 @@ function mergePersonValue(People $person, string $code): mixed
     return $person->getCustomFieldValue(WorkspaceCustomField::byCode($person->workspace_id, 'people', $code));
 }
 
-function mergePeopleWith(People $kept, People $duplicate, string $keep = 'current'): mixed
+function mergePeopleWith(People $current, People $picked, bool $keepPicked = false): mixed
 {
-    return livewire(ViewPeople::class, ['record' => $kept->getKey()])
-        ->callAction(mergeRecordAction(), data: ['duplicate_id' => $duplicate->getKey(), 'keep' => $keep]);
+    return livewire(ViewPeople::class, ['record' => $current->getKey()])
+        ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
 }
 
 it('combines emails with the kept person first and without repeats', function (): void {
@@ -82,7 +82,7 @@ it('blocks a merge that would give a person more than five emails', function ():
     $kept = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['b1@x.com', 'b2@x.com', 'b3@x.com']]);
 
-    mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['duplicate_id']);
+    mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
 
     expect(People::query()->whereKey($duplicate->getKey())->exists())->toBeTrue()
         ->and(mergePersonValue($kept, 'emails'))->toHaveCount(3);
@@ -153,7 +153,7 @@ it('keeps the other person when the member swaps the two', function (): void {
     $current = mergePersonRecord($this->workspace, $this->user, ['name' => 'Sam'], ['emails' => ['sam@one.com']]);
     $other = mergePersonRecord($this->workspace, $this->user, ['name' => 'Samuel'], ['emails' => ['samuel@two.com']]);
 
-    mergePeopleWith($current, $other, 'other')
+    mergePeopleWith($current, $other, keepPicked: true)
         ->assertHasNoActionErrors()
         ->assertRedirect(PeopleResource::getUrl('view', ['record' => $other]));
 
@@ -346,7 +346,7 @@ it('refuses the current person, a trashed person and another workspace\'s person
         'other workspace' => People::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create(),
     };
 
-    mergePeopleWith($kept, $forged)->assertHasActionErrors(['duplicate_id']);
+    mergePeopleWith($kept, $forged)->assertHasActionErrors(['picked_id']);
 
     expect(People::query()->whereKey($kept->getKey())->exists())->toBeTrue()
         ->and(People::withTrashed()->withoutGlobalScopes()->find($forged->getKey())->trashed())->toBe($case === 'trashed');
@@ -358,9 +358,9 @@ it('shows the unavailable error when the duplicate is deleted after it was picke
 
     $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
     $duplicate->delete();
-    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+    $page->callMountedAction()->assertHasActionErrors(['picked_id' => __('filament/record-page.merge.unavailable')]);
 
     expect(mergePersonValue($kept, 'job_title'))->toBeNull()
         ->and($kept->refresh()->name)->toBe('Kept');
@@ -372,9 +372,9 @@ it('shows the unavailable error when the duplicate disappears while the merge st
 
     $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
     Event::listen(TransactionBeginning::class, fn (): int => DB::table('people')->where('id', $duplicate->getKey())->update(['deleted_at' => now()]));
-    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+    $page->callMountedAction()->assertHasActionErrors(['picked_id' => __('filament/record-page.merge.unavailable')]);
 
     expect(People::query()->whereKey($kept->getKey())->exists())->toBeTrue()
         ->and(Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->exists())->toBeFalse();
@@ -388,9 +388,9 @@ it('shows the unavailable error when the kept person disappears while the merge 
 
     $page = livewire(ViewPeople::class, ['record' => $kept->getKey()])
         ->mountAction(mergeRecordAction())
-        ->setActionData(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current']);
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
     Event::listen(TransactionBeginning::class, fn (): int => DB::table('people')->where('id', $kept->getKey())->update(['deleted_at' => now()]));
-    $page->callMountedAction()->assertHasActionErrors(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+    $page->callMountedAction()->assertHasActionErrors(['picked_id' => __('filament/record-page.merge.unavailable')]);
 
     expect(People::query()->find($duplicate->getKey()))->not->toBeNull()
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
@@ -414,14 +414,14 @@ it('locks both people with one select in id order, whichever one is kept', funct
         }
     });
 
-    foreach (['current', 'other'] as $keep) {
+    foreach (['current' => false, 'picked' => true] as $kept => $keepPicked) {
         $locks = [];
         $current = mergePersonRecord($this->workspace, $this->user);
         $other = mergePersonRecord($this->workspace, $this->user);
 
-        mergePeopleWith($current, $other, $keep)->assertHasNoActionErrors();
+        mergePeopleWith($current, $other, $keepPicked)->assertHasNoActionErrors();
 
-        expect($locks)->toHaveCount(1, $keep)
+        expect($locks)->toHaveCount(1, $kept)
             ->and($locks[0]->sql)->toStartWith('select * from "people"')
             ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
             ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());

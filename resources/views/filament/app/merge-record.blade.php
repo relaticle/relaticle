@@ -1,6 +1,6 @@
 @php
     $left = $getLeftCard();
-    $keepsOther = $keepsOther();
+    $keepsPicked = $keepsPicked();
 @endphp
 
 <div
@@ -29,7 +29,7 @@
         <div class="relative grid gap-12 rounded-2xl bg-gray-50 p-3 ring-1 ring-gray-950/5 @3xl:grid-cols-2 @3xl:gap-14 dark:bg-white/5 dark:ring-white/10">
             <div class="min-w-0" data-merge-left>
                 @if ($left)
-                    @include('filament.app.merge-record.card', ['role' => 'left', 'card' => $left, 'isClearable' => ! $keepsOther])
+                    @include('filament.app.merge-record.card', ['role' => 'left', 'card' => $left, 'isClearable' => ! $keepsPicked])
                 @else
                     @include('filament.app.merge-record.picker')
                 @endif
@@ -41,7 +41,7 @@
                 <button
                     type="button"
                     @disabled(! $left)
-                    x-on:click="$set('keep', @js($keepsOther ? 'current' : 'other'), false, true)"
+                    x-on:click="$set('keep_picked', @js(! $keepsPicked), false, true)"
                     aria-label="{{ __('filament/record-page.merge.swap') }}"
                     title="{{ __('filament/record-page.merge.swap') }}"
                     class="flex size-8 shrink-0 items-center justify-center rounded-full bg-white text-gray-600 shadow-xs ring-1 ring-gray-950/10 outline-none transition hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-primary-500 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-gray-800 dark:text-gray-200 dark:ring-white/15 dark:hover:bg-gray-700"
@@ -54,7 +54,7 @@
             </div>
 
             <div class="min-w-0" data-merge-right>
-                @include('filament.app.merge-record.card', ['role' => 'right', 'card' => $getRightCard(), 'isClearable' => $keepsOther])
+                @include('filament.app.merge-record.card', ['role' => 'right', 'card' => $getRightCard(), 'isClearable' => $keepsPicked])
             </div>
         </div>
 

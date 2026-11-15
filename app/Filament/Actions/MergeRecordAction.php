@@ -49,8 +49,8 @@ final class MergeRecordAction extends Action
             ->modalFooterActionsAlignment(Alignment::End)
             ->modalSubmitAction(fn (Action $action): Action => $this->submitButton($action))
             ->schema([
-                MergeRecordPicker::make('duplicate_id'),
-                Hidden::make('keep')->default('current'),
+                MergeRecordPicker::make('picked_id'),
+                Hidden::make('keep_picked')->default(false),
             ])
             ->successNotificationTitle(__('filament/record-page.notifications.records_merged'))
             ->action(function (array $data, ViewRecord $livewire): void {
@@ -100,14 +100,14 @@ final class MergeRecordAction extends Action
     private function merge(array $data): Company|People
     {
         $current = $this->subject();
-        $id = $data['duplicate_id'] ?? null;
-        $other = is_string($id) ? $current::query()->whereKey($id)->first() : null;
+        $id = $data['picked_id'] ?? null;
+        $picked = is_string($id) ? $current::query()->whereKey($id)->first() : null;
 
-        if ($other === null || $current->is($other)) {
-            throw ValidationException::withMessages(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+        if ($picked === null || $current->is($picked)) {
+            throw ValidationException::withMessages(['picked_id' => __('filament/record-page.merge.unavailable')]);
         }
 
-        [$kept, $duplicate] = ($data['keep'] ?? 'current') === 'other' ? [$other, $current] : [$current, $other];
+        [$kept, $duplicate] = ($data['keep_picked'] ?? false) === true ? [$picked, $current] : [$current, $picked];
 
         /** @var User $user */
         $user = Filament::auth()->user();
