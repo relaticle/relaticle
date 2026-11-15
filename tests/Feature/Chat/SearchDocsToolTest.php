@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Models\PendingAction;
@@ -152,4 +153,47 @@ it('sends a ChatGPT user to the published Relaticle plugin', function (): void {
     $content = implode("\n", array_column(searchDocs('how do I connect ChatGPT to Relaticle')['results'], 'content'));
 
     expect($content)->toContain('https://chatgpt.com/plugins/plugin_asdk_app_6a92c3af04a0819180ed6652ebe09961');
+});
+
+it('finds the VS Code setup steps in the MCP guide', function (string $query): void {
+    $results = searchDocs($query)['results'];
+
+    $vsCode = collect($results)->first(fn (array $result): bool => str_contains($result['section'], 'VS Code'));
+
+    expect($vsCode)->not->toBeNull()
+        ->and($vsCode['title'])->toBe('MCP Server')
+        ->and($vsCode['content'])->toContain('.vscode/mcp.json')
+        ->and($vsCode['content'])->not->toEndWith('...');
+})->with([
+    'connect MCP client VSCode setup',
+    'VS Code MCP',
+]);
+
+it('returns the account deletion section first for a deletion question', function (): void {
+    $first = searchDocs('delete my account')['results'][0];
+
+    expect($first['section'])->toBe('Delete your account')
+        ->and($first['content'])->toContain('Keep my account');
+});
+
+it('still returns a page when the query matches only a parent heading that has sub-headings', function (): void {
+    $titles = array_column(searchDocs('Setup by Client')['results'], 'title');
+
+    expect($titles)->toContain('MCP Server');
+});
+
+it('returns at most two sections from one page even when many sub-headings match', function (): void {
+    $results = searchDocs('tool', 5)['results'];
+
+    $mcp = array_filter($results, fn (array $result): bool => $result['title'] === 'MCP Server');
+
+    expect($mcp)->not->toBeEmpty()
+        ->and(count($mcp))->toBeLessThanOrEqual(2);
+});
+
+it('asks the model for english keywords', function (): void {
+    $schema = resolve(SearchDocsTool::class)->schema(new JsonSchemaTypeFactory);
+
+    expect($schema['query']->toArray()['description'])
+        ->toBe('What the user wants to know, as English keywords. Translate a question asked in another language.');
 });
