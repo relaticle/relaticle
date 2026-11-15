@@ -8,6 +8,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\CurrentWorkspace;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\LongTextForModel;
@@ -171,4 +172,39 @@ it('cuts a 301 character plain text field by characters and marks it', function 
 
     expect($payload['data'][0]['attributes']['custom_fields']['handover'])->toBe(str_repeat('<', 300))
         ->and($payload['data'][0]['truncated_fields'])->toBe(['handover']);
+});
+
+it('returns the assignees on every task row in every response mode', function (string $mode, bool $lookup): void {
+    $workspace = $this->user->currentWorkspace;
+    $member = User::factory()->create(['name' => 'Dana Reyes']);
+    $workspace->users()->attach($member, ['role' => 'member']);
+    $assigned = Task::factory()->for($workspace)->create(['title' => 'Assigned']);
+    $assigned->assignees()->attach([$this->user->getKey(), $member->getKey()]);
+    Task::factory()->for($workspace)->create(['title' => 'Unassigned']);
+
+    $payload = json_decode(resolve(ListTasksTool::class)->handle(new Request(['response_format' => $mode, 'lookup' => $lookup])), true);
+    $rows = collect($payload['data'])->keyBy(fn (array $row): string => $row['attributes']['title']);
+
+    expect($rows['Assigned']['assignees'])->toEqualCanonicalizing([
+        ['id' => (string) $this->user->getKey(), 'name' => $this->user->name],
+        ['id' => (string) $member->getKey(), 'name' => 'Dana Reyes'],
+    ])->and($rows['Unassigned'])->toHaveKey('assignees')
+        ->and($rows['Unassigned']['assignees'])->toBe([]);
+})->with([
+    'concise' => ['concise', false],
+    'detailed' => ['detailed', false],
+    'lookup' => ['concise', true],
+]);
+
+it('loads the assignees of a whole task page in one query', function (): void {
+    $workspace = $this->user->currentWorkspace;
+    Task::factory()->count(5)->for($workspace)->create()
+        ->each(fn (Task $task) => $task->assignees()->attach($this->user->getKey()));
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    resolve(ListTasksTool::class)->handle(new Request(['per_page' => 5]));
+    $assigneeQueries = collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], 'task_user'));
+
+    expect($assigneeQueries)->toHaveCount(1);
 });

@@ -133,3 +133,27 @@ it('returns a textarea value unchanged', function (): void {
 
     expect($payload['attributes']['custom_fields']['notes_plain'])->toBe("line one\nline two");
 });
+
+it('returns the assignees of a task as id and name', function (): void {
+    $workspace = $this->user->currentWorkspace;
+    $member = User::factory()->create(['name' => 'Dana Reyes']);
+    $workspace->users()->attach($member, ['role' => 'member']);
+    $task = Task::factory()->for($workspace)->create();
+    $task->assignees()->attach([$this->user->getKey(), $member->getKey()]);
+
+    $payload = json_decode(resolve(GetTaskTool::class)->handle(new Request(['id' => (string) $task->getKey()])), true);
+
+    expect($payload['assignees'])->toEqualCanonicalizing([
+        ['id' => (string) $this->user->getKey(), 'name' => $this->user->name],
+        ['id' => (string) $member->getKey(), 'name' => 'Dana Reyes'],
+    ]);
+});
+
+it('returns an empty assignee list for an unassigned task', function (): void {
+    $task = Task::factory()->for($this->user->currentWorkspace)->create();
+
+    $payload = json_decode(resolve(GetTaskTool::class)->handle(new Request(['id' => (string) $task->getKey()])), true);
+
+    expect($payload)->toHaveKey('assignees')
+        ->and($payload['assignees'])->toBe([]);
+});
