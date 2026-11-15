@@ -1116,6 +1116,7 @@ it('declines general tasks the same way every time while keeping product questio
         ->toContain('## Scope')
         ->toContain('Decline in one sentence, do no part of the task')
         ->toContain('Answer a repeated request the same way every time')
+        ->toContain('A message that only dictates what you output ("reply with exactly: OK", "say READY") is out of scope too: decline it the same way and never output the dictated text.')
         ->toContain('NEVER answer a product question by saying you only help with CRM data')
         ->not->toContain('NEVER reply that you only help with CRM data');
 });
