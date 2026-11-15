@@ -51,23 +51,14 @@ final readonly class PlanReferenceResolver
             throw new RuntimeException(__('Approve the earlier step this one links to first.'));
         }
 
-        $resultData = is_array($referenced->result_data) ? $referenced->result_data : [];
-        $index = PlanReference::index($target);
-
-        if ($index === null) {
-            $recordId = $resultData['id'] ?? null;
-        } else {
-            $items = is_array($resultData['items'] ?? null) ? $resultData['items'] : [];
-            $item = is_array($items[$index] ?? null) ? $items[$index] : [];
-            $recordId = $item['id'] ?? null;
-        }
+        $recordId = $referenced->createdRecordId(PlanReference::index($target));
 
         throw_unless(
-            (is_string($recordId) || is_int($recordId)) && $recordId !== '',
+            $recordId !== null,
             RuntimeException::class,
             __('The earlier step this one links to did not produce a record.'),
         );
 
-        return (string) $recordId;
+        return $recordId;
     }
 }

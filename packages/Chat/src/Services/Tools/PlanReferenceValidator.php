@@ -20,7 +20,7 @@ use Relaticle\Chat\Support\ProposalPayload;
  * A reference is only ever legal within the turn that created its target: the
  * assistant proposes the company, reads back its proposal id, and references it
  * from the contact it proposes next. Anything looser (another conversation,
- * another turn, an already-decided proposal, a proposal for the wrong entity)
+ * another turn, a rejected or cancelled proposal, a proposal for the wrong entity)
  * is rejected here as a tool error the model can correct, exactly as a
  * hallucinated record id is today.
  */
@@ -63,11 +63,29 @@ final readonly class PlanReferenceValidator
             return "Step reference `{$value}` points at a {$referenced->operation->value} proposal. Only a create step produces a new record to reference.";
         }
 
-        if ($referenced->status !== PendingActionStatus::Pending) {
+        $recordError = $this->recordError($referenced, $value, PlanReference::index($target));
+
+        if ($recordError !== null) {
+            return $recordError;
+        }
+
+        $referencedModel = Relation::getMorphedModel($referenced->entity_type->value);
+
+        if ($referencedModel !== $expectedModel) {
+            $expected = class_basename($expectedModel);
+
+            return "Step reference `{$value}` points at a {$referenced->entity_type->value} proposal, but a {$expected} is required here.";
+        }
+
+        return null;
+    }
+
+    private function recordError(PendingAction $referenced, mixed $value, ?int $index): ?string
+    {
+        if (! in_array($referenced->status, [PendingActionStatus::Pending, PendingActionStatus::Approved], true)) {
             return "Step reference `{$value}` points at a proposal that is already {$referenced->status->value}. Use the record's real id instead.";
         }
 
-        $index = PlanReference::index($target);
         $payload = ProposalPayload::from($referenced);
 
         if ($payload->isBatch && $index === null) {
@@ -86,12 +104,8 @@ final readonly class PlanReferenceValidator
             }
         }
 
-        $referencedModel = Relation::getMorphedModel($referenced->entity_type->value);
-
-        if ($referencedModel !== $expectedModel) {
-            $expected = class_basename($expectedModel);
-
-            return "Step reference `{$value}` points at a {$referenced->entity_type->value} proposal, but a {$expected} is required here.";
+        if ($referenced->status === PendingActionStatus::Approved && $referenced->createdRecordId($index) === null) {
+            return "Step reference `{$value}` points at a step that was approved but did not create that record, so nothing can link to it.";
         }
 
         return null;

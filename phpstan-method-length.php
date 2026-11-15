@@ -40,7 +40,6 @@ return [
                 'Relaticle\Chat\Services\CreditService::recordResolution' => 68,
                 'Relaticle\Chat\Services\MyTasksService::forUser' => 69,
                 'Relaticle\Chat\Services\TipTapDocumentParser::walkDocument' => 67,
-                'Relaticle\Chat\Services\Tools\PlanReferenceValidator::error' => 66,
                 'Relaticle\Chat\Tools\Activity\ListActivityTool::handle' => 74,
                 'Relaticle\Chat\Tools\BaseReadListTool::buildDisplayBlock' => 61,
                 'Relaticle\Chat\Tools\BaseReadListTool::handle' => 80,

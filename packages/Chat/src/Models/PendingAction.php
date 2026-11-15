@@ -86,6 +86,20 @@ final class PendingAction extends Model
         return $this->status === PendingActionStatus::Pending;
     }
 
+    public function createdRecordId(?int $index = null): ?string
+    {
+        $result = is_array($this->result_data) ? $this->result_data : [];
+
+        if ($index !== null) {
+            $items = is_array($result['items'] ?? null) ? $result['items'] : [];
+            $result = is_array($items[$index] ?? null) ? $items[$index] : [];
+        }
+
+        $id = $result['id'] ?? null;
+
+        return (is_string($id) || is_int($id)) && $id !== '' ? (string) $id : null;
+    }
+
     public function needsOwnApproval(): bool
     {
         return $this->entity_type->needsOwnApproval();
