@@ -677,7 +677,7 @@ it('rings only the stored color of a stage, never the gray display fallback', fu
 
     expect($menu)->toContain('data-swatch="'.OptionColor::Gray->value.'"');
 
-    $ringed = substr_count($menu, 'aria-checked="true"');
+    $ringed = preg_match_all('/data-swatch="[^"]*"[^>]*aria-checked="true"|aria-checked="true"[^>]*data-swatch="/', $menu);
 
     expect($ringed)->toBe($case === 'colors off' ? 1 : 0);
 })->with(['none stored', 'outside the palette', 'colors off']);
