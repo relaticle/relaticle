@@ -27,7 +27,7 @@
                     aria-label="{{ __('filament/pages/boards.stage_menu.name', ['noun' => $noun]) }}"
                     x-on:keydown.enter.prevent="$el.blur()"
                     x-on:dropdown-escape="$el.value = $el.defaultValue"
-                    x-on:blur="$el.value.trim() !== $el.defaultValue && $wire.renameBoardColumn({{ Js::from($id) }}, $el.value)"
+                    x-on:blur="$el.value.trim() !== $el.defaultValue && $wire.renameBoardColumn({{ Js::from($id) }}, $el.value, $el.defaultValue)"
                 />
             </div>
 
