@@ -2453,7 +2453,6 @@ html.fi-record-stacked .fi-record-layout {
     background-color: var(--gray-500);
 }
 
-/* Dashed means "add something here": the same treatment on the add-card row, the add-stage tile and the empty Sort and Filter chips. */
 .ff-board :is(.ff-add-slot .ff-add-row, .ff-add-column-button) {
     @apply rounded-lg border border-dashed border-gray-300 bg-transparent text-gray-500 hover:bg-gray-100 dark:border-white/15 dark:text-gray-400 dark:hover:bg-white/5;
 }
