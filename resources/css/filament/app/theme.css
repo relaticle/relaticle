@@ -2081,10 +2081,6 @@ html.fi-record-stacked .fi-record-layout {
     & .fi-dropdown-list {
         @apply sm:p-1;
     }
-
-    & .fi-dropdown-list-item:not(.fi-color-danger) :is(.fi-dropdown-list-item-label, .fi-icon) {
-        @apply text-gray-950 dark:text-white;
-    }
 }
 
 .fi-board-stage-swatch[aria-pressed='true'] {
