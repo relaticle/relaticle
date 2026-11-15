@@ -11,6 +11,8 @@ use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
@@ -19,12 +21,16 @@ use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ProposalConflictsQuery;
+use Relaticle\Chat\Queries\ProposalRepeatsQuery;
+use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\RecordChipRenderer;
+use Relaticle\Chat\Support\RecordReferenceResolver;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 use Tests\Helpers\ProposalCardFixture;
 
-mutates(ProposalCard::class, ProposalConflictsQuery::class);
+mutates(ProposalCard::class, ProposalConflictsQuery::class, ProposalRepeatsQuery::class);
 
 beforeEach(function (): void {
     Feature::define(OnboardSeed::class, false);
@@ -749,5 +755,95 @@ describe('an edit made after the proposal', function (): void {
         $card->call('toggleLeftOutRow', (string) $proposal->getKey(), 0)
             ->assertDontSeeHtml('data-proposal-overwrite-notice')
             ->assertSeeHtml('data-proposal-shortcut');
+    });
+});
+
+function startConversationFor(User $user): string
+{
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    return $conversationId;
+}
+
+/** @param  list<string>  $titles */
+function proposeTasksIn(string $conversationId, array $titles): PendingAction
+{
+    resolve(CreateTaskTool::class)
+        ->setConversationId($conversationId)
+        ->setTurnId((string) Str::ulid())
+        ->handle(new Request(['records' => array_map(static fn (string $title): array => ['title' => $title], $titles)]));
+
+    return PendingAction::query()->where('conversation_id', $conversationId)->latest('id')->firstOrFail();
+}
+
+describe('a create that repeats a record approved earlier in the conversation', function (): void {
+    beforeEach(function (): void {
+        Bus::fake();
+        $this->conversationId = startConversationFor($this->user);
+        $this->approved = proposeTasksIn($this->conversationId, ['Call Jane']);
+        resolve(PendingActionService::class)->approve($this->approved, $this->user);
+        $this->task = Task::query()->where('title', 'Call Jane')->sole();
+    });
+
+    it('says the record exists, links to it and still creates the second one on approval', function (): void {
+        $again = proposeTasksIn($this->conversationId, ['  call jane']);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $again->getKey(), context: 'conversation')
+            ->assertSee('"Call Jane" was created earlier in this conversation. Approving adds another task with that name.')
+            ->assertSeeHtml('href="'.resolve(RecordReferenceResolver::class)->referenceUrl('task', (string) $this->task->getKey()).'"')
+            ->assertSeeHtml('data-proposal-shortcut')
+            ->call('approveAll');
+
+        expect(Task::query()->whereRaw('lower(trim(title)) = ?', ['call jane'])->count())->toBe(2);
+    });
+
+    it('marks only the repeated row of a batch', function (): void {
+        $batch = proposeTasksIn($this->conversationId, ['Send the contract', 'Call Jane']);
+
+        $card = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $batch->getKey(), context: 'conversation');
+
+        expect(substr_count($card->html(), 'data-proposal-repeat-notice'))->toBe(1);
+    });
+
+    it('stays quiet for a task of that name made in another conversation', function (): void {
+        $elsewhere = proposeTasksIn(startConversationFor($this->user), ['Call Jane']);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $elsewhere->getKey(), context: 'conversation')
+            ->assertSee('Call Jane')
+            ->assertDontSeeHtml('data-proposal-repeat-notice');
+    });
+
+    it('stays quiet once the earlier record is deleted', function (): void {
+        $this->task->delete();
+        $again = proposeTasksIn($this->conversationId, ['Call Jane']);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $again->getKey(), context: 'conversation')
+            ->assertSee('Call Jane')
+            ->assertDontSeeHtml('data-proposal-repeat-notice');
+    });
+
+    it('stays quiet when the earlier proposal of that name was discarded', function (): void {
+        $discarded = proposeTasksIn($this->conversationId, ['Send the contract']);
+        resolve(PendingActionService::class)->reject($discarded, $this->user);
+        $again = proposeTasksIn($this->conversationId, ['Send the contract']);
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $again->getKey(), context: 'conversation')
+            ->assertSee('Send the contract')
+            ->assertDontSeeHtml('data-proposal-repeat-notice');
     });
 });
