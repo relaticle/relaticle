@@ -3,9 +3,14 @@
 
 const PALETTE = ['#ff4d6d', '#ffb703', '#3ddc97', '#4cc9f0', '#7b5cff', '#ff7ab6', '#ff8a3d']
 const STAGE_SHARE = 0.25
-const GRAVITY = 1000
+// Telegram's ConfettiView in viewport heights: gravity 9.8 x mass 115 on an 896pt screen, and 0.93 damping per 60Hz frame.
+const GRAVITY = 1.26
+const DRAG = 2.6
+const FACING_DRAG = 3.4
+const RAIN_DRAG = 0.7
 const MAX_DT = 0.05
 const MAX_LIFETIME = 6
+const FADE_OUT = 0.5
 const SHADES = 8
 const BACK_SHADE = 0.88
 const EDGE_SHADE = 0.82
@@ -92,96 +97,97 @@ const stylesForBurst = (columnId) => {
     }
 }
 
-const piece = (x, y, angle, spread, speedMin, speedMax, styles, delay = 0) => {
-    const direction = angle + (Math.random() - 0.5) * spread
-    const speed = speedMin + Math.random() * (speedMax - speedMin)
+const piece = (x, y, vx, vy, styles, drag = 1) => {
     const kind = Math.random()
     const shape = kind < 0.15 ? 2 : kind < 0.4 ? 1 : 0
 
     return {
         x,
         y,
-        vx: Math.cos(direction) * speed,
-        vy: Math.sin(direction) * speed,
+        vx,
+        vy,
+        drag,
         rotation: Math.random() * Math.PI * 2,
         rotationSpeed: (Math.random() - 0.5) * 10,
         tumbleX: Math.random() * Math.PI * 2,
         tumbleXSpeed: 5 + Math.random() * 8,
         tumbleY: Math.random() * Math.PI * 2,
         tumbleYSpeed: 3 + Math.random() * 6,
-        flutter: 40 + Math.random() * 90,
-        wobble: 60 + Math.random() * 80,
-        size: 0.8 + Math.random() * 0.5,
+        flutter: 120 + Math.random() * 270,
+        size: 0.85 + Math.random() * 0.4,
         shape,
         width: shape === 1 ? 4 + Math.random() : shape === 2 ? 7 + Math.random() : 8 + Math.random() * 2,
         height: shape === 1 ? 14 + Math.random() * 2 : 11 + Math.random() * 2,
         styles: styles.stage && Math.random() < STAGE_SHARE ? styles.stage : styles.palette[(Math.random() * styles.palette.length) | 0],
-        age: -delay,
-        ttl: 2.6 + Math.random() * 1.4,
-        alive: true,
     }
 }
 
+// Each piece leaves a disc just off its edge, aimed at its own point on the top edge, at a speed scaled to that distance.
+// One shared aim point, as in Telegram's phone layout, piles both cannons into one clump over the middle of a wide board.
 const build = (styles, width, height) => {
-    const cap = width < 640 ? 80 : 150
-    const cannon = Math.floor(cap * 0.4)
+    const small = width < 640
     const pieces = []
 
-    for (const fromLeft of [true, false]) {
-        const angle = fromLeft ? -Math.PI / 3.4 : Math.PI + Math.PI / 3.4
+    for (const side of [1, -1]) {
+        const edge = side > 0 ? -60 : width + 60
 
-        for (let i = 0; i < cannon; i++) {
-            pieces.push(piece(fromLeft ? -20 : width + 20, height * 0.62, angle, Math.PI / 4, 1300, 2600, styles))
+        for (let i = 0; i < (small ? 35 : 50); i++) {
+            const around = Math.random() * Math.PI * 2
+            const radius = Math.random() * 50
+            const y = height * 0.85 + Math.sin(around) * radius
+            const reach = width * (0.1 + Math.random() * 0.85)
+            const angle = Math.atan2(y, reach) + (Math.random() - 0.5) * 0.12
+            const speed = Math.hypot(reach, y) * (3.3 + Math.random() * 1.1)
+
+            pieces.push(piece(edge + Math.cos(around) * radius, y, side * Math.cos(angle) * speed, -Math.sin(angle) * speed, styles))
         }
     }
 
-    for (let i = pieces.length; i < cap; i++) {
-        pieces.push(piece(Math.random() * width, -20, Math.PI / 2, Math.PI / 8, 80, 260, styles, 0.28 + Math.random() * 0.3))
+    for (let i = 0; i < (small ? 40 : 60); i++) {
+        pieces.push(piece(Math.random() * width, -20 - Math.random() * height * 0.6, 0, height * 0.15, styles, RAIN_DRAG))
     }
 
     return pieces
 }
 
-const step = (p, dt, width, height) => {
-    p.age += dt
-
-    if (p.age < 0) {
-        return
+// Telegram slows time to 0.8 for 0.7s once the cannons peak, so the burst hangs before it falls.
+const hang = (since) => {
+    if (since < 0 || since > 0.7) {
+        return 1
     }
 
-    if (p.age >= p.ttl || p.y > height + 60 || p.x < -400 || p.x > width + 400) {
-        p.alive = false
+    const ramp = since < 0.05 ? since / 0.05 : since > 0.5 ? (0.7 - since) / 0.2 : 1
 
-        return
-    }
+    return 1 - 0.2 * ramp * ramp
+}
+
+// Drag grows as a piece turns flat to its fall, which makes the throw slow down fast and each piece fall at its own speed.
+const step = (p, dt, gravity) => {
+    const rising = p.vy < 0
 
     p.tumbleX += p.tumbleXSpeed * dt
     p.tumbleY += p.tumbleYSpeed * dt
     p.rotation += p.rotationSpeed * dt
 
     const facing = Math.abs(Math.cos(p.tumbleX) * Math.cos(p.tumbleY))
-    const decay = Math.exp(-(1.2 + 2.8 * facing) * p.size * dt)
+    const decay = Math.exp(-(DRAG + FACING_DRAG * facing) * p.size * p.drag * dt)
 
-    p.vx = p.vx * decay + (Math.random() - 0.5) * p.wobble * dt * 8
-    p.vy = p.vy * decay + GRAVITY * dt
-    p.x += (p.vx + Math.sin(p.tumbleY) * p.flutter * facing * 3) * dt
+    p.vx *= decay
+    p.vy = p.vy * decay + gravity * dt
+    p.x += (p.vx + Math.sin(p.tumbleY) * p.flutter * facing) * dt
     p.y += p.vy * dt
+
+    return rising && p.vy >= 0
 }
 
 const draw = (ctx, p, dpr) => {
-    if (p.age < 0) {
-        return
-    }
-
     const flip = Math.cos(p.tumbleX)
     const skew = Math.sin(p.tumbleY) * 0.35
     const scaleY = Math.max(Math.abs(flip), 0.08)
     const cos = Math.cos(p.rotation)
     const sin = Math.sin(p.rotation)
-    const life = 1 - p.age / p.ttl
     const level = Math.min(SHADES - 1, Math.floor(Math.abs(flip) * SHADES))
 
-    ctx.globalAlpha = life < 0.25 ? life / 0.25 : 1
     ctx.fillStyle = p.styles[(flip >= 0 ? 0 : SHADES) + level]
     ctx.setTransform(cos * dpr, sin * dpr, (cos * skew - sin * scaleY) * dpr, (sin * skew + cos * scaleY) * dpr, p.x * dpr, p.y * dpr)
 
@@ -194,13 +200,22 @@ const draw = (ctx, p, dpr) => {
     }
 }
 
+let addVolley = null
+
 const fire = (columnId) => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.querySelector('[data-board-confetti]')) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
         return
     }
 
     // Read the stage color before the canvas lands: appending it first makes this read recalculate the whole board.
     const pieces = build(stylesForBurst(columnId), window.innerWidth, window.innerHeight)
+
+    if (addVolley) {
+        addVolley(pieces)
+
+        return
+    }
+
     const canvas = document.createElement('canvas')
 
     canvas.dataset.boardConfetti = ''
@@ -211,9 +226,17 @@ const fire = (columnId) => {
     const ctx = canvas.getContext('2d')
     const dpr = Math.min(window.devicePixelRatio || 1, 1.5)
     const cursor = { x: 0, y: 0, time: 0, seen: false }
-    const start = performance.now()
-    let last = start
+    let last = performance.now()
+    let elapsed = 0
+    let endsAt = MAX_LIFETIME
+    let peakedAt = Infinity
     let frameId = 0
+
+    addVolley = (more) => {
+        pieces.push(...more)
+        endsAt = elapsed + MAX_LIFETIME
+        peakedAt = Infinity
+    }
 
     const resize = () => {
         canvas.width = window.innerWidth * dpr
@@ -235,7 +258,7 @@ const fire = (columnId) => {
                 const dy = p.y - event.clientY
                 const distance = Math.hypot(dx, dy)
 
-                if (p.age < 0 || distance >= PUSH_RADIUS) {
+                if (distance >= PUSH_RADIUS) {
                     continue
                 }
 
@@ -258,30 +281,44 @@ const fire = (columnId) => {
         window.removeEventListener('resize', resize)
         window.removeEventListener('pointermove', push)
         canvas.remove()
+        addVolley = null
     }
 
     const frame = (now) => {
-        const dt = Math.min((now - last) / 1000, MAX_DT)
-        let alive = 0
+        const width = window.innerWidth
+        const height = window.innerHeight
+        const dt = Math.min((now - last) / 1000, MAX_DT) * hang(elapsed - peakedAt)
+        let kept = 0
 
         last = now
+        elapsed += dt
+
+        if (! canvas.isConnected || elapsed > endsAt) {
+            end()
+
+            return
+        }
+
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
-        ctx.clearRect(0, 0, window.innerWidth, window.innerHeight)
+        ctx.clearRect(0, 0, width, height)
+        ctx.globalAlpha = Math.min(1, (endsAt - elapsed) / FADE_OUT)
 
         for (const p of pieces) {
-            if (! p.alive) {
+            if (step(p, dt, GRAVITY * height) && peakedAt === Infinity) {
+                peakedAt = elapsed
+            }
+
+            if (p.y > height + 40 || p.x < -400 || p.x > width + 400) {
                 continue
             }
 
-            step(p, dt, window.innerWidth, window.innerHeight)
-
-            if (p.alive) {
-                alive++
-                draw(ctx, p, dpr)
-            }
+            pieces[kept++] = p
+            draw(ctx, p, dpr)
         }
 
-        if (alive === 0 || now - start > MAX_LIFETIME * 1000) {
+        pieces.length = kept
+
+        if (kept === 0) {
             end()
 
             return
