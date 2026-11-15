@@ -2081,7 +2081,7 @@ html.fi-record-stacked .fi-record-layout {
 .ff-column-menu .fi-dropdown-panel {
     @apply sm:p-0;
 
-    &:not([style*='display: none']) {
+    &:not([x-cloak], [style*='display: none']) {
         @apply flex! flex-col;
     }
 
