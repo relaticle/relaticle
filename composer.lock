@@ -10635,16 +10635,16 @@
         },
         {
             "name": "relaticle/flowforge",
-            "version": "v4.4.1",
+            "version": "v4.4.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/flowforge.git",
-                "reference": "444fce37671e59c54f30a455503ca1fe1184f620"
+                "reference": "7f9ab19c620751d124e61b69179ca99534eb82fb"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/444fce37671e59c54f30a455503ca1fe1184f620",
-                "reference": "444fce37671e59c54f30a455503ca1fe1184f620",
+                "url": "https://api.github.com/repos/relaticle/flowforge/zipball/7f9ab19c620751d124e61b69179ca99534eb82fb",
+                "reference": "7f9ab19c620751d124e61b69179ca99534eb82fb",
                 "shasum": ""
             },
             "require": {
@@ -10720,7 +10720,7 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-11-15T19:50:05+00:00"
+            "time": "2026-11-15T20:40:05+00:00"
         },
         {
             "name": "relaticle/ink",
