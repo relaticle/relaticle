@@ -1014,6 +1014,13 @@ it('opens the stage menu on a header click, renames on Enter and recolors from t
     expect($option()->name)->toBe('Discovery');
     $page->assertScript(boardWaitFor('document.querySelector(\''.boardHeaderTitle($ids[1]).'\').textContent.trim() === "Discovery"'), true);
 
+    $input->fill('Discovery call');
+    $input->press('Enter');
+    waitForPage($page, fn (): bool => $option()->name === 'Discovery call');
+
+    expect($option()->name)->toBe('Discovery call')
+        ->and($page->script("document.querySelector('{$menu} [data-stage-error]')"))->toBeNull();
+
     $page->page()->locator("{$menu} [data-stage-color-trigger]")->click();
     $page->assertVisible("{$menu} [data-stage-swatches]");
     $pink = OptionColor::Pink->value;
@@ -1153,8 +1160,8 @@ it('adds a stage in the color picked in its form, focused on open with gray sele
     $page->assertScript(boardWaitFor("document.activeElement === document.querySelector('.ff-add-column-input')"), true);
 
     $page->page()->locator('.ff-add-column-dot')->click();
-    $page->assertScript('document.querySelector(\'.ff-swatch[aria-checked="true"]\').getAttribute("aria-label")', 'Set color to '.OptionColor::Gray->label());
-    $page->page()->locator('.ff-swatch[aria-label="Set color to '.OptionColor::Blue->label().'"]')->click();
+    $page->assertScript('document.querySelector(\'.ff-add-column-form .ff-swatch[aria-checked="true"]\').getAttribute("aria-label")', 'Set color to '.OptionColor::Gray->label());
+    $page->page()->locator('.ff-add-column-form .ff-swatch[aria-label="Set color to '.OptionColor::Blue->label().'"]')->click();
     $page->assertScript("document.querySelector('.ff-add-column-dot').style.getPropertyValue('--color-500')", $blue);
 
     $page->page()->locator('.ff-add-column-input')->fill('Escalated');
