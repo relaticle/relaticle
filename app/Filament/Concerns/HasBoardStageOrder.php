@@ -229,6 +229,11 @@ trait HasBoardStageOrder
             return;
         }
 
+        $this->refreshBoardAfterStageWrite();
+    }
+
+    private function refreshBoardAfterStageWrite(): void
+    {
         $this->boardColumnFieldList = null;
         $this->forgetStoredBoardState();
         $this->rebuildBoard();
@@ -368,10 +373,7 @@ trait HasBoardStageOrder
             return;
         }
 
-        $this->boardColumnFieldList = null;
-        $this->resolvedBoardColumnField = null;
-        $this->forgetStoredBoardState();
-        $this->rebuildBoard();
+        $this->refreshBoardAfterStageWrite();
     }
 
     protected function addBoardStage(string $name, ?string $color = null): void
@@ -386,9 +388,7 @@ trait HasBoardStageOrder
             throw ValidationException::withMessages(['name' => $this->stageWriteFailure($exception, $name)]);
         }
 
-        $this->boardColumnFieldList = null;
-        $this->resolvedBoardColumnField = null;
-        $this->forgetStoredBoardState();
+        $this->refreshBoardAfterStageWrite();
     }
 
     protected function addBoardStageUsing(): ?Closure
