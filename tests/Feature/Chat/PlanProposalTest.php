@@ -435,7 +435,7 @@ describe('reference validation', function (): void {
             ->and($person->result_data['cancelled_by'] ?? null)->toBe((string) $companies->getKey());
     });
 
-    it('rejects a reference to an already decided proposal', function (): void {
+    it('links a step to one the user approved while the turn was still running', function (): void {
         ($this->tool)(CreateCompanyTool::class)->handle(new Request([
             'records' => [['name' => 'Acme Robotics']],
         ]));
@@ -443,11 +443,72 @@ describe('reference validation', function (): void {
         $company = ($this->proposalFor)('company');
         resolve(PendingActionService::class)->approve($company, $this->user);
 
+        $result = json_decode(($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $company->getKey())]],
+        ])), true);
+
+        $person = ($this->proposalFor)('people');
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: $person->getKey(), context: 'conversation')
+            ->call('approveAll');
+
+        expect($result['type'] ?? null)->toBe('pending_action')
+            ->and(collect($person->display_data['fields'])->firstWhere('label', 'Company')['value'])->toBe('Acme Robotics (step 1)')
+            ->and(People::query()->where('name', 'Jane Doe')->sole()->company->name)->toBe('Acme Robotics');
+    });
+
+    it('links a step to one record of a batch the user already approved', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+        resolve(ProposalPlanService::class)->approveAll($companies, $this->user);
+
+        ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)]],
+        ]));
+
+        Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+            ->dispatch('proposal:set-active', id: ($this->proposalFor)('people')->getKey(), context: 'conversation')
+            ->call('approveAll');
+
+        expect(People::query()->where('name', 'Jane Doe')->sole()->company->name)->toBe('Globex');
+    });
+
+    it('refuses a reference to a rejected step', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics']],
+        ]));
+
+        $company = ($this->proposalFor)('company');
+        resolve(PendingActionService::class)->reject($company, $this->user);
+
         $result = ($this->tool)(CreatePersonTool::class)->handle(new Request([
             'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $company->getKey())]],
         ]));
 
-        expect($result)->toContain('already approved');
+        expect($result)->toContain('already rejected')
+            ->and(PendingAction::query()->where('entity_type', 'people')->exists())->toBeFalse();
+    });
+
+    it('refuses a reference to a row the user left out of an approved batch', function (): void {
+        ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+            'records' => [['name' => 'Acme Robotics'], ['name' => 'Globex']],
+        ]));
+
+        $companies = ($this->proposalFor)('company');
+        resolve(PendingActionService::class)->approveItem($companies, $this->user, 0);
+        resolve(PendingActionService::class)->rejectItem($companies->refresh(), $this->user, 1);
+
+        $result = ($this->tool)(CreatePersonTool::class)->handle(new Request([
+            'records' => [['name' => 'Jane Doe', 'company_id' => PlanReference::to((string) $companies->getKey(), 1)]],
+        ]));
+
+        expect($companies->refresh()->status)->toBe(PendingActionStatus::Approved)
+            ->and($result)->toContain('did not create that record')
+            ->and(PendingAction::query()->where('entity_type', 'people')->exists())->toBeFalse();
     });
 
     it('rejects an invented reference', function (): void {
