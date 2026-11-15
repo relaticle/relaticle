@@ -2371,6 +2371,8 @@ html.fi-record-stacked .fi-record-layout {
     --ff-card-label: 6.5rem;
     --ff-card-padding: 0.75rem;
     --ff-dot-size: 0.75rem;
+    --ff-overlay-radius: var(--radius-menu);
+    --ff-overlay-shadow: 0 0 0 1px color-mix(in oklab, var(--gray-950) 5%, transparent), 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
 
     @media (width < 40rem) {
         --ff-column-width: min(300px, calc(100vw - 3.5rem));
@@ -2460,10 +2462,6 @@ html.fi-record-stacked .fi-record-layout {
     @apply focus-visible:bg-gray-100 dark:focus-visible:bg-white/5;
 }
 
-.ff-board :is(.ff-add-column-form, .ff-add-column-swatches) {
-    @apply rounded-menu;
-}
-
 .ff-board .ff-cell {
     min-height: 3.5rem;
 }
@@ -2504,6 +2502,7 @@ html.fi-record-stacked .fi-record-layout {
 
 .dark .ff-board {
     --ff-surface: var(--gray-900);
+    --ff-overlay-shadow: 0 0 0 1px color-mix(in oklab, #fff 10%, transparent), 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
     --ff-tray-bg: color-mix(in oklab, var(--gray-950) 50%, transparent);
 }
 
