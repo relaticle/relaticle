@@ -3,7 +3,8 @@
 
 const PALETTE = ['#ff4d6d', '#ffb703', '#3ddc97', '#4cc9f0', '#7b5cff', '#ff7ab6', '#ff8a3d']
 const STAGE_SHARE = 0.25
-// Telegram's ConfettiView in viewport heights: gravity 9.8 x mass 115 on an 896pt screen, and 0.93 damping per 60Hz frame.
+// Gravity is in window heights per second squared, so a burst plays the same at any size. Drag averages about 4.2 per
+// second, close to damping by 0.93 per 60Hz frame.
 const GRAVITY = 1.26
 const DRAG = 2.6
 const FACING_DRAG = 3.4
@@ -15,7 +16,7 @@ const SHADES = 8
 const BACK_SHADE = 0.88
 const EDGE_SHADE = 0.82
 const PUSH_RADIUS = 120
-const PUSH_GAIN = 0.35
+const PUSH_GAIN = 0.56
 const MAX_CURSOR_SPEED = 3000
 
 const hexRgb = (hex) => {
@@ -123,7 +124,7 @@ const piece = (x, y, vx, vy, styles, drag = 1) => {
 }
 
 // Each piece leaves a disc just off its edge, aimed at its own point on the top edge, at a speed scaled to that distance.
-// One shared aim point, as in Telegram's phone layout, piles both cannons into one clump over the middle of a wide board.
+// One shared aim point piles both cannons into one clump over the middle of a wide board.
 const build = (styles, width, height) => {
     const small = width < 640
     const pieces = []
@@ -150,7 +151,7 @@ const build = (styles, width, height) => {
     return pieces
 }
 
-// Telegram slows time to 0.8 for 0.7s once the cannons peak, so the burst hangs before it falls.
+// Time runs at 0.8 for 0.7s once the cannons peak, so the burst hangs before it falls.
 const hang = (since) => {
     if (since < 0 || since > 0.7) {
         return 1
