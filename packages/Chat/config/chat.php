@@ -60,6 +60,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cache Cost Factors
+    |--------------------------------------------------------------------------
+    |
+    | What a cached prompt token costs next to a model's input price, used only
+    | to estimate spend in chat:health. Anthropic's five-minute cache rates.
+    |
+    */
+
+    'cache_cost_factors' => ['read' => 0.1, 'write' => 1.25],
+
+    /*
+    |--------------------------------------------------------------------------
     | Web Search Credit Cost
     |--------------------------------------------------------------------------
     */

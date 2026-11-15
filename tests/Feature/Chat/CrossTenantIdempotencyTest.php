@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -28,12 +29,12 @@ it('allows the same idempotency key in two different workspaces', function (): v
 
     $service->settleReservation(
         workspace: $userA->currentWorkspace, user: $userA, type: AiCreditType::Chat,
-        model: 'claude-sonnet-4-6', inputTokens: 0, outputTokens: 0,
+        model: 'claude-sonnet-4-6', usage: new TextUsage(0, 0),
         resolutionKey: 'shared-key',
     );
     $service->settleReservation(
         workspace: $userB->currentWorkspace, user: $userB, type: AiCreditType::Chat,
-        model: 'claude-sonnet-4-6', inputTokens: 0, outputTokens: 0,
+        model: 'claude-sonnet-4-6', usage: new TextUsage(0, 0),
         resolutionKey: 'shared-key',
     );
 

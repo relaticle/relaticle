@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Services\SelfHostedEntitlements;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Laravel\Ai\Responses\Data\TextUsage;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Commands\ReleaseOrphanedReservationsCommand;
 use Relaticle\Chat\Enums\AiCreditType;
@@ -131,8 +132,7 @@ it('does not refund reservations that were settled', function (): void {
         user: $user,
         type: AiCreditType::Chat,
         model: 'claude-sonnet-4',
-        inputTokens: 10,
-        outputTokens: 10,
+        usage: new TextUsage(10, 10),
         resolutionKey: 'resolve-settled-1',
     );
 
@@ -173,8 +173,7 @@ it('makes a late settle a no-op after the sweeper refunded the turn', function (
         user: $user,
         type: AiCreditType::Chat,
         model: 'claude-sonnet-4',
-        inputTokens: 999,
-        outputTokens: 999,
+        usage: new TextUsage(999, 999),
         toolCallsCount: 5,
         resolutionKey: 'resolve-race-1',
     );

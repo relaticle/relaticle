@@ -302,8 +302,7 @@ final readonly class CreditService
         User $user,
         AiCreditType $type,
         string $model,
-        int $inputTokens,
-        int $outputTokens,
+        TextUsage $usage,
         int $toolCallsCount = 0,
         int $webSearchCount = 0,
         ?string $conversationId = null,
@@ -322,14 +321,14 @@ final readonly class CreditService
             resolutionKey: $resolutionKey,
             type: $type,
             model: $model,
-            inputTokens: $inputTokens,
-            outputTokens: $outputTokens,
+            inputTokens: $usage->uncachedInputTokens(),
+            outputTokens: $usage->outputTokens,
             creditsCharged: $creditsCharged,
             remainingDelta: -$adjustment,
             usedDelta: $adjustment,
             userId: (string) $user->getKey(),
             conversationId: $conversationId,
-            metadata: ['tool_calls_count' => $toolCallsCount, 'web_searches_count' => $webSearchCount],
+            metadata: ['tool_calls_count' => $toolCallsCount, 'web_searches_count' => $webSearchCount, 'tokens' => $this->tokenDetail($usage)],
         );
     }
 
@@ -383,7 +382,7 @@ final readonly class CreditService
             usedDelta: 0,
             userId: (string) $user->getKey(),
             conversationId: $conversationId,
-            metadata: ['reason' => $reason],
+            metadata: ['reason' => $reason, 'tokens' => $this->tokenDetail($usage)],
         );
     }
 
@@ -407,9 +406,19 @@ final readonly class CreditService
             'input_tokens' => $usage->uncachedInputTokens(),
             'output_tokens' => $usage->outputTokens,
             'credits_charged' => 0,
-            'metadata' => [],
+            'metadata' => ['tokens' => $this->tokenDetail($usage)],
             'created_at' => now(),
         ]);
+    }
+
+    /** @return array{prompt: int, cache_read: int|null, cache_write: int|null} */
+    private function tokenDetail(TextUsage $usage): array
+    {
+        return [
+            'prompt' => $usage->inputTokens,
+            'cache_read' => $usage->cacheReadInputTokens,
+            'cache_write' => $usage->cacheWriteInputTokens,
+        ];
     }
 
     public function calculateCredits(string $model, int $toolCallsCount, int $webSearchCount = 0): int
