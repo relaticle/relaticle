@@ -14,11 +14,11 @@ use App\Http\Middleware\RequireOperationGrant;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetApiWorkspaceContext;
 use App\Http\Middleware\StopImpersonationOnLogout;
-use App\Http\Middleware\StripOAuthErrorHint;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\SuperviseImpersonation;
 use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
+use App\Models\ActivityLog\Activity;
 use App\Models\Notification;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\SetUpPanel;
@@ -111,9 +111,6 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Global rather than the web group: Filament panel routes do not run the web group.
         $middleware->append(SecurityHeaders::class);
-
-        // Passport's HttpResponseException skips the exception handler, so only a response middleware can reach it.
-        $middleware->append(StripOAuthErrorHint::class);
 
         $middleware->authenticateSessions();
 
@@ -359,7 +356,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('app:purge-pending-uploads')->hourly()->withoutOverlapping()->onOneServer();
         $schedule->command('queue:prune-batches --hours=24')->daily()->onOneServer();
         $schedule->command('invitations:cleanup')->daily()->onOneServer();
+        $schedule->command('users:prune-unclaimed')->daily()->onOneServer();
         $schedule->command('activitylog:clean --force')->daily()->onOneServer();
+        $schedule->command('activitylog:clean '.Activity::SIGNUP_LOG.' --days=90 --force')->daily()->onOneServer();
         $schedule->command('model:prune', ['--model' => [Notification::class]])->daily()->onOneServer();
         $schedule->command('chat:expire-pending-actions')->everyFiveMinutes()->onOneServer();
         $schedule->command('chat:release-orphaned-reservations')->everyTenMinutes()->withoutOverlapping()->onOneServer();

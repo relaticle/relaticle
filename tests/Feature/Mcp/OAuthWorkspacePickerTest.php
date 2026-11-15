@@ -1258,3 +1258,17 @@ it('keeps the error and description but drops the hint on a malformed token requ
             'error_description' => 'The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.',
         ]);
 });
+
+it('drops the hint from an authorization request rejected before any redirect', function (): void {
+    $this->actingAs($this->user);
+
+    $this->getJson('/oauth/authorize?'.http_build_query([
+        'client_id' => $this->client->getKey(),
+        'resource' => url('/mcp'),
+    ]))
+        ->assertStatus(400)
+        ->assertExactJson([
+            'error' => 'invalid_request',
+            'error_description' => 'The request is missing a required parameter, includes an invalid parameter value, includes a parameter more than once, or is otherwise malformed.',
+        ]);
+});

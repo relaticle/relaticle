@@ -273,12 +273,7 @@ final class Billing extends Page
      */
     private function trialAvailable(): bool
     {
-        $workspace = $this->workspace();
-
-        return ! $this->isPaused()
-            && $workspace->plan === Plan::Free
-            && $workspace->pro_trial_used_at === null
-            && ! $workspace->subscriptions()->exists();
+        return ! $this->isPaused() && $this->workspace()->canStartTrial();
     }
 
     private function workspace(): Workspace

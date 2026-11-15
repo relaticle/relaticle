@@ -26,7 +26,7 @@ final class WorkspaceInvitationFactory extends Factory
             'workspace_id' => Workspace::factory(),
             'email' => fake()->unique()->safeEmail(),
             'role' => fake()->randomElement([WorkspaceRole::Admin->value, WorkspaceRole::Member->value]),
-            'expires_at' => now()->addDays(config('jetstream.invitation_expiry_days', 7)),
+            'expires_at' => now()->addDays(config('jetstream.invitation_expiry_days', 2)),
         ];
     }
 

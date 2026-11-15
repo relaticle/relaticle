@@ -120,6 +120,30 @@ it('lets administrators create customer accounts', function (): void {
     expect(Hash::check('creation-password', $user->password))->toBeTrue();
 });
 
+it('rejects a customer password shorter than the app minimum', function (): void {
+    $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
+
+    livewire(CreateUser::class)
+        ->fillForm([
+            'name' => 'Weak Customer',
+            'email' => 'weak-customer@example.test',
+            'password' => 'abc',
+        ])
+        ->call('create')
+        ->assertHasFormErrors(['password']);
+
+    expect(User::query()->where('email', 'weak-customer@example.test')->exists())->toBeFalse();
+});
+
+it('rejects a changed customer password shorter than the app minimum', function (): void {
+    $user = User::factory()->create();
+
+    livewire(EditUser::class, ['record' => $user->getKey()])
+        ->fillForm(['password' => 'abc'])
+        ->call('save')
+        ->assertHasFormErrors(['password']);
+});
+
 it('rejects administrator account changes through edit actions', function (string $pageClass): void {
     $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
     $user = User::factory()->create();

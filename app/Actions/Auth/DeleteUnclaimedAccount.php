@@ -21,19 +21,7 @@ final readonly class DeleteUnclaimedAccount
             return false;
         }
 
-        if ($holder->hasVerifiedEmail()) {
-            return false;
-        }
-
-        if ($holder->ownedWorkspaces()->exists()) {
-            return false;
-        }
-
-        if ($holder->workspaces()->exists()) {
-            return false;
-        }
-
-        if ($holder->socialAccounts()->exists()) {
+        if (User::query()->whereKey($holder->getKey())->unclaimed()->doesntExist()) {
             return false;
         }
 

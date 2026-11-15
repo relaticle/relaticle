@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\SentryEventScrubber;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Jobs\StoreMeetingJob;
 
@@ -37,8 +38,25 @@ return [
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#profiles-sample-rate
     'profiles_sample_rate' => env('SENTRY_PROFILES_SAMPLE_RATE') === null ? null : (float) env('SENTRY_PROFILES_SAMPLE_RATE'),
 
-    // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#send-default-pii
-    'send_default_pii' => env('SENTRY_SEND_DEFAULT_PII', false),
+    // Setting `data_collection` ends the legacy mode, so `send_default_pii` no longer applies.
+    'data_collection' => [
+        'user_info' => (bool) env('SENTRY_SEND_DEFAULT_PII', false),
+        'http_bodies' => [],
+        'http_headers' => [
+            'request' => ['terms' => ['forwarded', 'real-ip', 'connecting-ip', 'client-ip']],
+            'response' => ['mode' => 'off'],
+        ],
+        'url_query_params' => ['terms' => ['email']],
+        'gen_ai' => ['inputs' => false, 'outputs' => false],
+        'database_query_data' => false,
+        'queues' => false,
+        'stack_frame_variables' => false,
+    ],
+
+    // Callable strings, never closures: the image runs config:cache.
+    'before_send' => SentryEventScrubber::class.'::scrub',
+
+    'before_send_transaction' => SentryEventScrubber::class.'::scrub',
 
     // @see: https://docs.sentry.io/platforms/php/guides/laravel/configuration/options/#ignore-exceptions
     // 'ignore_exceptions' => [],
@@ -60,8 +78,8 @@ return [
         // Capture Laravel cache events (hits, writes etc.) as breadcrumbs
         'cache' => env('SENTRY_BREADCRUMBS_CACHE_ENABLED', true),
 
-        // Capture Livewire components like routes as breadcrumbs
-        'livewire' => env('SENTRY_BREADCRUMBS_LIVEWIRE_ENABLED', true),
+        // Off by default: the breadcrumbs carry component state, mount data and call arguments.
+        'livewire' => env('SENTRY_BREADCRUMBS_LIVEWIRE_ENABLED', false),
 
         // Capture SQL queries as breadcrumbs
         'sql_queries' => env('SENTRY_BREADCRUMBS_SQL_QUERIES_ENABLED', true),

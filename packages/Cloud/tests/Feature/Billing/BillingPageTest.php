@@ -96,7 +96,8 @@ it('asks a paused workspace that never trialed to subscribe, without offering a 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.paused.heading.free', ['workspace' => $workspace->name]))
         ->assertDontSee('cloud::billing.paused.heading.', false)
-        ->assertSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
+        ->assertSee(__('cloud::billing.paused.owner_body_free', ['workspace' => $workspace->name]))
+        ->assertDontSee(__('cloud::billing.paused.owner_body', ['workspace' => $workspace->name]))
         ->assertSee(__('cloud::billing.paused.continue'))
         ->assertDontSee(__('cloud::billing.trial.start_button'))
         ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']))
@@ -635,6 +636,18 @@ it('shows trialing state with subscribe CTA', function (): void {
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.trial.active_title'))
         ->assertSee(__('cloud::billing.subscribe.button'));
+});
+
+it('meters a running trial against the trial allowance', function (): void {
+    withHostedBilling();
+
+    [$user, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null])->save();
+    resolve(StartProTrial::class)->execute($user, $workspace);
+
+    livewire(Billing::class)
+        ->assertSeeHtml('/ '.number_format(Plan::trialCredits()))
+        ->assertDontSeeHtml('/ '.number_format(Plan::Pro->credits()));
 });
 
 it('shows manage state for an active subscription', function (): void {

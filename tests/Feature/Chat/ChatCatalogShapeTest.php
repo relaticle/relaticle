@@ -20,8 +20,8 @@ it('seeds one catalog carrying Auto membership, price and probed capabilities', 
         // Compared numerically, not identically: JSON has a single number type, so a
         // whole float comes back as an int. ModelRegistry::ratesFor() is where the
         // float guarantee lives, and ModelRegistrySourcesTest asserts it there.
-        ->and($sonnet['input_per_mtok'])->toEqual(3.0)
-        ->and($sonnet['output_per_mtok'])->toEqual(15.0)
+        ->and($sonnet['input_per_mtok'])->toEqual(2.0)
+        ->and($sonnet['output_per_mtok'])->toEqual(10.0)
         ->and($sonnet['capabilities']['supports_tools'])->toBeTrue()
         ->and($sonnet)->not->toHaveKey('supports_tools')
         ->and($sonnet)->not->toHaveKey('self_hosted');

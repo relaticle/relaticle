@@ -19,6 +19,9 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Concerns\ListsEntity;
 use App\Queries\Opportunities\OpportunitiesQuery;
+use App\Support\CustomFields\IncludedCustomFields;
+use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
@@ -32,6 +35,7 @@ mutates(
     OpportunitiesQuery::class,
     ListsEntity::class,
     OpportunityResource::class,
+    IncludedCustomFields::class,
 );
 
 beforeEach(function () {
@@ -296,6 +300,46 @@ describe('includes', function (): void {
                 ->has('included')
                 ->etc()
             );
+    });
+
+    it('returns the custom fields of a contact included on show endpoint', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+        $this->putJson("/api/v1/people/{$person->id}", ['custom_fields' => ['job_title' => 'VP Sales']])->assertOk();
+        $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $person->id]);
+
+        $this->getJson("/api/v1/opportunities/{$opportunity->id}?include=contact")
+            ->assertOk()
+            ->assertJsonPath('included.0.attributes.custom_fields.job_title', 'VP Sales');
+    });
+
+    it('returns the custom fields of a contact included on list endpoint', function (): void {
+        Sanctum::actingAs($this->user);
+
+        $person = People::factory()->recycle([$this->user, $this->workspace])->create();
+        $this->putJson("/api/v1/people/{$person->id}", ['custom_fields' => ['job_title' => 'VP Sales']])->assertOk();
+        Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $person->id]);
+
+        $this->getJson('/api/v1/opportunities?include=contact')
+            ->assertOk()
+            ->assertJsonPath('included.0.attributes.custom_fields.job_title', 'VP Sales');
+    });
+
+    it('loads the custom fields of included contacts once for the whole list', function (): void {
+        Sanctum::actingAs($this->user);
+
+        People::factory(3)->recycle([$this->user, $this->workspace])->create()
+            ->each(fn (People $person) => Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $person->id]));
+
+        $valueQueries = 0;
+        DB::listen(function (QueryExecuted $query) use (&$valueQueries): void {
+            $valueQueries += (int) str_contains($query->sql, 'from "custom_field_values"');
+        });
+
+        $this->getJson('/api/v1/opportunities?include=contact')->assertOk()->assertJsonCount(3, 'included');
+
+        expect($valueQueries)->toBe(2);
     });
 
     it('can include company on show endpoint', function (): void {

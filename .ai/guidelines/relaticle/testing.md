@@ -41,6 +41,10 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   `php -d xdebug.mode=coverage vendor/bin/pest --mutate --class='App\MyClass' tests/path/`
 - Use `$this->travelTo()` in tests that depend on day-of-week or weekly intervals
   to avoid flaky boundary failures
+- A test that counts rows made today fixes its clock too. The factories stamp `created_at` one
+  minute apart, going back from now, so the 30th row belongs to yesterday until 00:30 UTC.
+  `CrmAssistantInstructionsTest` and `SetupConversationTest` failed on main every night in that
+  half hour. Start the test with `$this->travelTo('2026-11-13 10:00:00')`.
 - Match test organization to existing conventions: before creating a test file,
   search `tests/` for files covering the same class or feature and extend those
 - A negated arch expectation covers one layer: `expect($layer)->not->toUse(...)` inside a
@@ -109,10 +113,10 @@ suite by class over nine test shards of four processes and eight Browser shards 
 class runs in one process. One 379s class once held its shard at 451s while the other shards
 finished in 150s.
 
-- A test class stays under 130s in CI and a Browser class under 90s. The `Record Shard Timings`
-  job fails a class past that: `php bin/shard-timings.php --over-budget`. Split the file. Move
-  tests to a second file in the same directory and keep every name. `FilterBarTest` became four
-  files that way.
+- A test class stays under 130s in CI and a Browser class under 90s. A crowded shard ran one
+  class 23% slower, so the `Record Shard Timings` job fails only a class past 160s or 115s:
+  `php bin/shard-timings.php --over-budget`. Split the file. Move tests to a second file in the
+  same directory and keep every name. `FilterBarTest` became four files that way.
 - Helpers that two test files share are plain functions in `tests/Helpers/functions/`, and a
   dataset they share sits in a `Datasets` directory beside the tests. Pest loads both at boot. A
   function declared in two test files is a fatal error in any run that loads both.

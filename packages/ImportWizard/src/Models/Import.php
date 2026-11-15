@@ -56,6 +56,9 @@ use Relaticle\ImportWizard\Importers\BaseImporter;
 ])]
 final class Import extends Model
 {
+    // Longer than the job's timeout plus retries, so a merely slow run is never offered as stalled.
+    private const int STALLED_AFTER_MINUTES = 30;
+
     /** @use HasFactory<ImportFactory> */
     use HasFactory;
 
@@ -121,6 +124,12 @@ final class Import extends Model
     protected function forWorkspace(Builder $query, string $workspaceId): void
     {
         $query->where('workspace_id', $workspaceId);
+    }
+
+    public function isStalled(): bool
+    {
+        return $this->status === ImportStatus::Importing
+            && $this->updated_at?->lt(now()->subMinutes(self::STALLED_AFTER_MINUTES)) === true;
     }
 
     public function getImporter(): BaseImporter

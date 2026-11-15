@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace App\Http\Resources\V1\Concerns;
 
 use App\Enums\CustomFieldType;
+use App\Support\CustomFields\IncludedCustomFields;
 use App\Support\CustomFields\RecordNameResolver;
 use App\Support\Media\MediaLookup;
 use App\Support\Media\RichContentAttachments;
 use Illuminate\Contracts\Pagination\Paginator;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Resources\Json\AnonymousResourceCollection;
+use Illuminate\Http\Resources\JsonApi\JsonApiRequest;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Models\CustomField;
 use Relaticle\CustomFields\Models\CustomFieldValue;
 
@@ -25,6 +29,36 @@ trait FormatsCustomFields
         resolve(MediaLookup::class)->prime($records);
 
         return parent::collection($resource);
+    }
+
+    protected function compileResourceRelationships(JsonApiRequest $request): void
+    {
+        parent::compileResourceRelationships($request);
+
+        if ($this->resource instanceof Model) {
+            IncludedCustomFields::load($this->resource, array_keys($this->toRelationships($request)));
+        }
+    }
+
+    /**
+     * @param  Collection<int, Model>  $relatedModels
+     * @param  list<string>  $requestedRelationships
+     */
+    protected function loadMissingRequestedRelationships(
+        JsonApiRequest $request,
+        Collection $relatedModels,
+        ?string $resourceClass,
+        array $requestedRelationships,
+    ): void {
+        parent::loadMissingRequestedRelationships($request, $relatedModels, $resourceClass, $requestedRelationships);
+
+        $relations = array_map(static fn (string $relationship): string => Str::before($relationship, '.'), $requestedRelationships);
+
+        $relatedModels
+            ->groupBy(static fn (Model $model): string => $model::class)
+            ->each(static function (Collection $models) use ($relations): void {
+                IncludedCustomFields::load(new EloquentCollection($models->all()), $relations);
+            });
     }
 
     protected function formatCustomFields(Model $record): \stdClass

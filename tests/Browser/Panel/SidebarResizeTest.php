@@ -131,6 +131,23 @@ it('keeps every navigation row 32px tall on the collapsed rail', function (): vo
         ->assertNoJavaScriptErrors();
 });
 
+it('keeps every navigation icon whole inside its row on the collapsed rail', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    $clippedIcons = '[...document.querySelectorAll(".fi-sidebar-nav .fi-sidebar-item-btn")].filter((row) => row.getClientRects().length > 0).filter((row) => { const rowBox = row.getBoundingClientRect(); const iconBox = row.querySelector(".fi-sidebar-item-icon").getBoundingClientRect(); return iconBox.left < rowBox.left || iconBox.right > rowBox.right; }).length';
+
+    visitAs($user, "/app/{$workspace->slug}")
+        ->resize(1440, 900)
+        ->click('[data-sidebar-workspace-toggle]')
+        ->wait(0.5)
+        ->assertScript('Alpine.store("sidebar").isOpen', false)
+        ->assertScript($clippedIcons, 0)
+        ->assertNoJavaScriptErrors();
+});
+
 it('hands the toggle to the top bar on collapse and back on expand, keeping the navigation in place', function (): void {
     $this->withVite();
 

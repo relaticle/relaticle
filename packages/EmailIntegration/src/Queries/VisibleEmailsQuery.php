@@ -112,6 +112,23 @@ final readonly class VisibleEmailsQuery
         return $email;
     }
 
+    /** @param  list<string>  $with */
+    public function replyableEmail(User $viewer, string $workspaceId, ?string $id, array $with = ['shares']): ?Email
+    {
+        if ($id === null) {
+            return null;
+        }
+
+        $email = Email::query()
+            ->forWorkspace($workspaceId)
+            ->withGlobalScope('visible', new VisibleEmailScope($viewer))
+            ->with($with)
+            ->whereKey($id)
+            ->first();
+
+        return $email instanceof Email && $viewer->can('view', $email) ? $email : null;
+    }
+
     /** @param  Builder<Email>  $query */
     private function withDetail(Builder $query, User $viewer, string $id): ?Email
     {

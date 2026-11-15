@@ -139,6 +139,16 @@ test('the tab strip hides admin-only tabs from members without the admin role', 
         ->not->toContain(__('workspaces.tabs.activity'));
 });
 
+test('the tab strip hides import history from a viewer', function (): void {
+    $viewer = User::factory()->create();
+    $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+
+    $this->actingAs($viewer);
+
+    expect(workspaceTabLabels(resolve(EditWorkspace::class)))
+        ->not->toContain(__('workspaces.tabs.import_history'));
+});
+
 test('a workspace member reaches their email accounts without the workspace email tabs', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);

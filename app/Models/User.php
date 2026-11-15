@@ -287,6 +287,19 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
      * @return Builder<User>
      */
     #[Scope]
+    protected function unclaimed(Builder $query): Builder
+    {
+        return $query->whereNull('email_verified_at')
+            ->whereDoesntHave('ownedWorkspaces')
+            ->whereDoesntHave('workspaces')
+            ->whereDoesntHave('socialAccounts');
+    }
+
+    /**
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    #[Scope]
     protected function scheduledForDeletion(Builder $query): Builder
     {
         return $query->whereNotNull('scheduled_deletion_at');

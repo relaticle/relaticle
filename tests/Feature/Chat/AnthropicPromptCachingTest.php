@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Events\Dispatcher;
+use Illuminate\Support\Facades\Date;
 use Laravel\Ai\AiManager;
 use Laravel\Ai\Enums\Lab;
 use Laravel\Ai\Gateway\Anthropic\AnthropicGateway;
@@ -62,6 +63,24 @@ it('keeps per-turn context out of the cached block', function (): void {
         ->and($body['system'][0]['text'])->not->toContain('01COMPANY')
         ->and($body['system'][1])->not->toHaveKey('cache_control')
         ->and($body['system'][1]['text'])->toContain('01COMPANY');
+});
+
+it('sends byte-identical system blocks for two steps built a second apart', function (): void {
+    $this->travelTo(Date::parse('2026-11-13 09:41:27', 'Asia/Yerevan'));
+    $agent = (new CrmAssistant)->withUserTimezone('Asia/Yerevan');
+
+    $first = anthropicRequestBodyFor($agent)['system'];
+    $this->travel(1)->seconds();
+
+    expect(anthropicRequestBodyFor($agent)['system'])->toBe($first);
+});
+
+it('still shows a date and time with the user offset as the example', function (): void {
+    $this->travelTo(Date::parse('2026-11-13 09:41:27', 'Asia/Yerevan'));
+
+    expect((new CrmAssistant)->withUserTimezone('Asia/Yerevan')->dynamicInstructions())
+        ->toContain('Today is 2026-11-13 (Friday), timezone Asia/Yerevan.')
+        ->toContain('such as 2026-11-13T15:00:00+04:00.');
 });
 
 it('still forces one tool call per turn alongside the cached system blocks', function (): void {

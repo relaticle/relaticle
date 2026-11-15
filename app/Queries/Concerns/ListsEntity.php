@@ -12,8 +12,10 @@ use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
 use App\Queries\FilterErrors;
 use App\Queries\FilterTree;
+use App\Support\CustomFields\IncludedCustomFields;
 use Illuminate\Contracts\Pagination\CursorPaginator;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use LogicException;
 use Spatie\QueryBuilder\QueryBuilder;
@@ -60,6 +62,16 @@ trait ListsEntity
 
     /** @return CursorPaginator<int, Model>|LengthAwarePaginator<int, Model> */
     public function paginate(User $user, ListQuery $list): CursorPaginator|LengthAwarePaginator
+    {
+        $page = $this->page($user, $list);
+
+        IncludedCustomFields::load(new Collection($page->items()), static::includes());
+
+        return $page;
+    }
+
+    /** @return CursorPaginator<int, Model>|LengthAwarePaginator<int, Model> */
+    private function page(User $user, ListQuery $list): CursorPaginator|LengthAwarePaginator
     {
         $ordered = $this->for($user, $list)->orderBy('id');
 
