@@ -184,7 +184,9 @@ final readonly class CustomFieldInput
             $this->fail($field, Operand::offsetRequired($field->code, $value, $viewerZone));
         }
 
-        return Date::parse($value)->utc()->toDateTimeString();
+        $zone = $viewerZone !== null && Operand::isBareDate($value) ? $viewerZone : null;
+
+        return Date::parse($value, $zone)->utc()->toDateTimeString();
     }
 
     private function isBlankString(mixed $value): bool
