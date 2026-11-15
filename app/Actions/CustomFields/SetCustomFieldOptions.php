@@ -140,7 +140,7 @@ final readonly class SetCustomFieldOptions
     {
         $changes = array_filter([
             'color' => $target['color'] !== null && $target['color'] !== $option->settings->color ? $target['color'] : null,
-            'celebrate' => $target['celebrate'] !== null && $target['celebrate'] !== $option->settings->celebrate ? $target['celebrate'] : null,
+            'celebrate' => $target['celebrate'] !== null && $target['celebrate'] !== $option->celebrates() ? $target['celebrate'] : null,
         ], static fn (mixed $value): bool => $value !== null);
 
         return $changes === [] ? null : StageOptionSettings::from([...$option->settings->toArray(), ...$changes]);

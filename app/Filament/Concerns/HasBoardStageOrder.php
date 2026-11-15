@@ -540,7 +540,7 @@ trait HasBoardStageOrder
             'name' => (string) $option->getAttribute('name'),
             'color' => $colorsEnabled ? ($option->settings->color ?? 'gray') : 'gray',
             'stored' => $option->settings->color,
-            'celebrate' => (bool) $option->settings->celebrate,
+            'celebrate' => (bool) $option->celebrates(),
         ]);
 
         $position = array_flip($this->storedBoardState()->orderStages(array_column($options->all(), 'id')));

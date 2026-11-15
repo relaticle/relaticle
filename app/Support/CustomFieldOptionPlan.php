@@ -449,7 +449,7 @@ final readonly class CustomFieldOptionPlan
     {
         return $target['option'] instanceof CustomFieldOption
             && $target['celebrate'] !== null
-            && $target['celebrate'] !== (bool) $target['option']->settings->celebrate;
+            && $target['celebrate'] !== (bool) $target['option']->celebrates();
     }
 
     /**

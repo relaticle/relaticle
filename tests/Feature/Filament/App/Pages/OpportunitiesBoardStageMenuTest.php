@@ -40,6 +40,7 @@ use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
+use Relaticle\CustomFields\Data\CustomFieldOptionSettingsData;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnCollapsed::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
@@ -535,6 +536,17 @@ it('keeps confetti through a rename and a recolor, and the color through togglin
 
     expect(stageOption($id)->name)->toBe('Renamed stage')
         ->and(stageOption($id)->settings->color)->toBe(OptionColor::Blue->value)
+        ->and(stageOption($id)->settings->celebrate)->toBeTrue();
+});
+
+it('keeps confetti when a caller saves the package settings object over it', function (): void {
+    $id = stageIds($this->stageField)[1];
+
+    livewire(OpportunitiesBoard::class)->call('setBoardColumnCelebrate', $id, true);
+
+    stageOption($id)->update(['settings' => new CustomFieldOptionSettingsData(color: OptionColor::Green->value)]);
+
+    expect(stageOption($id)->settings->color)->toBe(OptionColor::Green->value)
         ->and(stageOption($id)->settings->celebrate)->toBeTrue();
 });
 
