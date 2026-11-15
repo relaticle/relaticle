@@ -35,6 +35,7 @@ use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Events\ChatStreamFailed;
@@ -448,6 +449,28 @@ it('applies a kept proposal when it is approved and hands the turn back to the a
         ->and(Task::query()->where('title', 'From this turn')->exists())->toBeTrue()
         ->and($resumed)->toHaveCount(1);
 });
+
+it('records why a failed turn was refunded', function (Throwable $exception, string $cause): void {
+    withHostedBilling();
+
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 100, 'credits_used' => 0]);
+    $conversationId = (string) Str::uuid7();
+    seedFailoverConversation($user, $conversationId);
+
+    $job = makeFailedTurnJob($user, $conversationId);
+    resolve(CreditService::class)->reserveCredit($workspace, reservationKey: "reserve-{$job->turnId}", conversationId: $conversationId, userId: (string) $user->getKey());
+
+    $job->failed($exception);
+
+    $refund = AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->where('type', AiCreditType::Refund)->sole();
+
+    expect($refund->metadata['cause'])->toBe($cause);
+})->with([
+    'a timeout' => [new TimeoutExceededException('timed out'), 'timeout'],
+    'any other failure' => [new RuntimeException('boom'), 'failed'],
+]);
 
 it('orders the backfilled failed turn before a later retried turn when sorted by id', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();

@@ -13,6 +13,7 @@ use Illuminate\Support\Str;
 use Laravel\Ai\Ai;
 use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\RefundCause;
 use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AiCreditBalance;
@@ -95,7 +96,7 @@ final readonly class CreditService
      * work. Idempotent on $resolutionKey and mutually exclusive with settlement
      * (both write the same unique key).
      */
-    public function refundReservation(Workspace $workspace, int $credits = 1, string $resolutionKey = '', ?string $conversationId = null): void
+    public function refundReservation(Workspace $workspace, RefundCause $cause, int $credits = 1, string $resolutionKey = '', ?string $conversationId = null): void
     {
         if (! $this->entitlements->metersCredits($workspace)) {
             return;
@@ -113,7 +114,7 @@ final readonly class CreditService
             usedDelta: -$credits,
             userId: null,
             conversationId: $conversationId,
-            metadata: ['reason' => 'reservation_refund'],
+            metadata: ['reason' => 'reservation_refund', 'cause' => $cause->value],
         );
     }
 

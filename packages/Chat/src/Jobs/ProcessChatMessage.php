@@ -44,6 +44,7 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\RefundCause;
 use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Enums\WebTool;
 use Relaticle\Chat\Events\ChatStreamFailed;
@@ -198,6 +199,7 @@ final class ProcessChatMessage implements ShouldQueue
 
             $creditService->refundReservation(
                 $this->workspace,
+                RefundCause::NotStarted,
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
@@ -254,6 +256,7 @@ final class ProcessChatMessage implements ShouldQueue
         } catch (Throwable $e) {
             $creditService->refundReservation(
                 $this->workspace,
+                RefundCause::NotStarted,
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
@@ -558,6 +561,7 @@ final class ProcessChatMessage implements ShouldQueue
         // entered, and nothing was ever sent to a provider to pay for.
         resolve(CreditService::class)->refundReservation(
             $this->workspace,
+            $exception instanceof TimeoutExceededException ? RefundCause::Timeout : RefundCause::Failed,
             resolutionKey: $this->resolutionKey(),
             conversationId: $this->conversationId,
         );
@@ -646,6 +650,7 @@ final class ProcessChatMessage implements ShouldQueue
     {
         $creditService->refundReservation(
             $this->workspace,
+            RefundCause::Refused,
             resolutionKey: $this->resolutionKey(),
             conversationId: $this->conversationId,
         );
@@ -1060,6 +1065,7 @@ final class ProcessChatMessage implements ShouldQueue
         if (! $ranProviderTool) {
             $creditService->refundReservation(
                 $this->workspace,
+                RefundCause::BlankReply,
                 resolutionKey: $this->resolutionKey(),
                 conversationId: $this->conversationId,
             );
