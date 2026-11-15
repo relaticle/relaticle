@@ -1796,7 +1796,7 @@ it('rings the current stage color in the swatch grid', function (): void {
 
     $pink = OptionColor::Pink->value;
 
-    expect(stageMenuOf($component, $id))->toMatch("/data-stage-swatch=\"{$pink}\"[^>]*aria-pressed=\"true\"|aria-pressed=\"true\"[^>]*data-stage-swatch=\"{$pink}\"/");
+    expect(stageMenuOf($component, $id))->toMatch("/data-swatch=\"{$pink}\"[^>]*aria-checked=\"true\"|aria-checked=\"true\"[^>]*data-swatch=\"{$pink}\"/");
 });
 
 it('writes nothing when the picked color is the stored color in another case', function (): void {
@@ -1943,9 +1943,9 @@ it('rings only the stored color of a stage, never the gray display fallback', fu
 
     $menu = stageMenuOf(livewire(OpportunitiesBoard::class), $id);
 
-    expect($menu)->toContain('data-stage-swatch="'.OptionColor::Gray->value.'"');
+    expect($menu)->toContain('data-swatch="'.OptionColor::Gray->value.'"');
 
-    $ringed = substr_count($menu, 'aria-pressed="true"');
+    $ringed = substr_count($menu, 'aria-checked="true"');
 
     expect($ringed)->toBe($case === 'colors off' ? 1 : 0);
 })->with(['none stored', 'outside the palette', 'colors off']);

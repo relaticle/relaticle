@@ -12,6 +12,8 @@
                     class="size-3 shrink-0 rounded-full"
                     style="{{ $dot }}; background-color: var(--color-500)"
                     data-stage-color-trigger
+                    x-ref="colorTrigger"
+                    aria-haspopup="true"
                     aria-label="{{ __('filament/pages/boards.stage_menu.color', ['noun' => $noun]) }}"
                     x-bind:aria-expanded="swatches.toString()"
                     x-on:click="swatches = ! swatches"
@@ -31,25 +33,16 @@
                 />
             </div>
 
-            <div
-                class="absolute top-full left-2.5 z-10 -mt-1.5 grid w-max grid-cols-4 gap-2 rounded-menu bg-white p-2 shadow-lg ring-1 ring-gray-950/5 dark:bg-gray-900 dark:ring-white/10"
+            <x-flowforge::modern.color-swatches
+                :colors="$swatches"
+                :selected="collect($swatches)->firstWhere('current', true)['value'] ?? null"
+                :set-color-label="__('filament/pages/boards.stage_menu.set_color', ['color' => ':color'])"
+                open="swatches"
                 data-stage-swatches
-                x-show="swatches"
-                x-cloak
+                x-on:swatch-pick="swatches = false; $wire.setBoardColumnColor({{ Js::from($id) }}, $event.detail.value)"
+                x-on:swatch-close="swatches = false; $nextTick(() => $refs.colorTrigger.focus())"
                 x-on:click.outside="swatches = false"
-            >
-                @foreach ($swatches as $swatch)
-                    <button
-                        type="button"
-                        class="fi-board-stage-swatch size-6 rounded-md"
-                        style="{{ $swatch['style'] }}; background-color: var(--color-500)"
-                        data-stage-swatch="{{ $swatch['value'] }}"
-                        aria-pressed="{{ $swatch['current'] ? 'true' : 'false' }}"
-                        aria-label="{{ __('filament/pages/boards.stage_menu.set_color', ['color' => $swatch['label']]) }}"
-                        x-on:click="swatches = false; $wire.setBoardColumnColor({{ Js::from($id) }}, {{ Js::from($swatch['value']) }})"
-                    ></button>
-                @endforeach
-            </div>
+            />
         </div>
 
         @if (filled($error))

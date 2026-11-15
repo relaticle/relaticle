@@ -1017,7 +1017,7 @@ it('opens the stage menu on a header click, renames on Enter and recolors from t
     $page->page()->locator("{$menu} [data-stage-color-trigger]")->click();
     $page->assertVisible("{$menu} [data-stage-swatches]");
     $pink = OptionColor::Pink->value;
-    $page->page()->locator("{$menu} [data-stage-swatch=\"{$pink}\"]")->click();
+    $page->page()->locator("{$menu} [data-swatch=\"{$pink}\"]")->click();
     waitForPage($page, fn (): bool => $option()->settings->color === $pink);
 
     expect($option()->settings->color)->toBe($pink);
@@ -1080,7 +1080,7 @@ it('draws the swatches as rounded tiles on the dropdown surface in light and dar
     $page->page()->locator("{$menu} [data-stage-color-trigger]")->click();
     $page->assertVisible("{$menu} [data-stage-swatches]");
 
-    $geometry = "(() => { const swatch = document.querySelector('{$menu} [data-stage-swatch]'); const box = swatch.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height), parseFloat(getComputedStyle(swatch).borderTopLeftRadius)]; })()";
+    $geometry = "(() => { const swatch = document.querySelector('{$menu} [data-swatch]'); const box = swatch.getBoundingClientRect(); return [Math.round(box.width), Math.round(box.height), parseFloat(getComputedStyle(swatch).borderTopLeftRadius)]; })()";
     $page->assertScript($geometry, [24, 24, 6]);
 
     $surface = "(() => { const grid = document.querySelector('{$menu} [data-stage-swatches]'); return getComputedStyle(grid).backgroundColor === getComputedStyle(grid.closest('.fi-dropdown-panel')).backgroundColor; })()";
@@ -1153,8 +1153,8 @@ it('adds a stage in the color picked in its form, focused on open with gray sele
     $page->assertScript(boardWaitFor("document.activeElement === document.querySelector('.ff-add-column-input')"), true);
 
     $page->page()->locator('.ff-add-column-dot')->click();
-    $page->assertScript('document.querySelector(\'.ff-add-column-swatch[aria-pressed="true"]\').getAttribute("aria-label")', OptionColor::Gray->label());
-    $page->page()->locator('.ff-add-column-swatch[aria-label="'.OptionColor::Blue->label().'"]')->click();
+    $page->assertScript('document.querySelector(\'.ff-swatch[aria-checked="true"]\').getAttribute("aria-label")', 'Set color to '.OptionColor::Gray->label());
+    $page->page()->locator('.ff-swatch[aria-label="Set color to '.OptionColor::Blue->label().'"]')->click();
     $page->assertScript("document.querySelector('.ff-add-column-dot').style.getPropertyValue('--color-500')", $blue);
 
     $page->page()->locator('.ff-add-column-input')->fill('Escalated');
