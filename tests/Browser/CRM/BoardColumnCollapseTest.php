@@ -264,3 +264,86 @@ it('collapses one stage after collapse all and expand all on one page load, and 
     'tasks' => [Task::class, TaskField::STATUS->value, 'tasks/board', CrmEntity::Task],
     'opportunities' => [Opportunity::class, OpportunityField::STAGE->value, 'opportunities/board', CrmEntity::Opportunity],
 ]);
+
+it('drags an open column by its empty tray and keeps the order after a reload', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+
+    $page = openBoard($user, $path);
+
+    dragWithPointerEvents($page, "[data-column-root=\"{$ids[0]}\"] .ff-tray", boardHeaderTitle($ids[1]));
+    waitForStoredStageOrder($page, $user, $entity, $expected);
+    expect(storedStageOrder($user, $entity))->toBe($expected);
+
+    $page->navigate("/app/{$workspace->slug}/{$path}")->assertVisible('.ff-column >> nth=0');
+    waitForBoardColumns($page, $expected);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('drags a collapsed rail, keeps the order and leaves it collapsed, while a plain click still expands it', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $ids = boardStageOptionIds($model, $fieldCode);
+    $expected = [$ids[1], $ids[0], ...array_slice($ids, 2)];
+    $rail = fn (string $id): string => "[data-column-root=\"{$id}\"][data-collapsed]";
+
+    $page = openBoard($user, $path);
+
+    foreach ([$ids[0], $ids[1]] as $id) {
+        collapseStageFromMenu($page, $id);
+        $page->assertScript(boardWaitFor("document.querySelector('{$rail($id)}') !== null"), true);
+    }
+
+    dragCard($page, $rail($ids[0]), $rail($ids[1]));
+    waitForStoredStageOrder($page, $user, $entity, $expected);
+    $page->wait(0.6);
+
+    expect(storedStageOrder($user, $entity))->toBe($expected)
+        ->and(storedBoardState($user, $entity)->collapsedColumns)->toEqualCanonicalizing([$ids[0], $ids[1]]);
+    $page->assertScript('document.querySelectorAll(".ff-column[data-collapsed]").length', 2);
+
+    $page->navigate("/app/{$workspace->slug}/{$path}")->assertVisible('.ff-column >> nth=0');
+    waitForBoardColumns($page, $expected);
+    $page->assertScript('document.querySelectorAll(".ff-column[data-collapsed]").length', 2);
+
+    $page->page()->locator($rail($ids[0]))->click();
+    $page->assertScript(boardWaitFor("document.querySelector('{$rail($ids[0])}') === null"), true);
+    waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->collapsedColumns === [$ids[1]]);
+    expect(storedBoardState($user, $entity)->collapsedColumns)->toBe([$ids[1]]);
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
+
+it('still moves a card between two columns now that a column drags by its tray', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+
+    TenantContextService::setTenantId($workspace->getKey());
+    $field = CustomField::query()->forEntity($model)->where('code', $fieldCode)->firstOrFail();
+    [$from, $to] = [$field->options->get(0), $field->options->get(1)];
+    $record = $model::factory()->recycle([$user, $workspace])->create();
+    $record->saveCustomFieldValue($field, $from->getKey());
+    TenantContextService::setTenantId(null);
+
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+    $page = openBoard($user, $path)->assertVisible($card);
+
+    dragCard($page, $card, "[data-column-root=\"{$to->getKey()}\"] .ff-cards");
+    $page->assertScript(boardWaitFor("document.querySelector('[data-column-root=\"{$to->getKey()}\"] {$card}') !== null"), true);
+    $page->wait(1);
+
+    TenantContextService::setTenantId($workspace->getKey());
+    $stored = $record->refresh()->customFieldValues()->where('custom_field_id', $field->getKey())->value($field->getValueColumn());
+    TenantContextService::setTenantId(null);
+
+    expect((string) $stored)->toBe((string) $to->getKey())
+        ->and(storedStageOrder($user, $entity))->toBeNull();
+    $page->assertNoJavaScriptErrors();
+})->with('stage order boards');
