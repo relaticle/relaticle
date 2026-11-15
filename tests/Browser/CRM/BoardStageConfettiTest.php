@@ -17,9 +17,9 @@ use Relaticle\CustomFields\Services\TenantContextService;
 mutates(TasksBoard::class, OpportunitiesBoard::class, MoveCardAction::class);
 pest()->group('webkit');
 
-const CONFETTI_PROBE = 'window.confettiProbe = { moves: [], seen: 0, gone: false }; addEventListener("kanban-card-moved", (event) => window.confettiProbe.moves.push(JSON.parse(JSON.stringify(event.detail)))); new MutationObserver((records) => records.forEach((record) => { record.addedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && window.confettiProbe.seen++); record.removedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && (window.confettiProbe.gone = true)); })).observe(document.body, { childList: true }); true';
+const CONFETTI_PROBE = 'window.confettiProbe = { moves: [], seen: 0, gone: false }; addEventListener("kanban-card-moved", (event) => { window.confettiProbe.moves.push(JSON.parse(JSON.stringify(event.detail))); window.confettiProbe.movedAt = performance.now(); }); new MutationObserver((records) => records.forEach((record) => { record.addedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && (window.confettiProbe.seen++, window.confettiProbe.seenAt = performance.now())); record.removedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && (window.confettiProbe.gone = true, window.confettiProbe.goneAt = performance.now())); })).observe(document.body, { childList: true }); true';
 
-const CONFETTI_FILLS_UPPER_HALVES_EVENLY = '(() => { const canvas = document.querySelector("canvas[data-board-confetti]"); const pixels = canvas.getContext("2d").getImageData(0, 0, canvas.width, Math.floor(canvas.height / 2)).data; const painted = [0, 0]; for (let at = 3; at < pixels.length; at += 8) { if (pixels[at] > 0) { painted[((at - 3) / 4) % canvas.width < canvas.width / 2 ? 0 : 1]++; } } return Math.min(...painted) / Math.max(...painted) > 0.4; })()';
+const CONFETTI_RISES_EVENLY_ON_BOTH_SIDES = '(() => { const canvas = document.querySelector("canvas[data-board-confetti]"); const pixels = canvas.getContext("2d").getImageData(0, Math.floor(canvas.height * 0.15), canvas.width, Math.floor(canvas.height * 0.35)).data; const painted = [0, 0]; for (let at = 3; at < pixels.length; at += 8) { if (pixels[at] > 0) { painted[((at - 3) / 4) % canvas.width < canvas.width / 2 ? 0 : 1]++; } } return Math.min(...painted) / Math.max(...painted) > 0.4; })()';
 
 /**
  * @return array{0: Task|Opportunity, 1: CustomField}
@@ -82,9 +82,9 @@ it('fires confetti for the mover when a card lands in a stage with confetti on, 
     moveCardFromItsMenu($page, $card, $option()->name);
     $page->assertScript(boardWaitFor('window.confettiProbe.seen === 1'), true)
         ->assertScript('document.querySelectorAll("canvas[data-board-confetti]").length', 1)
-        ->wait(0.4);
+        ->assertScript(boardWaitFor('performance.now() - window.confettiProbe.seenAt > 400'), true);
 
-    expect($page->script(CONFETTI_FILLS_UPPER_HALVES_EVENLY))->toBeTrue();
+    expect($page->script(CONFETTI_RISES_EVENLY_ON_BOTH_SIDES))->toBeTrue();
 
     waitForConfettiToEnd($page);
 
@@ -147,6 +147,33 @@ it('scatters under a swiping pointer, ends with the canvas removed, and keeps th
         ->assertScript('document.querySelectorAll("[data-board-confetti]").length', 0)
         ->assertNoJavaScriptErrors();
 })->with('stage order boards');
+
+it('adds a second win during a burst to the same canvas and keeps it going', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    [$record] = confettiBoardCard($user, Opportunity::class, 'stage');
+    $ids = boardStageOptionIds(Opportunity::class, 'stage');
+    $card = "[data-card-id=\"{$record->getKey()}\"]";
+    $targets = CustomFieldOption::query()->withoutGlobalScopes()->whereIn('id', [$ids[1], $ids[2]])->get()->keyBy('id');
+    $targets->each->update(['settings' => ['celebrate' => true]]);
+
+    $page = openBoard($user, 'opportunities/board')->assertVisible($card)->assertScript(CONFETTI_PROBE, true);
+
+    moveCardFromItsMenu($page, $card, $targets[$ids[1]]->name);
+    $page->assertScript(boardWaitFor('window.confettiProbe.seen === 1'), true)
+        ->assertScript(boardWaitFor('performance.now() - window.confettiProbe.seenAt > 1000'), true);
+
+    moveCardFromItsMenu($page, $card, $targets[$ids[2]]->name);
+    $page->assertScript(boardWaitFor('window.confettiProbe.moves.length === 2'), true);
+
+    waitForConfettiToEnd($page);
+
+    expect($page->script('window.confettiProbe.seen'))->toBe(1)
+        ->and($page->script('window.confettiProbe.goneAt - window.confettiProbe.movedAt'))->toBeGreaterThan(3600);
+
+    $page->assertNoJavaScriptErrors();
+});
 
 it('fires confetti on a drag into a stage with confetti on, flat and with lanes', function (string $model, string $fieldCode, string $path, CrmEntity $entity, string $groupBy): void {
     $this->withVite();
