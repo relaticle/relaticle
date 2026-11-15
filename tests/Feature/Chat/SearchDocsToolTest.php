@@ -166,6 +166,7 @@ it('finds the VS Code setup steps in the MCP guide', function (string $query): v
         ->and($vsCode['content'])->not->toEndWith('...');
 })->with([
     'connect MCP client in VS Code setup',
+    'connect MCP client VSCode setup',
     'VS Code MCP',
 ]);
 

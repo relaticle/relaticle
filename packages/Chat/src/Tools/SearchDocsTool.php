@@ -68,6 +68,11 @@ final readonly class SearchDocsTool implements Tool
     ];
 
     /** @var array<string, string> */
+    private const array SPELLINGS = [
+        'vscode' => 'vs code',
+    ];
+
+    /** @var array<string, string> */
     private const array RETIRED_WORDS = [
         'field' => 'attribute',
         'fields' => 'attributes',
@@ -345,7 +350,7 @@ final readonly class SearchDocsTool implements Tool
      */
     private function terms(string $query): array
     {
-        $words = preg_split('/[^\p{L}\p{N}.]+/u', mb_strtolower(trim($query)), -1, PREG_SPLIT_NO_EMPTY) ?: [];
+        $words = preg_split('/[^\p{L}\p{N}.]+/u', strtr(mb_strtolower(trim($query)), self::SPELLINGS), -1, PREG_SPLIT_NO_EMPTY) ?: [];
 
         $words = array_map(fn (string $word): string => trim($word, '.'), $words);
         $words = array_map(
