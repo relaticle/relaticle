@@ -45,7 +45,7 @@ final readonly class SetCustomFieldOptions
 
         try {
             DB::transaction(function () use ($field, $data, $capsClears, $keepsColors): void {
-                $field = CustomField::query()->withoutGlobalScopes()->whereKey($field->getKey())->lockForUpdate()->sole();
+                $field = CustomField::query()->withoutGlobalScopes()->whereKey($field->getKey())->lock('for no key update')->sole();
                 $plan = CustomFieldOptionPlan::validated($field, $data, $capsClears, $keepsColors);
                 $options = $this->writeOptions($field, $plan);
                 $this->enableOptionColors($field, $plan);

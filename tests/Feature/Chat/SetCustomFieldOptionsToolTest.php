@@ -525,7 +525,7 @@ it('locks the field row before it writes any option', function (): void {
     resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
 
     $queries = array_column(DB::getQueryLog(), 'query');
-    $lock = array_search(true, array_map(fn (string $query): bool => str_contains($query, 'from "custom_fields"') && str_contains($query, 'for update'), $queries), true);
+    $lock = array_search(true, array_map(fn (string $query): bool => str_contains($query, 'from "custom_fields"') && str_contains($query, 'for no key update'), $queries), true);
     $write = array_search(true, array_map(fn (string $query): bool => str_starts_with($query, 'update "custom_field_options"'), $queries), true);
 
     expect($lock)->toBeInt()

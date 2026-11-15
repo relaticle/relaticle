@@ -2153,7 +2153,7 @@ it('tells the board user to reload when the options change under a delete, renam
     $armed = true;
 
     DB::listen(function (QueryExecuted $query) use (&$armed, $other): void {
-        if ($armed && str_contains($query->sql, 'for update') && str_contains($query->sql, 'custom_fields')) {
+        if ($armed && str_contains($query->sql, 'for no key update') && str_contains($query->sql, 'custom_fields')) {
             $armed = false;
             DB::table('custom_field_options')->where('id', $other)->update(['name' => 'Raced']);
         }
@@ -2227,7 +2227,7 @@ it('tells the board user to reload when the options change under an add', functi
     $first = stageIds($this->stageField)[0];
 
     DB::listen(function (QueryExecuted $query) use (&$armed, $first): void {
-        if ($armed && str_contains($query->sql, 'for update') && str_contains($query->sql, 'custom_fields')) {
+        if ($armed && str_contains($query->sql, 'for no key update') && str_contains($query->sql, 'custom_fields')) {
             $armed = false;
             DB::table('custom_field_options')->where('id', $first)->update(['name' => 'Raced']);
         }
