@@ -567,11 +567,11 @@ final class ProcessChatMessage implements ShouldQueue
             'class' => $exception instanceof Throwable ? $exception::class : null,
         ]);
 
-        $this->leaveFailedTurn($exception);
+        $keptProposals = $this->leaveFailedTurn($exception);
 
         $this->broadcastSafely(new ChatStreamFailed(
             conversationId: $this->conversationId,
-            message: $this->failureMessage($exception),
+            message: $this->failureMessage($exception, $keptProposals),
             retryOnAuto: $this->offersAutoRetry($exception),
         ));
 
@@ -613,18 +613,33 @@ final class ProcessChatMessage implements ShouldQueue
         ));
     }
 
-    private function leaveFailedTurn(?Throwable $exception): void
+    private function leaveFailedTurn(?Throwable $exception): bool
     {
-        resolve(PendingActionService::class)->supersedePendingForConversation($this->conversationId);
+        $keptProposals = $this->cancelProposalsOfFailedTurn($exception);
 
         if (! $this->opensTheThread()) {
             try {
-                $this->persistFailedTurn($exception);
+                $this->persistFailedTurn($exception, $keptProposals);
             } catch (Throwable $e) {
                 report($e);
                 ChatTelemetry::breadcrumb('failed.persist_failed', ['exception' => $e->getMessage()]);
             }
         }
+
+        return $keptProposals;
+    }
+
+    // A dead greeting stores no note, so nothing would explain a card it left docked.
+    private function cancelProposalsOfFailedTurn(?Throwable $exception): bool
+    {
+        $keepsOwn = $exception instanceof TimeoutExceededException && ! $this->opensTheThread();
+
+        resolve(PendingActionService::class)->supersedePendingForConversation(
+            $this->conversationId,
+            exceptTurnId: $keepsOwn ? $this->turnId : null,
+        );
+
+        return $keepsOwn && resolve(TurnContinuationService::class)->hasPendingProposals($this->conversationId);
     }
 
     private function refuseTurn(CreditService $creditService, string $message): void
@@ -683,14 +698,16 @@ final class ProcessChatMessage implements ShouldQueue
         return __('You are no longer a member of this workspace, so the assistant stopped.');
     }
 
-    private function failureMessage(?Throwable $exception): string
+    private function failureMessage(?Throwable $exception, bool $keptProposals = false): string
     {
         if ($exception instanceof MembershipRevokedException) {
             return $this->membershipRevokedMessage();
         }
 
         if ($exception instanceof TimeoutExceededException) {
-            return TurnNotes::timeout(self::TIMEOUT_SECONDS);
+            return $keptProposals
+                ? TurnNotes::timeoutWithProposals(self::TIMEOUT_SECONDS)
+                : TurnNotes::timeout(self::TIMEOUT_SECONDS);
         }
 
         if ($this->isRateLimited($exception)) {
@@ -764,7 +781,7 @@ final class ProcessChatMessage implements ShouldQueue
         ], static fn (mixed $value): bool => $value !== null);
     }
 
-    private function persistFailedTurn(?Throwable $exception): void
+    private function persistFailedTurn(?Throwable $exception, bool $keptProposals): void
     {
         $now = now();
         $table = DB::table('agent_conversation_messages');
@@ -813,7 +830,7 @@ final class ProcessChatMessage implements ShouldQueue
             ]);
         }
 
-        $text = $this->failureMessage($exception);
+        $text = $this->failureMessage($exception, $keptProposals);
         $document = $this->getParser()->buildFromText($text, [], $this->workspace);
 
         $table->insert([
