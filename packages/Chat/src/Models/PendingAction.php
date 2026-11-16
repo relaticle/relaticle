@@ -96,6 +96,15 @@ final class PendingAction extends Model
         return in_array($this->entity_type, [ProposalEntity::Email, ProposalEntity::EmailDraftSend], true);
     }
 
+    /** @return list<string> */
+    public function createdRecordIds(): array
+    {
+        $result = is_array($this->result_data) ? $this->result_data : [];
+        $ids = is_array($result['ids'] ?? null) ? $result['ids'] : [$result['id'] ?? null];
+
+        return array_values(array_map(strval(...), array_filter($ids, static fn (mixed $id): bool => (is_string($id) || is_int($id)) && $id !== '')));
+    }
+
     public function isExpired(): bool
     {
         return $this->expires_at->isPast();

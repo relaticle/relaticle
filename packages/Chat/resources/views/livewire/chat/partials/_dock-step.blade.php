@@ -166,6 +166,10 @@
             @include('chat::livewire.chat.partials._dock-overwrite-notice', ['notice' => $step['overwriteNotices'][0], 'class' => 'mb-2 me-4 ms-[3.125rem]'])
         @endif
 
+        @if (! $isOut && ! $step['isBatch'] && isset($step['repeatNotices'][0]))
+            @include('chat::livewire.chat.partials._dock-overwrite-notice', ['notice' => $step['repeatNotices'][0]['text'], 'noticeUrl' => $step['repeatNotices'][0]['url'], 'noticeKind' => 'repeat', 'class' => 'mb-2 me-4 ms-[3.125rem]'])
+        @endif
+
         @if (! $isOut)
             @if ($step['isBatch'])
                 <div class="divide-y divide-gray-100 pb-2 pe-2 ps-[3.125rem] dark:divide-white/5">
@@ -217,6 +221,10 @@
 
                             @if (! $rowOut && isset($step['overwriteNotices'][$rowIndex]))
                                 @include('chat::livewire.chat.partials._dock-overwrite-notice', ['notice' => $step['overwriteNotices'][$rowIndex], 'class' => 'my-1'])
+                            @endif
+
+                            @if (! $rowOut && isset($step['repeatNotices'][$rowIndex]))
+                                @include('chat::livewire.chat.partials._dock-overwrite-notice', ['notice' => $step['repeatNotices'][$rowIndex]['text'], 'noticeUrl' => $step['repeatNotices'][$rowIndex]['url'], 'noticeKind' => 'repeat', 'class' => 'my-1'])
                             @endif
 
                             @if (! $rowOut && ! $isDelete)
