@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Evals\Support;
 
 use PHPUnit\Framework\Attributes\Group;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
 use RuntimeException;
@@ -54,7 +55,7 @@ final class Splits
             foreach ((new ReflectionClass($class))->getMethods(ReflectionMethod::IS_PUBLIC) as $method) {
                 if ($method->class === $class && ! $method->isStatic() && str_starts_with($method->name, '__pest_evaluable_')) {
                     $cases[$class.'::'.$method->name] = array_map(
-                        static fn ($attribute): string => $attribute->newInstance()->name(),
+                        static fn (ReflectionAttribute $attribute): string => $attribute->newInstance()->name(),
                         $method->getAttributes(Group::class),
                     );
                 }

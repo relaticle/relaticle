@@ -39,7 +39,7 @@ it('asks for web access once when the user wants the web', function (): void {
         ->prompt('Search the web for the latest news about Company 01')
         ->toHaveToolCalls(['RequestWebAccessTool' => []])
         ->not->toMatch('/"name":"RequestWebAccessTool".*"name":"RequestWebAccessTool"/s');
-})->group('train');
+})->group('guard');
 
 it('answers a credit question from the balance tool', function (): void {
     $w = EvalWorkspace::seed();
@@ -47,4 +47,4 @@ it('answers a credit question from the balance tool', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('How many AI credits do I have left?')
         ->toHaveToolCalls(['GetCreditBalanceTool' => []]);
-})->group('test');
+})->group('train');

@@ -35,9 +35,13 @@ function listedEvalCases(?string $group = null): array
 
     $output = Process::path(base_path())->run($command)->throw()->output();
 
-    preg_match_all('/^ - (\S+?)(?:"dataset .*")?$/m', $output, $matches);
+    $lines = array_values(array_filter(explode("\n", $output), fn (string $line): bool => str_starts_with($line, ' - ')));
+    $cases = array_map(fn (string $line): string => Str::before(substr($line, 3), '"'), $lines);
 
-    return array_values(array_unique($matches[1]));
+    expect($lines)->not->toBeEmpty()
+        ->and(array_filter($cases, fn (string $case): bool => ! str_contains($case, '::__pest_evaluable_')))->toBe([]);
+
+    return array_values(array_unique($cases));
 }
 
 function assistantRowWithResults(EvalWorkspace $workspace, array $toolCalls, array $usage = [], array $meta = []): AgentConversationMessage
