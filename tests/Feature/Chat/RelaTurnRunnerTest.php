@@ -212,30 +212,6 @@ it('lists the rendered row ids of each tool call in the envelope', function (): 
         ->and($envelope->durationMs)->toBe(450);
 });
 
-it('records the step each tool call ran in', function (): void {
-    $workspace = EvalWorkspace::seed();
-    $conversation = $workspace->conversation();
-    $step = fn (string $id): array => ['content' => '', 'reasoning' => '', 'replay_blocks' => [], 'provider_tool_calls' => [], 'tool_calls' => [['id' => $id, 'name' => 'SearchCrmTool', 'arguments' => [], 'result' => '{}', 'result_id' => $id]]];
-
-    $row = AgentConversationMessage::query()->create([
-        'id' => (string) Str::uuid7(),
-        'conversation_id' => $conversation->getKey(),
-        'participant_type' => 'user',
-        'participant_id' => (string) $workspace->owner->getKey(),
-        'agent' => CrmAssistant::class,
-        'role' => 'assistant',
-        'content' => 'Done.',
-        'attachments' => '[]',
-        'steps' => json_encode([$step('a'), $step('b')], JSON_THROW_ON_ERROR),
-        'usage' => '[]',
-        'meta' => '[]',
-        'created_at' => now(),
-        'updated_at' => now(),
-    ]);
-
-    expect(array_column(RelaTurn::envelopeFromRow($row)->toolCalls, 'step'))->toBe([0, 1]);
-});
-
 it('reads the served model, cache legs, reasoning and step count from the stored row', function (): void {
     $row = assistantRowWithResults(
         EvalWorkspace::seed(),

@@ -140,7 +140,7 @@ it('finds a note by a word in its body', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('Find the note that mentions kumquat')
         ->toPassScorer(new TextMatches('/Call recap/'))
-        ->toPassScorer(new TextMatches('/no notes|nothing/i', negate: true));
+        ->toPassScorer(new TextMatches('/no notes?\b|nothing|none of|couldn.t find|could not find|don.t see|no (matches|results)\b/i', negate: true));
 })->group('test');
 
 it('retries a search in the singular before saying nothing exists', function (): void {

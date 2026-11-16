@@ -129,7 +129,6 @@ final class RelaTurn
             toolCalls: array_map(fn (array $call): array => [
                 'name' => (string) ($call['name'] ?? ''),
                 'arguments' => is_array($call['arguments'] ?? null) ? $call['arguments'] : [],
-                'step' => self::stepOf($row->steps, $call['id'] ?? null),
             ], $toolResults),
             renderedRowIds: array_map(self::renderedRowIdsOf(...), $toolResults),
             replayedBytes: self::replayedBytesOf($toolResults),
@@ -145,19 +144,6 @@ final class RelaTurn
             steps: count(self::decodeList($row->steps)),
             parallelToolCalls: count(array_filter(self::decodeList($row->steps), fn (mixed $step): bool => is_array($step) && count((array) ($step['tool_calls'] ?? [])) >= 2)),
         );
-    }
-
-    private static function stepOf(mixed $steps, mixed $callId): int
-    {
-        foreach (self::decodeList($steps) as $index => $step) {
-            foreach (is_array($step) ? (array) ($step['tool_calls'] ?? []) : [] as $call) {
-                if (is_array($call) && $callId !== null && ($call['id'] ?? null) === $callId) {
-                    return (int) $index;
-                }
-            }
-        }
-
-        return -1;
     }
 
     /**

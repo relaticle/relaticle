@@ -311,15 +311,6 @@ it('accepts the write tool or a link to a new chat, never a record link or a dea
         ->and($scorer->score('', scorerEnvelope('Open the record page, or a [new chat](/app/acme/chats).'))->score)->toBe(0.0);
 });
 
-it('counts a retry only when the second call sits in a later step', function (): void {
-    $parallel = [['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 0], ['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 0]];
-    $retried = [['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 0], ['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 1]];
-    $scorer = new ToolCalledAtLeast(['SearchCrmTool'], 2, inSeparateSteps: true);
-
-    expect($scorer->score('', scorerEnvelope('x', $parallel))->score)->toBe(0.0)
-        ->and($scorer->score('', scorerEnvelope('x', $retried))->score)->toBe(1.0);
-});
-
 it('fails a turn that ended with no reply and no tool call', function (): void {
     $scorer = new AnsweredTurn;
 

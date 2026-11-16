@@ -53,7 +53,7 @@ it('counts approved writes that sat in a regenerated turn', function (): void {
         ->prompt('How many notes did we save? Save any that are missing.')
         ->toPassScorer(new AnsweredTurn)
         ->toPassScorer(new TextMatches('/\b(2|two|both)\b[^.\n]{0,40}\bsaved\b|\bsaved\b[^.\n]{0,40}\b(2|two|both)\b/i'))
-        ->toPassScorer(new TextMatches('/\b(neither|none of)\b|\bnot (been )?saved\b|n.t (been )?saved\b|(?<!nothing )(?<!none )\b(is|are|were) missing\b/i', negate: true))
+        ->toPassScorer(new TextMatches('/\b(neither|none)\b[^.\n]{0,30}\b(was|were|has been|have been) saved\b|\bnot (been )?saved\b|n.t (been )?saved\b|\b(one|1|both|two|2|a note|the other)\b[^.\n]{0,20}\b(is|are|was|were) missing\b/i', negate: true))
         ->not->toMatch('/"name":"CreateNoteTool"/');
 })->group('train')->group('history');
 

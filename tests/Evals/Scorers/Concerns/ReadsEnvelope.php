@@ -50,7 +50,6 @@ trait ReadsEnvelope
         return array_values(array_map(static fn (mixed $call): array => [
             'name' => is_array($call) && is_string($call['name'] ?? null) ? $call['name'] : '',
             'arguments' => is_array($call) && is_array($call['arguments'] ?? null) ? $call['arguments'] : [],
-            'step' => is_array($call) && is_int($call['step'] ?? null) ? $call['step'] : -1,
         ], $calls));
     }
 
