@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Tests\Evals;
 
 use Dotenv\Dotenv;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Pest\Evals\Plugin;
@@ -51,6 +52,9 @@ abstract class EvalTestCase extends TestCase
         if (! Plugin::isEvalMode()) {
             $this->markTestSkipped('Eval skipped. Run with [--evals].');
         }
+
+        // The lazy migrate:fresh copies config('chat.models') into the settings table, so it runs before register() edits it.
+        DB::select('select 1');
 
         Sleep::fake(false);
 
