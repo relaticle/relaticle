@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
+use App\Queries\ViewerZone;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
@@ -172,7 +173,7 @@ abstract class BaseWriteUpdateTool implements Tool
                 return (string) json_encode(['error' => "records[{$index}]: {$nameError}"], JSON_UNESCAPED_SLASHES);
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, ignoreEntityId: $model->getKey(), viewerZone: $user->effectiveTimezone());
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, ignoreEntityId: $model->getKey(), viewerZone: ViewerZone::strict($user->effectiveTimezone()));
 
             if ($validation->error !== null) {
                 return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"], JSON_UNESCAPED_SLASHES);

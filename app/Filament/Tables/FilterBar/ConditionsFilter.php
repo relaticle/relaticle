@@ -7,6 +7,7 @@ namespace App\Filament\Tables\FilterBar;
 use App\Enums\CrmEntity;
 use App\Models\User;
 use App\Queries\Filters\TreeFilter;
+use App\Queries\ViewerZone;
 use Closure;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Hidden;
@@ -53,7 +54,7 @@ final readonly class ConditionsFilter
         $zone = FilamentTimezone::get();
         $tree = (new FilterRuleCompiler)->compile($rules, FilterFieldCatalog::for($entity, $user), $user, $zone);
 
-        (new TreeFilter($entity, $user, $zone))($query, $tree, self::NAME);
+        (new TreeFilter($entity, $user, ViewerZone::strict($zone)))($query, $tree, self::NAME);
 
         return $query;
     }

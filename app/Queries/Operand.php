@@ -111,10 +111,10 @@ final readonly class Operand
         ]);
     }
 
-    public static function assertOffset(string $path, string $name, mixed $operand, ?string $viewerZone): void
+    public static function assertOffset(string $path, string $name, mixed $operand, ?ViewerZone $viewerZone): void
     {
-        if ($viewerZone !== null && self::lacksOffset($operand)) {
-            throw FilterErrors::at($path, self::offsetRequired($name, (string) $operand, $viewerZone));
+        if ($viewerZone?->requiresOffset === true && self::lacksOffset($operand)) {
+            throw FilterErrors::at($path, self::offsetRequired($name, (string) $operand, $viewerZone->name));
         }
     }
 

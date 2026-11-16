@@ -115,6 +115,24 @@ it('shows a proposed date-time on the calendar day of the viewer', function (): 
     expect($card['new'])->toBe('Oct 1, 2026');
 });
 
+it('reads a proposed date with no time as the start of that day for the viewer, and finds it by that day', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    $task = Task::factory()->for($this->workspace)->create(['title' => 'Send the renewal']);
+
+    runUpdateToolForCustomFieldsTest(UpdateTaskTool::class, $task, ['due_date' => '2026-09-15']);
+    $proposal = latestPendingForCustomFieldsTest();
+    resolve(UpdateTask::class)->execute($this->user, $task, $proposal->action_data);
+
+    $found = json_decode(resolve(ListTasksTool::class)->handle(new Request([
+        'filter' => ['custom_fields' => ['due_date' => ['$eq' => '2026-09-15']]],
+        'lookup' => true,
+    ])), true);
+
+    expect(collect($proposal->display_data['fields'])->firstWhere('code', 'due_date')['new'])->toBe('Sep 15, 2026')
+        ->and((string) rawValueForCustomFieldsTest($task, 'due_date', 'datetime_value'))->toStartWith('2026-09-15 04:00:00')
+        ->and(array_column(array_column($found['data'], 'attributes'), 'title'))->toBe(['Send the renewal']);
+});
+
 it('proposes an update with the envelope every write tool shares', function (): void {
     $company = Company::factory()->for($this->workspace)->create(['name' => 'Acme']);
 

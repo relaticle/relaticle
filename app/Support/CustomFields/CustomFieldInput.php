@@ -7,6 +7,7 @@ namespace App\Support\CustomFields;
 use App\Enums\CustomFieldType;
 use App\Models\CustomField;
 use App\Queries\Operand;
+use App\Queries\ViewerZone;
 use App\Support\ChecklistHtml;
 use App\Support\Media\RichContentAttachments;
 use Illuminate\Support\Facades\Date;
@@ -22,7 +23,7 @@ final readonly class CustomFieldInput
      * @param  array<array-key, mixed>  $customFields
      * @return array<array-key, mixed>
      */
-    public function normalize(string $workspaceId, string $entityType, array $customFields, ?string $viewerZone = null): array
+    public function normalize(string $workspaceId, string $entityType, array $customFields, ?ViewerZone $viewerZone = null): array
     {
         if ($customFields === []) {
             return [];
@@ -59,7 +60,7 @@ final readonly class CustomFieldInput
     /**
      * @param  array{ids: array<string, list<string>>, labels: list<string>}  $entry
      */
-    private function normalizeValue(CustomField $field, mixed $value, array $entry, ?string $viewerZone): mixed
+    private function normalizeValue(CustomField $field, mixed $value, array $entry, ?ViewerZone $viewerZone): mixed
     {
         return match (CustomFieldType::from($field->type)) {
             CustomFieldType::SELECT,
@@ -174,17 +175,19 @@ final readonly class CustomFieldInput
         return RichContentAttachments::forWorkspace((string) $field->tenant_id)->canonicalize($html);
     }
 
-    private function utcDateTime(CustomField $field, mixed $value, ?string $viewerZone): mixed
+    private function utcDateTime(CustomField $field, mixed $value, ?ViewerZone $viewerZone): mixed
     {
         if (! is_string($value) || Validator::make(['value' => $value], ['value' => ['date']])->fails()) {
             return $value;
         }
 
-        if ($viewerZone !== null && Operand::lacksOffset($value)) {
-            $this->fail($field, Operand::offsetRequired($field->code, $value, $viewerZone));
+        if ($viewerZone?->requiresOffset === true && Operand::lacksOffset($value)) {
+            $this->fail($field, Operand::offsetRequired($field->code, $value, $viewerZone->name));
         }
 
-        return Date::parse($value)->utc()->toDateTimeString();
+        $zone = $viewerZone instanceof ViewerZone && Operand::isBareDate($value) ? $viewerZone->name : null;
+
+        return Date::parse($value, $zone)->utc()->toDateTimeString();
     }
 
     private function isBlankString(mixed $value): bool

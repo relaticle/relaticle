@@ -32,6 +32,7 @@ use Carbon\CarbonInterface;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
+use Laravel\Sanctum\Sanctum;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -743,3 +744,52 @@ it('drops a domain value that holds no host', function (string $empty): void {
 
     expect(collect($company->refresh()->getCustomFieldValue($field))->all())->toBe(['acme.com']);
 })->with(['scheme only' => 'https://', 'slash' => '/', 'www only' => 'www.']);
+
+function storedDueDateOf(Task $task): ?string
+{
+    $field = WorkspaceCustomField::byCode((string) $task->workspace_id, 'task', 'due_date');
+
+    return DB::table('custom_field_values')
+        ->where('entity_id', $task->getKey())
+        ->where('custom_field_id', $field->getKey())
+        ->value('datetime_value');
+}
+
+it('stores a date with no time as the start of that day in the token user timezone through mcp', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(CreateTaskTool::class, ['title' => 'Renewal', 'custom_fields' => ['due_date' => '2026-09-15']])
+        ->assertOk();
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['due_date' => '2026-09-15']])
+        ->assertOk();
+
+    $created = Task::query()->where('title', 'Renewal')->firstOrFail();
+
+    expect(storedDueDateOf($created))->toStartWith('2026-09-15 04:00:00')
+        ->and(storedDueDateOf($task))->toStartWith('2026-09-15 04:00:00');
+});
+
+it('keeps reading a time with no offset as utc through mcp and does not refuse it', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    $task = Task::factory()->create(['workspace_id' => $this->workspace->getKey()]);
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(UpdateTaskTool::class, ['id' => $task->getKey(), 'custom_fields' => ['due_date' => '2026-09-15T10:00:00']])
+        ->assertOk();
+
+    expect(storedDueDateOf($task))->toStartWith('2026-09-15 10:00:00');
+});
+
+it('keeps storing a date with no time as a utc midnight through the api for a user with a timezone', function (): void {
+    $this->user->forceFill(['timezone' => 'America/New_York'])->save();
+    Sanctum::actingAs($this->user);
+
+    $id = $this->postJson('/api/v1/tasks', ['title' => 'Renewal', 'custom_fields' => ['due_date' => '2026-09-15']])
+        ->assertCreated()
+        ->json('data.id');
+
+    expect(storedDueDateOf(Task::query()->withoutGlobalScopes()->findOrFail($id)))->toStartWith('2026-09-15 00:00:00');
+});

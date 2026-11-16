@@ -11,6 +11,7 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Queries\Filters\TreeFilter;
 use App\Queries\FilterTree;
+use App\Queries\ViewerZone;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Str;
@@ -145,7 +146,7 @@ final readonly class FilterRules
         $known = [];
         $zone = FilamentTimezone::get();
         $compiler = new FilterRuleCompiler;
-        $tree = new TreeFilter($entity, $user, $zone);
+        $tree = new TreeFilter($entity, $user, ViewerZone::strict($zone));
         $kept = [];
         $nodes = [];
 

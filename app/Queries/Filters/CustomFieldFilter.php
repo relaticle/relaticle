@@ -13,6 +13,7 @@ use App\Models\User;
 use App\Queries\CustomFieldFilterSchema;
 use App\Queries\FilterErrors;
 use App\Queries\Operand;
+use App\Queries\ViewerZone;
 use App\Support\CustomFields\CanonicalValue;
 use App\Support\CustomFields\CustomFieldOptionMap;
 use App\Support\CustomFields\WorkspaceCustomFields;
@@ -54,7 +55,7 @@ final readonly class CustomFieldFilter implements Filter
     public function __construct(
         private string $entityType,
         private User $user,
-        private ?string $viewerZone,
+        private ?ViewerZone $viewerZone,
         private CustomFieldOptionMap $optionMap = new CustomFieldOptionMap,
     ) {}
 
@@ -330,7 +331,7 @@ final readonly class CustomFieldFilter implements Filter
      */
     private function wholeDay(Builder $query, string $valueColumn, string $operator, string $date): void
     {
-        foreach (Operand::wholeDay($operator, $date, $this->viewerZone ?? 'UTC') as [$comparison, $instant]) {
+        foreach (Operand::wholeDay($operator, $date, $this->viewerZone->name ?? 'UTC') as [$comparison, $instant]) {
             $query->where($valueColumn, $comparison, $instant);
         }
     }

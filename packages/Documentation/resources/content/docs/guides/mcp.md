@@ -169,7 +169,7 @@ The server provides 50 tools. They cover account context, cross-entity discovery
 
 | Tool | Description |
 |------|-------------|
-| `who-ami-tool` | Get the authenticated user, current workspace, workspace members, and token abilities |
+| `who-ami-tool` | Get the authenticated user with their timezone, current workspace, workspace members, and token abilities |
 
 ### Workspace intelligence
 
@@ -270,7 +270,7 @@ Entity list tools take `filter`, `sort`, `include`, `per_page` (default 15, maxi
 
 `sort` takes a native field or a custom attribute that holds one value. A field that holds a list, such as email, phone, link or tags, cannot be sorted.
 
-List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs. A write stores a phone in E.164 form, a domain as a bare host, and a date-time as its UTC instant.
+List responses include `page`, `per_page`, `total`, `has_more`, and `next_page`. Create and update tools accept `custom_fields` as key-value pairs. A write stores a phone in E.164 form, a domain as a bare host, and a date-time as its UTC instant. A date with no time written to a date and time attribute is stored as the start of that day in the timezone of the token user. A time with no offset is still read as UTC.
 
 ### Filter records
 
@@ -301,7 +301,7 @@ Native fields and relations sit at the top level. Custom attributes sit under `c
 | Tasks | Native fields `title`, `created_at`, `updated_at`, `creation_source`, `assigned_to_me`. Record relations `companies`, `people`, `opportunities`. Member relations `creator`, `assignees`. |
 | Notes | Native fields `title`, `created_at`, `updated_at`, `creation_source`. Record relations `companies`, `people`, `opportunities`. Member relation `creator`. |
 
-`name` and `title` take the text operators. `created_at` and `updated_at` take the date and time operators. A date operand is `YYYY-MM-DD` or an ISO 8601 date-time such as `2026-10-01T09:30:00Z`, and any other format is an error. A date-time with an offset, such as `2026-10-01T13:00:00+05:00`, is read as the same instant in UTC. A date without a time covers that whole UTC day, on these fields and on a custom date and time field. `creation_source` is a single choice with the values `web`, `sample`, `import`, `api`, `mcp`, `chat`, `mailbox` and `system`. `stale_days` matches opportunities by whole days without activity, as in `{"$gte": 30}`. `assigned_to_me` takes `{"$eq": true}`.
+`name` and `title` take the text operators. `created_at` and `updated_at` take the date and time operators. A date operand is `YYYY-MM-DD` or an ISO 8601 date-time such as `2026-10-01T09:30:00Z`, and any other format is an error. A date-time with an offset, such as `2026-10-01T13:00:00+05:00`, is read as the same instant in UTC. A date without a time covers that whole day in the timezone of the token user, which the identity tool returns, on these fields and on a custom date and time field. `creation_source` is a single choice with the values `web`, `sample`, `import`, `api`, `mcp`, `chat`, `mailbox` and `system`. `stale_days` matches opportunities by whole days without activity, as in `{"$gte": 30}`. `assigned_to_me` takes `{"$eq": true}`.
 
 #### Combine conditions
 

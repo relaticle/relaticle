@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Services\Tools;
 
 use App\Models\User;
+use App\Queries\ViewerZone;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use Illuminate\Support\Facades\Validator;
@@ -20,7 +21,7 @@ final readonly class CustomFieldsRequestValidator
     /**
      * @param  string|int|null  $ignoreEntityId  the record being updated, excluded from unique-value checks
      */
-    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null, ?string $viewerZone = null): CustomFieldsValidationResult
+    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null, ?ViewerZone $viewerZone = null): CustomFieldsValidationResult
     {
         $rawCustomFields = is_array($rawCustomFields) ? $rawCustomFields : [];
 

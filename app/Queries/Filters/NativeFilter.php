@@ -9,6 +9,7 @@ use App\Queries\CustomFieldFilterSchema;
 use App\Queries\FilterDefinition;
 use App\Queries\FilterErrors;
 use App\Queries\Operand;
+use App\Queries\ViewerZone;
 use App\Support\LikePattern;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -19,7 +20,7 @@ use Spatie\QueryBuilder\Filters\Filter;
  */
 final readonly class NativeFilter implements Filter
 {
-    public function __construct(private FilterDefinition $definition, private ?string $viewerZone) {}
+    public function __construct(private FilterDefinition $definition, private ?ViewerZone $viewerZone) {}
 
     /**
      * @param  Builder<Model>  $query
@@ -89,7 +90,7 @@ final readonly class NativeFilter implements Filter
             return;
         }
 
-        foreach (Operand::wholeDay($operator, $operand, $this->viewerZone ?? 'UTC') as [$comparison, $instant]) {
+        foreach (Operand::wholeDay($operator, $operand, $this->viewerZone->name ?? 'UTC') as [$comparison, $instant]) {
             $query->where($column, $comparison, $instant);
         }
     }

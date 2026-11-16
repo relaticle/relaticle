@@ -8,6 +8,7 @@ use App\Mcp\Tools\Concerns\ChecksTokenAbility;
 use App\Mcp\Tools\Concerns\HasExplicitToolAnnotations;
 use App\Mcp\Tools\Concerns\LinksRecords;
 use App\Models\User;
+use App\Queries\ViewerZone;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -86,7 +87,7 @@ abstract class BaseUpdateTool extends Tool
         $customFields = $request->get('custom_fields');
 
         if (is_array($customFields)) {
-            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentWorkspace->getKey(), $this->entityType(), $customFields);
+            $customFields = resolve(CustomFieldInput::class)->normalize($user->currentWorkspace->getKey(), $this->entityType(), $customFields, ViewerZone::lenient($user->effectiveTimezone()));
             $request->merge(['custom_fields' => $customFields]);
         }
 

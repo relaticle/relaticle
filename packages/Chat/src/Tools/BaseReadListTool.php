@@ -13,6 +13,7 @@ use App\Queries\CustomFieldFilterSchema;
 use App\Queries\EntityFilters;
 use App\Queries\FilterErrors;
 use App\Queries\FilterTree;
+use App\Queries\ViewerZone;
 use App\Support\CustomFields\RecordNameResolver;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
@@ -704,7 +705,7 @@ abstract class BaseReadListTool implements Tool
             sort: is_string($sort) && $sort !== '' ? $sort : null,
             perPage: $this->perPageFor($request),
             page: is_numeric($page) ? (int) min($page, ListQuery::MAX_PAGE) : null,
-            viewerZone: $user->effectiveTimezone(),
+            viewerZone: ViewerZone::strict($user->effectiveTimezone()),
         );
     }
 }
