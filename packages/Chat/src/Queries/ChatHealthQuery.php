@@ -11,8 +11,11 @@ use Illuminate\Queue\TimeoutExceededException;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\LazyCollection;
 use Laravel\Ai\Storage\StoredMessage;
+use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\RefundCause;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\TurnNotes;
 use stdClass;
@@ -25,7 +28,8 @@ use stdClass;
  *   setup_conversations: int, setup_conversations_typed: int,
  *   cache: array<string, array{followups: int, zero_read: int, read_share: float}>,
  *   top_workspaces: list<array{workspace_id: string, turns: int, prompt_tokens: int}>,
- *   spend: Spend
+ *   spend: Spend,
+ *   refunds: array{by_cause: array<string, int>, provider_billed: int, most_in_one_workspace: int}
  * }
  *
  * @phpstan-import-type Spend from ChatSpendQuery
@@ -50,6 +54,30 @@ final readonly class ChatHealthQuery
             'proposals' => $this->proposals($from, $to),
             ...$this->setupConversations($from, $to),
             'spend' => $this->spend->forWindow($from, $to),
+            'refunds' => $this->refunds($from, $to),
+        ];
+    }
+
+    /** @return array{by_cause: array<string, int>, provider_billed: int, most_in_one_workspace: int} */
+    private function refunds(CarbonImmutable $from, CarbonImmutable $to): array
+    {
+        $refunds = AiCreditTransaction::query()
+            ->where('type', AiCreditType::Refund)
+            ->whereBetween('created_at', [$from, $to])
+            ->get(['workspace_id', 'metadata']);
+
+        $byCause = $refunds
+            ->countBy(static fn (AiCreditTransaction $refund): string => is_string($refund->metadata['cause'] ?? null) ? $refund->metadata['cause'] : 'unrecorded')
+            ->all();
+
+        return [
+            'by_cause' => $byCause,
+            'provider_billed' => array_sum(array_filter(
+                $byCause,
+                static fn (string $cause): bool => RefundCause::tryFrom($cause)?->providerBilled() === true,
+                ARRAY_FILTER_USE_KEY,
+            )),
+            'most_in_one_workspace' => (int) $refunds->countBy('workspace_id')->max(),
         ];
     }
 

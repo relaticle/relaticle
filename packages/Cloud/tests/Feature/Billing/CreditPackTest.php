@@ -6,6 +6,7 @@ use App\Enums\Plan;
 use App\Models\User;
 use App\Models\Workspace;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\RefundCause;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
@@ -105,7 +106,7 @@ it('returns a refunded reservation to the purchased bucket once the allowance is
     }
 
     expect($service->reserveCredit($workspace, 'reserve-turn-1'))->toBeTrue();
-    $service->refundReservation($workspace, 1, 'resolve-turn-1');
+    $service->refundReservation($workspace, RefundCause::Failed, 1, 'resolve-turn-1');
 
     // Without restoring the prepaid bucket the credit survives as an allowance
     // credit and resetPeriod() wipes it, so the customer silently loses a credit
@@ -128,7 +129,7 @@ it('credits a refund to the allowance while allowance credits remain', function 
     $service->addPurchasedCredits($workspace, 10, 'pack-refund-allowance');
 
     expect($service->reserveCredit($workspace, 'reserve-turn-2'))->toBeTrue();
-    $service->refundReservation($workspace, 1, 'resolve-turn-2');
+    $service->refundReservation($workspace, RefundCause::Failed, 1, 'resolve-turn-2');
 
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
     expect($balance->credits_remaining)->toBe(Plan::Free->credits() + 10)
@@ -145,7 +146,7 @@ it('does not invent purchased credits when a refund lands on an empty balance', 
         expect($service->reserveCredit($workspace))->toBeTrue();
     }
 
-    $service->refundReservation($workspace, 1, 'resolve-turn-3');
+    $service->refundReservation($workspace, RefundCause::Failed, 1, 'resolve-turn-3');
 
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
     expect($balance->credits_remaining)->toBe(1)

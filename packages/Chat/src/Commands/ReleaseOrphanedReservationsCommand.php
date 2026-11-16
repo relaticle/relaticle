@@ -11,6 +11,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Database\Query\Builder;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\RefundCause;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 
@@ -59,6 +60,7 @@ final class ReleaseOrphanedReservationsCommand extends Command
 
             $creditService->refundReservation(
                 workspace: $workspace,
+                cause: RefundCause::Orphaned,
                 resolutionKey: str_replace('reserve-', 'resolve-', (string) $orphan->idempotency_key),
                 conversationId: $orphan->conversation_id === null ? null : (string) $orphan->conversation_id,
             );

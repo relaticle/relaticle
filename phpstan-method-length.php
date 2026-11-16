@@ -30,7 +30,7 @@ return [
                 'Relaticle\Chat\Agents\CrmAssistant::staticInstructions' => 110,
                 'Relaticle\Chat\Http\Controllers\ChatController::send' => 141,
                 'Relaticle\Chat\Http\Controllers\ChatController::supersedeMessages' => 62,
-                'Relaticle\Chat\Jobs\ProcessChatMessage::process' => 132,
+                'Relaticle\Chat\Jobs\ProcessChatMessage::process' => 124,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::persistFailedTurn' => 69,
                 'Relaticle\Chat\Jobs\ProcessChatMessage::streamTurn' => 184,
                 'Relaticle\Chat\Livewire\Chat\ProposalCard::createCurrent' => 68,

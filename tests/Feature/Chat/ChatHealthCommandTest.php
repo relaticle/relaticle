@@ -354,3 +354,27 @@ it('lists the workspaces that cost the most, dearest first', function (): void {
         ['workspace_id' => (string) $this->user->currentWorkspace->getKey(), 'estimated_cost' => 0.2],
     ]);
 });
+
+it('counts refunds by cause and how many of them the provider billed', function (): void {
+    foreach (['timeout', 'timeout', 'blank_reply', 'failed', null] as $index => $cause) {
+        AiCreditTransaction::query()->create([
+            'workspace_id' => $this->user->currentWorkspace->getKey(),
+            'idempotency_key' => "refund-{$index}",
+            'type' => AiCreditType::Refund,
+            'model' => 'system',
+            'input_tokens' => 0,
+            'output_tokens' => 0,
+            'credits_charged' => 1,
+            'metadata' => array_filter(['reason' => 'reservation_refund', 'cause' => $cause]),
+            'created_at' => now(),
+        ]);
+    }
+
+    $refunds = resolve(ChatHealthQuery::class)->forWindow(...chatHealthWindow())['refunds'];
+
+    expect($refunds)->toBe([
+        'by_cause' => ['timeout' => 2, 'blank_reply' => 1, 'failed' => 1, 'unrecorded' => 1],
+        'provider_billed' => 3,
+        'most_in_one_workspace' => 5,
+    ]);
+});

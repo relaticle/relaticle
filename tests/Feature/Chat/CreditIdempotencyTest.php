@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
+use Relaticle\Chat\Enums\RefundCause;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
@@ -120,7 +121,7 @@ it('makes settle and refund mutually exclusive for one resolution key', function
         ->update(['credits_remaining' => 100, 'credits_used' => 0]);
     $service->reserveCredit($workspace); // used 1
 
-    $service->refundReservation($workspace, resolutionKey: 'resolve-TURN-2'); // refund wins
+    $service->refundReservation($workspace, RefundCause::Failed, resolutionKey: 'resolve-TURN-2'); // refund wins
     $service->settleReservedMinimum($workspace, $user, null, 'resolve-TURN-2', 'cancelled'); // must no-op
 
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first();

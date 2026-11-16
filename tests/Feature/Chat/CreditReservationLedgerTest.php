@@ -91,6 +91,7 @@ it('refunds orphaned reservations older than the age window', function (): void 
         ->where('workspace_id', $workspace->getKey())
         ->where('idempotency_key', 'resolve-orphan-1')
         ->where('type', AiCreditType::Refund->value)
+        ->where('metadata->cause', 'orphaned')
         ->exists())->toBeTrue();
 });
 

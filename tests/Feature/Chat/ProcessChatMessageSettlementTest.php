@@ -457,6 +457,7 @@ it('refunds a blank reply to a turn nobody typed without acknowledging it', func
         ->sole();
 
     expect($resolution->type)->toBe(AiCreditType::Refund)
+        ->and($resolution->metadata['cause'])->toBe('blank_reply')
         ->and($assistant->content)->toBe('');
 })->with([MessageOrigin::Resume, MessageOrigin::Greeting, MessageOrigin::DataArrived]);
 
@@ -511,6 +512,7 @@ it('refunds a turn that ends with no text and no tool call and stores an acknowl
         ->sole();
 
     expect($resolution->type)->toBe(AiCreditType::Refund)
+        ->and($resolution->metadata['cause'])->toBe('blank_reply')
         ->and($balance->credits_remaining)->toBe(100)
         ->and($balance->credits_used)->toBe(0)
         ->and($assistant->content)->toBe($acknowledgement)
@@ -748,6 +750,7 @@ it('refunds a blank turn and stores copy chosen by how the model stopped', funct
         ->sole();
 
     expect($resolution->type)->toBe(AiCreditType::Refund)
+        ->and($resolution->metadata['cause'])->toBe('blank_reply')
         ->and($assistant->content)->toBe($expected)
         ->and(json_decode((string) $assistant->steps, true)[0]['content'])->toBe($expected)
         ->and(json_decode((string) $assistant->document, true)['content'][0]['content'][0]['text'])->toBe($expected);
