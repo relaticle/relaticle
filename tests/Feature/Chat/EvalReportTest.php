@@ -377,7 +377,7 @@ it('compares two run directories and pins the headline figures', function (): vo
         ->and($output)->not->toContain('f.php|steady |')
         ->and($output)->toMatch('/Missing from candidate \(1\).*\n  f\.php\|dropped/')
         ->and($output)->toMatch('/Missing from baseline \(1\).*\n  f\.php\|added/')
-        ->and($output)->toContain('excluded from cost and duration: 1 errored or no-turn')
+        ->and($output)->toContain('excluded from cost: 1 errored with no spend; from duration: 1 errored or no-turn')
         ->and($output)->toContain('cost per repetition: $0.3000 (mean over 5 priced, 0 unpriced)')
         ->and($output)->toContain('duration p50 / p90: 300 ms / 500 ms (over 5 repetitions)')
         ->and($output)->toContain('retries: 1')
@@ -408,10 +408,25 @@ it('prints no interval when there is nothing to measure the spread from', functi
         Compare::readRun(writeRunFixture('same-a', [['case' => 'x', 'passed' => false], ['case' => 'y', 'passed' => false]])),
         Compare::readRun(writeRunFixture('same-b', [['case' => 'x', 'passed' => true], ['case' => 'y', 'passed' => true]])),
     );
+    $still = writeRunFixture('still', [['case' => 'x', 'passed' => true], ['case' => 'y', 'passed' => false]]);
+    $unchanged = Compare::report(Compare::readRun($still), Compare::readRun($still));
 
-    expect($one)->toContain('95% interval: n/a (one shared case)')
+    expect($unchanged)->toContain('95% interval: n/a (no case moved)')
+        ->and($one)->toContain('95% interval: n/a (one shared case)')
         ->and($same)->toContain('95% interval: n/a (every shared case moved by the same amount')
         ->and($same)->toContain('Paired difference: +100.0 pts');
+});
+
+it('counts the spend of an errored repetition in cost but keeps it out of duration', function (): void {
+    $run = Compare::readRun(writeRunFixture('spent', [
+        ['case' => 'x', 'passed' => true, 'cost_usd' => 0.1, 'duration_ms' => 100, 'errored' => false],
+        ['case' => 'x', 'passed' => false, 'cost_usd' => 0.3, 'duration_ms' => 9000, 'errored' => true],
+        ['case' => 'y', 'passed' => false, 'cost_usd' => 0.0, 'duration_ms' => 0, 'errored' => true],
+    ]));
+
+    expect(Compare::report($run, $run))->toContain('cost per repetition: $0.2000 (mean over 2 priced, 0 unpriced)')
+        ->toContain('duration p50 / p90: 100 ms / 100 ms (over 1 repetitions)')
+        ->toContain('excluded from cost: 1 errored with no spend; from duration: 2 errored or no-turn');
 });
 
 it('skips an interrupted last line, rejects a bad middle line and an empty run', function (): void {
@@ -455,6 +470,7 @@ it('refuses an unknown split, a split with noise and a missing directory', funct
     expect($run([$baseline, $candidate, '--split=bogus']))->toBe(1)
         ->and($run(['--noise', $baseline, $baseline, $baseline, '--split=test']))->toBe(1)
         ->and($run([$baseline, $candidate.'/nope']))->toBe(1)
+        ->and($run([$baseline, $candidate, '--nosie']))->toBe(1)
         ->and($run([$baseline, $candidate]))->toBe(0);
 });
 

@@ -227,6 +227,7 @@ final class Compare
         );
         $reason = match (true) {
             count($both) === 1 => 'one shared case',
+            $interval['low'] === 0.0 && $interval['high'] === 0.0 => 'no case moved',
             $interval['low'] === $interval['high'] => 'every shared case moved by the same amount, so there is no spread to measure',
             default => null,
         };
@@ -288,7 +289,8 @@ final class Compare
     {
         $lines = self::scope($run['lines'], $split, $deterministic);
         $healthy = array_values(array_filter($lines, fn (array $line): bool => ! self::isErrored($line)));
-        $priced = array_values(array_filter(array_map(fn (array $line): mixed => $line['cost_usd'] ?? null, $healthy), is_numeric(...)));
+        $spending = array_values(array_filter($lines, fn (array $line): bool => ! self::isErrored($line) || (float) ($line['cost_usd'] ?? 0) > 0));
+        $priced = array_values(array_filter(array_map(fn (array $line): mixed => $line['cost_usd'] ?? null, $spending), is_numeric(...)));
         $durations = array_values(array_filter(array_map(fn (array $line): mixed => $line['duration_ms'] ?? null, $healthy), is_int(...)));
         sort($durations);
         $guard = self::cases(self::scope($run['lines'], 'guard', $deterministic));
@@ -296,8 +298,8 @@ final class Compare
         return [
             ...($run['interrupted_line'] === null ? [] : ['  interrupted: line '.$run['interrupted_line'].' was skipped']),
             '  repetitions: '.count($lines),
-            '  excluded from cost and duration: '.(count($lines) - count($healthy)).' errored or no-turn',
-            '  cost per repetition: '.($priced === [] ? 'n/a' : sprintf('$%.4f', array_sum($priced) / count($priced))).' (mean over '.count($priced).' priced, '.(count($healthy) - count($priced)).' unpriced)',
+            '  excluded from cost: '.(count($lines) - count($spending)).' errored with no spend; from duration: '.(count($lines) - count($healthy)).' errored or no-turn',
+            '  cost per repetition: '.($priced === [] ? 'n/a' : sprintf('$%.4f', array_sum($priced) / count($priced))).' (mean over '.count($priced).' priced, '.(count($spending) - count($priced)).' unpriced)',
             '  duration p50 / p90: '.self::duration($durations, 50).' / '.self::duration($durations, 90).' (over '.count($durations).' repetitions)',
             '  retries: '.array_sum(array_map(fn (array $line): int => (int) ($line['retries'] ?? 0), $lines)),
             '  guard pass rate: '.($guard === [] ? 'n/a (no guard cases)' : self::percent(self::passRate($guard)).' over '.count($guard).' cases'),
