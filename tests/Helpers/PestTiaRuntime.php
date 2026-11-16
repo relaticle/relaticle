@@ -37,6 +37,7 @@ final class PestTiaRuntime
         'public/site.webmanifest' => 'tests/Feature/Filament/PanelWebAppMetaTest.php',
         'public/web-app-manifest-*.png' => 'tests/Feature/Filament/PanelWebAppMetaTest.php',
         'tests/Evals/Rela/**' => 'tests/Feature/Chat/RelaTurnRunnerTest.php',
+        'tests/Evals/bin/**' => 'tests/Feature/Chat/RelaTurnRunnerTest.php',
         'phpstan*.neon' => 'tests/Arch',
         'phpunit*.xml' => 'tests/Arch',
     ];

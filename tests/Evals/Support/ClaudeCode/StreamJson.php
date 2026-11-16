@@ -21,12 +21,20 @@ final class StreamJson
         $reasoning = '';
         $toolCalls = [];
         $model = '';
-        $usage = new TextUsage;
+        $usage = [];
 
         foreach ($lines as $line) {
-            $message = self::decode($line)['message'] ?? [];
+            $event = self::decode($line);
+
+            if (($event['type'] ?? '') === 'stream_event') {
+                $usage = array_replace($usage, array_filter((array) ($event['event']['usage'] ?? []), fn (mixed $value): bool => $value !== null && ! is_array($value)));
+
+                continue;
+            }
+
+            $message = $event['message'] ?? [];
             $model = (string) ($message['model'] ?? $model);
-            $usage = self::usageOf($message['usage'] ?? []) ?? $usage;
+            $usage = array_replace($usage, array_filter((array) ($message['usage'] ?? []), fn (mixed $value): bool => $value !== null && ! is_array($value)));
 
             foreach ($message['content'] ?? [] as $block) {
                 match ($block['type'] ?? '') {
@@ -43,11 +51,15 @@ final class StreamJson
             }
         }
 
+        if ($model === '') {
+            throw new RuntimeException('Claude Code wrote a message with no model id.');
+        }
+
         return new StepResponse(
             text: $text,
             toolCalls: $toolCalls,
             finishReason: $toolCalls === [] ? FinishReason::Stop : FinishReason::ToolCalls,
-            usage: $usage,
+            usage: self::usageOf($usage) ?? new TextUsage,
             meta: new Meta('claude-code', $model),
             reasoning: $reasoning,
         );
@@ -56,6 +68,13 @@ final class StreamJson
     public static function isEnd(string $line): bool
     {
         return (self::decode($line)['type'] ?? '') === 'result';
+    }
+
+    public static function isStreamEvent(string $line, string $type): bool
+    {
+        $event = self::decode($line);
+
+        return ($event['type'] ?? '') === 'stream_event' && ($event['event']['type'] ?? '') === $type;
     }
 
     public static function isAssistant(string $line): bool

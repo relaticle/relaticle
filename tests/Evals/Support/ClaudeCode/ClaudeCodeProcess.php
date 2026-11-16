@@ -8,16 +8,22 @@ use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Laravel\Ai\Gateway\StepResponse;
+use Laravel\Ai\Responses\Data\FinishReason;
+use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Ai\Responses\Data\ToolResult;
 use RuntimeException;
+use Throwable;
 
 final class ClaudeCodeProcess
 {
+    /** @var list<string> */
+    public static array $command = ['claude'];
+
     private const float IDLE_LIMIT_SECONDS = 900;
 
-    private const float SIBLING_GRACE_SECONDS = 0.4;
+    private const float POLL_SECONDS = 0.05;
 
-    private const array REMOVED_ENV = [
+    public const array REMOVED_ENV = [
         'CLAUDECODE',
         'CLAUDE_CODE_ENTRYPOINT',
         'CLAUDE_CODE_SESSION_ID',
@@ -33,8 +39,19 @@ final class ClaudeCodeProcess
     /** @var list<string> */
     private array $messageLines = [];
 
-    /** @var list<ToolResult> */
-    private array $unanswered = [];
+    private ?string $messageId = null;
+
+    /** @var list<string> */
+    private array $held = [];
+
+    /** @var array<string, true> */
+    private array $answeredByClaude = [];
+
+    /** @var list<array{id: string, name: string}> */
+    private array $rejected = [];
+
+    /** @var list<array{id: string|null, tool_use_ids: list<string>}> */
+    private array $messages = [];
 
     /** @var array<string, mixed>|null */
     private ?array $result = null;
@@ -45,12 +62,14 @@ final class ClaudeCodeProcess
 
     /**
      * @param  array<string, mixed>  $init
+     * @param  list<string>  $toolNames
      */
     private function __construct(
         private readonly InvokedProcess $process,
         private readonly ToolRendezvous $rendezvous,
         private readonly string $directory,
         public readonly string $firstInput,
+        private readonly array $toolNames,
         private array $init = [],
     ) {
         $this->lastOutputAt = microtime(true);
@@ -62,39 +81,50 @@ final class ClaudeCodeProcess
     public static function start(string $model, string $effort, string $instructions, string $firstMessage, array $tools): self
     {
         $directory = sys_get_temp_dir().'/cc'.bin2hex(random_bytes(4));
-        mkdir($directory.'/w', 0700, true);
+        $rendezvous = null;
 
-        $rendezvous = ToolRendezvous::listen($directory);
-        file_put_contents($directory.'/tools.json', json_encode($tools, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
-        file_put_contents($directory.'/mcp.json', json_encode(['mcpServers' => ['rela' => [
-            'command' => PHP_BINARY,
-            'args' => [dirname(__DIR__, 2).'/bin/claude-tool-stub.php', $directory.'/tools.json', $rendezvous->path()],
-        ]]], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
+        try {
+            mkdir($directory.'/w', 0700, true);
+            $rendezvous = ToolRendezvous::listen($directory);
 
-        $input = json_encode(['type' => 'user', 'message' => ['role' => 'user', 'content' => [['type' => 'text', 'text' => $firstMessage]]]], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
+            file_put_contents($directory.'/tools.json', json_encode($tools, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR));
+            file_put_contents($directory.'/mcp.json', json_encode(['mcpServers' => ['rela' => [
+                'command' => PHP_BINARY,
+                'args' => [dirname(__DIR__, 2).'/bin/claude-tool-stub.php', $directory.'/tools.json', $rendezvous->path()],
+            ]]], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 
-        $process = Process::path($directory.'/w')
-            ->forever()
-            ->env([...array_fill_keys(self::REMOVED_ENV, false), 'ENABLE_TOOL_SEARCH' => 'false'])
-            ->input($input."\n")
-            ->start([
-                'claude', '-p',
-                '--input-format', 'stream-json',
-                '--output-format', 'stream-json',
-                '--verbose',
-                '--system-prompt', $instructions,
-                '--model', $model,
-                '--effort', $effort,
-                '--tools', '',
-                '--mcp-config', $directory.'/mcp.json',
-                '--strict-mcp-config',
-                '--allowedTools', ...array_map(fn (array $tool): string => StreamJson::TOOL_PREFIX.$tool['name'], $tools),
-                '--setting-sources', '',
-                '--disable-slash-commands',
-                '--no-session-persistence',
-            ]);
+            $names = array_map(fn (array $tool): string => StreamJson::TOOL_PREFIX.$tool['name'], $tools);
+            $input = json_encode(['type' => 'user', 'message' => ['role' => 'user', 'content' => [['type' => 'text', 'text' => $firstMessage]]]], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR);
 
-        return new self($process, $rendezvous, $directory, $input);
+            $process = Process::path($directory.'/w')
+                ->forever()
+                ->env([...array_fill_keys(self::REMOVED_ENV, false), 'ENABLE_TOOL_SEARCH' => 'false'])
+                ->input($input."\n")
+                ->start([
+                    ...self::$command, '-p',
+                    '--input-format', 'stream-json',
+                    '--output-format', 'stream-json',
+                    '--verbose',
+                    '--include-partial-messages',
+                    '--system-prompt', $instructions,
+                    '--model', $model,
+                    '--effort', $effort,
+                    '--tools', '',
+                    '--mcp-config', $directory.'/mcp.json',
+                    '--strict-mcp-config',
+                    '--allowedTools', ...$names,
+                    '--setting-sources', '',
+                    '--disable-slash-commands',
+                    '--no-session-persistence',
+                ]);
+        } catch (Throwable $e) {
+            $rendezvous?->close();
+            File::deleteDirectory($directory);
+
+            throw $e;
+        }
+
+        return new self($process, $rendezvous, $directory, $input, $names);
     }
 
     /**
@@ -102,40 +132,48 @@ final class ClaudeCodeProcess
      */
     public function deliver(array $results): void
     {
-        $this->unanswered = $results;
+        foreach ($results as $result) {
+            $index = $this->waitFor(fn (): ?int => $this->rendezvous->indexOf($result->id, $result->name, $result->arguments) ?? (isset($this->answeredByClaude[$result->id]) ? -1 : null));
 
-        while ($this->unanswered !== []) {
-            $this->answerWaiting();
+            if ($index === -1) {
+                $this->rejected[] = ['id' => $result->id, 'name' => $result->name];
 
-            if ($this->unanswered === [] || $this->rendezvous->accept(0.25) !== null) {
                 continue;
             }
 
-            $this->pump();
-            $this->assertAlive();
+            $this->rendezvous->reply($result->text(), ! $result->successful(), $index);
         }
     }
 
     public function nextStep(): StepResponse
     {
+        $carried = null;
+
         while (true) {
-            $line = $this->takeLine();
+            $step = $this->readMessage();
 
-            if ($line !== null) {
-                $step = $this->handle($line);
+            if (! $step instanceof StepResponse) {
+                return $carried ?? throw new RuntimeException('Claude Code ended the turn without a message.');
+            }
 
-                if ($step instanceof StepResponse) {
-                    return $step;
-                }
+            $step = $carried instanceof StepResponse ? $this->merge($carried, $step) : $step;
+            $executed = $this->executed($step->toolCalls);
+
+            if ($step->toolCalls === []) {
+                $this->readToResult();
+
+                return $step;
+            }
+
+            if ($executed === []) {
+                $carried = $this->withoutCalls($step);
 
                 continue;
             }
 
-            if ($this->messageLines !== [] && $this->rendezvous->accept(0.05) !== null) {
-                return $this->closeMessage();
-            }
+            $step->toolCalls = $executed;
 
-            $this->assertAlive();
+            return $step;
         }
     }
 
@@ -155,6 +193,27 @@ final class ClaudeCodeProcess
         return $this->init;
     }
 
+    /**
+     * @return list<array{id: string, name: string}>
+     */
+    public function rejected(): array
+    {
+        return $this->rejected;
+    }
+
+    /**
+     * @return list<array{id: string|null, tool_use_ids: list<string>}>
+     */
+    public function messages(): array
+    {
+        return $this->messages;
+    }
+
+    public function directory(): string
+    {
+        return $this->directory;
+    }
+
     public function release(): void
     {
         if ($this->released) {
@@ -163,115 +222,206 @@ final class ClaudeCodeProcess
 
         $this->released = true;
 
-        if ($this->process->running()) {
-            $this->process->signal(SIGTERM);
+        foreach ([
+            fn () => $this->process->stop(3),
+            fn () => $this->rendezvous->close(),
+            fn () => File::deleteDirectory($this->directory),
+        ] as $cleanup) {
+            try {
+                $cleanup();
+            } catch (Throwable) {
+                continue;
+            }
         }
-
-        $this->rendezvous->close();
-        File::deleteDirectory($this->directory);
     }
 
-    private function handle(string $line): ?StepResponse
+    /**
+     * Claude Code runs tools that write one at a time, so a later call of the message
+     * connects only after the earlier one is answered. A call it refused answers itself.
+     *
+     * @param  list<ToolCall>  $calls
+     * @return list<ToolCall>
+     */
+    private function executed(array $calls): array
     {
-        $event = StreamJson::decode($line);
+        $this->waitFor(fn (): ?bool => array_filter($calls, fn (ToolCall $call): bool => $this->rendezvous->hasId($call->id)) !== [] || $this->unanswered($calls) === [] ? true : null);
 
-        if (($event['type'] ?? '') === 'system' && ($event['subtype'] ?? '') === 'init') {
-            $this->init = $event;
-            $this->assertSubscription($event);
-
-            return null;
+        foreach (array_filter($calls, fn (ToolCall $call): bool => isset($this->answeredByClaude[$call->id])) as $call) {
+            $this->rejected[] = ['id' => $call->id, 'name' => $call->name];
         }
 
-        if (StreamJson::isAssistant($line)) {
-            $this->messageLines[] = $line;
+        return $this->unanswered($calls);
+    }
 
-            return null;
+    /**
+     * @param  list<ToolCall>  $calls
+     * @return list<ToolCall>
+     */
+    private function unanswered(array $calls): array
+    {
+        return array_values(array_filter($calls, fn (ToolCall $call): bool => ! isset($this->answeredByClaude[$call->id])));
+    }
+
+    private function readMessage(): ?StepResponse
+    {
+        while (true) {
+            $line = $this->takeLine();
+
+            if ($line === null) {
+                $this->idle();
+
+                continue;
+            }
+
+            $event = StreamJson::decode($line);
+            $type = $event['type'] ?? '';
+
+            if ($type === 'system' && ($event['subtype'] ?? '') === 'init') {
+                $this->assertInit($event);
+            } elseif ($type === 'stream_event' && ($event['event']['type'] ?? '') === 'message_start') {
+                $this->messageLines = [];
+                $this->messageId = (string) ($event['event']['message']['id'] ?? '');
+            } elseif ($type === 'assistant' || $type === 'stream_event' && ($event['event']['type'] ?? '') === 'message_delta') {
+                $flushed = $this->collect($line, $type);
+
+                if ($flushed instanceof StepResponse) {
+                    return $flushed;
+                }
+            } elseif ($type === 'stream_event' && ($event['event']['type'] ?? '') === 'message_stop') {
+                return $this->closeMessage();
+            } elseif ($type === 'user') {
+                $this->recordUserLine($event);
+            } elseif ($type === 'result') {
+                $this->recordResult($event);
+
+                return $this->messageLines === [] ? null : $this->closeMessage();
+            }
+        }
+    }
+
+    private function collect(string $line, string $type): ?StepResponse
+    {
+        $id = $type === 'assistant' ? StreamJson::messageId($line) : null;
+
+        if ($id !== null && $this->messageId !== null && $this->messageId !== '' && $id !== $this->messageId) {
+            array_unshift($this->held, $line);
+
+            return $this->closeMessage();
         }
 
-        if (! StreamJson::isEnd($line)) {
-            return null;
-        }
+        $this->messageId = $id ?? $this->messageId;
+        $this->messageLines[] = $line;
 
+        return null;
+    }
+
+    private function closeMessage(): StepResponse
+    {
+        $step = StreamJson::step(...$this->messageLines);
+        $this->messages[] = ['id' => $this->messageId, 'tool_use_ids' => array_map(fn (ToolCall $call): string => $call->id, $step->toolCalls)];
+        $this->messageLines = [];
+        $this->messageId = null;
+
+        return $step;
+    }
+
+    private function readToResult(): void
+    {
+        while ($this->result === null) {
+            $line = $this->takeLine();
+
+            if ($line === null) {
+                $this->idle();
+
+                continue;
+            }
+
+            $event = StreamJson::decode($line);
+
+            if (($event['type'] ?? '') === 'result') {
+                $this->recordResult($event);
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    private function recordUserLine(array $event): void
+    {
+        foreach ((array) ($event['message']['content'] ?? []) as $block) {
+            if (is_array($block) && ($block['type'] ?? '') === 'tool_result' && is_string($block['tool_use_id'] ?? null)) {
+                $this->answeredByClaude[$block['tool_use_id']] = true;
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $event
+     */
+    private function recordResult(array $event): void
+    {
         $this->result = $event;
 
         if (($event['is_error'] ?? false) === true) {
             throw new RuntimeException('Claude Code failed: '.mb_substr((string) ($event['result'] ?? json_encode($event)), 0, 500));
         }
-
-        $step = StreamJson::step(...$this->messageLines);
-        $this->messageLines = [];
-
-        return $step->toolCalls === []
-            ? $step
-            : throw new RuntimeException('Claude Code ended the turn after calling a tool it did not run: '.$step->toolCalls[0]->name);
     }
 
-    private function closeMessage(): StepResponse
+    private function merge(StepResponse $earlier, StepResponse $later): StepResponse
     {
-        $this->rendezvous->accept(self::SIBLING_GRACE_SECONDS);
-        $this->pump();
+        $later->text = $earlier->text === '' ? $later->text : $earlier->text."\n\n".$later->text;
+        $later->usage = $earlier->usage->add($later->usage);
 
-        while (($line = $this->takeLine()) !== null) {
-            if (StreamJson::isAssistant($line)) {
-                $this->messageLines[] = $line;
-            }
-        }
+        return $later;
+    }
 
-        $step = StreamJson::step(...$this->messageLines);
-        $this->messageLines = [];
+    private function withoutCalls(StepResponse $step): StepResponse
+    {
+        $step->toolCalls = [];
+        $step->finishReason = FinishReason::Stop;
 
         return $step;
     }
 
-    private function answerWaiting(): void
+    /**
+     * @template T
+     *
+     * @param  callable(): T|null  $ready
+     * @return T
+     */
+    private function waitFor(callable $ready): mixed
     {
-        foreach ($this->rendezvous->waiting() as $index => $call) {
-            $match = $this->matchResult($call['name'], $call['arguments']);
+        while (true) {
+            $this->consumeLines();
 
-            if ($match === null) {
-                continue;
+            if (($value = $ready()) !== null) {
+                return $value;
             }
 
-            $this->rendezvous->reply($match->text(), ! $match->successful(), $index);
-            $this->unanswered = array_values(array_filter($this->unanswered, fn (ToolResult $result): bool => $result !== $match));
-
-            $this->answerWaiting();
-
-            return;
+            $this->idle();
         }
     }
 
-    /**
-     * @param  array<string, mixed>  $arguments
-     */
-    private function matchResult(string $name, array $arguments): ?ToolResult
+    private function consumeLines(): void
     {
-        $named = array_values(array_filter($this->unanswered, fn (ToolResult $result): bool => $result->name === $name));
+        while (($line = $this->rawLine()) !== null) {
+            $event = StreamJson::decode($line);
 
-        foreach ($named as $result) {
-            if (self::canonical($result->arguments) === self::canonical($arguments)) {
-                return $result;
+            if (($event['type'] ?? '') === 'user') {
+                $this->recordUserLine($event);
+            } else {
+                $this->held[] = $line;
             }
         }
-
-        return $named[0] ?? null;
-    }
-
-    /**
-     * @param  array<array-key, mixed>  $value
-     */
-    private static function canonical(array $value): string
-    {
-        $sort = function (array $node) use (&$sort): array {
-            ksort($node);
-
-            return array_map(fn (mixed $child): mixed => is_array($child) ? $sort($child) : $child, $node);
-        };
-
-        return json_encode($sort($value), JSON_THROW_ON_ERROR);
     }
 
     private function takeLine(): ?string
+    {
+        return array_shift($this->held) ?? $this->rawLine();
+    }
+
+    private function rawLine(): ?string
     {
         $this->pump();
 
@@ -284,7 +434,7 @@ final class ClaudeCodeProcess
         $line = substr($this->buffer, 0, $newline);
         $this->buffer = substr($this->buffer, $newline + 1);
 
-        return trim($line) === '' ? $this->takeLine() : $line;
+        return trim($line) === '' ? $this->rawLine() : $line;
     }
 
     private function pump(): void
@@ -297,10 +447,16 @@ final class ClaudeCodeProcess
         }
     }
 
-    private function assertAlive(): void
+    private function idle(): void
     {
-        if (! $this->process->running() && $this->pumpedNothing()) {
-            throw new RuntimeException('Claude Code exited before the turn ended: '.mb_substr(trim($this->process->errorOutput()) ?: 'no error output', 0, 500));
+        $this->rendezvous->accept(self::POLL_SECONDS);
+
+        if (! $this->process->running()) {
+            $this->pump();
+
+            if ($this->held === [] && ! str_contains($this->buffer, "\n")) {
+                throw new RuntimeException('Claude Code exited before the turn ended: '.mb_substr(trim($this->process->errorOutput()) ?: 'no error output', 0, 500));
+            }
         }
 
         if (microtime(true) - $this->lastOutputAt > self::IDLE_LIMIT_SECONDS) {
@@ -308,20 +464,27 @@ final class ClaudeCodeProcess
         }
     }
 
-    private function pumpedNothing(): bool
-    {
-        $this->pump();
-
-        return $this->buffer === '' || ! str_contains($this->buffer, "\n");
-    }
-
     /**
      * @param  array<string, mixed>  $init
      */
-    private function assertSubscription(array $init): void
+    private function assertInit(array $init): void
     {
-        if (($init['apiKeySource'] ?? 'none') !== 'none') {
-            throw new RuntimeException('Claude Code is not signed in with the plan, its key source is '.json_encode($init['apiKeySource']));
+        $this->init = $init;
+
+        if (($init['apiKeySource'] ?? null) !== 'none') {
+            throw new RuntimeException('Claude Code is not signed in with the plan, its key source is '.json_encode($init['apiKeySource'] ?? null));
+        }
+
+        $connected = array_filter((array) ($init['mcp_servers'] ?? []), fn (mixed $server): bool => is_array($server) && ($server['name'] ?? null) === 'rela' && ($server['status'] ?? null) === 'connected');
+
+        if ($connected === []) {
+            throw new RuntimeException('Claude Code did not connect the rela tool server: '.json_encode($init['mcp_servers'] ?? null));
+        }
+
+        $missing = array_diff($this->toolNames, (array) ($init['tools'] ?? []));
+
+        if ($missing !== []) {
+            throw new RuntimeException('Claude Code does not offer '.count($missing).' of the rela tools, first '.reset($missing));
         }
     }
 }

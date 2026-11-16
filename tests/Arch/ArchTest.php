@@ -367,6 +367,7 @@ foreach ([
 foreach ([
     'App',
     'Relaticle\Chat',
+    'Relaticle\Cloud',
     'Relaticle\Documentation',
     'Relaticle\EmailIntegration',
     'Relaticle\ImportWizard',

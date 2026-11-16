@@ -32,7 +32,7 @@ final class EvalReport
     /** @var array<string, int> */
     private static array $repetitions = [];
 
-    /** @var list<array{passed: bool, split: ?string, cost_usd: ?float, turn_durations: list<int>, retries: int}> */
+    /** @var list<array{passed: bool, split: ?string, cost_usd: ?float, notional_cost_usd: ?float, plan: bool, turn_durations: list<int>, retries: int}> */
     private static array $lines = [];
 
     /**
@@ -40,7 +40,7 @@ final class EvalReport
      * @param  list<TurnEnvelope>  $turns
      * @param  list<array{level: string|null, score: float, reasoning: string}>  $verdicts
      */
-    public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null, array $verdicts = []): void
+    public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null, array $verdicts = [], bool $history = false): void
     {
         self::$startedAt ??= now();
 
@@ -58,7 +58,7 @@ final class EvalReport
             'reasons' => $reasons,
         ];
 
-        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split, $verdicts);
+        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split, $verdicts, $history);
     }
 
     public static function flush(string $model, string $judge): ?string
@@ -119,7 +119,7 @@ final class EvalReport
      * @param  list<TurnEnvelope>  $turns
      * @param  list<array{level: string|null, score: float, reasoning: string}>  $verdicts
      */
-    private static function writeRepetition(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons, int $samples, bool $judged, array $turns, string $file, ?string $split, array $verdicts): void
+    private static function writeRepetition(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons, int $samples, bool $judged, array $turns, string $file, ?string $split, array $verdicts, bool $history): void
     {
         $turns = $turns === [] && $envelope instanceof TurnEnvelope ? [$envelope] : $turns;
         $rep = self::$repetitions[$file.'|'.$testName] = (self::$repetitions[$file.'|'.$testName] ?? 0) + 1;
@@ -131,7 +131,9 @@ final class EvalReport
         $served = $turns === [] ? '' : $turns[array_key_last($turns)]->servedModel;
         $effort = self::effort();
 
-        self::$lines[] = ['passed' => $passed, 'split' => $split, 'cost_usd' => $cost, 'turn_durations' => self::healthyDurations($turns), 'retries' => $retries];
+        $runner = self::runnerFields($turns);
+
+        self::$lines[] = ['passed' => $passed, 'split' => $split, 'cost_usd' => $cost, 'notional_cost_usd' => $runner['notional_cost_usd'] ?? null, 'plan' => $runner['runner'] === 'plan', 'turn_durations' => self::healthyDurations($turns), 'retries' => $retries];
 
         $traceDirectory = $runDirectory.'/traces/'.(Str::slug($file) ?: 'no-file');
         $slug = (Str::slug($testName) ?: 'case').'-'.substr(md5($testName), 0, 8);
@@ -147,6 +149,7 @@ final class EvalReport
             'rep' => $rep,
             'passed' => $passed,
             'judged' => $judged,
+            'history' => $history,
             'reasons' => $reasons,
             'model_requested' => RelaTurn::model(),
             'model_served' => $served,
@@ -159,7 +162,7 @@ final class EvalReport
             'tool_calls' => array_sum(array_map(fn (TurnEnvelope $turn): int => count($turn->toolCalls), $turns)),
             'retries' => $retries,
             'turns' => $samples,
-            ...self::runnerFields($turns),
+            ...$runner,
             ...($verdicts === [] ? [] : ['judge' => $verdicts]),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n", append: true);
     }
@@ -171,11 +174,22 @@ final class EvalReport
     private static function runnerFields(array $turns): array
     {
         $runner = $turns === [] ? EvalModels::runner() : $turns[array_key_last($turns)]->runner;
-
-        return [
+        $fields = [
             'runner' => $runner,
             'parallel_tool_calls' => array_sum(array_map(fn (TurnEnvelope $turn): int => $turn->parallelToolCalls, $turns)),
-            ...($runner === 'plan' ? ['notional_cost_usd' => round(array_sum(array_map(fn (TurnEnvelope $turn): float => $turn->notionalCostUsd(), $turns)), 6)] : []),
+        ];
+
+        if ($runner !== 'plan') {
+            return $fields;
+        }
+
+        $costs = array_map(fn (TurnEnvelope $turn): ?float => $turn->notionalCostUsd(), $turns);
+        $known = $turns !== [] && ! in_array(null, $costs, true);
+
+        return [
+            ...$fields,
+            'notional_cost_usd' => $known ? round(array_sum($costs), 6) : null,
+            ...($known ? [] : ['notional_cost_missing' => 'no result line arrived from Claude Code for at least one run']),
         ];
     }
 
@@ -222,6 +236,10 @@ final class EvalReport
      */
     private static function costOf(array $turns): ?float
     {
+        if (array_filter($turns, fn (TurnEnvelope $turn): bool => $turn->runner === 'plan') !== []) {
+            return null;
+        }
+
         $total = 0.0;
 
         foreach ($turns as $turn) {
@@ -287,7 +305,7 @@ final class EvalReport
     }
 
     /**
-     * @return array{cases: int, passed: int, pass_rate: float, tokens_in_mean: float, replayed_bytes_mean: float, cost_usd: ?float, unpriced_lines: int, duration_ms_p50: ?int, duration_ms_p90: ?int, retries: int, pass_rate_by_split: array<string, float>}
+     * @return array{cases: int, passed: int, pass_rate: float, tokens_in_mean: float, replayed_bytes_mean: float, cost_usd: ?float, unpriced_lines: int, duration_ms_p50: ?int, duration_ms_p90: ?int, retries: int, pass_rate_by_split: array<string, float>, notional_cost_usd?: float|null, lines_without_notional_cost?: int}
      */
     private static function totals(): array
     {
@@ -301,11 +319,31 @@ final class EvalReport
             'tokens_in_mean' => round(array_sum(array_column(self::$cases, 'tokens_in')) / $count, 1),
             'replayed_bytes_mean' => round(array_sum(array_column(self::$cases, 'replayed_bytes')) / $count, 1),
             'cost_usd' => self::totalCost(),
-            'unpriced_lines' => count(array_filter(self::$lines, fn (array $line): bool => $line['cost_usd'] === null)),
+            'unpriced_lines' => count(array_filter(self::$lines, fn (array $line): bool => $line['cost_usd'] === null && ! $line['plan'])),
             'duration_ms_p50' => self::percentile(50),
             'duration_ms_p90' => self::percentile(90),
             'retries' => array_sum(array_column(self::$lines, 'retries')),
             'pass_rate_by_split' => self::passRateBySplit(),
+            ...self::planTotals(),
+        ];
+    }
+
+    /**
+     * @return array<string, float|int|null>
+     */
+    private static function planTotals(): array
+    {
+        $plan = array_filter(self::$lines, fn (array $line): bool => $line['plan']);
+
+        if ($plan === []) {
+            return [];
+        }
+
+        $costs = array_filter(array_column($plan, 'notional_cost_usd'), fn (?float $cost): bool => $cost !== null);
+
+        return [
+            'notional_cost_usd' => $costs === [] ? null : round(array_sum($costs), 6),
+            'lines_without_notional_cost' => count($plan) - count($costs),
         ];
     }
 

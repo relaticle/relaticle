@@ -11,6 +11,7 @@ use Pest\Evals\Plugin;
 use RuntimeException;
 use Tests\Evals\Support\ClaudeCode\ClaudeCodeGateway;
 use Tests\Evals\Support\EvalModels;
+use Tests\Evals\Support\RelaTurn;
 use Tests\TestCase;
 
 abstract class EvalTestCase extends TestCase
@@ -61,6 +62,10 @@ abstract class EvalTestCase extends TestCase
         }
 
         EvalModels::register(getenv('PEST_EVALS_EFFORT') ?: null);
+
+        if (EvalModels::runner() === 'plan') {
+            EvalModels::assertPlanServes(RelaTurn::model());
+        }
     }
 
     protected function tearDown(): void

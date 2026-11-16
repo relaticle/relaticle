@@ -93,8 +93,14 @@ final class Compare
      */
     public static function report(array $baseline, array $candidate, ?string $split = null, bool $deterministic = false): string
     {
-        $base = self::cases(self::scope($baseline['lines'], $split, $deterministic));
-        $cand = self::cases(self::scope($candidate['lines'], $split, $deterministic));
+        $runner = self::runnerOf($baseline);
+
+        if ($runner !== self::runnerOf($candidate)) {
+            throw new RuntimeException('Refusing to compare a '.$runner.' run with a '.self::runnerOf($candidate).' run: their usage, cost and message history are measured differently.');
+        }
+
+        $base = self::cases(self::headline(self::scope($baseline['lines'], $split, $deterministic), $runner));
+        $cand = self::cases(self::headline(self::scope($candidate['lines'], $split, $deterministic), $runner));
         $both = array_values(array_intersect(array_keys($base), array_keys($cand)));
         $out = [
             'Split: '.($split ?? 'all').($deterministic ? ', deterministic cases only' : ''),
@@ -103,6 +109,7 @@ final class Compare
         ];
 
         array_push($out, ...self::pairedLines($base, $cand, $both));
+        array_push($out, ...self::historyLines($runner, ['baseline' => $baseline, 'candidate' => $candidate], $split, $deterministic));
         array_push($out, ...self::flipTable($base, $cand, $both));
         array_push($out, ...self::missing('baseline', array_diff_key($cand, $base)), ...self::missing('candidate', array_diff_key($base, $cand)));
 
@@ -118,7 +125,14 @@ final class Compare
      */
     public static function noiseReport(array $runs, bool $deterministic = false): string
     {
-        $cases = array_map(fn (array $run): array => self::cases(self::scope($run['lines'], null, $deterministic)), $runs);
+        $runners = array_values(array_unique(array_map(self::runnerOf(...), $runs)));
+
+        if (count($runners) > 1) {
+            throw new RuntimeException('Refusing to measure noise over runs from different runners: '.implode(', ', $runners).'.');
+        }
+
+        $runner = $runners[0];
+        $cases = array_map(fn (array $run): array => self::cases(self::headline(self::scope($run['lines'], null, $deterministic), $runner)), $runs);
         $shared = array_keys(array_intersect_key(...$cases));
         $differing = array_filter($shared, function (string $key) use ($cases): bool {
             $shares = array_map(fn (array $run): float => round(self::share($run[$key]), 9), $cases);
@@ -131,6 +145,7 @@ final class Compare
             sprintf('Cases whose pass share differs between runs: %d of %d (%s)', count($differing), count($shared), self::percent($shared === [] ? 0.0 : count($differing) / count($shared))),
             'Pass rate per run, over the cases in every run: '.implode(', ', array_map(self::percent(...), $rates)),
             'Largest pass-rate gap between runs: '.self::percent(max($rates) - min($rates)),
+            ...self::historyRates($runner, $runs, $deterministic),
         ];
 
         foreach (['model_requested' => 'none', 'effort' => 'none'] as $field => $fallback) {
@@ -150,6 +165,73 @@ final class Compare
         }
 
         return implode("\n", $out)."\n";
+    }
+
+    /**
+     * @param  Run  $run
+     */
+    private static function runnerOf(array $run): string
+    {
+        $runners = array_values(array_unique(array_map(fn (array $line): string => (string) ($line['runner'] ?? 'api'), $run['lines'])));
+
+        return count($runners) === 1 ? $runners[0] : throw new RuntimeException('A run mixes runners: '.implode(', ', $runners).'.');
+    }
+
+    /**
+     * @param  list<Line>  $lines
+     * @return list<Line>
+     */
+    private static function headline(array $lines, string $runner): array
+    {
+        return $runner === 'plan' ? array_values(array_filter($lines, fn (array $line): bool => ($line['history'] ?? false) !== true)) : $lines;
+    }
+
+    /**
+     * @param  list<Line>  $lines
+     * @return list<Line>
+     */
+    private static function historyOnly(array $lines): array
+    {
+        return array_values(array_filter($lines, fn (array $line): bool => ($line['history'] ?? false) === true));
+    }
+
+    /**
+     * @param  array<string, Run>  $runs
+     * @return list<string>
+     */
+    private static function historyLines(string $runner, array $runs, ?string $split, bool $deterministic): array
+    {
+        if ($runner !== 'plan') {
+            return [];
+        }
+
+        $parts = [];
+
+        foreach ($runs as $label => $run) {
+            $history = self::cases(self::historyOnly(self::scope($run['lines'], $split, $deterministic)));
+            $parts[] = sprintf('%s %s over %d', $label, $history === [] ? 'n/a' : self::percent(self::passRate($history)), count($history));
+        }
+
+        return ['History cases (plan runner replays earlier turns as text, so they are left out of the headline and the paired difference): '.implode(', ', $parts)];
+    }
+
+    /**
+     * @param  list<Run>  $runs
+     * @return list<string>
+     */
+    private static function historyRates(string $runner, array $runs, bool $deterministic): array
+    {
+        if ($runner !== 'plan') {
+            return [];
+        }
+
+        $rates = array_map(function (array $run) use ($deterministic): string {
+            $history = self::cases(self::historyOnly(self::scope($run['lines'], null, $deterministic)));
+
+            return $history === [] ? 'n/a' : self::percent(self::passRate($history));
+        }, $runs);
+
+        return ['History cases are left out above. Their pass rate per run: '.implode(', ', $rates)];
     }
 
     /**
@@ -301,9 +383,20 @@ final class Compare
             '  excluded from cost: '.(count($lines) - count($spending)).' errored with no spend; from duration: '.(count($lines) - count($healthy)).' errored or no-turn',
             '  cost per repetition: '.($priced === [] ? 'n/a' : sprintf('$%.4f', array_sum($priced) / count($priced))).' (mean over '.count($priced).' priced, '.(count($spending) - count($priced)).' unpriced)',
             '  duration p50 / p90: '.self::duration($durations, 50).' / '.self::duration($durations, 90).' (over '.count($durations).' repetitions)',
+            ...(self::runnerOf($run) === 'plan' ? ['  notional plan cost per repetition: '.self::notional($spending)] : []),
             '  retries: '.array_sum(array_map(fn (array $line): int => (int) ($line['retries'] ?? 0), $lines)),
             '  guard pass rate: '.($guard === [] ? 'n/a (no guard cases)' : self::percent(self::passRate($guard)).' over '.count($guard).' cases'),
         ];
+    }
+
+    /**
+     * @param  list<Line>  $lines
+     */
+    private static function notional(array $lines): string
+    {
+        $costs = array_values(array_filter(array_map(fn (array $line): mixed => $line['notional_cost_usd'] ?? null, $lines), is_numeric(...)));
+
+        return $costs === [] ? 'n/a' : sprintf('$%.4f (mean over %d, %d without a result line)', array_sum($costs) / count($costs), count($costs), count($lines) - count($costs));
     }
 
     /**

@@ -51,6 +51,15 @@ final class EvalModels
         app()->forgetInstance(ModelRegistry::class);
     }
 
+    public static function assertPlanServes(string $model): void
+    {
+        $provider = resolve(ModelRegistry::class)->find($model)?->provider;
+
+        if ($provider !== ClaudeCodeProvider::NAME) {
+            throw new RuntimeException("PEST_EVALS_RUNNER=plan runs Claude models only, and {$model} is served by ".($provider ?? 'no provider').'. Use PEST_EVALS_RUNNER=api for it.');
+        }
+    }
+
     public static function runner(): string
     {
         return self::validRunner(getenv('PEST_EVALS_RUNNER') ?: 'api');

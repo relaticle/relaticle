@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Illuminate\Database\Events\QueryExecuted;
+use Illuminate\Process\InvokedProcess;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
@@ -10,6 +11,7 @@ use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Laravel\Ai\AiManager;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Gateway\StepContext;
 use Laravel\Ai\Messages\AssistantMessage;
 use Laravel\Ai\Messages\Message;
 use Laravel\Ai\Messages\ToolResultMessage;
@@ -17,12 +19,18 @@ use Laravel\Ai\Messages\UserMessage;
 use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\ToolCall;
 use Laravel\Ai\Responses\Data\ToolResult;
+use Laravel\Ai\Streaming\Events\StreamStart;
+use Laravel\Ai\Streaming\Events\TextDelta;
+use Laravel\Ai\Streaming\Events\TextEnd;
+use Laravel\Ai\Streaming\Events\TextStart;
 use Pest\Evals\Support\ToolCallParser;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Services\ModelRegistry;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeGateway;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeProcess;
 use Tests\Evals\Support\ClaudeCode\ClaudeCodeProvider;
 use Tests\Evals\Support\ClaudeCode\HistoryTranscript;
 use Tests\Evals\Support\ClaudeCode\StreamJson;
@@ -483,7 +491,8 @@ it('renders an empty history as nothing and a tool turn in order', function (): 
         ->and($text)->toContain('{"data":[]}');
 });
 
-it('answers a tool call from the stub through the rendezvous socket', function (): void {
+function stubSession(): array
+{
     $directory = sys_get_temp_dir().'/ccs'.bin2hex(random_bytes(3));
     mkdir($directory);
     $schemas = $directory.'/tools.json';
@@ -492,32 +501,54 @@ it('answers a tool call from the stub through the rendezvous socket', function (
         'description' => 'Lists companies',
         'inputSchema' => ['type' => 'object', 'properties' => ['limit' => ['type' => 'integer']]],
     ]]));
-    $rendezvous = ToolRendezvous::listen($directory);
+
+    return [$directory, $schemas, ToolRendezvous::listen($directory)];
+}
+
+function waitForStubCalls(ToolRendezvous $rendezvous, InvokedProcess $process, int $count): void
+{
+    $deadline = microtime(true) + 20;
+
+    while (count($rendezvous->waiting()) < $count) {
+        if (microtime(true) > $deadline) {
+            throw new RuntimeException('The stub never reached the rendezvous.');
+        }
+
+        if (! $process->running()) {
+            throw new RuntimeException('The stub exited: '.$process->errorOutput());
+        }
+
+        $rendezvous->accept(0.1);
+    }
+}
+
+function stubReplies(string $output): array
+{
+    return array_map(fn (string $line): array => json_decode($line, true), array_values(array_filter(explode("\n", $output))));
+}
+
+it('answers a tool call from the stub through the rendezvous socket', function (): void {
+    [$directory, $schemas, $rendezvous] = stubSession();
 
     $input = implode("\n", [
         '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}',
         '{"jsonrpc":"2.0","method":"notifications/initialized"}',
         '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
-        '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ListCompaniesTool","arguments":{"limit":5}}}',
+        '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ListCompaniesTool","arguments":{"limit":5},"_meta":{"claudecode/toolUseId":"toolu_1"}}}',
     ])."\n";
 
     $process = Process::forever()->input($input)->start([PHP_BINARY, base_path('tests/Evals/bin/claude-tool-stub.php'), $schemas, $rendezvous->path()]);
 
-    $call = null;
-
-    while ($call === null) {
-        $process->running();
-        $call = $rendezvous->accept(0.1);
-    }
-
+    waitForStubCalls($rendezvous, $process, 1);
+    $call = $rendezvous->waiting()[0];
     $rendezvous->reply('{"data":["Company 01"]}', false);
     $result = $process->wait();
     $rendezvous->close();
 
-    $replies = array_map(fn (string $line): array => json_decode($line, true), array_values(array_filter(explode("\n", $result->output()))));
+    $replies = stubReplies($result->output());
     File::deleteDirectory($directory);
 
-    expect($call)->toBe(['name' => 'ListCompaniesTool', 'arguments' => ['limit' => 5]])
+    expect($call)->toBe(['id' => 'toolu_1', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 5]])
         ->and($replies)->toHaveCount(3)
         ->and($replies[0]['result']['capabilities'])->toHaveKey('tools')
         ->and($replies[1]['result']['tools'][0]['name'])->toBe('ListCompaniesTool')
@@ -525,6 +556,346 @@ it('answers a tool call from the stub through the rendezvous socket', function (
         ->and($replies[2]['id'])->toBe(3)
         ->and($replies[2]['result']['content'][0]['text'])->toBe('{"data":["Company 01"]}')
         ->and($replies[2]['result']['isError'])->toBeFalse();
+});
+
+it('lets the stub hold two calls at once and answer them in either order', function (): void {
+    [$directory, $schemas, $rendezvous] = stubSession();
+
+    $input = implode("\n", [
+        '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ListCompaniesTool","arguments":{"limit":1},"_meta":{"claudecode/toolUseId":"toolu_a"}}}',
+        '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"ListCompaniesTool","arguments":{"limit":2},"_meta":{"claudecode/toolUseId":"toolu_b"}}}',
+    ])."\n";
+
+    $process = Process::forever()->input($input)->start([PHP_BINARY, base_path('tests/Evals/bin/claude-tool-stub.php'), $schemas, $rendezvous->path()]);
+
+    waitForStubCalls($rendezvous, $process, 2);
+    $rendezvous->reply('B', false, $rendezvous->indexOf('toolu_b', 'ListCompaniesTool', ['limit' => 2]));
+    $rendezvous->reply('A', true, $rendezvous->indexOf('toolu_a', 'ListCompaniesTool', ['limit' => 1]));
+    $replies = stubReplies($process->wait()->output());
+    $rendezvous->close();
+    File::deleteDirectory($directory);
+
+    $byId = array_column($replies, 'result', 'id');
+
+    expect($byId)->toHaveCount(2)
+        ->and($byId[4]['content'][0]['text'])->toBe('B')
+        ->and($byId[4]['isError'])->toBeFalse()
+        ->and($byId[3]['content'][0]['text'])->toBe('A')
+        ->and($byId[3]['isError'])->toBeTrue();
+});
+
+it('fails the stub test loudly when the stub exits instead of waiting forever', function (): void {
+    [$directory, , $rendezvous] = stubSession();
+    $process = Process::forever()->start([PHP_BINARY, '-r', 'exit(3);']);
+
+    expect(fn () => waitForStubCalls($rendezvous, $process, 1))->toThrow(RuntimeException::class, 'The stub exited');
+
+    $rendezvous->close();
+    File::deleteDirectory($directory);
+});
+
+function fakeClaudeScenario(array $steps): string
+{
+    $path = sys_get_temp_dir().'/fc'.bin2hex(random_bytes(3)).'.json';
+    file_put_contents($path, json_encode(['steps' => $steps], JSON_THROW_ON_ERROR));
+    ClaudeCodeProcess::$command = [PHP_BINARY, base_path('tests/Evals/bin/fake-claude.php'), $path];
+
+    return $path;
+}
+
+function fakeClaudeRecord(string $scenario): array
+{
+    return json_decode((string) file_get_contents($scenario.'.record'), true, flags: JSON_THROW_ON_ERROR);
+}
+
+function startFakeClaude(string ...$tools): ClaudeCodeProcess
+{
+    return ClaudeCodeProcess::start('claude-sonnet-5', 'high', 'You are Rela.', 'hello', array_map(fn (string $name): array => [
+        'name' => $name,
+        'description' => $name,
+        'inputSchema' => ['type' => 'object'],
+    ], $tools));
+}
+
+function toolMessage(string $id, array $calls, ?string $text = null): array
+{
+    return ['do' => 'message', 'id' => $id, 'stop' => 'tool_use', 'blocks' => [
+        ...($text === null ? [] : [['type' => 'text', 'text' => $text]]),
+        ...array_map(fn (array $call): array => ['type' => 'tool_use', 'id' => $call[0], 'name' => 'mcp__rela__'.$call[1], 'input' => $call[2]], $calls),
+    ]];
+}
+
+function textMessage(string $id, string $text): array
+{
+    return ['do' => 'message', 'id' => $id, 'blocks' => [['type' => 'text', 'text' => $text]]];
+}
+
+afterEach(function (): void {
+    ClaudeCodeProcess::$command = ['claude'];
+    ClaudeCodeGateway::releaseAll();
+});
+
+it('hands one tool call to laravel ai and resumes the model with its result', function (): void {
+    $scenario = fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', ['limit' => 5]]], 'Checking.'),
+        ['do' => 'connect', 'key' => 'k1', 'id' => 'toolu_1', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 5]],
+        ['do' => 'await', 'keys' => ['k1']],
+        ['do' => 'user_ok', 'id' => 'toolu_1'],
+        textMessage('m2', 'Done.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    $first = $process->nextStep();
+    $process->deliver([new ToolResult('toolu_1', 'ListCompaniesTool', ['limit' => 5], '{"data":[]}')]);
+    $second = $process->nextStep();
+    $record = fakeClaudeRecord($scenario);
+
+    expect($first->text)->toBe('Checking.')
+        ->and($first->toolCalls)->toHaveCount(1)
+        ->and($first->toolCalls[0]->id)->toBe('toolu_1')
+        ->and($first->finishReason)->toBe(FinishReason::ToolCalls)
+        ->and($first->usage->inputTokens)->toBe(32)
+        ->and($first->usage->outputTokens)->toBe(9)
+        ->and($second->text)->toBe('Done.')
+        ->and($second->finishReason)->toBe(FinishReason::Stop)
+        ->and($process->result()['total_cost_usd'])->toBe(0.01)
+        ->and($record['replies'])->toBe([['key' => 'k1', 'text' => '{"data":[]}', 'is_error' => false]])
+        ->and($record['claudecode_set'])->toBeFalse()
+        ->and($record['api_key_set'])->toBeFalse()
+        ->and($record['tool_search'])->toBe('false')
+        ->and($record['arguments'])->toContain('--include-partial-messages', '--strict-mcp-config', '--no-session-persistence')
+        ->and(json_decode($record['first_input'], true)['message']['content'][0]['text'])->toBe('hello');
+
+    $process->release();
+});
+
+it('keeps parallel calls of one message in one step and matches each result by tool use id', function (): void {
+    $scenario = fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_a', 'ListCompaniesTool', ['limit' => 1]], ['toolu_b', 'ListCompaniesTool', ['limit' => 2]]]),
+        ['do' => 'connect', 'key' => 'kb', 'id' => 'toolu_b', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 2]],
+        ['do' => 'connect', 'key' => 'ka', 'id' => 'toolu_a', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 1]],
+        ['do' => 'await', 'keys' => ['ka', 'kb']],
+        textMessage('m2', 'Both read.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    $first = $process->nextStep();
+    $process->deliver([
+        new ToolResult('toolu_a', 'ListCompaniesTool', ['limit' => 1], 'ONE'),
+        new ToolResult('toolu_b', 'ListCompaniesTool', ['limit' => 2], 'TWO'),
+    ]);
+    $second = $process->nextStep();
+    $replies = collect(fakeClaudeRecord($scenario)['replies'])->pluck('text', 'key')->all();
+
+    expect(array_map(fn (ToolCall $call): string => $call->id, $first->toolCalls))->toBe(['toolu_a', 'toolu_b'])
+        ->and($replies)->toEqual(['ka' => 'ONE', 'kb' => 'TWO'])
+        ->and($second->text)->toBe('Both read.');
+
+    $process->release();
+});
+
+it('keeps serial calls in one step when claude code connects the second only after the first is answered', function (): void {
+    $scenario = fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_a', 'ListCompaniesTool', ['limit' => 1]], ['toolu_b', 'ListCompaniesTool', ['limit' => 2]]]),
+        ['do' => 'connect', 'key' => 'ka', 'id' => 'toolu_a', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 1]],
+        ['do' => 'await', 'keys' => ['ka']],
+        ['do' => 'user_ok', 'id' => 'toolu_a'],
+        ['do' => 'connect', 'key' => 'kb', 'id' => 'toolu_b', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 2]],
+        ['do' => 'await', 'keys' => ['kb']],
+        textMessage('m2', 'Both read.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    $first = $process->nextStep();
+    $process->deliver([
+        new ToolResult('toolu_a', 'ListCompaniesTool', ['limit' => 1], 'ONE'),
+        new ToolResult('toolu_b', 'ListCompaniesTool', ['limit' => 2], 'TWO'),
+    ]);
+    $second = $process->nextStep();
+
+    expect($first->toolCalls)->toHaveCount(2)
+        ->and(collect(fakeClaudeRecord($scenario)['replies'])->pluck('text', 'key')->all())->toBe(['ka' => 'ONE', 'kb' => 'TWO'])
+        ->and($second->text)->toBe('Both read.');
+
+    $process->release();
+});
+
+it('skips the result of a call claude code refused only after it handed the step over', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_a', 'ListCompaniesTool', []], ['toolu_b', 'ListCompaniesTool', ['limit' => 9]]]),
+        ['do' => 'connect', 'key' => 'ka', 'id' => 'toolu_a', 'name' => 'ListCompaniesTool', 'arguments' => []],
+        ['do' => 'await', 'keys' => ['ka']],
+        ['do' => 'user_ok', 'id' => 'toolu_a'],
+        ['do' => 'user_error', 'id' => 'toolu_b'],
+        textMessage('m2', 'Done.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    $first = $process->nextStep();
+    $process->deliver([
+        new ToolResult('toolu_a', 'ListCompaniesTool', [], 'ONE'),
+        new ToolResult('toolu_b', 'ListCompaniesTool', ['limit' => 9], 'TWO'),
+    ]);
+
+    expect($first->toolCalls)->toHaveCount(2)
+        ->and($process->rejected())->toBe([['id' => 'toolu_b', 'name' => 'ListCompaniesTool']])
+        ->and($process->nextStep()->text)->toBe('Done.');
+
+    $process->release();
+});
+
+it('does not hand laravel ai a tool call claude code rejected itself', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', []], ['toolu_2', 'ListCompaniesTool', ['limit' => 9]]]),
+        ['do' => 'user_error', 'id' => 'toolu_2'],
+        ['do' => 'connect', 'key' => 'k1', 'id' => 'toolu_1', 'name' => 'ListCompaniesTool', 'arguments' => []],
+        ['do' => 'await', 'keys' => ['k1']],
+        textMessage('m2', 'Done.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    $first = $process->nextStep();
+
+    expect(array_map(fn (ToolCall $call): string => $call->id, $first->toolCalls))->toBe(['toolu_1'])
+        ->and($process->rejected())->toBe([['id' => 'toolu_2', 'name' => 'ListCompaniesTool']]);
+
+    $process->release();
+});
+
+it('folds a message whose only calls were rejected into the message that follows', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', []]], 'Trying.'),
+        ['do' => 'user_error', 'id' => 'toolu_1'],
+        textMessage('m2', 'I could not read them.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    $step = $process->nextStep();
+
+    expect($step->toolCalls)->toBe([])
+        ->and($step->finishReason)->toBe(FinishReason::Stop)
+        ->and($step->text)->toBe("Trying.\n\nI could not read them.")
+        ->and($step->usage->outputTokens)->toBe(18)
+        ->and($process->rejected())->toHaveCount(1)
+        ->and($process->result())->not->toBeNull();
+
+    $process->release();
+});
+
+it('cleans up the process, the socket and the directory when laravel ai ends the turn early', function (): void {
+    $scenario = fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', []]]),
+        ['do' => 'connect', 'key' => 'k1', 'id' => 'toolu_1', 'name' => 'ListCompaniesTool', 'arguments' => []],
+        ['do' => 'await', 'keys' => ['k1']],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+    $process->nextStep();
+    $directory = $process->directory();
+    $pid = fakeClaudeRecord($scenario)['pid'];
+
+    expect($directory)->toBeDirectory()
+        ->and(file_exists($directory.'/s'))->toBeTrue();
+
+    $process->release();
+    $process->release();
+
+    expect($directory)->not->toBeDirectory()
+        ->and(Process::run(['kill', '-0', (string) $pid])->failed())->toBeTrue();
+});
+
+it('stays quiet on the cpu while the model is still generating', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        ['do' => 'pause', 'seconds' => 1.5],
+        textMessage('m1', 'Slow answer.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+    $cpu = function (): float {
+        $usage = getrusage();
+
+        return $usage['ru_utime.tv_sec'] + $usage['ru_stime.tv_sec'] + ($usage['ru_utime.tv_usec'] + $usage['ru_stime.tv_usec']) / 1_000_000;
+    };
+    $cpuBefore = $cpu();
+    $wallBefore = microtime(true);
+
+    $step = $process->nextStep();
+
+    expect($step->text)->toBe('Slow answer.')
+        ->and(microtime(true) - $wallBefore)->toBeGreaterThan(1.4)
+        ->and($cpu() - $cpuBefore)->toBeLessThan(0.5);
+
+    $process->release();
+});
+
+it('fails the turn when the init line does not show the plan, the rela server and every tool', function (array $init, string $message): void {
+    fakeClaudeScenario([['do' => 'init', ...$init], textMessage('m1', 'x'), ['do' => 'result']]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    expect(fn () => $process->nextStep())->toThrow(RuntimeException::class, $message);
+
+    $process->release();
+})->with([
+    'an api key source' => [['apiKeySource' => 'ANTHROPIC_API_KEY'], 'not signed in with the plan'],
+    'no key source field' => [['apiKeySource' => null], 'not signed in with the plan'],
+    'a server that failed' => [['mcp_servers' => [['name' => 'rela', 'status' => 'failed']]], 'did not connect the rela tool server'],
+    'a missing tool' => [['tools' => []], 'does not offer 1 of the rela tools'],
+]);
+
+it('removes its directory and socket when claude cannot be started', function (): void {
+    $before = glob(sys_get_temp_dir().'/cc*');
+
+    expect(fn () => ClaudeCodeProcess::start('claude-sonnet-5', 'high', 'x', 'y', [['name' => 'T', 'description' => 'T', 'inputSchema' => ['bad' => NAN]]]))->toThrow(JsonException::class)
+        ->and(glob(sys_get_temp_dir().'/cc*'))->toBe($before);
+});
+
+it('streams a gateway step in the anthropic event order and releases the process after the last step', function (): void {
+    fakeClaudeScenario([['do' => 'init'], textMessage('m1', 'Hello there.'), ['do' => 'result']]);
+    $before = glob(sys_get_temp_dir().'/cc*');
+    ClaudeCodeProvider::register();
+    $provider = resolve(AiManager::class)->textProvider('claude-code');
+    $gateway = new ClaudeCodeGateway;
+
+    $stream = $gateway->generateStreamStep('inv-1', $provider, 'claude-sonnet-5', 'You are Rela.', [new UserMessage('hello')], [], null, null, null, new StepContext);
+    $events = [];
+
+    foreach ($stream as $event) {
+        $events[] = $event::class;
+    }
+
+    $records = ClaudeCodeGateway::takeRecords();
+
+    expect($events)->toBe([StreamStart::class, TextStart::class, TextDelta::class, TextEnd::class])
+        ->and($stream->getReturn()->text)->toBe('Hello there.')
+        ->and($records)->toHaveCount(1)
+        ->and($records[0]['result']['total_cost_usd'])->toBe(0.01)
+        ->and(glob(sys_get_temp_dir().'/cc*'))->toBe($before);
+});
+
+it('refuses a plan run of a model the claude code gateway cannot serve', function (): void {
+    EvalModels::register(null, 'plan');
+
+    expect(fn () => EvalModels::assertPlanServes('gpt-6-luna'))->toThrow(RuntimeException::class, 'PEST_EVALS_RUNNER=plan runs Claude models only, and gpt-6-luna is served by openai')
+        ->and(fn () => EvalModels::assertPlanServes('claude-haiku-5-5'))->not->toThrow(RuntimeException::class);
+});
+
+it('fails a claude code message that carries no model id instead of storing an empty one', function (): void {
+    $line = '{"type":"assistant","message":{"id":"m1","content":[{"type":"text","text":"x"}],"usage":{"input_tokens":1,"output_tokens":1}}}';
+
+    expect(fn () => StreamJson::step($line))->toThrow(RuntimeException::class, 'no model id');
 });
 
 it('points every claude model at the claude code provider under the plan runner', function (): void {

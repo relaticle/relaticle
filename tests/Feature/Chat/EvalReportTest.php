@@ -474,24 +474,74 @@ it('refuses an unknown split, a split with noise and a missing directory', funct
         ->and($run([$baseline, $candidate]))->toBe(0);
 });
 
+function planRun(float $cost = 0.25): array
+{
+    return ['input' => 'hi', 'result' => [
+        'total_cost_usd' => $cost,
+        'usage' => ['input_tokens' => 3, 'cache_read_input_tokens' => 30, 'cache_creation_input_tokens' => 15, 'output_tokens' => 11, 'output_tokens_details' => ['thinking_tokens' => 5]],
+    ]];
+}
+
 it('records the runner and the parallel tool call count on the result line and keeps them out of the scored json', function (): void {
-    $envelope = cachedEnvelope()->withRunner('plan', [['input' => 'hi', 'result' => ['total_cost_usd' => 0.25]]]);
+    $envelope = cachedEnvelope()->withRunner('plan', [planRun()]);
     $parallel = new TurnEnvelope('ok', [], [], 0, 10, 5, 100, null, parallelToolCalls: 2);
 
-    EvalReport::record('plan case', true, $envelope, turns: [$parallel->withRunner('plan'), $envelope]);
+    EvalReport::record('plan case', true, $envelope, turns: [$parallel->withRunner('plan', [planRun(0.5)]), $envelope]);
     EvalReport::record('api case', true, cachedEnvelope());
 
     [$plan, $api] = reportResultLines();
 
     expect($plan['runner'])->toBe('plan')
         ->and($plan['parallel_tool_calls'])->toBe(2)
-        ->and($plan['notional_cost_usd'])->toBe(0.25)
+        ->and($plan['notional_cost_usd'])->toBe(0.75)
         ->and($api['runner'])->toBe('api')
         ->and($api['parallel_tool_calls'])->toBe(0)
         ->and($api)->not->toHaveKey('notional_cost_usd')
         ->and(json_decode($envelope->toJson(), true))->not->toHaveKeys(['runner', 'parallel_tool_calls', 'claude_code'])
         ->and($envelope->toTrace()['runner'])->toBe('plan')
         ->and($envelope->toTrace()['claude_code'][0]['input'])->toBe('hi');
+});
+
+it('takes a plan line usage from the result line and leaves its API price null', function (): void {
+    EvalReport::record('plan case', true, cachedEnvelope()->withRunner('plan', [planRun()]));
+
+    [$line] = reportResultLines();
+
+    expect($line['cost_usd'])->toBeNull()
+        ->and($line['usage'])->toBe(['input' => 48, 'output' => 11, 'cache_read' => 30, 'cache_write' => 15, 'reasoning' => 5])
+        ->and($line['notional_cost_usd'])->toBe(0.25)
+        ->and($line)->not->toHaveKey('notional_cost_missing');
+});
+
+it('writes a null notional cost with the reason when no result line arrived', function (): void {
+    EvalReport::record('plan case', false, cachedEnvelope()->withRunner('plan', [['input' => 'hi', 'result' => null]]));
+    EvalReport::record('failed plan case', false, TurnEnvelope::failed('boom')->withRunner('plan'));
+
+    [$silent, $failed] = reportResultLines();
+
+    expect($silent['notional_cost_usd'])->toBeNull()
+        ->and($silent['notional_cost_missing'])->toContain('no result line')
+        ->and($failed['notional_cost_usd'])->toBeNull()
+        ->and($failed['cost_usd'])->toBeNull();
+});
+
+it('keeps plan notional cost out of the API cost and the unpriced count in the totals', function (): void {
+    EvalReport::record('plan case', true, cachedEnvelope()->withRunner('plan', [planRun(0.25)]));
+    EvalReport::record('silent plan case', true, cachedEnvelope()->withRunner('plan', [['input' => 'hi', 'result' => null]]));
+
+    $report = json_decode((string) file_get_contents((string) EvalReport::flush('claude-sonnet-5', 'claude-opus-5-5')), true, flags: JSON_THROW_ON_ERROR);
+
+    expect($report['totals']['cost_usd'])->toBeNull()
+        ->and($report['totals']['unpriced_lines'])->toBe(0)
+        ->and($report['totals']['notional_cost_usd'])->toBe(0.25)
+        ->and($report['totals']['lines_without_notional_cost'])->toBe(1);
+});
+
+it('records the history group on the result line', function (): void {
+    EvalReport::record('with history', true, cachedEnvelope(), history: true);
+    EvalReport::record('without history', true, cachedEnvelope());
+
+    expect(array_column(reportResultLines(), 'history'))->toBe([true, false]);
 });
 
 it('keeps the runner and the retry count when an envelope is rebuilt', function (): void {
@@ -501,4 +551,57 @@ it('keeps the runner and the retry count when an envelope is rebuilt', function 
         ->and($envelope->retries)->toBe(2)
         ->and($envelope->servedModel)->toBe('claude-sonnet-5')
         ->and(TurnEnvelope::failed('boom')->runner)->toBe('api');
+});
+
+function runnerFixture(string $name, string $runner, array $lines): string
+{
+    return writeRunFixture($name, array_map(fn (array $line): array => $line + ['runner' => $runner], $lines));
+}
+
+it('refuses to compare a plan run with an API run and names both runners', function (): void {
+    $plan = runnerFixture('plan', 'plan', [['case' => 'one', 'passed' => true]]);
+    $api = runnerFixture('api', 'api', [['case' => 'one', 'passed' => true]]);
+
+    $result = Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), $plan, $api]);
+
+    expect($result->successful())->toBeFalse()
+        ->and($result->errorOutput())->toContain('Refusing to compare a plan run with a api run');
+
+    $legacy = writeRunFixture('legacy', [['case' => 'one', 'passed' => true]]);
+
+    expect(Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), $legacy, $api])->successful())->toBeTrue()
+        ->and(Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), $legacy, $plan])->successful())->toBeFalse();
+});
+
+it('refuses to measure noise over mixed runners', function (): void {
+    $lines = [['case' => 'one', 'passed' => true]];
+    $directories = [runnerFixture('r1', 'plan', $lines), runnerFixture('r2', 'plan', $lines), runnerFixture('r3', 'api', $lines)];
+
+    $result = Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), '--noise', ...$directories]);
+
+    expect($result->successful())->toBeFalse()
+        ->and($result->errorOutput())->toContain('different runners: plan, api');
+});
+
+it('reports plan history cases apart from the headline and the paired difference', function (): void {
+    $baseline = runnerFixture('plan-base', 'plan', [
+        ['case' => 'plain', 'passed' => true],
+        ['case' => 'replays', 'passed' => false, 'history' => true],
+    ]);
+    $candidate = runnerFixture('plan-cand', 'plan', [
+        ['case' => 'plain', 'passed' => true],
+        ['case' => 'replays', 'passed' => true, 'history' => true],
+    ]);
+
+    $output = Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), $baseline, $candidate])->throw()->output();
+
+    expect($output)->toContain('Cases: baseline 1, candidate 1, shared 1')
+        ->and($output)->toContain('Paired difference: +0.0 pts')
+        ->and($output)->toContain('History cases (plan runner replays earlier turns as text, so they are left out of the headline and the paired difference): baseline 0.0% over 1, candidate 100.0% over 1')
+        ->and($output)->not->toContain('replays |');
+
+    $noise = Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), '--noise', $baseline, $candidate, $baseline])->throw()->output();
+
+    expect($noise)->toContain('cases in every run: 1')
+        ->and($noise)->toContain('History cases are left out above. Their pass rate per run: 0.0%, 100.0%, 0.0%');
 });

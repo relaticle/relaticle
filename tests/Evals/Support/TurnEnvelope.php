@@ -48,12 +48,37 @@ final readonly class TurnEnvelope
      */
     public function withRunner(string $runner, array $claudeCode = []): self
     {
-        return new self(...[...get_object_vars($this), 'runner' => $runner, 'claudeCode' => $claudeCode]);
+        $fields = [...get_object_vars($this), 'runner' => $runner, 'claudeCode' => $claudeCode];
+
+        if ($runner !== 'plan' || ! self::everyRunHasResult($claudeCode)) {
+            return new self(...$fields);
+        }
+
+        $sum = fn (callable $read): int => array_sum(array_map(fn (array $run): int => (int) $read($run['result']['usage'] ?? []), $claudeCode));
+
+        return new self(...[
+            ...$fields,
+            'inputTokens' => $sum(fn (array $usage): int => (int) ($usage['input_tokens'] ?? 0) + (int) ($usage['cache_read_input_tokens'] ?? 0) + (int) ($usage['cache_creation_input_tokens'] ?? 0)),
+            'outputTokens' => $sum(fn (array $usage): int => (int) ($usage['output_tokens'] ?? 0)),
+            'cacheReadTokens' => $sum(fn (array $usage): int => (int) ($usage['cache_read_input_tokens'] ?? 0)),
+            'cacheWriteTokens' => $sum(fn (array $usage): int => (int) ($usage['cache_creation_input_tokens'] ?? 0)),
+            'reasoningTokens' => $sum(fn (array $usage): int => (int) ($usage['output_tokens_details']['thinking_tokens'] ?? 0)),
+        ]);
     }
 
-    public function notionalCostUsd(): float
+    public function notionalCostUsd(): ?float
     {
-        return array_sum(array_map(fn (array $run): float => (float) ($run['result']['total_cost_usd'] ?? 0), $this->claudeCode));
+        return self::everyRunHasResult($this->claudeCode)
+            ? array_sum(array_map(fn (array $run): float => (float) ($run['result']['total_cost_usd'] ?? 0), $this->claudeCode))
+            : null;
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $claudeCode
+     */
+    private static function everyRunHasResult(array $claudeCode): bool
+    {
+        return $claudeCode !== [] && array_filter($claudeCode, fn (array $run): bool => ! is_array($run['result'] ?? null)) === [];
     }
 
     public function toJson(): string

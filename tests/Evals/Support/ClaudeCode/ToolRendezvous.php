@@ -8,7 +8,7 @@ use RuntimeException;
 
 final class ToolRendezvous
 {
-    /** @var list<array{connection: resource, name: string, arguments: array<string, mixed>}> */
+    /** @var list<array{connection: resource, id: string|null, name: string, arguments: array<string, mixed>}> */
     private array $waiting = [];
 
     /**
@@ -34,7 +34,7 @@ final class ToolRendezvous
     }
 
     /**
-     * @return array{name: string, arguments: array<string, mixed>}|null
+     * @return array{id: string|null, name: string, arguments: array<string, mixed>}|null
      */
     public function accept(float $seconds): ?array
     {
@@ -60,18 +60,61 @@ final class ToolRendezvous
             return null;
         }
 
-        $request = ['name' => $request['name'], 'arguments' => is_array($request['arguments'] ?? null) ? $request['arguments'] : []];
+        $request = [
+            'id' => is_string($request['id'] ?? null) ? $request['id'] : null,
+            'name' => $request['name'],
+            'arguments' => is_array($request['arguments'] ?? null) ? $request['arguments'] : [],
+        ];
         $this->waiting[] = ['connection' => $connection] + $request;
 
         return $request;
     }
 
     /**
-     * @return list<array{name: string, arguments: array<string, mixed>}>
+     * @return list<array{id: string|null, name: string, arguments: array<string, mixed>}>
      */
     public function waiting(): array
     {
-        return array_map(fn (array $call): array => ['name' => $call['name'], 'arguments' => $call['arguments']], $this->waiting);
+        return array_map(fn (array $call): array => ['id' => $call['id'], 'name' => $call['name'], 'arguments' => $call['arguments']], $this->waiting);
+    }
+
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    public function indexOf(string $id, string $name, array $arguments): ?int
+    {
+        foreach ($this->waiting as $index => $call) {
+            if ($call['id'] === $id) {
+                return $index;
+            }
+        }
+
+        foreach ($this->waiting as $index => $call) {
+            if ($call['id'] === null && $call['name'] === $name && self::canonical($call['arguments']) === self::canonical($arguments)) {
+                return $index;
+            }
+        }
+
+        return null;
+    }
+
+    public function hasId(string $id): bool
+    {
+        return array_filter($this->waiting, fn (array $call): bool => $call['id'] === $id) !== [];
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $value
+     */
+    private static function canonical(array $value): string
+    {
+        $sort = function (array $node) use (&$sort): array {
+            ksort($node);
+
+            return array_map(fn (mixed $child): mixed => is_array($child) ? $sort($child) : $child, $node);
+        };
+
+        return json_encode($sort($value), JSON_THROW_ON_ERROR);
     }
 
     public function reply(string $text, bool $isError, int $index = 0): void

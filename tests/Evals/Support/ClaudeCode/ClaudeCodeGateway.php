@@ -33,6 +33,7 @@ use Laravel\Ai\Streaming\Events\TextEnd;
 use Laravel\Ai\Streaming\Events\TextStart;
 use Laravel\Ai\Streaming\Events\ToolCall as ToolCallEvent;
 use LogicException;
+use Throwable;
 
 final class ClaudeCodeGateway implements Gateway, StepTextGateway
 {
@@ -47,13 +48,15 @@ final class ClaudeCodeGateway implements Gateway, StepTextGateway
     private static array $started = [];
 
     /**
-     * @return list<array{input: string, init: array<string, mixed>, result: array<string, mixed>|null}>
+     * @return list<array{input: string, init: array<string, mixed>, messages: list<array{id: string|null, tool_use_ids: list<string>}>, rejected_tool_calls: list<array{id: string, name: string}>, result: array<string, mixed>|null}>
      */
     public static function takeRecords(): array
     {
         $records = array_map(fn (ClaudeCodeProcess $process): array => [
             'input' => $process->firstInput,
             'init' => array_intersect_key($process->init(), array_flip(['model', 'apiKeySource', 'claude_code_version', 'tools', 'mcp_servers'])),
+            'messages' => $process->messages(),
+            'rejected_tool_calls' => $process->rejected(),
             'result' => $process->result(),
         ], self::$started);
 
@@ -100,7 +103,7 @@ final class ClaudeCodeGateway implements Gateway, StepTextGateway
 
         $messageId = $this->eventId();
 
-        yield (new StreamStart($this->eventId(), $provider->name(), $response->meta->model ?? $model, time()))->withInvocationId($invocationId);
+        yield (new StreamStart($this->eventId(), $provider->name(), $response->meta->model, time()))->withInvocationId($invocationId);
 
         if ($response->text !== '') {
             yield (new TextStart($this->eventId(), $messageId, time()))->withInvocationId($invocationId);
@@ -131,19 +134,26 @@ final class ClaudeCodeGateway implements Gateway, StepTextGateway
 
         $process = self::$live[$key] ?? null;
 
-        if ($process === null) {
-            $process = self::$live[$key] = self::$started[] = ClaudeCodeProcess::start(
-                $model,
-                $this->effortFrom($options),
-                (string) $instructions,
-                $this->firstMessage($messages),
-                $this->mcpTools($tools, $provider),
-            );
-        } else {
-            $process->deliver($this->pendingResults($messages));
-        }
+        try {
+            if ($process === null) {
+                $process = self::$live[$key] = self::$started[] = ClaudeCodeProcess::start(
+                    $model,
+                    $this->effortFrom($options),
+                    (string) $instructions,
+                    $this->firstMessage($messages),
+                    $this->mcpTools($tools, $provider),
+                );
+            } else {
+                $process->deliver($this->pendingResults($messages));
+            }
 
-        $response = $process->nextStep();
+            $response = $process->nextStep();
+        } catch (Throwable $e) {
+            $process?->release();
+            unset(self::$live[$key]);
+
+            throw $e;
+        }
 
         if ($response->finishReason !== FinishReason::ToolCalls) {
             $process->release();
