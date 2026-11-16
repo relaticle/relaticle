@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Pest\Evals\Scorers\Scorer;
+use Tests\Evals\Scorers\AnsweredTurn;
 use Tests\Evals\Scorers\CalledAnyOf;
 use Tests\Evals\Scorers\CalledOrHandsOff;
 use Tests\Evals\Scorers\EveryRecordCarries;
@@ -253,6 +254,7 @@ it('fails every scorer on a failed turn', function (Scorer $scorer): void {
     'ToolArgumentEquals' => fn (): Scorer => new ToolArgumentEquals('CreateTaskTool', 'records.*.title', 'x'),
     'EveryRecordCarries' => fn (): Scorer => new EveryRecordCarries('CreateTaskTool', 'opportunity_ids'),
     'NoCodeFence' => fn (): Scorer => new NoCodeFence,
+    'AnsweredTurn' => fn (): Scorer => new AnsweredTurn,
     'CalledOrHandsOff' => fn (): Scorer => new CalledOrHandsOff(['UpdatePersonTool']),
     'NotCalledOrReplyMatches' => fn (): Scorer => new NotCalledOrReplyMatches(['CreateTaskTool'], '/already/i'),
 ]);
@@ -295,13 +297,35 @@ it('fails a reply that holds a code fence, also in an earlier step', function ()
         ->and((new NoCodeFence)->score('', scorerEnvelope('Done.', stepsText: ["```py\nx\n```"]))->score)->toBe(0.0);
 });
 
-it('accepts the write tool or a hand off link, never a dead end', function (): void {
+it('accepts the write tool or a link to a new chat, never a record link or a dead end', function (): void {
     $scorer = new CalledOrHandsOff(['UpdatePersonTool']);
 
     expect($scorer->score('', scorerEnvelope('Drafted.', [['name' => 'UpdatePersonTool', 'arguments' => []]]))->score)->toBe(1.0)
-        ->and($scorer->score('', scorerEnvelope('Open [People](/app/people) and edit it.'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Continue in a [new chat](https://x.test/app/acme/chats?prompt=Link%20Priya).'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Continue in a [new chat](/app/acme/chats).'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Open [People](/app/people) and edit it.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Open [Priya Raman](/app/acme/people/01abc) and set the company.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Open [Settings](/app/acme/settings) to add it.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('See [the chat](/app/acme/chats/01abc).'))->score)->toBe(0.0)
         ->and($scorer->score('', scorerEnvelope('Open the record page and edit it.'))->score)->toBe(0.0)
-        ->and($scorer->score('', scorerEnvelope('Open the [record page](/app/people/1).'))->score)->toBe(0.0);
+        ->and($scorer->score('', scorerEnvelope('Open the record page, or a [new chat](/app/acme/chats).'))->score)->toBe(0.0);
+});
+
+it('counts a retry only when the second call sits in a later step', function (): void {
+    $parallel = [['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 0], ['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 0]];
+    $retried = [['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 0], ['name' => 'SearchCrmTool', 'arguments' => [], 'step' => 1]];
+    $scorer = new ToolCalledAtLeast(['SearchCrmTool'], 2, inSeparateSteps: true);
+
+    expect($scorer->score('', scorerEnvelope('x', $parallel))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('x', $retried))->score)->toBe(1.0);
+});
+
+it('fails a turn that ended with no reply and no tool call', function (): void {
+    $scorer = new AnsweredTurn;
+
+    expect($scorer->score('', scorerEnvelope('Here you go.'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('', [['name' => 'ListTasksTool', 'arguments' => []]]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('  '))->score)->toBe(0.0);
 });
 
 it('passes when the write was never called or the reply says it exists', function (): void {

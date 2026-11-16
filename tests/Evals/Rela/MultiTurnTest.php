@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use Relaticle\Chat\Models\PendingAction;
+use Tests\Evals\Scorers\AnsweredTurn;
 use Tests\Evals\Scorers\EveryRecordCarries;
 use Tests\Evals\Scorers\NotCalledOrReplyMatches;
 use Tests\Evals\Scorers\TextMatches;
@@ -19,11 +21,11 @@ it('finishes twelve writes across three record types inside ninety seconds', fun
         ->toPassScorer(new EveryRecordCarries('CreateOpportunityTool', 'company_id', records: 4))
         ->toPassScorer(new EveryRecordCarries('CreateTaskTool', 'opportunity_ids', records: 4));
 
-    $writes = array_filter(RelaTurn::$last->toolCalls, fn (array $call): bool => preg_match('/^(Create|Update)/', $call['name']) === 1);
+    $proposals = PendingAction::query()->where('workspace_id', $w->workspace->getKey())->pluck('entity_type')->map(fn (mixed $type): string => $type instanceof BackedEnum ? $type->value : (string) $type)->sort()->values()->all();
 
-    expect($writes)->toHaveCount(3)
+    expect($proposals)->toBe(['opportunity', 'people', 'task'])
         ->and(RelaTurn::$last->durationMs)->toBeLessThan(90_000);
-})->group('train');
+})->group('train')->group('clock');
 
 it('keeps the links when the first step is approved before the second is proposed', function (): void {
     $w = EvalWorkspace::seed();
@@ -31,11 +33,16 @@ it('keeps the links when the first step is approved before the second is propose
 
     expect((new RelaTurn($w))(...))
         ->prompt('Create Northwind Traders, add Priya Raman there, and a deal for them')
-        ->toHaveToolCalls(['CreateCompanyTool' => [], 'CreatePersonTool' => [], 'CreateOpportunityTool' => []])
-        ->toPassScorer(new EveryRecordCarries('CreatePersonTool', 'company_id', '/^\$ref:|^[0-9a-z]{26}$/i'))
-        ->toPassScorer(new EveryRecordCarries('CreateOpportunityTool', 'company_id', '/^\$ref:|^[0-9a-z]{26}$/i'));
+        ->toHaveToolCalls(['CreateCompanyTool' => [], 'CreatePersonTool' => [], 'CreateOpportunityTool' => []]);
 
-    expect(ApprovesMidTurn::approved($w, 'company'))->toBeTrue();
+    $reference = '/^\$ref:|^[0-9a-z]{26}$/i';
+    $people = ApprovesMidTurn::storedRecords($w, 'people');
+    $opportunities = ApprovesMidTurn::storedRecords($w, 'opportunity');
+
+    expect(ApprovesMidTurn::approved($w, 'company'))->toBeTrue()
+        ->and($people)->not->toBeEmpty()
+        ->and($opportunities)->not->toBeEmpty()
+        ->and(array_map(fn (array $record): bool => preg_match($reference, (string) ($record['company_id'] ?? '')) === 1, [...$people, ...$opportunities]))->each->toBeTrue();
 })->group('test');
 
 it('counts approved writes that sat in a regenerated turn', function (): void {
@@ -44,7 +51,9 @@ it('counts approved writes that sat in a regenerated turn', function (): void {
 
     expect((new RelaTurn($w, conversationId: $conversationId))(...))
         ->prompt('How many notes did we save? Save any that are missing.')
-        ->toPassScorer(new TextMatches('/\b(2|two|both)\b/i'))
+        ->toPassScorer(new AnsweredTurn)
+        ->toPassScorer(new TextMatches('/\b(2|two|both)\b[^.\n]{0,40}\bsaved\b|\bsaved\b[^.\n]{0,40}\b(2|two|both)\b/i'))
+        ->toPassScorer(new TextMatches('/\b(neither|none of)\b|\bnot (been )?saved\b|n.t (been )?saved\b|(?<!nothing )(?<!none )\b(is|are|were) missing\b/i', negate: true))
         ->not->toMatch('/"name":"CreateNoteTool"/');
 })->group('train')->group('history');
 
@@ -54,5 +63,6 @@ it('does not propose again a task created earlier in the conversation', function
 
     expect((new RelaTurn($w, conversationId: $conversationId))(...))
         ->prompt('Add a task to research Company 04')
+        ->toPassScorer(new AnsweredTurn)
         ->toPassScorer(new NotCalledOrReplyMatches(['CreateTaskTool'], '/already/i'));
 })->group('test')->group('history');

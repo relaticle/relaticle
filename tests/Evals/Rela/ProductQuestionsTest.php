@@ -76,7 +76,7 @@ it('answers a Russian product question from the docs', function (): void {
         ->prompt('Как экспортировать мои компании в файл?')
         ->toPassScorer(new CalledAnyOf(['SearchDocsTool']))
         ->toPassScorer(new TextMatches('/\p{Cyrillic}{3}/u'))
-        ->toPassScorer(new TextMatches('/\]\(https?:\/\/[^)\s]*help[^)\s]*\)/i'));
+        ->toPassScorer(new TextMatches('/\]\(https?:\/\/[^)\s]*\/help\/[a-z0-9-]+\/[a-z0-9-]+[^)\s]*\)/i'));
 })->group('test');
 
 it('says a field type cannot be changed after creation', function (): void {

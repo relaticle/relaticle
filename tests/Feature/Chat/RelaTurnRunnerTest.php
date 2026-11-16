@@ -161,6 +161,35 @@ it('records a failed sample when the turn throws', function (): void {
         ->and($envelope['replayed_bytes'])->toBe(0);
 });
 
+it('does not run a later turn of a conversation whose earlier turn failed', function (): void {
+    RelaTurn::forget();
+    CrmAssistant::fake(fn () => throw new RuntimeException('provider down'));
+    $workspace = EvalWorkspace::seed();
+    $turn = new RelaTurn($workspace, conversationId: (string) $workspace->conversation()->getKey());
+
+    $turn('first');
+
+    expect(fn (): string => $turn('second'))->toThrow(RuntimeException::class, 'turn 1 failed: provider down')
+        ->and(RelaTurn::$turns)->toHaveCount(1)
+        ->and(RelaTurn::$skipped)->toBe(1);
+
+    RelaTurn::forget();
+});
+
+it('keeps running independent samples after one of them failed', function (): void {
+    RelaTurn::forget();
+    CrmAssistant::fake(fn () => throw new RuntimeException('provider down'));
+    $turn = new RelaTurn(EvalWorkspace::seed());
+
+    $turn('first');
+    $turn('second');
+
+    expect(RelaTurn::$turns)->toHaveCount(2)
+        ->and(RelaTurn::$skipped)->toBe(0);
+
+    RelaTurn::forget();
+});
+
 it('lists the rendered row ids of each tool call in the envelope', function (): void {
     $row = assistantRowWithResults(
         EvalWorkspace::seed(),
@@ -181,6 +210,30 @@ it('lists the rendered row ids of each tool call in the envelope', function (): 
         ->and($envelope->inputTokens)->toBe(120)
         ->and($envelope->outputTokens)->toBe(30)
         ->and($envelope->durationMs)->toBe(450);
+});
+
+it('records the step each tool call ran in', function (): void {
+    $workspace = EvalWorkspace::seed();
+    $conversation = $workspace->conversation();
+    $step = fn (string $id): array => ['content' => '', 'reasoning' => '', 'replay_blocks' => [], 'provider_tool_calls' => [], 'tool_calls' => [['id' => $id, 'name' => 'SearchCrmTool', 'arguments' => [], 'result' => '{}', 'result_id' => $id]]];
+
+    $row = AgentConversationMessage::query()->create([
+        'id' => (string) Str::uuid7(),
+        'conversation_id' => $conversation->getKey(),
+        'participant_type' => 'user',
+        'participant_id' => (string) $workspace->owner->getKey(),
+        'agent' => CrmAssistant::class,
+        'role' => 'assistant',
+        'content' => 'Done.',
+        'attachments' => '[]',
+        'steps' => json_encode([$step('a'), $step('b')], JSON_THROW_ON_ERROR),
+        'usage' => '[]',
+        'meta' => '[]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    expect(array_column(RelaTurn::envelopeFromRow($row)->toolCalls, 'step'))->toBe([0, 1]);
 });
 
 it('reads the served model, cache legs, reasoning and step count from the stored row', function (): void {

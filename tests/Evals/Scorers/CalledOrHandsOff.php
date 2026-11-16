@@ -12,7 +12,7 @@ final readonly class CalledOrHandsOff implements Scorer
 {
     use ReadsEnvelope;
 
-    private const string LINK = '/\]\((https?:\/\/|\/)[^)\s]+\)/';
+    private const string LINK = '/\]\([^)\s]*\/chats(\?[^)\s]*)?\)/';
 
     private const string DEAD_END = '/record page/i';
 
@@ -36,7 +36,7 @@ final readonly class CalledOrHandsOff implements Scorer
         $reply = $this->replyText($output);
 
         if (preg_match(self::LINK, $reply) !== 1) {
-            return $this->fail('Called none of '.implode(', ', $this->names).' and the reply holds no markdown link');
+            return $this->fail('Called none of '.implode(', ', $this->names).' and the reply holds no link to a new chat');
         }
 
         if (preg_match(self::DEAD_END, $reply) === 1) {

@@ -15,7 +15,7 @@ final readonly class ToolCalledAtLeast implements Scorer
     /**
      * @param  list<string>  $names
      */
-    public function __construct(private array $names, private int $times) {}
+    public function __construct(private array $names, private int $times, private bool $inSeparateSteps = false) {}
 
     public function score(string $input, string $output, ?string $expected = null): ScorerResult
     {
@@ -23,10 +23,11 @@ final readonly class ToolCalledAtLeast implements Scorer
             return $failed;
         }
 
-        $calls = count(array_filter($this->toolCalls($output), fn (array $call): bool => in_array($call['name'], $this->names, true)));
+        $matching = array_filter($this->toolCalls($output), fn (array $call): bool => in_array($call['name'], $this->names, true));
+        $calls = $this->inSeparateSteps ? count(array_unique(array_column($matching, 'step'))) : count($matching);
 
         if ($calls < $this->times) {
-            return $this->fail("Called {$calls} time(s) of ".implode(', ', $this->names).", expected at least {$this->times}");
+            return $this->fail("Called {$calls} ".($this->inSeparateSteps ? 'step(s)' : 'time(s)').' of '.implode(', ', $this->names).", expected at least {$this->times}");
         }
 
         return $this->pass("Called {$calls} time(s) of ".implode(', ', $this->names));

@@ -537,6 +537,16 @@ it('keeps plan notional cost out of the API cost and the unpriced count in the t
         ->and($report['totals']['lines_without_notional_cost'])->toBe(1);
 });
 
+it('records the clock group and the skipped turns on the result line', function (): void {
+    EvalReport::record('on the clock', true, cachedEnvelope(), clock: true, skippedTurns: 2);
+    EvalReport::record('off the clock', true, cachedEnvelope());
+
+    $lines = reportResultLines();
+
+    expect(array_column($lines, 'clock'))->toBe([true, false])
+        ->and(array_column($lines, 'turns_skipped'))->toBe([2, 0]);
+});
+
 it('records the history group on the result line', function (): void {
     EvalReport::record('with history', true, cachedEnvelope(), history: true);
     EvalReport::record('without history', true, cachedEnvelope());
@@ -604,4 +614,27 @@ it('reports plan history cases apart from the headline and the paired difference
 
     expect($noise)->toContain('cases in every run: 1')
         ->and($noise)->toContain('History cases are left out above. Their pass rate per run: 0.0%, 100.0%, 0.0%');
+});
+
+it('reports plan clock cases apart from the headline and the paired difference', function (): void {
+    $baseline = runnerFixture('clock-base', 'plan', [
+        ['case' => 'plain', 'passed' => true],
+        ['case' => 'dated', 'passed' => false, 'clock' => true],
+    ]);
+    $candidate = runnerFixture('clock-cand', 'plan', [
+        ['case' => 'plain', 'passed' => true],
+        ['case' => 'dated', 'passed' => true, 'clock' => true],
+    ]);
+
+    $output = Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), $baseline, $candidate])->throw()->output();
+
+    expect($output)->toContain('Cases: baseline 1, candidate 1, shared 1')
+        ->and($output)->toContain('Paired difference: +0.0 pts')
+        ->and($output)->toContain('Clock cases (Claude Code injects its own date and timing, so they are left out of the headline and the paired difference): baseline 0.0% over 1, candidate 100.0% over 1')
+        ->and($output)->not->toContain('dated |');
+
+    $noise = Process::run([PHP_BINARY, base_path('bin/eval-compare.php'), '--noise', $baseline, $candidate, $baseline])->throw()->output();
+
+    expect($noise)->toContain('cases in every run: 1')
+        ->and($noise)->toContain('Clock cases are left out above. Their pass rate per run: 0.0%, 100.0%, 0.0%');
 });

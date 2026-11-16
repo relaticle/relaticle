@@ -7,7 +7,7 @@ namespace Tests\Evals\Support;
 final readonly class TurnEnvelope
 {
     /**
-     * @param  list<array{name: string, arguments: array<string, mixed>}>  $toolCalls
+     * @param  list<array{name: string, arguments: array<string, mixed>, step?: int}>  $toolCalls
      * @param  list<list<string>>  $renderedRowIds
      * @param  list<string>  $stepsText
      * @param  list<array<string, mixed>>  $claudeCode

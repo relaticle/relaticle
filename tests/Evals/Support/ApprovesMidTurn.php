@@ -34,6 +34,20 @@ final readonly class ApprovesMidTurn
         });
     }
 
+    /**
+     * @return list<array<string, mixed>>
+     */
+    public static function storedRecords(EvalWorkspace $w, string $entity): array
+    {
+        return PendingAction::query()
+            ->where('workspace_id', $w->workspace->getKey())
+            ->where('entity_type', $entity)
+            ->get()
+            ->flatMap(fn (PendingAction $action): array => is_array($action->action_data['records'] ?? null) ? $action->action_data['records'] : [$action->action_data])
+            ->values()
+            ->all();
+    }
+
     public static function approved(EvalWorkspace $w, string $entity): bool
     {
         return PendingAction::query()

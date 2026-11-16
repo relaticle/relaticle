@@ -37,7 +37,7 @@ trait ReadsEnvelope
     }
 
     /**
-     * @return list<array{name: string, arguments: array<string, mixed>}>
+     * @return list<array{name: string, arguments: array<string, mixed>, step: int}>
      */
     private function toolCalls(string $output): array
     {
@@ -50,6 +50,7 @@ trait ReadsEnvelope
         return array_values(array_map(static fn (mixed $call): array => [
             'name' => is_array($call) && is_string($call['name'] ?? null) ? $call['name'] : '',
             'arguments' => is_array($call) && is_array($call['arguments'] ?? null) ? $call['arguments'] : [],
+            'step' => is_array($call) && is_int($call['step'] ?? null) ? $call['step'] : -1,
         ], $calls));
     }
 

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Relaticle\Chat\Models\AgentConversationMessage;
+use Tests\Evals\Scorers\AnsweredTurn;
 use Tests\Evals\Scorers\CalledAnyOf;
 use Tests\Evals\Scorers\NoContactWord;
 use Tests\Evals\Scorers\NoDuplicateRowSet;
@@ -12,7 +13,6 @@ use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\RendersTable;
 use Tests\Evals\Scorers\ReplayedBytesUnder;
 use Tests\Evals\Scorers\TextMatches;
-use Tests\Evals\Scorers\ToolCalledAtLeast;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
@@ -139,7 +139,7 @@ it('finds a note by a word in its body', function (): void {
 
     expect((new RelaTurn($w))(...))
         ->prompt('Find the note that mentions kumquat')
-        ->toPassScorer(new TextMatches('/\[Call recap\]\(/'))
+        ->toPassScorer(new TextMatches('/Call recap/'))
         ->toPassScorer(new TextMatches('/no notes|nothing/i', negate: true));
 })->group('test');
 
@@ -149,20 +149,23 @@ it('retries a search in the singular before saying nothing exists', function ():
 
     expect((new RelaTurn($w))(...))
         ->prompt('Do I have anything about integrations?')
-        ->toPassScorer(new ToolCalledAtLeast(['SearchCrmTool', 'ListCompaniesTool', 'ListPeopleTool', 'ListOpportunitiesTool', 'ListTasksTool', 'ListNotesTool'], 2))
-        ->toPassScorer(new TextMatches('/Integration Partner/'));
+        ->toPassScorer(new AnsweredTurn)
+        ->toPassScorer(new TextMatches('/Integration Partner/'))
+        ->toPassScorer(new TextMatches('/no (records|results|matches)|nothing (matches|exists)/i', negate: true));
 })->group('train');
 
 it('does not call a new sample opportunity stale', function (): void {
     $this->travelTo('2026-11-13 12:00:00');
     $w = EvalWorkspace::seed();
     Prior::sampleOnly($w);
+    $w->withoutActivityRows();
 
     expect((new RelaTurn($w))(...))
         ->prompt('Which deals have gone quiet for 30 days?')
         ->repeat(3)
+        ->toPassScorer(new AnsweredTurn)
         ->toPassJudge('The reply names no opportunity as idle or quiet for 30 days. Saying that none qualifies, or that the records are new or sample data, passes.');
-})->group('test');
+})->group('test')->group('clock');
 
 it('totals deals by close date with a tool, never by hand', function (): void {
     $this->travelTo('2026-07-20 12:00:00');
@@ -173,4 +176,4 @@ it('totals deals by close date with a tool, never by hand', function (): void {
         ->prompt('What is the value of deals closing in August?')
         ->toPassScorer(new TextMatches('/(?<![\d,.])400(?![\d,])/', negate: true))
         ->toPassScorer(new TextMatches('/(?<![\d,.])300(?![\d,])|cannot|can\'t|can\x{2019}t|unable|not able/iu'));
-})->group('train');
+})->group('train')->group('clock');

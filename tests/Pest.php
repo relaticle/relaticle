@@ -101,6 +101,7 @@ pest()->afterEach(function (): void {
     RecordingJudge::$used = false;
     $verdicts = RecordingJudge::$verdicts;
     $history = in_array('history', $this->groups(), true);
+    $clock = in_array('clock', $this->groups(), true);
     RecordingJudge::$verdicts = [];
 
     if ($status->isSkipped()) {
@@ -111,7 +112,7 @@ pest()->afterEach(function (): void {
     $split = current(array_intersect($this->groups(), Splits::NAMES)) ?: null;
 
     if (! RelaTurn::$last instanceof TurnEnvelope) {
-        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], judged: $judged, file: basename(self::$__filename, '.php'), split: $split, verdicts: $verdicts, history: $history);
+        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], judged: $judged, file: basename(self::$__filename, '.php'), split: $split, verdicts: $verdicts, history: $history, clock: $clock, skippedTurns: RelaTurn::$skipped);
         EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
 
         return;
@@ -129,6 +130,8 @@ pest()->afterEach(function (): void {
         $split,
         $verdicts,
         $history,
+        $clock,
+        RelaTurn::$skipped,
     );
     EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
     RelaTurn::forget();

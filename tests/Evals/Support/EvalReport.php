@@ -40,7 +40,7 @@ final class EvalReport
      * @param  list<TurnEnvelope>  $turns
      * @param  list<array{level: string|null, score: float, reasoning: string}>  $verdicts
      */
-    public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null, array $verdicts = [], bool $history = false): void
+    public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null, array $verdicts = [], bool $history = false, bool $clock = false, int $skippedTurns = 0): void
     {
         self::$startedAt ??= now();
 
@@ -58,7 +58,7 @@ final class EvalReport
             'reasons' => $reasons,
         ];
 
-        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split, $verdicts, $history);
+        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split, $verdicts, $history, $clock, $skippedTurns);
     }
 
     public static function flush(string $model, string $judge): ?string
@@ -119,7 +119,7 @@ final class EvalReport
      * @param  list<TurnEnvelope>  $turns
      * @param  list<array{level: string|null, score: float, reasoning: string}>  $verdicts
      */
-    private static function writeRepetition(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons, int $samples, bool $judged, array $turns, string $file, ?string $split, array $verdicts, bool $history): void
+    private static function writeRepetition(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons, int $samples, bool $judged, array $turns, string $file, ?string $split, array $verdicts, bool $history, bool $clock, int $skippedTurns): void
     {
         $turns = $turns === [] && $envelope instanceof TurnEnvelope ? [$envelope] : $turns;
         $rep = self::$repetitions[$file.'|'.$testName] = (self::$repetitions[$file.'|'.$testName] ?? 0) + 1;
@@ -150,6 +150,7 @@ final class EvalReport
             'passed' => $passed,
             'judged' => $judged,
             'history' => $history,
+            'clock' => $clock,
             'reasons' => $reasons,
             'model_requested' => RelaTurn::model(),
             'model_served' => $served,
@@ -162,6 +163,7 @@ final class EvalReport
             'tool_calls' => array_sum(array_map(fn (TurnEnvelope $turn): int => count($turn->toolCalls), $turns)),
             'retries' => $retries,
             'turns' => $samples,
+            'turns_skipped' => $skippedTurns,
             ...$runner,
             ...($verdicts === [] ? [] : ['judge' => $verdicts]),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n", append: true);

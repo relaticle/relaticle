@@ -110,6 +110,7 @@ final class Compare
 
         array_push($out, ...self::pairedLines($base, $cand, $both));
         array_push($out, ...self::historyLines($runner, ['baseline' => $baseline, 'candidate' => $candidate], $split, $deterministic));
+        array_push($out, ...self::clockLines($runner, ['baseline' => $baseline, 'candidate' => $candidate], $split, $deterministic));
         array_push($out, ...self::flipTable($base, $cand, $both));
         array_push($out, ...self::missing('baseline', array_diff_key($cand, $base)), ...self::missing('candidate', array_diff_key($base, $cand)));
 
@@ -146,6 +147,7 @@ final class Compare
             'Pass rate per run, over the cases in every run: '.implode(', ', array_map(self::percent(...), $rates)),
             'Largest pass-rate gap between runs: '.self::percent(max($rates) - min($rates)),
             ...self::historyRates($runner, $runs, $deterministic),
+            ...self::clockRates($runner, $runs, $deterministic),
         ];
 
         foreach (['model_requested' => 'none', 'effort' => 'none'] as $field => $fallback) {
@@ -183,7 +185,7 @@ final class Compare
      */
     private static function headline(array $lines, string $runner): array
     {
-        return $runner === 'plan' ? array_values(array_filter($lines, fn (array $line): bool => ($line['history'] ?? false) !== true)) : $lines;
+        return $runner === 'plan' ? array_values(array_filter($lines, fn (array $line): bool => ($line['history'] ?? false) !== true && ($line['clock'] ?? false) !== true)) : $lines;
     }
 
     /**
@@ -193,6 +195,15 @@ final class Compare
     private static function historyOnly(array $lines): array
     {
         return array_values(array_filter($lines, fn (array $line): bool => ($line['history'] ?? false) === true));
+    }
+
+    /**
+     * @param  list<Line>  $lines
+     * @return list<Line>
+     */
+    private static function clockOnly(array $lines): array
+    {
+        return array_values(array_filter($lines, fn (array $line): bool => ($line['clock'] ?? false) === true));
     }
 
     /**
@@ -213,6 +224,45 @@ final class Compare
         }
 
         return ['History cases (plan runner replays earlier turns as text, so they are left out of the headline and the paired difference): '.implode(', ', $parts)];
+    }
+
+    /**
+     * @param  array<string, Run>  $runs
+     * @return list<string>
+     */
+    private static function clockLines(string $runner, array $runs, ?string $split, bool $deterministic): array
+    {
+        if ($runner !== 'plan') {
+            return [];
+        }
+
+        $parts = [];
+
+        foreach ($runs as $label => $run) {
+            $clock = self::cases(self::clockOnly(self::scope($run['lines'], $split, $deterministic)));
+            $parts[] = sprintf('%s %s over %d', $label, $clock === [] ? 'n/a' : self::percent(self::passRate($clock)), count($clock));
+        }
+
+        return ['Clock cases (Claude Code injects its own date and timing, so they are left out of the headline and the paired difference): '.implode(', ', $parts)];
+    }
+
+    /**
+     * @param  list<Run>  $runs
+     * @return list<string>
+     */
+    private static function clockRates(string $runner, array $runs, bool $deterministic): array
+    {
+        if ($runner !== 'plan') {
+            return [];
+        }
+
+        $rates = array_map(function (array $run) use ($deterministic): string {
+            $clock = self::cases(self::clockOnly(self::scope($run['lines'], null, $deterministic)));
+
+            return $clock === [] ? 'n/a' : self::percent(self::passRate($clock));
+        }, $runs);
+
+        return ['Clock cases are left out above. Their pass rate per run: '.implode(', ', $rates)];
     }
 
     /**

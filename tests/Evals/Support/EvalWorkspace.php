@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 use Relaticle\Chat\Actions\CreateConversation;
 use Relaticle\Chat\Models\AgentConversation;
@@ -159,6 +160,11 @@ final readonly class EvalWorkspace
                 $opportunity->saveCustomFieldValue($closeDate, $date);
             }
         });
+    }
+
+    public function withoutActivityRows(): void
+    {
+        DB::table('activity_log')->where('workspace_id', $this->workspace->getKey())->delete();
     }
 
     public function withTextRegionField(): void

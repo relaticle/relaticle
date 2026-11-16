@@ -36,6 +36,11 @@ final class RelaTurn
     /** @var list<TurnEnvelope> */
     public static array $turns = [];
 
+    public static int $skipped = 0;
+
+    /** @var array<string, array{turn: int, error: string}> */
+    private static array $failedConversations = [];
+
     private readonly string $modelId;
 
     private readonly string $provider;
@@ -75,6 +80,13 @@ final class RelaTurn
     public function __invoke(string $prompt): string
     {
         [$conversationId, $resumesTurnId] = $this->nextConversation();
+
+        if (isset(self::$failedConversations[$conversationId])) {
+            self::$skipped++;
+
+            throw new RuntimeException(sprintf('turn %d failed: %s', self::$failedConversations[$conversationId]['turn'], self::$failedConversations[$conversationId]['error']));
+        }
+
         $previousId = $this->latestAssistantRow($conversationId)?->id;
         $turnId = (string) Str::ulid();
 
@@ -83,6 +95,10 @@ final class RelaTurn
 
         self::$last = $this->envelope = $envelope;
         self::$turns[] = $envelope;
+
+        if ($envelope->error !== null) {
+            self::$failedConversations[$conversationId] = ['turn' => count(self::$turns), 'error' => $envelope->error];
+        }
 
         EvalModels::assertServed($this->modelId, $envelope->servedModel);
 
@@ -93,6 +109,8 @@ final class RelaTurn
     {
         self::$last = null;
         self::$turns = [];
+        self::$skipped = 0;
+        self::$failedConversations = [];
     }
 
     public function envelope(): TurnEnvelope
@@ -111,6 +129,7 @@ final class RelaTurn
             toolCalls: array_map(fn (array $call): array => [
                 'name' => (string) ($call['name'] ?? ''),
                 'arguments' => is_array($call['arguments'] ?? null) ? $call['arguments'] : [],
+                'step' => self::stepOf($row->steps, $call['id'] ?? null),
             ], $toolResults),
             renderedRowIds: array_map(self::renderedRowIdsOf(...), $toolResults),
             replayedBytes: self::replayedBytesOf($toolResults),
@@ -126,6 +145,19 @@ final class RelaTurn
             steps: count(self::decodeList($row->steps)),
             parallelToolCalls: count(array_filter(self::decodeList($row->steps), fn (mixed $step): bool => is_array($step) && count((array) ($step['tool_calls'] ?? [])) >= 2)),
         );
+    }
+
+    private static function stepOf(mixed $steps, mixed $callId): int
+    {
+        foreach (self::decodeList($steps) as $index => $step) {
+            foreach (is_array($step) ? (array) ($step['tool_calls'] ?? []) : [] as $call) {
+                if (is_array($call) && $callId !== null && ($call['id'] ?? null) === $callId) {
+                    return (int) $index;
+                }
+            }
+        }
+
+        return -1;
     }
 
     /**
