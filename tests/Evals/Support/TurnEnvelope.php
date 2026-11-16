@@ -34,6 +34,15 @@ final readonly class TurnEnvelope
         return new self('', [], [], 0, 0, 0, 0, $error);
     }
 
+    public function withRetries(int $retries): self
+    {
+        return new self(
+            $this->text, $this->toolCalls, $this->renderedRowIds, $this->replayedBytes, $this->inputTokens,
+            $this->outputTokens, $this->durationMs, $this->error, $this->stepsText, $this->servedModel,
+            $this->cacheReadTokens, $this->cacheWriteTokens, $this->reasoningTokens, $this->steps, $retries,
+        );
+    }
+
     public function toJson(): string
     {
         return json_encode([

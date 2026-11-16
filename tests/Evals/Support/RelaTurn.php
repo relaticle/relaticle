@@ -86,6 +86,8 @@ final class RelaTurn
         self::$last = $this->envelope = $envelope;
         self::$turns[] = $envelope;
 
+        EvalModels::assertServed($this->modelId, $envelope->servedModel);
+
         return $envelope->toJson();
     }
 
@@ -117,7 +119,7 @@ final class RelaTurn
             inputTokens: (int) ($usage['input_tokens'] ?? 0),
             outputTokens: (int) ($usage['output_tokens'] ?? 0),
             durationMs: (int) ($meta['duration_ms'] ?? 0),
-            error: null,
+            error: ($meta['error'] ?? false) === true ? self::storedErrorOf($meta) : null,
             stepsText: self::stepsTextOf($row->steps),
             servedModel: (string) ($meta['model'] ?? ''),
             cacheReadTokens: (int) ($usage['cache_read_input_tokens'] ?? 0),
@@ -125,6 +127,16 @@ final class RelaTurn
             reasoningTokens: (int) ($usage['reasoning_tokens'] ?? 0),
             steps: count(self::decodeList($row->steps)),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function storedErrorOf(array $meta): string
+    {
+        $failure = is_array($meta['failure'] ?? null) ? $meta['failure'] : [];
+
+        return (string) ($failure['message'] ?? $failure['class'] ?? 'The turn stored an error row.');
     }
 
     /**
@@ -179,22 +191,25 @@ final class RelaTurn
     {
         $retryable = false;
         $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $resumesTurnId, $retryable);
+        $extraAttempts = 0;
 
-        for ($retry = 0; $retry < self::MAX_RETRIES && $retryable; $retry++) {
+        for (; $extraAttempts < self::MAX_RETRIES && $retryable; $extraAttempts++) {
             Sleep::for(self::RETRY_DELAY_SECONDS)->seconds();
 
             $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $resumesTurnId, $retryable);
         }
 
-        return $envelope;
+        return $envelope->withRetries($envelope->retries + $extraAttempts);
     }
 
     private function runOnce(string $prompt, string $conversationId, string $turnId, ?string $previousId, ?string $resumesTurnId, bool &$retryable): TurnEnvelope
     {
         $retrying = null;
         $failure = null;
+        $inJobRetries = 0;
 
-        Event::listen(ChatStreamRetrying::class, function (ChatStreamRetrying $event) use (&$retrying): void {
+        Event::listen(ChatStreamRetrying::class, function (ChatStreamRetrying $event) use (&$retrying, &$inJobRetries): void {
+            $inJobRetries++;
             $retrying = "a transient provider error (rate limit, overload or dropped connection) asked for a retry, attempt {$event->attempt} of {$event->maxAttempts}";
         });
         Event::listen(ChatStreamFailed::class, function (ChatStreamFailed $event) use (&$failure): void {
@@ -213,7 +228,7 @@ final class RelaTurn
         if ($row !== null && $row->id !== $previousId) {
             $retryable = false;
 
-            return self::envelopeFromRow($row);
+            return self::envelopeFromRow($row)->withRetries($inJobRetries);
         }
 
         $retryable = $failure === null;
@@ -221,7 +236,7 @@ final class RelaTurn
         return TurnEnvelope::failed(implode('; ', array_filter([
             $failure,
             $retrying,
-        ])) ?: 'The turn stored no assistant message.');
+        ])) ?: 'The turn stored no assistant message.')->withRetries($inJobRetries);
     }
 
     private function runJob(string $prompt, string $conversationId, string $turnId, ?string $resumesTurnId): void
