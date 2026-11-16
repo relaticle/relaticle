@@ -154,6 +154,7 @@ final class EvalReport
             'usage' => $usage,
             'cost_usd' => $cost,
             'duration_ms' => $durationMs,
+            'errored' => $turns === [] || array_filter($turns, fn (TurnEnvelope $turn): bool => $turn->error !== null) !== [],
             'steps' => array_sum(array_map(fn (TurnEnvelope $turn): int => $turn->steps, $turns)),
             'tool_calls' => array_sum(array_map(fn (TurnEnvelope $turn): int => count($turn->toolCalls), $turns)),
             'retries' => $retries,
