@@ -42,7 +42,7 @@ final class EvalReport
      */
     public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null, array $verdicts = [], bool $history = false, bool $clock = false, int $skippedTurns = 0): void
     {
-        self::$startedAt ??= now();
+        self::$startedAt ??= self::wallClock();
 
         self::$cases[] = [
             'name' => $testName,
@@ -67,7 +67,7 @@ final class EvalReport
             return null;
         }
 
-        $startedAt = self::$startedAt ?? now();
+        $startedAt = self::$startedAt ?? self::wallClock();
         $directory = self::baseDirectory();
         $path = $directory.'/'.$startedAt->format('Y-m-d-His').'-'.self::slug($model).'.json';
 
@@ -278,7 +278,7 @@ final class EvalReport
         }
 
         $name = implode('-', [
-            (self::$startedAt ?? now())->format('Y-m-d-His'),
+            (self::$startedAt ?? self::wallClock())->format('Y-m-d-His'),
             self::slug(RelaTurn::model()),
             self::slug(self::effort()),
             self::slug((string) (getenv('PEST_EVALS_LABEL') ?: 'run')),
@@ -376,5 +376,10 @@ final class EvalReport
         }
 
         return $rates;
+    }
+
+    private static function wallClock(): CarbonImmutable
+    {
+        return CarbonImmutable::createFromTimestamp(time(), 'UTC');
     }
 }

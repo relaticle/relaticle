@@ -44,6 +44,14 @@ it('writes nothing when no case was recorded', function (): void {
         ->and((string) EvalReport::$directory)->not->toBeDirectory();
 });
 
+it('names the run by the wall clock even when the first case moved the app clock', function (): void {
+    $this->travelTo('2026-08-28 12:00:00');
+
+    EvalReport::record('dated case', true, reportEnvelope(10, 5, 0, 100, 0));
+
+    expect((string) EvalReport::flush('claude-sonnet-5', 'claude-opus-5-5'))->not->toContain('2026-08-28');
+});
+
 it('writes one file per run with per-case metrics and totals', function (): void {
     EvalReport::record('first case', true, reportEnvelope(1000, 50, 400, 1200, 2, 'All done.', ['Checking', 'Reading the list']), [], 3);
     EvalReport::record('second case', false, reportEnvelope(3000, 70, 800, 900, 1), ['The reply says contact']);
