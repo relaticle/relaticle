@@ -273,9 +273,15 @@ it('records a judged case and clears the flag when the wrapper is reset', functi
     $verdict = (new RecordingJudge($inner))->judge(new Evaluation(['a' => 'b'], 'q', ['bad' => 0.0, 'good' => 1.0]));
 
     expect($verdict->score)->toBe(1.0)
-        ->and(RecordingJudge::$used)->toBeTrue();
+        ->and(RecordingJudge::$used)->toBeTrue()
+        ->and(RecordingJudge::$verdicts)->toBe([['level' => null, 'score' => 1.0, 'reasoning' => 'fine']]);
+
+    EvalReport::record('judged case', true, cachedEnvelope(), judged: true, verdicts: RecordingJudge::$verdicts);
+
+    expect(reportResultLines()[0]['judge'])->toEqual([['level' => null, 'score' => 1.0, 'reasoning' => 'fine']]);
 
     RecordingJudge::$used = false;
+    RecordingJudge::$verdicts = [];
 });
 
 it('reports the path it cannot write', function (): void {
@@ -362,4 +368,33 @@ it('measures the noise floor over three runs and names the file and line of a ma
     expect($noise)->toContain('differs between runs: 1 of 2')->and($noise)->toContain('Largest pass-rate gap between runs: 50.0%')
         ->and(fn () => Compare::readRun($runs[0]))->toThrow(RuntimeException::class, 'results.jsonl line 2')
         ->and(fn () => Compare::readRun($runs[0].'/nope'))->toThrow(RuntimeException::class, 'does not exist');
+});
+
+it('records the runner and the parallel tool call count on the result line and keeps them out of the scored json', function (): void {
+    $envelope = cachedEnvelope()->withRunner('plan', [['input' => 'hi', 'result' => ['total_cost_usd' => 0.25]]]);
+    $parallel = new TurnEnvelope('ok', [], [], 0, 10, 5, 100, null, parallelToolCalls: 2);
+
+    EvalReport::record('plan case', true, $envelope, turns: [$parallel->withRunner('plan'), $envelope]);
+    EvalReport::record('api case', true, cachedEnvelope());
+
+    [$plan, $api] = reportResultLines();
+
+    expect($plan['runner'])->toBe('plan')
+        ->and($plan['parallel_tool_calls'])->toBe(2)
+        ->and($plan['notional_cost_usd'])->toBe(0.25)
+        ->and($api['runner'])->toBe('api')
+        ->and($api['parallel_tool_calls'])->toBe(0)
+        ->and($api)->not->toHaveKey('notional_cost_usd')
+        ->and(json_decode($envelope->toJson(), true))->not->toHaveKeys(['runner', 'parallel_tool_calls', 'claude_code'])
+        ->and($envelope->toTrace()['runner'])->toBe('plan')
+        ->and($envelope->toTrace()['claude_code'][0]['input'])->toBe('hi');
+});
+
+it('keeps the runner and the retry count when an envelope is rebuilt', function (): void {
+    $envelope = cachedEnvelope()->withRunner('plan')->withRetries(2);
+
+    expect($envelope->runner)->toBe('plan')
+        ->and($envelope->retries)->toBe(2)
+        ->and($envelope->servedModel)->toBe('claude-sonnet-5')
+        ->and(TurnEnvelope::failed('boom')->runner)->toBe('api');
 });

@@ -39,7 +39,7 @@ it('does not repeat the same task table when asked to investigate', function ():
     expect((new RelaTurn($w, conversationId: $conversationId))(...))
         ->prompt('investigate')
         ->toPassScorer(new NoDuplicateRowSet, expected: $previous);
-})->group('test');
+})->group('test')->group('history');
 
 it('answers a how many question from the summary, not from a list', function (): void {
     $w = EvalWorkspace::seed();

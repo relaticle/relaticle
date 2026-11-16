@@ -10,6 +10,7 @@ final readonly class TurnEnvelope
      * @param  list<array{name: string, arguments: array<string, mixed>}>  $toolCalls
      * @param  list<list<string>>  $renderedRowIds
      * @param  list<string>  $stepsText
+     * @param  list<array<string, mixed>>  $claudeCode
      */
     public function __construct(
         public string $text,
@@ -27,6 +28,9 @@ final readonly class TurnEnvelope
         public int $reasoningTokens = 0,
         public int $steps = 0,
         public int $retries = 0,
+        public string $runner = 'api',
+        public int $parallelToolCalls = 0,
+        public array $claudeCode = [],
     ) {}
 
     public static function failed(string $error): self
@@ -36,11 +40,20 @@ final readonly class TurnEnvelope
 
     public function withRetries(int $retries): self
     {
-        return new self(
-            $this->text, $this->toolCalls, $this->renderedRowIds, $this->replayedBytes, $this->inputTokens,
-            $this->outputTokens, $this->durationMs, $this->error, $this->stepsText, $this->servedModel,
-            $this->cacheReadTokens, $this->cacheWriteTokens, $this->reasoningTokens, $this->steps, $retries,
-        );
+        return new self(...[...get_object_vars($this), 'retries' => $retries]);
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $claudeCode
+     */
+    public function withRunner(string $runner, array $claudeCode = []): self
+    {
+        return new self(...[...get_object_vars($this), 'runner' => $runner, 'claudeCode' => $claudeCode]);
+    }
+
+    public function notionalCostUsd(): float
+    {
+        return array_sum(array_map(fn (array $run): float => (float) ($run['result']['total_cost_usd'] ?? 0), $this->claudeCode));
     }
 
     public function toJson(): string
@@ -76,6 +89,8 @@ final readonly class TurnEnvelope
             'served_model' => $this->servedModel,
             'steps' => $this->steps,
             'retries' => $this->retries,
-        ];
+            'runner' => $this->runner,
+            'parallel_tool_calls' => $this->parallelToolCalls,
+        ] + ($this->claudeCode === [] ? [] : ['claude_code' => $this->claudeCode]);
     }
 }

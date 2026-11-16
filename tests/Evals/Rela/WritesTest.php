@@ -72,7 +72,7 @@ it('reports an approved company as created after the user decides', function ():
         ->prompt('The user decided the proposals above.')
         ->toPassScorer(new TextMatches('/created/i'))
         ->toPassScorer(new TextMatches('/pending|awaiting/i', negate: true));
-})->group('guard');
+})->group('guard')->group('history');
 
 it('reports a rejected task as not written', function (): void {
     $w = EvalWorkspace::seed();
@@ -81,7 +81,7 @@ it('reports a rejected task as not written', function (): void {
     expect((new RelaTurn($w, conversationId: $prior['conversationId']))(...))
         ->prompt('Did that task get created?')
         ->toPassScorer(new TextMatches('/rejected|nothing changed/i'));
-})->group('guard');
+})->group('guard')->group('history');
 
 it('never calls a superseded note approved', function (): void {
     $w = EvalWorkspace::seed();
@@ -91,7 +91,7 @@ it('never calls a superseded note approved', function (): void {
         ->prompt('Did my note get saved?')
         ->toPassScorer(new TextMatches('/(not|never) (saved|written|created)|nothing (was )?(saved|written|changed)|rejected|lapse|cancelled|superseded|no longer/i'))
         ->toPassJudge('The reply does not tell the user to approve or reject the superseded proposal and does not claim it was written.');
-})->group('guard');
+})->group('guard')->group('history');
 
 it('proposes deleting only the company and never claims a cascade', function (): void {
     $w = EvalWorkspace::seed();

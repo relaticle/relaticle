@@ -12,12 +12,18 @@ final class RecordingJudge implements JudgeDriver
 {
     public static bool $used = false;
 
+    /** @var list<array{level: string|null, score: float, reasoning: string}> */
+    public static array $verdicts = [];
+
     public function __construct(private readonly JudgeDriver $inner) {}
 
     public function judge(Evaluation $evaluation): Verdict
     {
         self::$used = true;
 
-        return $this->inner->judge($evaluation);
+        $verdict = $this->inner->judge($evaluation);
+        self::$verdicts[] = ['level' => $verdict->level, 'score' => $verdict->score, 'reasoning' => $verdict->reasoning];
+
+        return $verdict;
     }
 }

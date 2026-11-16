@@ -22,6 +22,7 @@ use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Support\StoredSteps;
 use RuntimeException;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeGateway;
 use Throwable;
 
 final class RelaTurn
@@ -77,7 +78,8 @@ final class RelaTurn
         $previousId = $this->latestAssistantRow($conversationId)?->id;
         $turnId = (string) Str::ulid();
 
-        $envelope = $this->runWithRetries($prompt, $conversationId, $turnId, $previousId, $resumesTurnId);
+        $envelope = $this->runWithRetries($prompt, $conversationId, $turnId, $previousId, $resumesTurnId)
+            ->withRunner(EvalModels::runner(), ClaudeCodeGateway::takeRecords());
 
         self::$last = $this->envelope = $envelope;
         self::$turns[] = $envelope;
@@ -122,6 +124,7 @@ final class RelaTurn
             cacheWriteTokens: (int) ($usage['cache_write_input_tokens'] ?? 0),
             reasoningTokens: (int) ($usage['reasoning_tokens'] ?? 0),
             steps: count(self::decodeList($row->steps)),
+            parallelToolCalls: count(array_filter(self::decodeList($row->steps), fn (mixed $step): bool => is_array($step) && count((array) ($step['tool_calls'] ?? [])) >= 2)),
         );
     }
 
@@ -221,6 +224,7 @@ final class RelaTurn
         } finally {
             Event::forget(ChatStreamRetrying::class);
             Event::forget(ChatStreamFailed::class);
+            ClaudeCodeGateway::releaseAll();
         }
 
         $row = $this->latestAssistantRow($conversationId);

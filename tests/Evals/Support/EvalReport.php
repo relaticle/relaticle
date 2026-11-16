@@ -8,6 +8,7 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Services\ModelRegistry;
 use RuntimeException;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeProvider;
 
 final class EvalReport
 {
@@ -37,8 +38,9 @@ final class EvalReport
     /**
      * @param  list<string>  $reasons
      * @param  list<TurnEnvelope>  $turns
+     * @param  list<array{level: string|null, score: float, reasoning: string}>  $verdicts
      */
-    public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null): void
+    public static function record(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons = [], int $samples = 1, bool $judged = false, array $turns = [], string $file = '', ?string $split = null, array $verdicts = []): void
     {
         self::$startedAt ??= now();
 
@@ -56,7 +58,7 @@ final class EvalReport
             'reasons' => $reasons,
         ];
 
-        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split);
+        self::writeRepetition($testName, $passed, $envelope, $reasons, $samples, $judged, $turns, $file, $split, $verdicts);
     }
 
     public static function flush(string $model, string $judge): ?string
@@ -115,8 +117,9 @@ final class EvalReport
     /**
      * @param  list<string>  $reasons
      * @param  list<TurnEnvelope>  $turns
+     * @param  list<array{level: string|null, score: float, reasoning: string}>  $verdicts
      */
-    private static function writeRepetition(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons, int $samples, bool $judged, array $turns, string $file, ?string $split): void
+    private static function writeRepetition(string $testName, bool $passed, ?TurnEnvelope $envelope, array $reasons, int $samples, bool $judged, array $turns, string $file, ?string $split, array $verdicts): void
     {
         $turns = $turns === [] && $envelope instanceof TurnEnvelope ? [$envelope] : $turns;
         $rep = self::$repetitions[$file.'|'.$testName] = (self::$repetitions[$file.'|'.$testName] ?? 0) + 1;
@@ -155,7 +158,24 @@ final class EvalReport
             'tool_calls' => array_sum(array_map(fn (TurnEnvelope $turn): int => count($turn->toolCalls), $turns)),
             'retries' => $retries,
             'turns' => $samples,
+            ...self::runnerFields($turns),
+            ...($verdicts === [] ? [] : ['judge' => $verdicts]),
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR)."\n", append: true);
+    }
+
+    /**
+     * @param  list<TurnEnvelope>  $turns
+     * @return array<string, mixed>
+     */
+    private static function runnerFields(array $turns): array
+    {
+        $runner = $turns === [] ? EvalModels::runner() : $turns[array_key_last($turns)]->runner;
+
+        return [
+            'runner' => $runner,
+            'parallel_tool_calls' => array_sum(array_map(fn (TurnEnvelope $turn): int => $turn->parallelToolCalls, $turns)),
+            ...($runner === 'plan' ? ['notional_cost_usd' => round(array_sum(array_map(fn (TurnEnvelope $turn): float => $turn->notionalCostUsd(), $turns)), 6)] : []),
+        ];
     }
 
     private static function write(string $path, string $contents, bool $append = false): void
@@ -227,7 +247,7 @@ final class EvalReport
     {
         $descriptor = resolve(ModelRegistry::class)->find(RelaTurn::model());
 
-        return $descriptor?->provider === 'anthropic' ? (string) config('chat.anthropic_effort') : 'none';
+        return in_array($descriptor?->provider, ['anthropic', ClaudeCodeProvider::NAME], true) ? (string) config('chat.anthropic_effort') : 'none';
     }
 
     private static function runDirectory(): string

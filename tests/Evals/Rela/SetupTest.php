@@ -49,7 +49,7 @@ it('asks for one company when a typed message names no record in an empty worksp
         ->not->toMatch('/"name":"(Create|Update|Delete)/')
         ->toPassScorer(new TextMatches('/(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$/i'))
         ->toPassScorer(new OneClosingQuestionAtMost);
-})->group('test')->with([
+})->group('test')->group('history')->with([
     'a greeting' => ['hi'],
     'a question about the product' => ['what can you do?'],
     'a statement about the business' => ['I run a small marketing agency'],
@@ -61,7 +61,7 @@ it('proposes the company when the owner answers the ask with a bare name', funct
     expect((new RelaTurn($w, conversationId: Prior::askedForOneCompany($w)))(...))
         ->prompt('Northwind Studio')
         ->toHaveToolCalls(['CreateCompanyTool' => fn (array $arguments): bool => count($arguments['records'] ?? []) === 1]);
-})->group('train');
+})->group('train')->group('history');
 
 it('asks for one company on the turn that opens an ordinary chat in an empty workspace', function (): void {
     $w = EvalWorkspace::seed();
@@ -100,7 +100,7 @@ it('answers an owner who brings a file about the file, without the company ask',
     expect((new RelaTurn($w, conversationId: Prior::greetedInAnEmptyWorkspace($w)))(...))
         ->prompt('I have a CSV of my customers')
         ->toPassScorer(new TextMatches('/^(?!.*(compan|client)[^?]*\bwork(ing)? with\b).*(attach|import)/is'));
-})->group('train');
+})->group('train')->group('history');
 
 it('says plainly that a sample only workspace holds sample data', function (): void {
     $w = EvalWorkspace::seed();

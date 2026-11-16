@@ -4,23 +4,48 @@ declare(strict_types=1);
 
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
+use Laravel\Ai\AiManager;
 use Laravel\Ai\Exceptions\RateLimitedException;
+use Laravel\Ai\Messages\AssistantMessage;
+use Laravel\Ai\Messages\Message;
+use Laravel\Ai\Messages\ToolResultMessage;
+use Laravel\Ai\Messages\UserMessage;
+use Laravel\Ai\Responses\Data\FinishReason;
 use Laravel\Ai\Responses\Data\ToolCall;
+use Laravel\Ai\Responses\Data\ToolResult;
 use Pest\Evals\Support\ToolCallParser;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Relaticle\Chat\Services\ModelRegistry;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeProvider;
+use Tests\Evals\Support\ClaudeCode\HistoryTranscript;
+use Tests\Evals\Support\ClaudeCode\StreamJson;
+use Tests\Evals\Support\ClaudeCode\ToolRendezvous;
 use Tests\Evals\Support\EvalModels;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
 use Tests\Evals\Support\Splits;
 use Tests\Evals\Support\TurnEnvelope;
+
+/**
+ * @return list<Message>
+ */
+function priorTurnWithOneToolCall(): array
+{
+    return [
+        new UserMessage('List my companies'),
+        new AssistantMessage('', collect([new ToolCall('t1', 'ListCompaniesTool', ['limit' => 5], 't1')])),
+        new ToolResultMessage(collect([new ToolResult('t1', 'ListCompaniesTool', ['limit' => 5], '{"data":[]}')])),
+        new AssistantMessage('You have no companies yet.'),
+    ];
+}
 
 /**
  * @return list<string>
@@ -405,4 +430,112 @@ it('names the case that has no split or two of them', function (): void {
         ->toThrow(RuntimeException::class, 'Eval case [Rela::third] needs exactly one of [train, test, guard], found train and guard')
         ->and(fn () => Splits::assertGrouped(['Rela::fourth' => ['train', 'slow']]))
         ->not->toThrow(RuntimeException::class);
+});
+
+it('reads one assistant message at a time from a claude code stream', function (): void {
+    $lines = [
+        '{"type":"system","subtype":"init","model":"claude-sonnet-5","tools":["mcp__rela__CreateCompanyTool"]}',
+        '{"type":"assistant","message":{"model":"claude-sonnet-5","content":[{"type":"tool_use","id":"t1","name":"mcp__rela__CreateCompanyTool","input":{"records":[{"name":"Northwind Traders"}]}}],"usage":{"input_tokens":2,"cache_creation_input_tokens":1396,"cache_read_input_tokens":0,"output_tokens":30}}}',
+        '{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":[{"type":"text","text":"{}"}]}]}}',
+        '{"type":"assistant","message":{"model":"claude-sonnet-5","content":[{"type":"text","text":"Review the proposal below."}],"usage":{"input_tokens":2,"cache_creation_input_tokens":194,"cache_read_input_tokens":1396,"output_tokens":9}}}',
+        '{"type":"result","subtype":"success","is_error":false,"num_turns":2,"duration_ms":4735}',
+    ];
+
+    $first = StreamJson::step($lines[1]);
+    $second = StreamJson::step($lines[3]);
+
+    expect($first->toolCalls)->toHaveCount(1)
+        ->and($first->toolCalls[0]->name)->toBe('CreateCompanyTool')
+        ->and($first->toolCalls[0]->id)->toBe('t1')
+        ->and($first->toolCalls[0]->arguments)->toBe(['records' => [['name' => 'Northwind Traders']]])
+        ->and($first->finishReason)->toBe(FinishReason::ToolCalls)
+        ->and($first->meta->model)->toBe('claude-sonnet-5')
+        ->and($second->text)->toBe('Review the proposal below.')
+        ->and($second->finishReason)->toBe(FinishReason::Stop)
+        ->and($second->usage->cacheReadInputTokens)->toBe(1396)
+        ->and(StreamJson::isEnd($lines[4]))->toBeTrue()
+        ->and(StreamJson::isEnd($lines[2]))->toBeFalse();
+});
+
+it('merges the lines one claude code message arrives in', function (): void {
+    $thinking = '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5","content":[{"type":"thinking","thinking":"Two records."}],"usage":{"input_tokens":2,"output_tokens":5}}}';
+    $text = '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5","content":[{"type":"text","text":"Checking."}],"usage":{"input_tokens":2,"output_tokens":9}}}';
+    $call = '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5","content":[{"type":"tool_use","id":"t9","name":"mcp__rela__ListCompaniesTool","input":{}}],"usage":{"input_tokens":2,"output_tokens":20}}}';
+
+    $step = StreamJson::step($thinking, $text, $call);
+
+    expect(StreamJson::messageId($call))->toBe('m1')
+        ->and($step->text)->toBe('Checking.')
+        ->and($step->reasoning)->toBe('Two records.')
+        ->and($step->toolCalls)->toHaveCount(1)
+        ->and($step->toolCalls[0]->arguments)->toBe([])
+        ->and($step->usage->outputTokens)->toBe(20)
+        ->and($step->finishReason)->toBe(FinishReason::ToolCalls);
+});
+
+it('renders an empty history as nothing and a tool turn in order', function (): void {
+    expect(HistoryTranscript::render([]))->toBe('');
+
+    $text = HistoryTranscript::render(priorTurnWithOneToolCall());
+
+    expect($text)->toMatch('/User: .*\nRela called ListCompaniesTool\(.*\)\nTool result: .*\nRela: /s')
+        ->and($text)->toContain('{"limit":5}')
+        ->and($text)->toContain('{"data":[]}');
+});
+
+it('answers a tool call from the stub through the rendezvous socket', function (): void {
+    $directory = sys_get_temp_dir().'/ccs'.bin2hex(random_bytes(3));
+    mkdir($directory);
+    $schemas = $directory.'/tools.json';
+    file_put_contents($schemas, json_encode([[
+        'name' => 'ListCompaniesTool',
+        'description' => 'Lists companies',
+        'inputSchema' => ['type' => 'object', 'properties' => ['limit' => ['type' => 'integer']]],
+    ]]));
+    $rendezvous = ToolRendezvous::listen($directory);
+
+    $input = implode("\n", [
+        '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}',
+        '{"jsonrpc":"2.0","method":"notifications/initialized"}',
+        '{"jsonrpc":"2.0","id":2,"method":"tools/list"}',
+        '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"ListCompaniesTool","arguments":{"limit":5}}}',
+    ])."\n";
+
+    $process = Process::forever()->input($input)->start([PHP_BINARY, base_path('tests/Evals/bin/claude-tool-stub.php'), $schemas, $rendezvous->path()]);
+
+    $call = null;
+
+    while ($call === null) {
+        $process->running();
+        $call = $rendezvous->accept(0.1);
+    }
+
+    $rendezvous->reply('{"data":["Company 01"]}', false);
+    $result = $process->wait();
+    $rendezvous->close();
+
+    $replies = array_map(fn (string $line): array => json_decode($line, true), array_values(array_filter(explode("\n", $result->output()))));
+    File::deleteDirectory($directory);
+
+    expect($call)->toBe(['name' => 'ListCompaniesTool', 'arguments' => ['limit' => 5]])
+        ->and($replies)->toHaveCount(3)
+        ->and($replies[0]['result']['capabilities'])->toHaveKey('tools')
+        ->and($replies[1]['result']['tools'][0]['name'])->toBe('ListCompaniesTool')
+        ->and($replies[1]['result']['tools'][0]['inputSchema']['type'])->toBe('object')
+        ->and($replies[2]['id'])->toBe(3)
+        ->and($replies[2]['result']['content'][0]['text'])->toBe('{"data":["Company 01"]}')
+        ->and($replies[2]['result']['isError'])->toBeFalse();
+});
+
+it('points every claude model at the claude code provider under the plan runner', function (): void {
+    EvalModels::register(null, 'plan');
+
+    $registry = resolve(ModelRegistry::class);
+
+    expect($registry->find('claude-sonnet-5')?->provider)->toBe('claude-code')
+        ->and($registry->find('claude-haiku-5-5')?->provider)->toBe('claude-code')
+        ->and($registry->find('gpt-6-luna')?->provider)->toBe('openai')
+        ->and(config('ai.providers.claude-code.driver'))->toBe('claude-code')
+        ->and(resolve(AiManager::class)->textProvider('claude-code'))->toBeInstanceOf(ClaudeCodeProvider::class)
+        ->and(fn () => EvalModels::register(null, 'cloud'))->toThrow(RuntimeException::class, 'PEST_EVALS_RUNNER must be one of api, plan');
 });

@@ -62,6 +62,8 @@ use Relaticle\EmailIntegration\Notifications\EmailAccessRequestedNotification;
 use Relaticle\EmailIntegration\Services\MailboxHistoryImportService;
 use Relaticle\EmailIntegration\Support\MailboxOAuthWorkspace;
 use Tests\Evals\EvalTestCase;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeJudge;
+use Tests\Evals\Support\EvalModels;
 use Tests\Evals\Support\EvalReport;
 use Tests\Evals\Support\RecordingJudge;
 use Tests\Evals\Support\RelaTurn;
@@ -85,7 +87,9 @@ pest()->beforeAll(function (): void {
     Splits::assertComplete();
 })->in('Evals');
 
-pest()->evals()->judgeUsing(new RecordingJudge(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL)));
+pest()->evals()->judgeUsing(new RecordingJudge(EvalModels::runner() === 'plan'
+    ? new ClaudeCodeJudge(EvalReport::JUDGE_MODEL)
+    : new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL)));
 
 pest()->afterEach(function (): void {
     if (! Plugin::isEvalMode()) {
@@ -95,6 +99,8 @@ pest()->afterEach(function (): void {
     $status = $this->status();
     $judged = RecordingJudge::$used;
     RecordingJudge::$used = false;
+    $verdicts = RecordingJudge::$verdicts;
+    RecordingJudge::$verdicts = [];
 
     if ($status->isSkipped()) {
         return;
@@ -104,7 +110,7 @@ pest()->afterEach(function (): void {
     $split = current(array_intersect($this->groups(), Splits::NAMES)) ?: null;
 
     if (! RelaTurn::$last instanceof TurnEnvelope) {
-        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], judged: $judged, file: basename(self::$__filename, '.php'), split: $split);
+        EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], judged: $judged, file: basename(self::$__filename, '.php'), split: $split, verdicts: $verdicts);
         EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
 
         return;
@@ -120,6 +126,7 @@ pest()->afterEach(function (): void {
         RelaTurn::$turns,
         basename(self::$__filename, '.php'),
         $split,
+        $verdicts,
     );
     EvalReport::flushOnShutdown(RelaTurn::model(), EvalReport::JUDGE_MODEL);
     RelaTurn::forget();

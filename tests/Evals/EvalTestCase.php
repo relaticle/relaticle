@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Sleep;
 use Pest\Evals\Plugin;
 use RuntimeException;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeGateway;
 use Tests\Evals\Support\EvalModels;
 use Tests\TestCase;
 
@@ -51,6 +52,26 @@ abstract class EvalTestCase extends TestCase
         }
 
         Sleep::fake(false);
+
+        if (EvalModels::runner() === 'plan') {
+            config()->set('chat.title_generation.enabled', false);
+            config()->set('chat.next_steps.enabled', false);
+        } else {
+            $this->useProviderKeys();
+        }
+
+        EvalModels::register(getenv('PEST_EVALS_EFFORT') ?: null);
+    }
+
+    protected function tearDown(): void
+    {
+        ClaudeCodeGateway::releaseAll();
+
+        parent::tearDown();
+    }
+
+    private function useProviderKeys(): void
+    {
         Http::allowStrayRequests();
 
         $keys = self::providerKeys(
@@ -63,8 +84,6 @@ abstract class EvalTestCase extends TestCase
 
         config()->set('ai.providers.anthropic.key', $keys['ANTHROPIC_API_KEY']);
         config()->set('ai.providers.openai.key', $keys['OPENAI_API_KEY']);
-
-        EvalModels::register(getenv('PEST_EVALS_EFFORT') ?: null);
     }
 
     private static function firstPresent(mixed ...$candidates): ?string
