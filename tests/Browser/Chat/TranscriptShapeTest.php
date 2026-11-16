@@ -1003,6 +1003,33 @@ it('keeps every message the same height while a reply streams and after it ends'
  * what it holds: the caret lands in the box without a second click, and the
  * frame grows with the text instead of sitting at one fixed width.
  */
+it('shows the message actions without hover on a touch screen and keeps them hidden on a desktop', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'touch actions');
+    $askedAt = Date::parse('2026-08-19 10:00:00', 'UTC');
+
+    transcriptShapeInsertMessage($conversationId, $user, 'How many companies do I have?', $askedAt);
+    transcriptShapeInsertMessage($conversationId, $user, 'You have twelve companies.', $askedAt->addMinute());
+    DB::table('agent_conversation_messages')->where('content', 'You have twelve companies.')->update(['role' => 'assistant']);
+
+    $path = "/app/{$workspace->slug}/chats/{$conversationId}";
+    $rowOpacities = "Array.from(document.querySelectorAll('[data-copy-button]')).map((button) => getComputedStyle(button.parentElement).opacity)";
+
+    $this->actingAs($user);
+
+    $touch = $this->visit($path, ['viewport' => ['width' => 390, 'height' => 844], 'hasTouch' => true, 'isMobile' => true])
+        ->assertSourceHas('You have twelve companies.');
+
+    expect($touch->script($rowOpacities))->toBe(['1', '1']);
+
+    $desktop = visitAs($user, $path)->assertSourceHas('You have twelve companies.');
+
+    expect($desktop->script($rowOpacities))->toBe(['0', '0']);
+});
+
 it('focuses the message editor on open and grows its width with the text', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
