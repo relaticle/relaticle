@@ -345,7 +345,7 @@ it('never names a model the app cannot actually serve', function (): void {
         ->assertDontSee('Gemini')
         ->assertSee(__('Which AI models does my plan unlock?'))
         ->assertSee('1x for Sonnet 5;', false)
-        ->assertSee('GPT 5.5, Opus 5 and GPT 5.4');
+        ->assertSee('GPT 5.5 and Opus 5');
 });
 
 it('pins the exact membership of every model list derived from the chat catalog', function (): void {
@@ -362,9 +362,9 @@ it('pins the exact membership of every model list derived from the chat catalog'
         // $freeCloudModels, via $modelsUnlockAnswer
         ->assertSee('Every plan can use Sonnet 5.')
         // $paidCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5, Opus 5 and GPT 5.4.')
+        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5 and Opus 5.')
         // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
-        ->assertSee('1x for Sonnet 5; 1.5x for GPT 5.5 and GPT 5.4; 3x for Opus 5)', false);
+        ->assertSee('1x for Sonnet 5; 1.5x for GPT 5.5; 3x for Opus 5)', false);
 });
 
 /**
@@ -382,7 +382,7 @@ it('names the models a plan includes even when this install holds no provider ke
     $this->get('/pricing')
         ->assertOk()
         ->assertSee('Every plan can use Sonnet 5.')
-        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5, Opus 5 and GPT 5.4', false)
+        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5 and Opus 5', false)
         ->assertSee('3x for Opus 5', false)
         ->assertDontSee('Gemini');
 });
