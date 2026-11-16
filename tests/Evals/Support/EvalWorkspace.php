@@ -121,6 +121,59 @@ final readonly class EvalWorkspace
             ->sole();
     }
 
+    public function withAssignedTask(): void
+    {
+        resolve(CurrentWorkspace::class)->within($this->workspace, function (): void {
+            $assignee = User::factory()->create(['name' => 'Dana Ortiz']);
+            $this->workspace->users()->attach($assignee, ['role' => 'member']);
+
+            Task::factory()->for($this->workspace)->create(['title' => 'Send the renewal quote'])
+                ->assignees()->attach($assignee->getKey());
+        });
+    }
+
+    public function withNoteBody(): void
+    {
+        resolve(CurrentWorkspace::class)->within($this->workspace, function (): void {
+            $note = Note::factory()->for($this->workspace)->create(['title' => 'Call recap']);
+            $note->saveCustomFieldValue($this->field('note', 'body'), '<p>Agreed to send a sample crate of kumquat before the pricing review.</p>');
+        });
+    }
+
+    public function withIntegrationPartner(): void
+    {
+        resolve(CurrentWorkspace::class)->within($this->workspace, function (): void {
+            Company::factory()->for($this->workspace)->create(['name' => 'Integration Partner']);
+        });
+    }
+
+    public function withAugustOpportunities(): void
+    {
+        resolve(CurrentWorkspace::class)->within($this->workspace, function (): void {
+            $amount = $this->field('opportunity', 'amount');
+            $closeDate = $this->field('opportunity', 'close_date');
+
+            foreach ([['August Deal A', 100, '2026-08-05'], ['August Deal B', 250, '2026-08-14'], ['August Deal C', -50, '2026-08-27']] as [$name, $value, $date]) {
+                $opportunity = Opportunity::factory()->for($this->workspace)->create(['name' => $name]);
+                $opportunity->saveCustomFieldValue($amount, $value);
+                $opportunity->saveCustomFieldValue($closeDate, $date);
+            }
+        });
+    }
+
+    public function withTextRegionField(): void
+    {
+        resolve(CreateCustomField::class)->execute($this->owner, ['entity_type' => 'company', 'name' => 'Region', 'code' => 'region', 'type' => 'text']);
+    }
+
+    public function withSpanishNames(): void
+    {
+        resolve(CurrentWorkspace::class)->within($this->workspace, function (): void {
+            $company = Company::factory()->for($this->workspace)->create(['name' => 'Panadería La Espiga']);
+            People::factory()->for($this->workspace)->create(['name' => 'Señora Álvarez', 'company_id' => $company->getKey()]);
+        });
+    }
+
     private function setupConversation(): AgentConversation
     {
         $existing = AgentConversation::query()

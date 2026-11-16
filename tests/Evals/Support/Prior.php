@@ -7,6 +7,8 @@ namespace Tests\Evals\Support;
 use App\Enums\CreationSource;
 use App\Enums\WorkspaceRole;
 use App\Models\Company;
+use App\Models\Note;
+use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
@@ -102,6 +104,83 @@ final readonly class Prior
         return $conversationId;
     }
 
+    public static function setupWithOwnRecords(EvalWorkspace $w): string
+    {
+        self::noRecords($w);
+
+        resolve(CurrentWorkspace::class)->within($w->workspace, function () use ($w): void {
+            Company::factory()->for($w->workspace)->create(['name' => 'Northwind Traders']);
+            People::factory()->for($w->workspace)->create(['name' => 'Priya Raman']);
+        });
+
+        resolve(WorkspaceActivationFacts::class)->forget($w->workspace);
+
+        return self::setupConversation($w);
+    }
+
+    public static function setupConversation(EvalWorkspace $w): string
+    {
+        return (string) $w->conversation(AgentConversation::PURPOSE_SETUP)->getKey();
+    }
+
+    public static function regeneratedNotes(EvalWorkspace $w): string
+    {
+        $conversationId = (string) $w->conversation()->getKey();
+        $turnId = (string) Str::ulid();
+        $titles = ['Pricing call recap', 'Security review recap'];
+        $ask = 'Save two notes: Pricing call recap and Security review recap';
+
+        $ids = resolve(CurrentWorkspace::class)->within($w->workspace, fn (): array => array_map(
+            fn (string $title): string => (string) Note::factory()->for($w->workspace)->create(['title' => $title])->getKey(),
+            $titles,
+        ));
+
+        $pending = self::proposal($w, $conversationId, $turnId, 'note', $titles);
+
+        self::userRow($w, $conversationId, $ask);
+        self::assistantRow($w, $conversationId, 'I drafted both notes for your approval.', [
+            ['name' => 'CreateNoteTool', 'arguments' => ['records' => self::records('note', $titles)], 'result' => self::envelope($pending, $titles)],
+        ]);
+
+        self::decide($pending, PendingActionStatus::Approved, [
+            'items' => array_map(fn (string $id): array => ['status' => 'approved', 'id' => $id], $ids),
+            'ids' => $ids,
+            'count' => 2,
+        ]);
+
+        AgentConversationMessage::query()->where('conversation_id', $conversationId)->update(['superseded_at' => now()]);
+
+        self::userRow($w, $conversationId, $ask);
+        self::assistantRow($w, $conversationId, 'Sure, tell me if you want any changes to the wording.', []);
+
+        return $conversationId;
+    }
+
+    public static function approvedTask(EvalWorkspace $w): string
+    {
+        $conversationId = (string) $w->conversation()->getKey();
+        $turnId = (string) Str::ulid();
+
+        $task = resolve(CurrentWorkspace::class)->within(
+            $w->workspace,
+            fn (): Task => Task::factory()->for($w->workspace)->create(['title' => 'Research Company 04']),
+        );
+
+        $pending = self::proposal($w, $conversationId, $turnId, 'task', ['Research Company 04']);
+        $id = (string) $task->getKey();
+
+        self::userRow($w, $conversationId, 'Add a task to research Company 04');
+        self::assistantRow($w, $conversationId, 'I drafted "Research Company 04" for your approval.', [
+            ['name' => 'CreateTaskTool', 'arguments' => ['records' => self::records('task', ['Research Company 04'])], 'result' => self::envelope($pending, ['Research Company 04'])],
+        ]);
+        self::decide($pending, PendingActionStatus::Approved, ['items' => [['status' => 'approved', 'id' => $id]], 'ids' => [$id], 'count' => 1]);
+
+        self::userRow($w, $conversationId, 'Thanks. What else is open on Company 04?');
+        self::assistantRow($w, $conversationId, 'Nothing else is open on Company 04 right now.', []);
+
+        return $conversationId;
+    }
+
     public static function viewer(EvalWorkspace $w): EvalWorkspace
     {
         $viewer = User::factory()->create(['name' => 'Vik Viewer']);
@@ -124,8 +203,8 @@ final readonly class Prior
             fn (): Company => Company::factory()->for($w->workspace)->create(['name' => 'Acme Robotics']),
         );
 
-        $pending = self::proposal($w, $conversationId, $turnId, 'company', 'Acme Robotics');
-        $envelope = self::envelope($pending, 'Acme Robotics');
+        $pending = self::proposal($w, $conversationId, $turnId, 'company', ['Acme Robotics']);
+        $envelope = self::envelope($pending, ['Acme Robotics']);
 
         self::userRow($w, $conversationId, 'Create a company called Acme Robotics');
         self::assistantRow($w, $conversationId, 'I drafted Acme Robotics for your approval.', [
@@ -167,12 +246,12 @@ final readonly class Prior
         $conversationId = (string) $w->conversation()->getKey();
         $turnId = (string) Str::ulid();
 
-        $pending = self::proposal($w, $conversationId, $turnId, $entity, $title);
-        $arguments = ['records' => [[self::titleKey($entity) => $title]]];
+        $pending = self::proposal($w, $conversationId, $turnId, $entity, [$title]);
+        $arguments = ['records' => self::records($entity, [$title])];
 
         self::userRow($w, $conversationId, $ask);
         self::assistantRow($w, $conversationId, "I drafted \"{$title}\" for your approval.", [
-            ['name' => $tool, 'arguments' => $arguments, 'result' => self::envelope($pending, $title)],
+            ['name' => $tool, 'arguments' => $arguments, 'result' => self::envelope($pending, [$title])],
         ]);
 
         self::decide($pending, $status, $status === PendingActionStatus::Rejected ? ['items' => [['status' => 'rejected']], 'count' => 0] : []);
@@ -180,15 +259,18 @@ final readonly class Prior
         return ['conversationId' => $conversationId, 'turnId' => $turnId];
     }
 
-    private static function proposal(EvalWorkspace $w, string $conversationId, string $turnId, string $entity, string $title): PendingAction
+    /**
+     * @param  list<string>  $titles
+     */
+    private static function proposal(EvalWorkspace $w, string $conversationId, string $turnId, string $entity, array $titles): PendingAction
     {
         $pending = ProposalCardFixture::proposal(
             $w->owner,
-            ['_batch' => true, 'records' => [[self::titleKey($entity) => $title]]],
+            ['_batch' => true, 'records' => self::records($entity, $titles)],
             [
                 'title' => 'Create '.ucfirst($entity),
-                'summary' => "Create {$entity} \"{$title}\"",
-                'items' => [['title' => $title, 'summary' => "Create {$entity} \"{$title}\"", 'fields' => [['label' => 'Name', 'value' => $title]]]],
+                'summary' => 'Create '.count($titles)." {$entity}",
+                'items' => array_map(fn (string $title): array => ['title' => $title, 'summary' => "Create {$entity} \"{$title}\"", 'fields' => [['label' => 'Name', 'value' => $title]]], $titles),
             ],
         );
 
@@ -207,10 +289,22 @@ final readonly class Prior
         return $entity === 'company' ? 'name' : 'title';
     }
 
-    private static function envelope(PendingAction $pending, string $title): string
+    /**
+     * @param  list<string>  $titles
+     * @return list<array<string, string>>
+     */
+    private static function records(string $entity, array $titles): array
+    {
+        return array_map(fn (string $title): array => [self::titleKey($entity) => $title], $titles);
+    }
+
+    /**
+     * @param  list<string>  $titles
+     */
+    private static function envelope(PendingAction $pending, array $titles): string
     {
         return json_encode(
-            PendingActionEnvelope::for($pending, 'create', ['_batch' => true, 'records' => [[self::titleKey($pending->entity_type->value) => $title]]]),
+            PendingActionEnvelope::for($pending, 'create', ['_batch' => true, 'records' => self::records($pending->entity_type->value, $titles)]),
             JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR,
         );
     }
