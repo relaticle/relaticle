@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Models\Company;
 use App\Models\People;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
@@ -254,6 +255,31 @@ it('treats a lone proposal as a plan of one', function (): void {
 
     expect($result['approved'])->toHaveCount(1)
         ->and(Company::query()->where('name', 'Solo Corp')->exists())->toBeTrue();
+});
+
+it('saves the assignees of a batch task proposal approved from the card', function (): void {
+    $member = User::factory()->create();
+    $this->user->currentWorkspace->users()->attach($member, ['role' => 'member']);
+
+    ($this->tool)(CreateTaskTool::class)->handle(new Request([
+        'records' => [
+            ['title' => 'Draft the brief'],
+            ['title' => 'Send the contract', 'assignee_ids' => [(string) $member->getKey()]],
+        ],
+    ]));
+
+    $proposal = ($this->proposalFor)('task');
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
+        ->call('approveAll')
+        ->assertNotDispatched('proposal:resolve-failed');
+
+    $first = Task::query()->where('title', 'Draft the brief')->firstOrFail();
+    $second = Task::query()->where('title', 'Send the contract')->firstOrFail();
+
+    expect($first->assignees)->toHaveCount(0)
+        ->and($second->assignees->modelKeys())->toBe([$member->getKey()]);
 });
 
 describe('reference validation', function (): void {

@@ -19,6 +19,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Pagination\CursorPaginator;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -77,6 +78,18 @@ abstract class BaseReadListTool implements Tool
     abstract protected function entity(): CrmEntity;
 
     abstract protected function citationType(): string;
+
+    /** @return array<int, string> */
+    protected function eagerLoad(): array
+    {
+        return [];
+    }
+
+    /** @return array<string, mixed> */
+    protected function extraPayload(Model $model): array
+    {
+        return [];
+    }
 
     abstract public function description(): string;
 
@@ -167,12 +180,7 @@ abstract class BaseReadListTool implements Tool
             return (string) json_encode(['error' => $e->getMessage()], JSON_UNESCAPED_SLASHES);
         }
 
-        // Loaded onto the paginator's own model instances (not a copy), so the
-        // display block below and the `included` payload further down read the
-        // same eager-loaded relations without a second query.
-        if ($requestedIncludes !== [] && $results instanceof LengthAwarePaginator) {
-            $this->loadIncludes($results, $requestedIncludes, $user);
-        }
+        $this->loadRelations($results, $requestedIncludes, $user);
 
         // Captured before the resource collection is built: wrapping a paginator
         // in a resource collection replaces its items with resource instances,
@@ -217,6 +225,24 @@ abstract class BaseReadListTool implements Tool
     }
 
     /**
+     * @param  CursorPaginator<int, Model>|LengthAwarePaginator<int, Model>  $results
+     * @param  list<string>  $requestedIncludes
+     */
+    private function loadRelations(CursorPaginator|LengthAwarePaginator $results, array $requestedIncludes, User $user): void
+    {
+        // Loaded onto the paginator's own models, so the display block and
+        // the `included` payload read the same relations without a second query.
+        if ($this->eagerLoad() !== []) {
+            $models = new Collection(array_values($results->items()));
+            $models->load($this->eagerLoad());
+        }
+
+        if ($requestedIncludes !== [] && $results instanceof LengthAwarePaginator) {
+            $this->loadIncludes($results, $requestedIncludes, $user);
+        }
+    }
+
+    /**
      * @param  array<mixed>  $items
      * @param  list<mixed>  $models
      * @param  list<string>  $requestedIncludes
@@ -253,6 +279,10 @@ abstract class BaseReadListTool implements Tool
         $item['url'] = $id !== null && $linkType !== null
             ? $resolver->referenceUrl($linkType, $id)
             : null;
+
+        if ($model instanceof Model) {
+            $item = [...$item, ...$this->extraPayload($model)];
+        }
 
         if ($requestedIncludes !== [] && $model instanceof Model) {
             $item['included'] = $this->includedFor($model, $requestedIncludes, $resolver);
