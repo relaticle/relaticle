@@ -3,9 +3,11 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
 use Pest\Evals\Contracts\JudgeDriver;
 use Pest\Evals\Eval\Evaluation;
 use Pest\Evals\Eval\Verdict;
+use Tests\Evals\Support\Compare;
 use Tests\Evals\Support\EvalReport;
 use Tests\Evals\Support\Prices;
 use Tests\Evals\Support\RecordingJudge;
@@ -283,4 +285,81 @@ it('reports the path it cannot write', function (): void {
     expect(fn () => EvalReport::record('blocked', true, cachedEnvelope()))->toThrow(RuntimeException::class, $blocker);
 
     unlink($blocker);
+});
+
+it('reports no difference inside the interval for identical runs', function (): void {
+    $r = Compare::pairedInterval([1.0, 0.0, 1.0, 1.0], [1.0, 0.0, 1.0, 1.0]);
+
+    expect($r['diff'])->toBe(0.0)->and($r['low'])->toBe(0.0)->and($r['high'])->toBe(0.0);
+});
+
+it('reports a paired gain with its interval', function (): void {
+    $r = Compare::pairedInterval([0.0, 0.0, 1.0, 1.0], [1.0, 1.0, 1.0, 1.0]);
+
+    expect($r['diff'])->toBe(0.5)->and($r['low'])->toBeGreaterThan(-0.1)->and($r['high'])->toBeLessThan(1.1);
+});
+
+it('collapses the interval for a single case and rejects empty input', function (): void {
+    $r = Compare::pairedInterval([0.0], [1.0]);
+
+    expect($r)->toBe(['diff' => 1.0, 'low' => 1.0, 'high' => 1.0])
+        ->and(fn () => Compare::pairedInterval([], []))->toThrow(InvalidArgumentException::class);
+});
+
+function writeRunFixture(string $name, array $lines): string
+{
+    $directory = (string) EvalReport::$directory.'/'.$name;
+    File::ensureDirectoryExists($directory);
+    file_put_contents($directory.'/results.jsonl', implode("\n", array_map(
+        fn (array $line): string => json_encode($line + ['file' => 'f.php', 'split' => 'test', 'cost_usd' => null, 'duration_ms' => 100, 'retries' => 0], JSON_THROW_ON_ERROR),
+        $lines,
+    ))."\n");
+
+    return $directory;
+}
+
+it('compares two run directories with a flip table and the cases missing from either run', function (): void {
+    $baseline = writeRunFixture('baseline', [
+        ['case' => 'steady', 'passed' => true],
+        ['case' => 'steady', 'passed' => true],
+        ['case' => 'flipper', 'passed' => false],
+        ['case' => 'flipper', 'passed' => true],
+        ['case' => 'dropped', 'passed' => true],
+        ['case' => 'guarded', 'passed' => true, 'split' => 'guard'],
+    ]);
+    $candidate = writeRunFixture('candidate', [
+        ['case' => 'steady', 'passed' => true],
+        ['case' => 'steady', 'passed' => true],
+        ['case' => 'flipper', 'passed' => true],
+        ['case' => 'flipper', 'passed' => true],
+        ['case' => 'added', 'passed' => false, 'cost_usd' => 0.25],
+        ['case' => 'guarded', 'passed' => false, 'split' => 'guard'],
+    ]);
+
+    $result = Process::run(['php', base_path('bin/eval-compare.php'), $baseline, $candidate, '--split=test']);
+
+    expect($result->successful())->toBeTrue($result->errorOutput())
+        ->and($result->output())->toContain('flipper | 1/2 | 2/2')
+        ->and($result->output())->not->toContain('steady |')
+        ->and($result->output())->toContain('Missing from candidate (1)')
+        ->and($result->output())->toContain('Missing from baseline (1)')
+        ->and($result->output())->toContain('Cases: baseline 3, candidate 3, in both 2')
+        ->and($result->output())->toContain('guard pass rate: 100.0% (1 of 1 lines)')
+        ->and($result->output())->toContain('guard pass rate: 0.0% (0 of 1 lines)')
+        ->and($result->output())->toContain('(mean over 1 priced lines, 4 lacked a cost)');
+});
+
+it('measures the noise floor over three runs and names the file and line of a malformed result', function (): void {
+    $runs = [
+        writeRunFixture('a', [['case' => 'x', 'passed' => true], ['case' => 'y', 'passed' => true]]),
+        writeRunFixture('b', [['case' => 'x', 'passed' => false], ['case' => 'y', 'passed' => true]]),
+        writeRunFixture('c', [['case' => 'x', 'passed' => true], ['case' => 'y', 'passed' => true]]),
+    ];
+
+    $noise = Compare::noiseReport(array_map(Compare::readRun(...), $runs));
+    file_put_contents($runs[0].'/results.jsonl', "{\"case\":\"x\",\"passed\":true}\nnot json\n");
+
+    expect($noise)->toContain('differs between runs: 1 of 2')->and($noise)->toContain('Largest pass-rate gap between runs: 50.0%')
+        ->and(fn () => Compare::readRun($runs[0]))->toThrow(RuntimeException::class, 'results.jsonl line 2')
+        ->and(fn () => Compare::readRun($runs[0].'/nope'))->toThrow(RuntimeException::class, 'does not exist');
 });
