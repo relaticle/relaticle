@@ -15,8 +15,6 @@ final readonly class ClaudeCodeJudge implements JudgeDriver
 {
     private const int TIMEOUT_SECONDS = 300;
 
-    private const int IDLE_SECONDS = 120;
-
     public function __construct(private string $model) {}
 
     /**
@@ -60,7 +58,6 @@ final readonly class ClaudeCodeJudge implements JudgeDriver
         try {
             $result = Process::path($directory)
                 ->timeout(self::TIMEOUT_SECONDS)
-                ->idleTimeout(self::IDLE_SECONDS)
                 ->env(array_fill_keys(ClaudeCodeProcess::REMOVED_ENV, false))
                 ->input($prompt)
                 ->run([

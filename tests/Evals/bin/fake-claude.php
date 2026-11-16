@@ -105,6 +105,12 @@ foreach ($scenario['steps'] as $step) {
             $emit(['type' => 'result', 'subtype' => 'success', 'is_error' => false, 'result' => 'done', 'total_cost_usd' => $step['cost'] ?? 0.01, 'usage' => $step['usage'] ?? ['input_tokens' => 3, 'cache_read_input_tokens' => 30, 'cache_creation_input_tokens' => 15, 'output_tokens' => 11]]);
 
             break;
+        case 'result_error':
+            $emit(['type' => 'result', 'subtype' => 'error', 'is_error' => true, 'result' => $step['text']]);
+
+            break;
+        case 'exit':
+            exit($step['code'] ?? 0);
         case 'hang':
             $read = [$wait[0]];
             $write = $except = null;

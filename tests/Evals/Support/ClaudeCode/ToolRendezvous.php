@@ -98,11 +98,6 @@ final class ToolRendezvous
         return null;
     }
 
-    public function hasId(string $id): bool
-    {
-        return array_filter($this->waiting, fn (array $call): bool => $call['id'] === $id) !== [];
-    }
-
     /**
      * @param  array<array-key, mixed>  $value
      */

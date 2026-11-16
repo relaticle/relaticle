@@ -594,9 +594,30 @@ it('fails the stub test loudly when the stub exits instead of waiting forever', 
     File::deleteDirectory($directory);
 });
 
+function isolatedTempRoot(bool $forget = false): ?string
+{
+    static $base = null;
+
+    if ($forget) {
+        $base !== null && File::deleteDirectory($base);
+        $base = null;
+        ClaudeCodeProcess::$tempRoot = null;
+
+        return null;
+    }
+
+    if ($base === null) {
+        $base = sys_get_temp_dir().'/fct'.bin2hex(random_bytes(4));
+        mkdir($base.'/root', 0700, true);
+        ClaudeCodeProcess::$tempRoot = $base.'/root';
+    }
+
+    return $base;
+}
+
 function fakeClaudeScenario(array $steps): string
 {
-    $path = sys_get_temp_dir().'/fc'.bin2hex(random_bytes(3)).'.json';
+    $path = isolatedTempRoot().'/scenario'.bin2hex(random_bytes(3)).'.json';
     file_put_contents($path, json_encode(['steps' => $steps], JSON_THROW_ON_ERROR));
     ClaudeCodeProcess::$command = [PHP_BINARY, base_path('tests/Evals/bin/fake-claude.php'), $path];
 
@@ -631,8 +652,9 @@ function textMessage(string $id, string $text): array
 }
 
 afterEach(function (): void {
-    ClaudeCodeProcess::$command = ['claude'];
+    ClaudeCodeProcess::$command = ClaudeCodeProcess::DEFAULT_COMMAND;
     ClaudeCodeGateway::releaseAll();
+    isolatedTempRoot(forget: true);
 });
 
 it('hands one tool call to laravel ai and resumes the model with its result', function (): void {
@@ -752,6 +774,102 @@ it('skips the result of a call claude code refused only after it handed the step
     $process->release();
 });
 
+it('counts a stub connection that carries no tool use id when its name and arguments match', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', ['limit' => 5]]]),
+        ['do' => 'connect', 'key' => 'k1', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 5]],
+        ['do' => 'await', 'keys' => ['k1']],
+        textMessage('m2', 'Done.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+    $started = microtime(true);
+
+    $first = $process->nextStep();
+    $process->deliver([new ToolResult('toolu_1', 'ListCompaniesTool', ['limit' => 5], 'ONE')]);
+
+    expect(microtime(true) - $started)->toBeLessThan(10)
+        ->and($first->toolCalls)->toHaveCount(1)
+        ->and($process->nextStep()->text)->toBe('Done.');
+
+    $process->release();
+});
+
+it('answers serial calls that connect in the reverse of the order laravel ai returns them', function (): void {
+    $scenario = fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_a', 'ListCompaniesTool', ['limit' => 1]], ['toolu_b', 'ListCompaniesTool', ['limit' => 2]]]),
+        ['do' => 'connect', 'key' => 'kb', 'id' => 'toolu_b', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 2]],
+        ['do' => 'await', 'keys' => ['kb']],
+        ['do' => 'user_ok', 'id' => 'toolu_b'],
+        ['do' => 'connect', 'key' => 'ka', 'id' => 'toolu_a', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 1]],
+        ['do' => 'await', 'keys' => ['ka']],
+        textMessage('m2', 'Both read.'),
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+    $started = microtime(true);
+
+    $process->nextStep();
+    $process->deliver([
+        new ToolResult('toolu_a', 'ListCompaniesTool', ['limit' => 1], 'ONE'),
+        new ToolResult('toolu_b', 'ListCompaniesTool', ['limit' => 2], 'TWO'),
+    ]);
+
+    $final = $process->nextStep();
+
+    expect(microtime(true) - $started)->toBeLessThan(10)
+        ->and($final->text)->toBe('Both read.')
+        ->and(collect(fakeClaudeRecord($scenario)['replies'])->pluck('text', 'key')->all())->toBe(['kb' => 'TWO', 'ka' => 'ONE']);
+
+    $process->release();
+});
+
+it('fails fast with claude code own error when it writes one and exits while the step waits for a call', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', []]]),
+        ['do' => 'result_error', 'text' => 'You have hit your usage limit'],
+        ['do' => 'exit', 'code' => 1],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+    $started = microtime(true);
+
+    expect(fn () => $process->nextStep())->toThrow(RuntimeException::class, 'Claude Code failed: You have hit your usage limit')
+        ->and(microtime(true) - $started)->toBeLessThan(10);
+
+    $process->release();
+});
+
+it('fails fast with claude code own error when it exits while deliver waits for a connection', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', []]]),
+        ['do' => 'connect', 'key' => 'k1', 'id' => 'toolu_1', 'name' => 'ListCompaniesTool', 'arguments' => []],
+        ['do' => 'pause', 'seconds' => 1],
+        ['do' => 'result_error', 'text' => 'You have hit your usage limit'],
+        ['do' => 'exit', 'code' => 1],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+    $started = microtime(true);
+    $process->nextStep();
+
+    expect(fn () => $process->deliver([new ToolResult('toolu_zzz', 'ListCompaniesTool', ['x' => 1], 'ONE')]))->toThrow(RuntimeException::class, 'Claude Code failed: You have hit your usage limit')
+        ->and(microtime(true) - $started)->toBeLessThan(10);
+
+    $process->release();
+});
+
+it('reports a silent exit as an exit and not as a wait that timed out', function (): void {
+    fakeClaudeScenario([['do' => 'init'], toolMessage('m1', [['toolu_1', 'ListCompaniesTool', []]]), ['do' => 'exit', 'code' => 2]]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    expect(fn () => $process->nextStep())->toThrow(RuntimeException::class, 'Claude Code exited before the turn ended');
+
+    $process->release();
+});
+
 it('does not hand laravel ai a tool call claude code rejected itself', function (): void {
     fakeClaudeScenario([
         ['do' => 'init'],
@@ -856,15 +974,14 @@ it('fails the turn when the init line does not show the plan, the rela server an
 ]);
 
 it('removes its directory and socket when claude cannot be started', function (): void {
-    $before = glob(sys_get_temp_dir().'/cc*');
+    isolatedTempRoot();
 
     expect(fn () => ClaudeCodeProcess::start('claude-sonnet-5', 'high', 'x', 'y', [['name' => 'T', 'description' => 'T', 'inputSchema' => ['bad' => NAN]]]))->toThrow(JsonException::class)
-        ->and(glob(sys_get_temp_dir().'/cc*'))->toBe($before);
+        ->and(glob(ClaudeCodeProcess::$tempRoot.'/*'))->toBe([]);
 });
 
 it('streams a gateway step in the anthropic event order and releases the process after the last step', function (): void {
     fakeClaudeScenario([['do' => 'init'], textMessage('m1', 'Hello there.'), ['do' => 'result']]);
-    $before = glob(sys_get_temp_dir().'/cc*');
     ClaudeCodeProvider::register();
     $provider = resolve(AiManager::class)->textProvider('claude-code');
     $gateway = new ClaudeCodeGateway;
@@ -882,7 +999,7 @@ it('streams a gateway step in the anthropic event order and releases the process
         ->and($stream->getReturn()->text)->toBe('Hello there.')
         ->and($records)->toHaveCount(1)
         ->and($records[0]['result']['total_cost_usd'])->toBe(0.01)
-        ->and(glob(sys_get_temp_dir().'/cc*'))->toBe($before);
+        ->and(glob(ClaudeCodeProcess::$tempRoot.'/*'))->toBe([]);
 });
 
 it('refuses a plan run of a model the claude code gateway cannot serve', function (): void {

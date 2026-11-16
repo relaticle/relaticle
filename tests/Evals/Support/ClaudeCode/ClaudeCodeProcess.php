@@ -16,8 +16,12 @@ use Throwable;
 
 final class ClaudeCodeProcess
 {
+    public const array DEFAULT_COMMAND = ['claude'];
+
     /** @var list<string> */
-    public static array $command = ['claude'];
+    public static array $command = self::DEFAULT_COMMAND;
+
+    public static ?string $tempRoot = null;
 
     private const float IDLE_LIMIT_SECONDS = 900;
 
@@ -80,7 +84,7 @@ final class ClaudeCodeProcess
      */
     public static function start(string $model, string $effort, string $instructions, string $firstMessage, array $tools): self
     {
-        $directory = sys_get_temp_dir().'/cc'.bin2hex(random_bytes(4));
+        $directory = (self::$tempRoot ?? sys_get_temp_dir()).'/cc'.bin2hex(random_bytes(4));
         $rendezvous = null;
 
         try {
@@ -132,16 +136,30 @@ final class ClaudeCodeProcess
      */
     public function deliver(array $results): void
     {
-        foreach ($results as $result) {
-            $index = $this->waitFor(fn (): ?int => $this->rendezvous->indexOf($result->id, $result->name, $result->arguments) ?? (isset($this->answeredByClaude[$result->id]) ? -1 : null));
+        $pending = $results;
 
-            if ($index === -1) {
-                $this->rejected[] = ['id' => $result->id, 'name' => $result->name];
+        while ($pending !== []) {
+            $this->consumeLines();
+            $progressed = false;
 
-                continue;
+            foreach ($pending as $key => $result) {
+                $index = $this->rendezvous->indexOf($result->id, $result->name, $result->arguments);
+
+                if ($index !== null) {
+                    $this->rendezvous->reply($result->text(), ! $result->successful(), $index);
+                } elseif (isset($this->answeredByClaude[$result->id])) {
+                    $this->rejected[] = ['id' => $result->id, 'name' => $result->name];
+                } else {
+                    continue;
+                }
+
+                unset($pending[$key]);
+                $progressed = true;
             }
 
-            $this->rendezvous->reply($result->text(), ! $result->successful(), $index);
+            if (! $progressed) {
+                $this->idle();
+            }
         }
     }
 
@@ -244,7 +262,7 @@ final class ClaudeCodeProcess
      */
     private function executed(array $calls): array
     {
-        $this->waitFor(fn (): ?bool => array_filter($calls, fn (ToolCall $call): bool => $this->rendezvous->hasId($call->id)) !== [] || $this->unanswered($calls) === [] ? true : null);
+        $this->waitFor(fn (): ?bool => array_filter($calls, fn (ToolCall $call): bool => $this->rendezvous->indexOf($call->id, $call->name, $call->arguments) !== null) !== [] || $this->unanswered($calls) === [] ? true : null);
 
         foreach (array_filter($calls, fn (ToolCall $call): bool => isset($this->answeredByClaude[$call->id])) as $call) {
             $this->rejected[] = ['id' => $call->id, 'name' => $call->name];
@@ -410,9 +428,15 @@ final class ClaudeCodeProcess
 
             if (($event['type'] ?? '') === 'user') {
                 $this->recordUserLine($event);
-            } else {
-                $this->held[] = $line;
+
+                continue;
             }
+
+            if (($event['type'] ?? '') === 'result') {
+                $this->recordResult($event);
+            }
+
+            $this->held[] = $line;
         }
     }
 
@@ -454,7 +478,7 @@ final class ClaudeCodeProcess
         if (! $this->process->running()) {
             $this->pump();
 
-            if ($this->held === [] && ! str_contains($this->buffer, "\n")) {
+            if (! str_contains($this->buffer, "\n")) {
                 throw new RuntimeException('Claude Code exited before the turn ended: '.mb_substr(trim($this->process->errorOutput()) ?: 'no error output', 0, 500));
             }
         }
