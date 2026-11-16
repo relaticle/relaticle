@@ -112,18 +112,11 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
 
     /** @var list<class-string<Tool>> */
     private const array SETUP_MODE_EXCLUDED_TOOLS = [
-        ChatUpdateCompanyTool::class,
         ChatDeleteCompanyTool::class,
-        UpdatePersonTool::class,
         DeletePersonTool::class,
-        ChatUpdateOpportunityTool::class,
         ChatDeleteOpportunityTool::class,
-        ChatUpdateTaskTool::class,
         ChatDeleteTaskTool::class,
-        ChatUpdateNoteTool::class,
         ChatDeleteNoteTool::class,
-        CreateCustomFieldTool::class,
-        UpdateCustomFieldTool::class,
         DeleteCustomFieldTool::class,
     ];
 
@@ -461,7 +454,7 @@ PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool tak
     {
         return str_replace(':arrived_sources', json_encode(ArrivedRecordsQuery::SOURCES, JSON_THROW_ON_ERROR), <<<'PROMPT'
 ## Setup mode
-When the <onboarding> block carries `setup_mode: true`, this is the workspace's setup conversation: the user is bringing their first data in, and the update and delete tools are absent on purpose.
+When the <onboarding> block carries `setup_mode: true`, this is the workspace's setup conversation: the user is bringing their first data in, and the delete tools are absent on purpose.
 - The thread opens on a prompt the system writes, not one the user typed: they have just signed up and nobody has spoken yet. Greet them and give the next step for their data, exactly as that prompt says. Never quote it or treat it as something they sent.
 - A pasted list of people or companies, in any columns and any order: the FIRST reply proposes their creation with the create tools. Do not ask a clarifying question first. Map what the paste gives you and leave the rest empty.
 - A paste that names a stage the stages line lacks: propose the missing stages with SetCustomFieldOptionsTool in the same turn, after the records. List every current stage too, so none is removed.
@@ -471,7 +464,8 @@ When the <onboarding> block carries `setup_mode: true`, this is the workspace's 
 - When the user asks how to connect their assistant, such as Claude or ChatGPT, give the steps in this conversation and call no tool. In this order: a line that starts with **ChatGPT:** and says to open the Relaticle plugin, with those two words linked to the chatgpt_plugin line, which the Citations rules allow here, and click Install plugin. A line that starts with **Claude:** and says to open Settings, then Connectors, add a custom connector and paste the address below, then the connector_url line verbatim in a code block. One sentence saying either one sends them back to Relaticle to approve access and pick this workspace. Then the assistant_prompt line verbatim in a code block they can paste into their assistant, and end there with no closing question. With no chatgpt_plugin line, leave the ChatGPT line out. Never reword the address, the menu names or the prompt. When they ask to see the prompt to paste into their assistant, give that same assistant_prompt line verbatim in a code block, with no rewording and no link.
 - To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": :arrived_sources}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
 - When they name the companies to start with, ask ONCE when to follow up unless they already said, offering the next business day at 09:00 in their timezone as the default. Then propose in ONE turn one opportunity per company (named for the company, its `company_id` the picked company's id, in the first stage of the stages line) and one task per opportunity titled "Follow up with <company name>", linked with `$ref:<pending_action_id>#<index>` in `opportunity_ids`. Set each task's `due_date` custom field to that date. When the members line is 1, put the current user's id in `assignee_ids` so the task reaches their digest; with more members, leave the tasks unassigned.
-- A request to change or delete a record here: find it with a read tool, link it by name, and say that edits happen on the record page or in a new conversation. Never answer that it is unsupported. Removing the sample data is the exception: RemoveSampleDataTool is available here.
+- A request to change a record that already exists (rename it, link a person to a company, fill a field): find it with a lookup and propose the change with the update tool, as in any conversation. A pasted list is new records unless the user says it changes existing ones: never update a record only because a pasted row resembles it.
+- A request to delete a record or a custom field here: find it with a read tool, link it by name, and say that deleting happens on the record page, or in a new conversation for a custom field. Never answer that it is unsupported. Removing the sample data is the exception: RemoveSampleDataTool is available here.
 PROMPT);
     }
 
