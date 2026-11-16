@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Laravel\Ai\Exceptions\RateLimitedException;
@@ -12,7 +11,6 @@ use Laravel\Ai\Responses\Data\ToolCall;
 use Pest\Evals\Support\ToolCallParser;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
-use Relaticle\Chat\Events\ChatStreamRetrying;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
 use Tests\Evals\Support\EvalModels;
@@ -157,7 +155,8 @@ it('keeps the retry cause and retries a rate limited turn three times', function
 
     expect($envelope['error'])->toContain('rate limit')
         ->and($envelope['error'])->toContain('asked for a retry')
-        ->and($envelope['text'])->toBe('');
+        ->and($envelope['text'])->toBe('')
+        ->and($turn->envelope()->retries)->toBe(RelaTurn::MAX_RETRIES);
 
     Sleep::assertSleptTimes(RelaTurn::MAX_RETRIES);
     Sleep::assertSequence([Sleep::for(2)->seconds(), Sleep::for(2)->seconds(), Sleep::for(2)->seconds()]);
@@ -251,21 +250,6 @@ it('accepts a known alias and rejects an unknown substitution', function (): voi
         ->toThrow(RuntimeException::class, 'Asked for claude-sonnet-5-5, served by claude-sonnet-5');
 });
 
-it('counts a provider retry inside one attempt as a retry of the turn', function (): void {
-    CrmAssistant::fake(function (): string {
-        Event::dispatch(new ChatStreamRetrying('c', 2, 5, 1));
-
-        return 'Fine.';
-    });
-    $turn = new RelaTurn(EvalWorkspace::seed());
-
-    $turn('anything');
-
-    expect($turn->envelope()->error)->toBeNull()
-        ->and($turn->envelope()->retries)->toBe(1)
-        ->and($turn->envelope()->toTrace()['retries'])->toBe(1);
-});
-
 it('counts an extra attempt after a rate limited first attempt', function (): void {
     Sleep::fake();
     $calls = 0;
@@ -282,7 +266,25 @@ it('counts an extra attempt after a rate limited first attempt', function (): vo
 
     expect($turn->envelope()->error)->toBeNull()
         ->and($turn->envelope()->text)->toBe('Fine.')
-        ->and($turn->envelope()->retries)->toBeGreaterThanOrEqual(1);
+        ->and($turn->envelope()->retries)->toBe(1);
+});
+
+it('counts the extra attempt of a turn that retries and then throws', function (): void {
+    Sleep::fake();
+    $calls = 0;
+    CrmAssistant::fake(function () use (&$calls): string {
+        if ($calls++ === 0) {
+            throw RateLimitedException::forProvider('anthropic');
+        }
+
+        throw new RuntimeException('The provider broke.');
+    });
+    $turn = new RelaTurn(EvalWorkspace::seed());
+
+    $turn('anything');
+
+    expect($turn->envelope()->error)->toContain('The provider broke.')
+        ->and($turn->envelope()->retries)->toBe(1);
 });
 
 it('reads a stored error row as a failed turn', function (): void {
