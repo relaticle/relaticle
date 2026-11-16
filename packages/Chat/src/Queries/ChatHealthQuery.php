@@ -24,14 +24,19 @@ use stdClass;
  *   proposals: array<string, int>,
  *   setup_conversations: int, setup_conversations_typed: int,
  *   cache: array<string, array{followups: int, zero_read: int, read_share: float}>,
- *   top_workspaces: list<array{workspace_id: string, turns: int, prompt_tokens: int}>
+ *   top_workspaces: list<array{workspace_id: string, turns: int, prompt_tokens: int}>,
+ *   spend: Spend
  * }
+ *
+ * @phpstan-import-type Spend from ChatSpendQuery
  */
 final readonly class ChatHealthQuery
 {
     private const int FOLLOW_UP_SECONDS = 300;
 
     private const int TOP_WORKSPACES = 5;
+
+    public function __construct(private ChatSpendQuery $spend) {}
 
     /** @return Report */
     public function forWindow(CarbonImmutable $from, CarbonImmutable $to): array
@@ -44,6 +49,7 @@ final readonly class ChatHealthQuery
             ...$this->scanTurns($from, $to),
             'proposals' => $this->proposals($from, $to),
             ...$this->setupConversations($from, $to),
+            'spend' => $this->spend->forWindow($from, $to),
         ];
     }
 

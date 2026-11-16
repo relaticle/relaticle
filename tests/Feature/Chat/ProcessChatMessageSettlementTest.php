@@ -609,6 +609,16 @@ function settleWebResearchTurn(string $provider, string $model, string $conversa
         ->sole();
 }
 
+it('records the prompt, cache-read and cache-write tokens of a settled turn on the ledger', function (): void {
+    AnthropicSse::fake(AnthropicSse::reply('Three deals.', 'claude-sonnet-5'));
+
+    $resolution = settleWebResearchTurn('anthropic', 'claude-sonnet-5', 'c-tokens-1', '01TURNTOKENSAAAAAAAAAAAAAA');
+
+    expect($resolution->metadata['tokens'])->toBe(['prompt' => 1240, 'cache_read' => 1000, 'cache_write' => 200])
+        ->and($resolution->input_tokens)->toBe(40)
+        ->and($resolution->output_tokens)->toBe(12);
+});
+
 it('charges 2 credits per web search', function (): void {
     AnthropicSse::fake(AnthropicSse::webResearchReply(
         ['filaforms', 'filaforms pricing', 'filaforms founder'],

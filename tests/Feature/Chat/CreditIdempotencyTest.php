@@ -7,6 +7,7 @@ use App\Models\Workspace;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -37,8 +38,7 @@ it('does not double-charge when settle is called twice with the same idempotency
         'user' => $user,
         'type' => AiCreditType::Chat,
         'model' => 'claude-sonnet-4',
-        'inputTokens' => 100,
-        'outputTokens' => 200,
+        'usage' => new TextUsage(100, 200),
         'toolCallsCount' => 1,
         'conversationId' => 'conv_1',
         'resolutionKey' => 'response_abc123',
@@ -97,7 +97,7 @@ it('settles a reservation exactly once even when called twice with the same key'
 
     $args = [
         'workspace' => $workspace, 'user' => $user, 'type' => AiCreditType::Chat,
-        'model' => 'claude-sonnet', 'inputTokens' => 10, 'outputTokens' => 20,
+        'model' => 'claude-sonnet', 'usage' => new TextUsage(10, 20),
         'toolCallsCount' => 0, 'conversationId' => null, 'reservedCredits' => 1,
         'resolutionKey' => 'resolve-TURN-1',
     ];

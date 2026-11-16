@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Laravel\Ai\Responses\Data\TextUsage;
 use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
@@ -74,8 +75,7 @@ it('reserve + settle + refund cycles move credits_used in lockstep with the chat
         user: $user,
         type: AiCreditType::Chat,
         model: 'claude-opus-5',
-        inputTokens: 100,
-        outputTokens: 200,
+        usage: new TextUsage(100, 200),
         resolutionKey: 'turn-success',
     );
 
