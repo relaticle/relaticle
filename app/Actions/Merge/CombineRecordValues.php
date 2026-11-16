@@ -33,8 +33,8 @@ final readonly class CombineRecordValues
         foreach ($this->activeFields($kept) as $field) {
             $value = $this->combine(
                 $field,
-                $this->withoutSelfLinks(field: $field, value: $kept->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
-                $this->withoutSelfLinks(field: $field, value: $duplicate->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
+                $this->swapDuplicateForKept(field: $field, value: $kept->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
+                $this->swapDuplicateForKept(field: $field, value: $duplicate->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
             );
 
             $customFields[$field->code] = $value;
@@ -107,15 +107,18 @@ final readonly class CombineRecordValues
             ->get();
     }
 
-    private function withoutSelfLinks(CustomField $field, mixed $value, Company|People $kept, Company|People $duplicate): mixed
+    private function swapDuplicateForKept(CustomField $field, mixed $value, Company|People $kept, Company|People $duplicate): mixed
     {
         if (! $this->linksToSameEntity($field, $kept) || ! is_array($value)) {
             return $value;
         }
 
-        $selfIds = [$kept->getKey(), $duplicate->getKey()];
+        $linkedIds = array_map(
+            fn (mixed $linkedId): mixed => $linkedId === $duplicate->getKey() ? $kept->getKey() : $linkedId,
+            $value,
+        );
 
-        return array_values(array_filter($value, fn (mixed $linkedId): bool => ! in_array($linkedId, $selfIds, true)));
+        return array_values(array_unique($linkedIds, SORT_REGULAR));
     }
 
     private function linksToSameEntity(CustomField $field, Company|People $record): bool
