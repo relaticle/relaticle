@@ -662,6 +662,20 @@ it('lists stale opportunities alike on the api and mcp', function (): void {
     ]);
 });
 
+it('never lists an opportunity younger than the window as stale, even with no activity logged for it', function (): void {
+    $this->travelTo(now()->subDays(40));
+    Model::withoutEvents(fn (): Model => unlinkedRecord($this->user, 'opportunities', 'Seeded Forty Days Ago'));
+    $this->travelBack();
+    Model::withoutEvents(fn (): Model => unlinkedRecord($this->user, 'opportunities', 'Seeded Today'));
+
+    expectTitlesOnEverySurface($this, $this->user, 'opportunities', [
+        [['stale_days' => ['$gte' => 30]], ['Seeded Forty Days Ago']],
+        [['stale_days' => ['$gte' => 1]], ['Seeded Forty Days Ago']],
+        [['stale_days' => ['$gte' => 60]], []],
+        [['$not' => ['stale_days' => ['$gte' => 30]]], ['Seeded Today']],
+    ]);
+});
+
 it('lists the tasks assigned to the caller alike on the api and mcp', function (): void {
     $colleague = filterSurfaceMember($this->user);
     unlinkedRecord($this->user, 'tasks', 'Mine')->assignees()->attach($this->user);

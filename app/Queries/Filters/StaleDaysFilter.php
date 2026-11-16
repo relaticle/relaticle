@@ -39,10 +39,14 @@ final readonly class StaleDaysFilter implements Filter
 
         $workspaceId = $this->user->currentWorkspace->getKey();
 
-        $query->whereNotExists(fn (DbBuilder $activity) => $activity->from('activity_log')
-            ->where('activity_log.workspace_id', $workspaceId)
-            ->where('activity_log.subject_type', 'opportunity')
-            ->whereColumn('activity_log.subject_id', 'opportunities.id')
-            ->where('activity_log.created_at', '>=', now()->subDays($days)));
+        $since = now()->subDays($days);
+
+        // A writer that skips model events logs no creation, so age is checked on the record itself.
+        $query->where('opportunities.created_at', '<', $since)
+            ->whereNotExists(fn (DbBuilder $activity) => $activity->from('activity_log')
+                ->where('activity_log.workspace_id', $workspaceId)
+                ->where('activity_log.subject_type', 'opportunity')
+                ->whereColumn('activity_log.subject_id', 'opportunities.id')
+                ->where('activity_log.created_at', '>=', $since));
     }
 }
