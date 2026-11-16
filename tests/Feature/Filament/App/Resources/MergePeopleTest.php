@@ -78,6 +78,22 @@ it('combines emails with the kept person first and without repeats', function ()
         ->and(People::query()->find($kept->getKey()))->not->toBeNull();
 });
 
+it('combines tags without repeating one that differs only in letter case or spacing', function (): void {
+    CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'people',
+        'code' => 'segments',
+        'name' => 'Segments',
+        'type' => 'tags-input',
+    ]);
+    $kept = mergePersonRecord($this->workspace, $this->user, [], ['segments' => ['VIP', 'Enterprise']]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['segments' => [' vip', 'Partner']]);
+
+    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergePersonValue($kept, 'segments'))->toBe(['VIP', 'Enterprise', 'Partner']);
+});
+
 it('blocks a merge that would give a person more than five emails', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['b1@x.com', 'b2@x.com', 'b3@x.com']]);

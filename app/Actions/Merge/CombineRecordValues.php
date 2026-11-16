@@ -160,6 +160,7 @@ final readonly class CombineRecordValues
         return match ($field->type) {
             CustomFieldType::DOMAIN->value => CanonicalValue::of($field, $value),
             CustomFieldType::EMAIL->value => EmailAddress::canonicalize($value),
+            CustomFieldType::TAGS_INPUT->value => mb_strtolower(trim($value)),
             default => $value,
         };
     }
