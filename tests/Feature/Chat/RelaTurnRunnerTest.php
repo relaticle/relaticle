@@ -13,6 +13,7 @@ use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\AgentConversationMessage;
+use Relaticle\Chat\Services\ModelRegistry;
 use Tests\Evals\Support\EvalModels;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
@@ -325,4 +326,35 @@ it('fails loudly when the provider served another model, and still records the t
 
     expect($served)->toBe('Asked for claude-opus-5, served by claude-sonnet-5')
         ->and(RelaTurn::$last)->toBeInstanceOf(TurnEnvelope::class);
+});
+
+it('resolves a candidate model the catalog does not offer', function (): void {
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5-5'))->toBeNull();
+
+    EvalModels::register();
+
+    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5-5')?->provider)->toBe('anthropic')
+        ->and(resolve(ModelRegistry::class)->find('gpt-6-luna')?->provider)->toBe('openai')
+        ->and(resolve(ModelRegistry::class)->find('claude-sonnet-5')?->provider)->toBe('anthropic');
+});
+
+it('refuses an unknown effort before any turn runs', function (): void {
+    expect(fn () => EvalModels::effortFrom('extreme'))->toThrow(RuntimeException::class);
+});
+
+it('keeps the configured effort when none is asked for and applies a valid one', function (): void {
+    $configured = config('chat.anthropic_effort');
+
+    expect(EvalModels::effortFrom(null))->toBeNull()
+        ->and(EvalModels::effortFrom(''))->toBeNull()
+        ->and(EvalModels::effortFrom('xhigh'))->toBe('xhigh');
+
+    EvalModels::register('low');
+
+    expect(config('chat.anthropic_effort'))->toBe('low');
+
+    config()->set('chat.anthropic_effort', $configured);
+    EvalModels::register(null);
+
+    expect(config('chat.anthropic_effort'))->toBe($configured);
 });
