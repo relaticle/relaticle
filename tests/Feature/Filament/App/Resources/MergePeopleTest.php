@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Actions\Merge\MergePeople;
 use App\Actions\Merge\MergeRecords;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\ActivityLog\AppEventPalette;
@@ -38,7 +37,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergePeople::class, MergeRecords::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
+mutates(MergeRecords::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
 
 beforeEach(function (): void {
     Queue::fake();

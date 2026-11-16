@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Actions\Merge\CombineRecordValues;
-use App\Actions\Merge\MergeCompanies;
 use App\Actions\Merge\MergeRecords;
 use App\Actions\Merge\MoveRecordHistory;
 use App\Actions\Merge\MoveRecordLinks;
@@ -43,7 +42,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergeCompanies::class, MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, MoveRecordHistory::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
+mutates(MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, MoveRecordHistory::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
 
 beforeEach(function (): void {
     Storage::fake('local');

@@ -127,13 +127,13 @@ final readonly class CombineRecordValues
             && $field->lookup_type === $record->getMorphClass();
     }
 
-    private function combine(CustomField $field, mixed $kept, mixed $duplicate): mixed
+    private function combine(CustomField $field, mixed $keptValue, mixed $duplicateValue): mixed
     {
-        if ($this->isList($field) && is_array($kept) && is_array($duplicate)) {
-            return $this->unique($field, [...$kept, ...$duplicate]);
+        if ($this->isList($field) && is_array($keptValue) && is_array($duplicateValue)) {
+            return $this->unique($field, [...$keptValue, ...$duplicateValue]);
         }
 
-        return $this->pick($kept, $duplicate);
+        return $this->pick($keptValue, $duplicateValue);
     }
 
     /**
@@ -180,9 +180,9 @@ final readonly class CombineRecordValues
         return $field->settings->max_values;
     }
 
-    private function pick(mixed $kept, mixed $duplicate): mixed
+    private function pick(mixed $keptValue, mixed $duplicateValue): mixed
     {
-        return $this->isFilled($kept) ? $kept : $duplicate;
+        return $this->isFilled($keptValue) ? $keptValue : $duplicateValue;
     }
 
     private function isFilled(mixed $value): bool

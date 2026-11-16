@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 namespace App\Actions\Merge;
 
+use App\Actions\Company\UpdateCompany;
+use App\Actions\People\UpdatePeople;
 use App\Data\MergedValues;
 use App\Enums\CreationSource;
+use App\Enums\MediaCollection;
 use App\Events\RecordMerged;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
-use Closure;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,46 +26,78 @@ final readonly class MergeRecords
         private CombineRecordValues $combine,
         private MoveRecordLinks $moveLinks,
         private MoveRecordHistory $moveHistory,
+        private UpdateCompany $updateCompany,
+        private UpdatePeople $updatePeople,
     ) {}
 
-    /**
-     * @template TRecord of Company|People
-     *
-     * @param  TRecord  $kept
-     * @param  TRecord  $duplicate
-     * @param  Closure(TRecord, TRecord): void  $moveOwnLinks
-     * @param  Closure(TRecord, MergedValues): TRecord  $writeValues
-     * @return TRecord
-     */
-    public function execute(User $user, Company|People $kept, Company|People $duplicate, Closure $moveOwnLinks, Closure $writeValues): Company|People
+    public function execute(User $user, Company|People $kept, Company|People $duplicate): Company|People
     {
         abort_unless($user->can('update', $kept) && $user->can('delete', $duplicate), 403);
 
-        if ($kept->is($duplicate) || $kept->workspace_id !== $duplicate->workspace_id) {
+        if ($kept::class !== $duplicate::class || $kept->is($duplicate) || $kept->workspace_id !== $duplicate->workspace_id) {
             throw $this->unavailable();
         }
 
-        return DB::transaction(function () use ($user, $kept, $duplicate, $moveOwnLinks, $writeValues): Company|People {
+        return DB::transaction(function () use ($user, $kept, $duplicate): Company|People {
             [$kept, $duplicate] = $this->lock($kept, $duplicate);
 
-            $values = $this->combine->execute($kept, $duplicate);
+            $mergedValues = $this->combine->execute($kept, $duplicate);
 
-            $this->assertWithinLimits($values);
+            $this->assertWithinLimits($mergedValues);
 
             if ($kept->creation_source === CreationSource::SAMPLE && $duplicate->creation_source !== CreationSource::SAMPLE) {
                 $kept->update(['creation_source' => $duplicate->creation_source]);
             }
 
             $this->moveLinks->execute($kept, $duplicate);
-            $moveOwnLinks($kept, $duplicate);
+            $this->moveEntityLinks($kept, $duplicate);
             $this->moveHistory->execute($user, $kept, $duplicate);
 
             event(new RecordMerged($kept, $duplicate));
 
             $duplicate->delete();
 
-            return $writeValues($kept, $values);
+            return $this->saveMergedValues($user, $kept, $mergedValues);
         });
+    }
+
+    private function moveEntityLinks(Company|People $kept, Company|People $duplicate): void
+    {
+        match (true) {
+            $kept instanceof Company => $this->moveCompanyLinks($kept, (string) $duplicate->getKey()),
+            $kept instanceof People => DB::table('opportunities')
+                ->where('contact_id', $duplicate->getKey())
+                ->update(['contact_id' => $kept->getKey()]),
+        };
+    }
+
+    private function moveCompanyLinks(Company $kept, string $duplicateId): void
+    {
+        DB::table('people')->where('company_id', $duplicateId)->update(['company_id' => $kept->getKey()]);
+        DB::table('opportunities')->where('company_id', $duplicateId)->update(['company_id' => $kept->getKey()]);
+        $this->moveLogoIfKeptHasNone($kept, $duplicateId);
+    }
+
+    private function moveLogoIfKeptHasNone(Company $kept, string $duplicateId): void
+    {
+        $logoOf = fn (string $recordId): Builder => DB::table('media')
+            ->where('model_type', $kept->getMorphClass())
+            ->where('model_id', $recordId)
+            ->where('collection_name', MediaCollection::Logo->value);
+
+        if (! $logoOf((string) $kept->getKey())->exists()) {
+            $logoOf($duplicateId)->update(['model_id' => $kept->getKey()]);
+        }
+    }
+
+    private function saveMergedValues(User $user, Company|People $kept, MergedValues $mergedValues): Company|People
+    {
+        $data = [...$mergedValues->attributes, 'custom_fields' => $mergedValues->customFields];
+
+        return match ($kept::class) {
+            Company::class => $this->updateCompany->execute($user, $kept, $data),
+            People::class => $this->updatePeople->execute($user, $kept, $data),
+        };
     }
 
     /**
@@ -90,9 +125,9 @@ final readonly class MergeRecords
         return [$locked[(string) $kept->getKey()], $locked[(string) $duplicate->getKey()]];
     }
 
-    private function assertWithinLimits(MergedValues $values): void
+    private function assertWithinLimits(MergedValues $mergedValues): void
     {
-        $over = Arr::first($values->overLimit);
+        $over = Arr::first($mergedValues->overLimit);
 
         if ($over === null) {
             return;

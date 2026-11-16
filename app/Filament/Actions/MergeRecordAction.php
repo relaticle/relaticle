@@ -4,8 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Actions;
 
-use App\Actions\Merge\MergeCompanies;
-use App\Actions\Merge\MergePeople;
+use App\Actions\Merge\MergeRecords;
 use App\Enums\CrmEntity;
 use App\Filament\Components\Forms\MergeRecordPicker;
 use App\Models\Company;
@@ -103,7 +102,7 @@ final class MergeRecordAction extends Action
         $pickedId = $data['picked_id'] ?? null;
         $picked = is_string($pickedId) ? $current::query()->whereKey($pickedId)->first() : null;
 
-        if ($picked === null || $current->is($picked)) {
+        if ($picked === null) {
             throw ValidationException::withMessages(['picked_id' => __('filament/record-page.merge.unavailable')]);
         }
 
@@ -112,11 +111,7 @@ final class MergeRecordAction extends Action
         /** @var User $user */
         $user = Filament::auth()->user();
 
-        return match (true) {
-            $kept instanceof People && $duplicate instanceof People => resolve(MergePeople::class)->execute($user, $kept, $duplicate),
-            $kept instanceof Company && $duplicate instanceof Company => resolve(MergeCompanies::class)->execute($user, $kept, $duplicate),
-            default => abort(404),
-        };
+        return resolve(MergeRecords::class)->execute($user, $kept, $duplicate);
     }
 
     private function subject(): Company|People

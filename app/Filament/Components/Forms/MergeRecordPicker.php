@@ -156,18 +156,18 @@ final class MergeRecordPicker extends Field
      */
     private function pairing(): ?array
     {
-        $id = $this->getState();
+        $pickedId = $this->getState();
 
-        if (! is_string($id) || $id === '') {
+        if (! is_string($pickedId) || $pickedId === '') {
             return null;
         }
 
         $keepsPicked = $this->keepPickedState();
 
-        $key = "{$id}|{$keepsPicked}";
+        $key = "{$pickedId}|{$keepsPicked}";
 
         if (! array_key_exists($key, $this->pairings)) {
-            $this->pairings[$key] = $this->buildPairing($id, $keepsPicked);
+            $this->pairings[$key] = $this->buildPairing($pickedId, $keepsPicked);
         }
 
         return $this->pairings[$key];
