@@ -101,3 +101,11 @@ it('proposes deleting only the company and never claims a cascade', function ():
         ->toHaveToolCalls(['DeleteCompanyTool' => []])
         ->toPassJudge('The reply proposes deleting the company only. It never says the people, tasks or notes linked to it are deleted too.');
 })->group('test');
+
+it('proposes instead of asking when every field is given', function (): void {
+    $w = EvalWorkspace::seed();
+
+    expect((new RelaTurn($w))(...))
+        ->prompt('Add a demo person named Sam Field')
+        ->toHaveToolCalls(['CreatePersonTool' => []]);
+})->group('train');
