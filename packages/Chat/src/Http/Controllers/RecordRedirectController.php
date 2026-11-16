@@ -15,6 +15,9 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\RecordReferenceResolver;
 
 /**
@@ -79,7 +82,7 @@ final readonly class RecordRedirectController
         /** @var User $user */
         $user = $request->user();
 
-        $record = $modelClass::query()->withoutGlobalScope(WorkspaceScope::class)->withTrashed()->find($id);
+        $record = $this->find($modelClass, $id) ?? $this->createdByProposal($user, $modelClass, $type, $id);
 
         abort_if($record === null, 404);
 
@@ -89,10 +92,31 @@ final readonly class RecordRedirectController
             return response()->view('chat::record-gone', status: Response::HTTP_GONE);
         }
 
-        $url = $resolver->urlFor($type, $id, $record->workspace);
+        $url = $resolver->urlFor($type, (string) $record->getKey(), $record->workspace);
 
         abort_if($url === null, 404);
 
         return redirect($url);
+    }
+
+    /** @param  class-string<Company|People|Opportunity|Task|Note>  $modelClass */
+    private function find(string $modelClass, string $id): Company|People|Opportunity|Task|Note|null
+    {
+        return $modelClass::query()->withoutGlobalScope(WorkspaceScope::class)->withTrashed()->find($id);
+    }
+
+    /** @param  class-string<Company|People|Opportunity|Task|Note>  $modelClass */
+    private function createdByProposal(User $user, string $modelClass, string $type, string $proposalId): Company|People|Opportunity|Task|Note|null
+    {
+        $created = PendingAction::query()
+            ->whereKey($proposalId)
+            ->where('user_id', $user->getKey())
+            ->where('operation', PendingActionOperation::Create)
+            ->where('status', PendingActionStatus::Approved)
+            ->where('entity_type', $type)
+            ->first()
+            ?->createdRecordIds() ?? [];
+
+        return count($created) === 1 ? $this->find($modelClass, $created[0]) : null;
     }
 }

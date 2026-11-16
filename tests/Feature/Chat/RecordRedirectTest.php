@@ -18,9 +18,16 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Laravel\Ai\Tools\Request;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Http\Controllers\RecordRedirectController;
+use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Services\PendingActionService;
+use Relaticle\Chat\Services\ProposalPlanService;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(RecordRedirectController::class);
@@ -170,4 +177,80 @@ it('404s for a custom field belonging to another workspace', function (): void {
     $stranger = User::factory()->withPersonalWorkspace()->create();
 
     $this->actingAs($stranger)->get("/r/custom_field/{$field->getKey()}")->assertNotFound();
+});
+
+/** @param  list<string>  $titles */
+function proposeTasksForRedirect(User $user, array $titles): PendingAction
+{
+    test()->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $conversationId = (string) Str::uuid7();
+
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+
+    resolve(CreateTaskTool::class)
+        ->setConversationId($conversationId)
+        ->setTurnId((string) Str::ulid())
+        ->handle(new Request(['records' => array_map(static fn (string $title): array => ['title' => $title], $titles)]));
+
+    return PendingAction::query()->where('conversation_id', $conversationId)->sole();
+}
+
+it('opens the record an approved proposal created when the link carries the proposal id', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $proposal = proposeTasksForRedirect($user, ['Call Jane']);
+    resolve(ProposalPlanService::class)->approveAll($proposal, $user);
+    $task = Task::query()->where('title', 'Call Jane')->sole();
+
+    $this->actingAs($user)
+        ->get("/r/task/{$proposal->getKey()}")
+        ->assertRedirect(TaskResource::getUrl('index', ['task' => $task->getKey()], panel: 'app', tenant: $user->currentWorkspace));
+});
+
+it('shows the gone page when the record a proposal created was deleted since', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $proposal = proposeTasksForRedirect($user, ['Call Jane']);
+    resolve(ProposalPlanService::class)->approveAll($proposal, $user);
+    Task::query()->where('title', 'Call Jane')->sole()->delete();
+
+    $this->actingAs($user)->get("/r/task/{$proposal->getKey()}")->assertGone();
+});
+
+it('404s for a proposal id that names no single record', function (Closure $decide, string $type): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $proposal = proposeTasksForRedirect($user, ['Call Jane', 'Send the contract']);
+    $decide($proposal, $user);
+
+    $this->actingAs($user)->get("/r/{$type}/{$proposal->getKey()}")->assertNotFound();
+})->with([
+    'a proposal still pending' => [fn (PendingAction $proposal, User $user) => null, 'task'],
+    'a discarded proposal' => [fn (PendingAction $proposal, User $user) => resolve(PendingActionService::class)->reject($proposal, $user), 'task'],
+    'a proposal that created two records' => [fn (PendingAction $proposal, User $user) => resolve(ProposalPlanService::class)->approveAll($proposal, $user), 'task'],
+]);
+
+it('404s for an approved proposal linked under another record type', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $proposal = proposeTasksForRedirect($user, ['Call Jane']);
+    resolve(ProposalPlanService::class)->approveAll($proposal, $user);
+
+    $this->actingAs($user)->get("/r/company/{$proposal->getKey()}")->assertNotFound();
+});
+
+it('404s for an approved proposal that belongs to someone else', function (): void {
+    $owner = User::factory()->withPersonalWorkspace()->create();
+    $proposal = proposeTasksForRedirect($owner, ['Call Jane']);
+    resolve(ProposalPlanService::class)->approveAll($proposal, $owner);
+
+    $this->actingAs(User::factory()->withPersonalWorkspace()->create())
+        ->get("/r/task/{$proposal->getKey()}")
+        ->assertNotFound();
 });
