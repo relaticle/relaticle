@@ -51,4 +51,27 @@ final readonly class HeadingAnchors
             $matches[1],
         );
     }
+
+    /**
+     * Every heading the renderer permalinks (h2 to h6), with one slug
+     * normalizer across all of them, because the renderer dedupes ids across
+     * levels within a document.
+     *
+     * @return list<array{level: int, text: string, anchor: string}>
+     */
+    public function all(string $body): array
+    {
+        preg_match_all('/^(#{2,6})[ \t]+(.+)$/m', $body, $matches, PREG_SET_ORDER);
+
+        $normalizer = new UniqueSlugNormalizer(new SlugNormalizer);
+
+        return array_map(
+            fn (array $match): array => [
+                'level' => strlen($match[1]),
+                'text' => trim($match[2]),
+                'anchor' => $normalizer->normalize(trim($match[2])),
+            ],
+            $matches,
+        );
+    }
 }

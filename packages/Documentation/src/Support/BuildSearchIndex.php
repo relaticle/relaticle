@@ -8,8 +8,8 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
 /**
- * One record per `##` heading, plus a lead record for the text above the
- * first one, so client-side search can jump straight to a section instead of
+ * One record per `##` and `###` heading, plus a lead record for the text above
+ * the first one, so client-side search can jump straight to a section instead of
  * just the page. `v` lets a client refuse a payload shape it doesn't
  * understand instead of guessing at it.
  *
@@ -92,26 +92,13 @@ final readonly class BuildSearchIndex
             ->all());
     }
 
-    /**
-     * The heading text is captured twice with the identical regex -- once
-     * here to slice the body into per-section content, once inside
-     * HeadingAnchors to derive real anchor ids -- so the two stay aligned in
-     * document order without this class reimplementing the renderer's
-     * slugging (and its duplicate-heading suffixing) itself.
-     *
-     * @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>
-     */
+    /** @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}> */
     private function sections(DocPage $page): array
     {
-        $chunks = preg_split('/^##[ \t]+(.+)$/m', $page->body, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$page->body];
-        $anchors = (new HeadingAnchors)($page->body);
-
-        $records = [$this->record($page, $page->title, '', $chunks[0])];
-        $counter = count($chunks);
-
-        for ($i = 1, $heading = 0; $i < $counter; $i += 2, $heading++) {
-            $records[] = $this->record($page, $chunks[$i], $anchors[$heading] ?? '', $chunks[$i + 1] ?? '');
-        }
+        $records = array_map(
+            fn (array $section): array => $this->record($page, $section['section'] === '' ? $page->title : $section['section'], $section['anchor'], $section['markdown']),
+            (new PageSections)($page->body),
+        );
 
         return array_values(array_filter(
             $records,

@@ -260,6 +260,80 @@ it('gives the search index anchors that equal the real heading ids the renderer 
         ->and($indexAnchors)->toBe($renderedIds);
 });
 
+it('gives sub-heading records anchors that equal the real heading ids the renderer emits', function (): void {
+    $fixturePath = storage_path('framework/testing/search-index-subanchors-'.Str::random(8));
+
+    File::ensureDirectoryExists("{$fixturePath}/help/anchors");
+    File::put(
+        "{$fixturePath}/help/anchors/nested-headings.md",
+        <<<'MARKDOWN'
+        ---
+        title: Nested headings
+        description: Exercises sub-heading anchors.
+        order: 1
+        ---
+
+        Intro text above the first heading.
+
+        ## Settings
+
+        Lead-in for settings.
+
+        ### Settings
+
+        A sub-heading repeating its parent's text.
+
+        #### Deep
+
+        A level four heading between two sub-headings.
+
+        ### Café
+
+        A non-ASCII sub-heading.
+
+        ## Settings
+
+        A second top-level heading with the same text.
+        MARKDOWN,
+    );
+
+    Config::set('documentation.content_path', $fixturePath);
+
+    $repository = new DocsRepository;
+    $page = $repository->find('help/anchors/nested-headings');
+
+    $renderedIds = renderedHeadingIds(app(RenderDocMarkdown::class)($page->body));
+
+    $records = collect((new BuildSearchIndex($repository))()['records'])->where('path', $page->path);
+
+    File::deleteDirectory($fixturePath);
+
+    expect($records->pluck('section')->all())->toBe(['Nested headings', 'Settings', 'Settings / Settings', 'Settings / Café', 'Settings'])
+        ->and($records->pluck('anchor')->reject(fn (string $anchor): bool => $anchor === '')->values()->all())
+        ->toBe(['settings', 'settings-1', 'café', 'settings-2'])
+        ->and($renderedIds)->toBe(['settings', 'settings-1', 'deep', 'café', 'settings-2']);
+});
+
+it('points every real search record at an id the rendered page contains', function (): void {
+    $repository = new DocsRepository;
+    $renderer = app(RenderDocMarkdown::class);
+
+    $records = collect((new BuildSearchIndex($repository))()['records'])->groupBy('path');
+    $missing = [];
+
+    foreach ($repository->pages() as $page) {
+        $ids = renderedHeadingIds($renderer($page->body));
+
+        foreach ($records->get($page->path, []) as $record) {
+            if ($record['anchor'] !== '' && ! in_array($record['anchor'], $ids, true)) {
+                $missing[] = "{$page->path}#{$record['anchor']}";
+            }
+        }
+    }
+
+    expect($missing)->toBe([]);
+});
+
 it('busts the cached search index on a front-matter-only title edit', function (): void {
     $bodyTemplate = <<<'MARKDOWN'
         ---

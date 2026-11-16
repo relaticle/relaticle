@@ -8,7 +8,7 @@ The content and the engine behind Relaticle's help center and developer guides. 
 |---|---|
 | `resources/content/{docs,help}` | The Markdown articles, one file per page |
 | `Support\DocsRepository` | Reads the content into `DocPage` and `DocCategory` objects and caches the manifest |
-| `Support\BuildSearchIndex` | One search record per `##` heading. Rela, the built-in AI assistant, reads it through `SearchDocsTool`, and the website search reads it too |
+| `Support\BuildSearchIndex` | One search record per `##` and `###` heading. Rela, the built-in AI assistant, reads it through `SearchDocsTool`, and the website search reads it too |
 | `Support\DocUrl` | The one place that maps a content path onto a public URL |
 | `Support\HeadingAnchors` | The heading ids the renderer and the search index share |
 | `routes/web.php` | `/openapi.json` and `/openapi.yaml`, served from the spec Scribe generates |
