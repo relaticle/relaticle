@@ -19,7 +19,7 @@ pest()->group('webkit');
 
 const CONFETTI_PROBE = 'window.confettiProbe = { moves: [], seen: 0, gone: false }; addEventListener("kanban-card-moved", (event) => { window.confettiProbe.moves.push(JSON.parse(JSON.stringify(event.detail))); window.confettiProbe.movedAt = performance.now(); }); new MutationObserver((records) => records.forEach((record) => { record.addedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && (window.confettiProbe.seen++, window.confettiProbe.seenAt = performance.now())); record.removedNodes.forEach((node) => node.dataset?.boardConfetti !== undefined && (window.confettiProbe.gone = true, window.confettiProbe.goneAt = performance.now())); })).observe(document.body, { childList: true }); true';
 
-const CONFETTI_RISES_EVENLY_ON_BOTH_SIDES = '(() => { const canvas = document.querySelector("canvas[data-board-confetti]"); const pixels = canvas.getContext("2d").getImageData(0, Math.floor(canvas.height * 0.15), canvas.width, Math.floor(canvas.height * 0.35)).data; const painted = [0, 0]; for (let at = 3; at < pixels.length; at += 8) { if (pixels[at] > 0) { painted[((at - 3) / 4) % canvas.width < canvas.width / 2 ? 0 : 1]++; } } return Math.min(...painted) / Math.max(...painted) > 0.4; })()';
+const CONFETTI_PAINTED_PER_SIDE = '(() => { const canvas = document.querySelector("canvas[data-board-confetti]"); const pixels = canvas.getContext("2d").getImageData(0, Math.floor(canvas.height * 0.15), canvas.width, Math.floor(canvas.height * 0.35)).data; const painted = [0, 0]; for (let at = 3; at < pixels.length; at += 8) { if (pixels[at] > 0) { painted[((at - 3) / 4) % canvas.width < canvas.width / 2 ? 0 : 1]++; } } return painted; })()';
 
 /**
  * @return array{0: Task|Opportunity, 1: CustomField}
@@ -49,6 +49,18 @@ function moveCardFromItsMenu(mixed $page, string $card, string $toName): void
     $page->page()->locator("{$card} .fi-dropdown-trigger")->click();
     $page->page()->locator(".fi-dropdown-panel[style*='display: block'] .fi-dropdown-list-item:has-text('".__('filament/pages/boards.move_to.label')."')")->click();
     $page->page()->locator(".fi-modal-open [role=radio]:has-text('{$toName}')")->click();
+}
+
+/**
+ * @return array{0: int, 1: int}
+ */
+function confettiRisenPerSide(mixed $page): array
+{
+    for ($attempt = 0; $attempt < 50 && array_sum($page->script(CONFETTI_PAINTED_PER_SIDE)) < 3000; $attempt++) {
+        $page->wait(0.1);
+    }
+
+    return $page->script(CONFETTI_PAINTED_PER_SIDE);
 }
 
 function waitForConfettiToEnd(mixed $page): void
@@ -81,10 +93,11 @@ it('fires confetti for the mover when a card lands in a stage with confetti on, 
 
     moveCardFromItsMenu($page, $card, $option()->name);
     $page->assertScript(boardWaitFor('window.confettiProbe.seen === 1'), true)
-        ->assertScript('document.querySelectorAll("canvas[data-board-confetti]").length', 1)
-        ->assertScript(boardWaitFor('performance.now() - window.confettiProbe.seenAt > 400'), true);
+        ->assertScript('document.querySelectorAll("canvas[data-board-confetti]").length', 1);
 
-    expect($page->script(CONFETTI_RISES_EVENLY_ON_BOTH_SIDES))->toBeTrue();
+    [$left, $right] = confettiRisenPerSide($page);
+
+    expect(min($left, $right) / max($left, $right, 1))->toBeGreaterThan(0.4);
 
     waitForConfettiToEnd($page);
 
