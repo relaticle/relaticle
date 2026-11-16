@@ -196,7 +196,7 @@ final readonly class CustomFieldOptionPlan
 
         foreach ($removed as $id => $option) {
             $hasReplacement = array_key_exists($id, $replacements);
-            $clears = $hasReplacement && $replacements[$id] === null;
+            $clears = $hasReplacement ? $replacements[$id] === null : self::onlyDeletedRecordsHold($field, $id);
             $replacement = $hasReplacement && ! $clears ? self::targetIndex($targets, $replacements[$id]) : null;
 
             if ($hasReplacement && ! $clears && $replacement === null) {
@@ -207,7 +207,7 @@ final readonly class CustomFieldOptionPlan
                 $moves[(string) $option->name] = CustomFieldValue::query()->holdingOption($field, $id)->count();
             }
 
-            if (! $hasReplacement && CustomFieldValue::query()->holdingOption($field, $id)->exists()) {
+            if (! $hasReplacement && ! $clears && CustomFieldValue::query()->holdingOption($field, $id)->exists()) {
                 $errors[] = __('Records still use ":name", so it needs a replacement from the new list.', ['name' => $option->name]);
             }
 
@@ -233,6 +233,12 @@ final readonly class CustomFieldOptionPlan
         }
 
         return new self($targets, $removals, ! $keepsColors && self::turnsOnColors($field, $targets), $field->getValueColumn() === 'json_value', $field);
+    }
+
+    private static function onlyDeletedRecordsHold(CustomField $field, string $optionId): bool
+    {
+        return CustomFieldValue::query()->holdingOption($field, $optionId)->exists()
+            && ! CustomFieldValue::query()->holdingOptionOnLiveRecord($field, $optionId)->exists();
     }
 
     /**

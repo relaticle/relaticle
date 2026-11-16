@@ -254,6 +254,78 @@ it('refuses at proposal to remove an option records still use when no replacemen
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('removes an option only deleted records hold and clears their value', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    $trashed = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+    $trashed->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+    ]]);
+
+    expect($decoded)->not->toHaveKey('error')
+        ->and($decoded['display']['fields'])->toContain(['label' => 'Removed', 'value' => 'Churned']);
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(CustomFieldOption::query()->withoutGlobalScopes()->find($churnedId))->toBeNull()
+        ->and(setOptionsStoredValue($trashed, $this->lifecycle))->toBeNull()
+        ->and(setOptionsNames($this->lifecycle))->toBe(['Lead', 'Customer']);
+});
+
+it('removes a multi-select option only deleted records hold and keeps their other options', function (): void {
+    $trashed = setOptionsCompany($this->workspace, $this->segments, [setOptionsId($this->segments, 'Enterprise'), setOptionsId($this->segments, 'SMB')]);
+    $trashed->delete();
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'segments',
+        'options' => [['name' => 'SMB'], ['name' => 'Startup']],
+    ]]);
+
+    expect($decoded)->not->toHaveKey('error');
+
+    resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner);
+
+    expect(setOptionsStoredValue($trashed, $this->segments))->toBe([setOptionsId($this->segments, 'SMB')]);
+});
+
+it('refuses at approval when a live record took an option only deleted records held at proposal', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)->delete();
+
+    setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+    ]]);
+
+    $live = setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+
+    expect(fn (): PendingAction => resolve(PendingActionService::class)->approve(setOptionsPending($this->convId), $this->owner))
+        ->toThrow(ValidationException::class, 'Records still use "Churned"');
+
+    expect(setOptionsStoredValue($live, $this->lifecycle))->toBe($churnedId)
+        ->and(setOptionsNames($this->lifecycle))->toBe(['Lead', 'Customer', 'Churned']);
+});
+
+it('still refuses a removal without a replacement when a live record shares the option with deleted ones', function (): void {
+    $churnedId = setOptionsId($this->lifecycle, 'Churned');
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId)->delete();
+    setOptionsCompany($this->workspace, $this->lifecycle, $churnedId);
+
+    $decoded = setOptionsPropose($this->convId, [[
+        'entity_type' => 'company',
+        'code' => 'lifecycle',
+        'options' => [['name' => 'Lead'], ['name' => 'Customer']],
+    ]]);
+
+    expect($decoded['error'])->toContain('Records still use "Churned"')
+        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
 it('refuses at approval a removal that records started using after the proposal', function (): void {
     setOptionsPropose($this->convId, [[
         'entity_type' => 'company',
