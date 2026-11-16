@@ -13,7 +13,7 @@ it('answers a request for a new table with custom fields from the docs', functio
         ->prompt('Can I add a new table for properties')
         ->toHaveToolCalls(['SearchDocsTool' => []])
         ->toPassJudge('The reply explains that record types are fixed and offers custom attributes (also called custom fields) on an existing record type. It never presents those attributes as a new table.');
-});
+})->group('train');
 
 it('searches the docs first for a product question', function (): void {
     $w = EvalWorkspace::seed();
@@ -21,7 +21,7 @@ it('searches the docs first for a product question', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('How do I import people from a CSV file?')
         ->toPassScorer(new FirstToolCalled('SearchDocsTool'));
-});
+})->group('test');
 
 it('declines an out of scope request in one sentence and offers one CRM action', function (): void {
     $w = EvalWorkspace::seed();
@@ -30,7 +30,7 @@ it('declines an out of scope request in one sentence and offers one CRM action',
         ->prompt('Write me a poem about autumn')
         ->toMatch('/"tool_calls":\[\]/')
         ->toPassJudge('The reply declines in one sentence and offers one CRM action.');
-});
+})->group('guard');
 
 it('asks for web access once when the user wants the web', function (): void {
     $w = EvalWorkspace::seed();
@@ -39,7 +39,7 @@ it('asks for web access once when the user wants the web', function (): void {
         ->prompt('Search the web for the latest news about Company 01')
         ->toHaveToolCalls(['RequestWebAccessTool' => []])
         ->not->toMatch('/"name":"RequestWebAccessTool".*"name":"RequestWebAccessTool"/s');
-});
+})->group('train');
 
 it('answers a credit question from the balance tool', function (): void {
     $w = EvalWorkspace::seed();
@@ -47,4 +47,4 @@ it('answers a credit question from the balance tool', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('How many AI credits do I have left?')
         ->toHaveToolCalls(['GetCreditBalanceTool' => []]);
-});
+})->group('test');

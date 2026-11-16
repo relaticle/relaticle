@@ -17,7 +17,7 @@ it('answers a Persian message in Persian script', function (): void {
         ->toPassScorer(new NoEmDash);
 
     expect(Scripts::isLatin($turn->envelope()->text))->toBeFalse();
-});
+})->group('train');
 
 it('answers a Spanish message in Spanish', function (): void {
     $w = EvalWorkspace::seed();
@@ -26,4 +26,4 @@ it('answers a Spanish message in Spanish', function (): void {
         ->prompt('Muestrame mis empresas')
         ->toHaveToolCalls(['ListCompaniesTool' => []])
         ->toPassJudge('The reply is written in Spanish, not English.');
-});
+})->group('test');

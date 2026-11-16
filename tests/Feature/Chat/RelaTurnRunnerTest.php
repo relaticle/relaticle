@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Sleep;
 use Illuminate\Support\Str;
 use Laravel\Ai\Exceptions\RateLimitedException;
@@ -18,7 +19,26 @@ use Tests\Evals\Support\EvalModels;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
 use Tests\Evals\Support\RelaTurn;
+use Tests\Evals\Support\Splits;
 use Tests\Evals\Support\TurnEnvelope;
+
+/**
+ * @return list<string>
+ */
+function listedEvalCases(?string $group = null): array
+{
+    $command = [PHP_BINARY, '-d', 'memory_limit=1G', 'vendor/bin/pest', 'tests/Evals', '--list-tests', '--no-tia'];
+
+    if ($group !== null) {
+        $command[] = '--group='.$group;
+    }
+
+    $output = Process::path(base_path())->run($command)->throw()->output();
+
+    preg_match_all('/^ - (\S+?)(?:"dataset .*")?$/m', $output, $matches);
+
+    return array_values(array_unique($matches[1]));
+}
 
 function assistantRowWithResults(EvalWorkspace $workspace, array $toolCalls, array $usage = [], array $meta = []): AgentConversationMessage
 {
@@ -357,4 +377,28 @@ it('keeps the configured effort when none is asked for and applies a valid one',
     EvalModels::register(null);
 
     expect(config('chat.anthropic_effort'))->toBe($configured);
+});
+
+it('puts every eval case in exactly one split', function (): void {
+    $cases = listedEvalCases();
+    $listed = [];
+
+    foreach (Splits::NAMES as $split) {
+        foreach (listedEvalCases($split) as $case) {
+            $listed[$case][] = $split;
+        }
+    }
+
+    expect($cases)->not->toBeEmpty();
+
+    Splits::assertGrouped(collect($cases)->mapWithKeys(fn (string $case): array => [$case => $listed[$case] ?? []])->all());
+});
+
+it('names the case that has no split or two of them', function (): void {
+    expect(fn () => Splits::assertGrouped(['Rela::first' => ['train'], 'Rela::second' => []]))
+        ->toThrow(RuntimeException::class, 'Eval case [Rela::second] needs exactly one of [train, test, guard], found none')
+        ->and(fn () => Splits::assertGrouped(['Rela::third' => ['train', 'guard']]))
+        ->toThrow(RuntimeException::class, 'Eval case [Rela::third] needs exactly one of [train, test, guard], found train and guard')
+        ->and(fn () => Splits::assertGrouped(['Rela::fourth' => ['train', 'slow']]))
+        ->not->toThrow(RuntimeException::class);
 });

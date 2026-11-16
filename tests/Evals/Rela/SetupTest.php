@@ -39,7 +39,7 @@ it('greets a new sales workspace in two short paragraphs with one bold question,
         ->repeat(3)
         ->toMatch('/"tool_calls":\[\]/')
         ->toPassScorer(new NoContactWord);
-});
+})->group('train');
 
 it('asks for one company when a typed message names no record in an empty workspace', function (string $message): void {
     $w = EvalWorkspace::seed();
@@ -49,7 +49,7 @@ it('asks for one company when a typed message names no record in an empty worksp
         ->not->toMatch('/"name":"(Create|Update|Delete)/')
         ->toPassScorer(new TextMatches('/(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$/i'))
         ->toPassScorer(new OneClosingQuestionAtMost);
-})->with([
+})->group('test')->with([
     'a greeting' => ['hi'],
     'a question about the product' => ['what can you do?'],
     'a statement about the business' => ['I run a small marketing agency'],
@@ -61,7 +61,7 @@ it('proposes the company when the owner answers the ask with a bare name', funct
     expect((new RelaTurn($w, conversationId: Prior::askedForOneCompany($w)))(...))
         ->prompt('Northwind Studio')
         ->toHaveToolCalls(['CreateCompanyTool' => fn (array $arguments): bool => count($arguments['records'] ?? []) === 1]);
-});
+})->group('train');
 
 it('asks for one company on the turn that opens an ordinary chat in an empty workspace', function (): void {
     $w = EvalWorkspace::seed();
@@ -72,7 +72,7 @@ it('asks for one company on the turn that opens an ordinary chat in an empty wor
         ->not->toMatch('/"name":"(Create|Update|Delete)/')
         ->toPassScorer(new TextMatches('/(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$/i'))
         ->toPassScorer(new OneClosingQuestionAtMost);
-});
+})->group('test');
 
 it('runs the read before the company ask in an empty workspace', function (): void {
     $w = EvalWorkspace::seed();
@@ -82,7 +82,7 @@ it('runs the read before the company ask in an empty workspace', function (): vo
         ->prompt('show me my pipeline')
         ->toHaveToolCalls(['ListOpportunitiesTool' => []])
         ->toPassScorer(new TextMatches('/(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$/i'));
-});
+})->group('train');
 
 it('does not ask for a company in an empty workspace past its first 14 days', function (): void {
     $w = EvalWorkspace::seed();
@@ -92,7 +92,7 @@ it('does not ask for a company in an empty workspace past its first 14 days', fu
     expect((new RelaTurn($w))(...))
         ->prompt('what can you do?')
         ->toPassScorer(new TextMatches('/^(?!.*(compan|client)[^?]*\bwork(ing)? with\b[^?]*\??[^?]*$).+/is'));
-});
+})->group('test');
 
 it('answers an owner who brings a file about the file, without the company ask', function (): void {
     $w = EvalWorkspace::seed();
@@ -100,7 +100,7 @@ it('answers an owner who brings a file about the file, without the company ask',
     expect((new RelaTurn($w, conversationId: Prior::greetedInAnEmptyWorkspace($w)))(...))
         ->prompt('I have a CSV of my customers')
         ->toPassScorer(new TextMatches('/^(?!.*(compan|client)[^?]*\bwork(ing)? with\b).*(attach|import)/is'));
-});
+})->group('train');
 
 it('says plainly that a sample only workspace holds sample data', function (): void {
     $w = EvalWorkspace::seed();
@@ -109,4 +109,4 @@ it('says plainly that a sample only workspace holds sample data', function (): v
     expect((new RelaTurn($w))(...))
         ->prompt('Give me an overview of my workspace')
         ->toPassScorer(new TextMatches('/sample/i'));
-});
+})->group('test');

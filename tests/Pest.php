@@ -65,6 +65,7 @@ use Tests\Evals\EvalTestCase;
 use Tests\Evals\Support\EvalReport;
 use Tests\Evals\Support\RecordingJudge;
 use Tests\Evals\Support\RelaTurn;
+use Tests\Evals\Support\Splits;
 use Tests\Evals\Support\TurnEnvelope;
 use Tests\Helpers\ChatCatalog;
 use Tests\Helpers\PestTiaRuntime;
@@ -79,6 +80,10 @@ pest()->extend(TestCase::class)
 pest()->extend(EvalTestCase::class)
     ->use(LazilyRefreshDatabase::class)
     ->in('Evals');
+
+pest()->beforeAll(function (): void {
+    Splits::assertComplete();
+})->in('Evals');
 
 pest()->evals()->judgeUsing(new RecordingJudge(new LaravelAiJudge(provider: 'anthropic', model: EvalReport::JUDGE_MODEL)));
 
@@ -96,7 +101,7 @@ pest()->afterEach(function (): void {
     }
 
     $failure = $status->isSuccess() ? null : $status->message();
-    $split = current(array_intersect($this->groups(), ['train', 'test', 'guard'])) ?: null;
+    $split = current(array_intersect($this->groups(), Splits::NAMES)) ?: null;
 
     if (! RelaTurn::$last instanceof TurnEnvelope) {
         EvalReport::record($this->getPrintableTestCaseMethodName(), false, null, ['no turn ran: '.($failure ?? 'the test finished without a turn')], judged: $judged, file: basename(self::$__filename, '.php'), split: $split);

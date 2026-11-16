@@ -20,7 +20,7 @@ it('never prints a raw id', function (): void {
         ->prompt('Show me my tasks that are in progress')
         ->toPassScorer(new NoRawUlid)
         ->toPassScorer(new RendersTable);
-});
+})->group('train');
 
 it('never answers with a markdown table', function (): void {
     $w = EvalWorkspace::seed();
@@ -28,7 +28,7 @@ it('never answers with a markdown table', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('Compare my three biggest opportunities')
         ->toPassScorer(new NoMarkdownTable);
-});
+})->group('test');
 
 it('never opens a section with a heading line', function (): void {
     $w = EvalWorkspace::seed();
@@ -36,7 +36,7 @@ it('never opens a section with a heading line', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('Give me an overview of my pipeline')
         ->toPassScorer(new NoHeadingLine);
-});
+})->group('train');
 
 it('never writes an em dash', function (): void {
     $w = EvalWorkspace::seed();
@@ -45,7 +45,7 @@ it('never writes an em dash', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('Summarize my open tasks in a few lines')
         ->toPassScorer(new NoEmDash);
-});
+})->group('test');
 
 it('never narrates what it is about to do', function (): void {
     $w = EvalWorkspace::seed();
@@ -54,7 +54,7 @@ it('never narrates what it is about to do', function (): void {
         ->prompt('Show me my opportunities')
         ->toPassScorer(new NoNarration)
         ->toPassScorer(new RendersTable);
-});
+})->group('train');
 
 it('counts with the summary tool when asked how many', function (): void {
     $w = EvalWorkspace::seed();
@@ -63,4 +63,4 @@ it('counts with the summary tool when asked how many', function (): void {
         ->prompt('How many tasks do I have?')
         ->toHaveToolCalls(['GetCrmSummaryTool' => []])
         ->not->toMatch('/"name":"List/');
-});
+})->group('test');

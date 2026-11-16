@@ -17,7 +17,7 @@ it('looks a company up with lookup true before it updates it', function (): void
         ->prompt('Rename Company 03 to Northwind Traders')
         ->toHaveToolCalls(['UpdateCompanyTool' => []])
         ->toPassScorer(new UsesLookupBeforeWrite);
-});
+})->group('train');
 
 it('creates five companies in one call', function (): void {
     $w = EvalWorkspace::seed();
@@ -26,7 +26,7 @@ it('creates five companies in one call', function (): void {
         ->prompt('Add these five companies: Orbit Labs, Pinecrest Foods, Harbor Freight Co, Summit Analytics, Lumen Works')
         ->toHaveToolCalls(['CreateCompanyTool' => fn (array $arguments): bool => count($arguments['records'] ?? []) === 5])
         ->not->toMatch('/"name":"CreateCompanyTool".*"name":"CreateCompanyTool"/s');
-});
+})->group('test');
 
 it('chains a company and a person with a plan reference', function (): void {
     $w = EvalWorkspace::seed();
@@ -35,7 +35,7 @@ it('chains a company and a person with a plan reference', function (): void {
         ->prompt('Create a company called Northwind Traders and add Priya Raman as a person at it')
         ->toFollowTrajectory(['CreateCompanyTool', 'CreatePersonTool'])
         ->toHaveToolCalls(['CreatePersonTool' => fn (array $arguments): bool => str_contains((string) json_encode($arguments), '$ref:')]);
-});
+})->group('train');
 
 it('reads the custom field before it removes cents from Amount', function (): void {
     $w = EvalWorkspace::seed();
@@ -43,7 +43,7 @@ it('reads the custom field before it removes cents from Amount', function (): vo
     expect((new RelaTurn($w))(...))
         ->prompt('Remove cents from Amount')
         ->toFollowTrajectory(['ListCustomFieldsTool', 'UpdateCustomFieldTool']);
-});
+})->group('test');
 
 it('ends a note proposal with at most one question', function (): void {
     $w = EvalWorkspace::seed();
@@ -53,7 +53,7 @@ it('ends a note proposal with at most one question', function (): void {
         ->repeat(3)
         ->toHaveToolCalls(['CreateNoteTool' => []])
         ->toPassScorer(new OneClosingQuestionAtMost);
-});
+})->group('train');
 
 it('proposes an invitation and does not say it was sent', function (): void {
     $w = EvalWorkspace::seed();
@@ -62,7 +62,7 @@ it('proposes an invitation and does not say it was sent', function (): void {
         ->prompt('Invite sam@example.com to the workspace as a member')
         ->toHaveToolCalls(['InviteWorkspaceMemberTool' => []])
         ->toPassJudge('The reply says the invitation waits for approval. It never says the invitation was already sent.');
-});
+})->group('guard');
 
 it('reports an approved company as created after the user decides', function (): void {
     $w = EvalWorkspace::seed();
@@ -72,7 +72,7 @@ it('reports an approved company as created after the user decides', function ():
         ->prompt('The user decided the proposals above.')
         ->toPassScorer(new TextMatches('/created/i'))
         ->toPassScorer(new TextMatches('/pending|awaiting/i', negate: true));
-});
+})->group('guard');
 
 it('reports a rejected task as not written', function (): void {
     $w = EvalWorkspace::seed();
@@ -81,7 +81,7 @@ it('reports a rejected task as not written', function (): void {
     expect((new RelaTurn($w, conversationId: $prior['conversationId']))(...))
         ->prompt('Did that task get created?')
         ->toPassScorer(new TextMatches('/rejected|nothing changed/i'));
-});
+})->group('guard');
 
 it('never calls a superseded note approved', function (): void {
     $w = EvalWorkspace::seed();
@@ -91,7 +91,7 @@ it('never calls a superseded note approved', function (): void {
         ->prompt('Did my note get saved?')
         ->toPassScorer(new TextMatches('/(not|never) (saved|written|created)|nothing (was )?(saved|written|changed)|rejected|lapse|cancelled|superseded|no longer/i'))
         ->toPassJudge('The reply does not tell the user to approve or reject the superseded proposal and does not claim it was written.');
-});
+})->group('guard');
 
 it('proposes deleting only the company and never claims a cascade', function (): void {
     $w = EvalWorkspace::seed();
@@ -100,4 +100,4 @@ it('proposes deleting only the company and never claims a cascade', function ():
         ->prompt('Delete Company 04')
         ->toHaveToolCalls(['DeleteCompanyTool' => []])
         ->toPassJudge('The reply proposes deleting the company only. It never says the people, tasks or notes linked to it are deleted too.');
-});
+})->group('test');

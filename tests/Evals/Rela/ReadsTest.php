@@ -27,7 +27,7 @@ it('answers a judgement question with a subset, never a bulk update offer', func
         ->toPassScorer(new RendersTable)
         ->toPassScorer(new OneClosingQuestionAtMost)
         ->toPassJudge('The reply proposes a subset of the listed tasks or asks which to move. It never offers to update every listed task.');
-});
+})->group('train');
 
 it('does not repeat the same task table when asked to investigate', function (): void {
     $w = EvalWorkspace::seed();
@@ -39,7 +39,7 @@ it('does not repeat the same task table when asked to investigate', function ():
     expect((new RelaTurn($w, conversationId: $conversationId))(...))
         ->prompt('investigate')
         ->toPassScorer(new NoDuplicateRowSet, expected: $previous);
-});
+})->group('test');
 
 it('answers a how many question from the summary, not from a list', function (): void {
     $w = EvalWorkspace::seed();
@@ -48,7 +48,7 @@ it('answers a how many question from the summary, not from a list', function ():
         ->prompt('How many deals do we have')
         ->toHaveToolCalls(['GetCrmSummaryTool' => []])
         ->not->toMatch('/"name":"List/');
-});
+})->group('train');
 
 it('lists companies in a short reply with no table and no heading', function (): void {
     $w = EvalWorkspace::seed();
@@ -62,7 +62,7 @@ it('lists companies in a short reply with no table and no heading', function ():
         ->toPassScorer(new NoHeadingLine);
 
     expect(mb_strlen($turn->envelope()->text))->toBeLessThan(200);
-});
+})->group('test');
 
 it('does not claim to show the first page as everything when more rows exist', function (): void {
     $w = EvalWorkspace::seed();
@@ -73,7 +73,7 @@ it('does not claim to show the first page as everything when more rows exist', f
         ->toPassScorer(new RendersTable)
         ->toPassScorer(new TextMatches('/first \d+ of/i', negate: true))
         ->toPassJudge('The reply either says more people exist beyond those shown, or shows all 40.');
-});
+})->group('train');
 
 it('keeps the replayed task list under ten kilobytes', function (): void {
     $w = EvalWorkspace::seed();
@@ -84,7 +84,7 @@ it('keeps the replayed task list under ten kilobytes', function (): void {
         ->toHaveToolCalls(['ListTasksTool' => []])
         ->toPassScorer(new RendersTable)
         ->toPassScorer(new ReplayedBytesUnder(10_000));
-});
+})->group('test');
 
 it('reads recent activity with the activity tool', function (): void {
     $w = EvalWorkspace::seed();
@@ -92,7 +92,7 @@ it('reads recent activity with the activity tool', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('What changed in my workspace recently?')
         ->toHaveToolCalls(['ListActivityTool' => []]);
-});
+})->group('train');
 
 it('looks up workspace members with the members tool', function (): void {
     $w = EvalWorkspace::seed();
@@ -100,7 +100,7 @@ it('looks up workspace members with the members tool', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('Who is in my workspace?')
         ->toHaveToolCalls(['ListWorkspaceMembersTool' => []]);
-});
+})->group('test');
 
 it('says person and company where the user did not say contact', function (): void {
     $w = EvalWorkspace::seed();
@@ -110,7 +110,7 @@ it('says person and company where the user did not say contact', function (): vo
         ->prompt($prompt)
         ->repeat(3)
         ->toPassScorer(new NoContactWord);
-});
+})->group('train');
 
 it('may say contact when the user said contact', function (): void {
     $w = EvalWorkspace::seed();
@@ -121,4 +121,4 @@ it('may say contact when the user said contact', function (): void {
         ->repeat(3)
         ->toPassScorer(new CalledAnyOf(['ListPeopleTool', 'GetCompanyTool']))
         ->toPassScorer(new NoContactWord);
-});
+})->group('test');
