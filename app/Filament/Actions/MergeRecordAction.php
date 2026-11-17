@@ -33,15 +33,20 @@ final class MergeRecordAction extends Action
         return 'mergeRecord';
     }
 
+    public static function canMerge(Model $record): bool
+    {
+        return ($record instanceof Company || $record instanceof People)
+            && Gate::allows('update', $record)
+            && Gate::allows('delete', $record);
+    }
+
     protected function setUp(): void
     {
         parent::setUp();
 
         $this->label(__('filament/record-page.actions.merge_record'))
             ->icon('lucide-merge')
-            ->authorize(fn (Model $record): bool => ($record instanceof Company || $record instanceof People)
-                && Gate::allows('update', $record)
-                && Gate::allows('delete', $record))
+            ->authorize(fn (Model $record): bool => self::canMerge($record))
             ->modalHeading(fn (): Htmlable => $this->heading())
             ->modalWidth(Width::FourExtraLarge)
             ->stickyModalFooter()

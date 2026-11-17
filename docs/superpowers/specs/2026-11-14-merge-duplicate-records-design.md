@@ -1,7 +1,7 @@
 # Merge duplicate companies and people
 
 **Date:** 2026-11-14
-**Status:** Phase 1 built (PR #1193)
+**Status:** Phase 1 built (PR #1193), Phase 2 built
 **Issue:** #885
 
 ## Summary
@@ -27,7 +27,7 @@ emails in a merge comes straight back on the next sync.
 | 3 | Where it starts | **Merge record** is the first item in the record page's ⋯ menu. Companies and people only |
 | 4 | Dialog | The current record fills the priority slot, the other slot starts empty with a **+** that opens a search, a ⇄ button swaps the two, and a third card previews the result |
 | 5 | Which record survives | The priority record keeps its ID and URL. A new ID would break every saved link, API reference and Rela mention to both records, and double the links to move |
-| 6 | Duplicate prompt | Phase 2, a separate PR: a record-page banner that opens the merge dialog with the duplicate picked. A duplicates review page is out of scope |
+| 6 | Duplicate prompt | Phase 2, a separate PR: a record-page section listing the duplicates, each with a Merge that opens the dialog with it picked. A duplicates review page is out of scope |
 | 7 | Rela, API, MCP | Out of scope. Panel only |
 | 8 | Build shape | Approach A below |
 | 9 | More than 5 domains or emails | Block the merge. The dialog names the list over the limit (`getMaxValues()`, 5) so the member trims it first. Dropping extras would let mailbox sync recreate the duplicate |
@@ -37,9 +37,24 @@ emails in a merge comes straight back on the next sync.
 
 1. **Merge two records** (built, below): the action, the dialog and the merge.
 2. **Duplicate prompt**: on a company or person page, a query in `app/Queries` finds other live records
-   in the workspace sharing any domain or email, with mailbox sync's normalization. A banner names the
-   shared value, and its **Merge** button opens the Phase 1 dialog with the first duplicate picked. The
-   banner is hidden from members who cannot merge, and gone once no duplicate is left.
+   in the workspace sharing any domain or email, with mailbox sync's normalization. A collapsed section
+   counts them, and expanding it lists each one with the value it shares and its own **Merge**, which
+   opens the Phase 1 dialog with that record picked. The section is hidden from members who cannot merge,
+   and gone once no duplicate is left.
+   Built as `App\Queries\Crm\DuplicateRecordQuery::get()`. It reads each of the record's domains or
+   emails through `EntitiesByFieldValueQuery` with `CanonicalValue::spellings()`, the match the upsert API
+   and the restore conflict already use: case-insensitive, with `www.` and a scheme folded into one domain.
+   It returns up to 10 records, grouped by the value they share and oldest first within each value.
+   The section is `App\Livewire\App\Records\DuplicateRecordsPrompt`, deferred with `lazy: on-load` in
+   the record rail under the quick actions, so the page never waits on the scan and its own requests
+   never repeat it. At 100,000 companies the scan took about 240 ms a request locally. While it runs, a
+   "Checking for duplicates" row shows, and with none found the slot takes no space. The section is a
+   native `Section` and its rows a small view, because an action inside a `RepeatableEntry` item cannot
+   be mounted. A row's **Merge** dispatches `merge-duplicate` to the page, which mounts its own
+   `MergeRecordAction` named `mergeDuplicate`, since that action needs the record page. `duplicateId()`
+   accepts only an id from the list, falling back to the first duplicate. Both merge entry points read
+   `MergeRecordAction::canMerge()`. The header's dismiss writes a session key for the record, so the
+   section stays hidden for that record until the session ends.
 
 ## Approaches
 
@@ -222,11 +237,17 @@ Rollback and race tests, per entity:
 - a duplicate or kept record that vanishes at the start of the transaction gives the "no longer
   available" error and changes nothing
 
+`MergeDuplicatePromptTest` covers the duplicate prompt: a shared domain and a shared email in another
+case, every record that matches any value listed and counted, the dialog opened with the row's record
+picked, an id outside the list falling back to the first duplicate, no prompt for an unshared value, a
+trashed record, another workspace or a member who cannot merge, the prompt keeping the duplicate left
+after a merge, and a dismiss that hides it for that record only.
+
 `MergeRecordDialogStateTest` covers the dialog's "no longer available" message: absent before a pick, shown when the picked record is deleted while the dialog is open.
 
 Three browser test files, run in Chromium and in WebKit (`--browser safari`):
 - `MergeRecordDialogTest`: the main flows. Open, search, pick, swap, merge, land on the kept record,
-  and the over-limit block
+  the over-limit block, and the merge opened from the duplicate prompt
 - `MergeRecordDialogKeyboardTest`: Esc, arrows, Enter, focus after a pick and tabbing out of the list
 - `MergeRecordDialogLayoutTest`: the row layout on laptop and desktop, the stacked phone layout, and
   the popover's placement and height cap, including while the phone sheet is still rising
@@ -236,7 +257,7 @@ The picker joins the `MenusTest` dataset, so its rows, icons and height cap foll
 ## Non-goals
 
 - Merging more than two records at once
-- A duplicates review page (the banner is Phase 2)
+- A duplicates review page (the record-page prompt is Phase 2)
 - Merging two duplicate opportunities, tasks or notes into one. The notes, tasks and opportunities
   linked to a merged company or person do move, as listed under What moves
 - Merging from Rela, the REST API or the MCP server

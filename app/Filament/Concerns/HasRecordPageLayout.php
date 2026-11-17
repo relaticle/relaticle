@@ -15,21 +15,26 @@ use App\Filament\Components\Infolists\RecordOverview;
 use App\Filament\Components\RecordChip;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Livewire\App\Records\DuplicateRecordsPrompt;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\User;
+use App\Queries\Crm\DuplicateRecordQuery;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Infolists\Components\Entry;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -94,6 +99,7 @@ trait HasRecordPageLayout
                 ->verticallyAlignCenter()
                 ->extraAttributes(['class' => 'fi-record-header']),
             $this->quickActions(),
+            $this->duplicatePrompt(),
             RecordDetails::section($this->crmRecord(), static::nativeDetailEntries()),
             CommunicationIntelligenceInfolist::section()
                 ->contained(false)
@@ -237,6 +243,47 @@ trait HasRecordPageLayout
         ])
             ->key('quickActions')
             ->extraAttributes(['class' => 'fi-record-rail-quick-actions']);
+    }
+
+    #[On('merge-duplicate')]
+    public function mergeDuplicate(string $duplicate): void
+    {
+        $this->mountAction('mergeDuplicate', ['duplicate' => $duplicate]);
+    }
+
+    public function mergeDuplicateAction(): MergeRecordAction
+    {
+        return MergeRecordAction::make('mergeDuplicate')
+            ->record($this->getRecord())
+            ->fillForm(fn (array $arguments): array => ['picked_id' => $this->duplicateId($arguments['duplicate'] ?? null), 'keep_picked' => false]);
+    }
+
+    private function duplicatePrompt(): Livewire
+    {
+        $record = $this->crmRecord();
+
+        return Livewire::make(DuplicateRecordsPrompt::class)
+            ->data(['lazy' => 'on-load'])
+            ->key('duplicatePrompt')
+            ->extraAttributes(['class' => 'fi-record-duplicates'])
+            ->visible(fn (): bool => ! $record instanceof Opportunity
+                && MergeRecordAction::canMerge($record)
+                && ! session()->has(DuplicateRecordsPrompt::dismissedKey($record)));
+    }
+
+    private function duplicateId(mixed $id): ?string
+    {
+        $record = $this->crmRecord();
+
+        if ($record instanceof Opportunity) {
+            return null;
+        }
+
+        /** @var User $user */
+        $user = Filament::auth()->user();
+        $duplicates = resolve(DuplicateRecordQuery::class)->get($user, $record);
+
+        return is_string($id) && isset($duplicates[$id]) ? $id : array_key_first($duplicates);
     }
 
     private function quickCreateAction(CreateAction $action, string $label): CreateAction

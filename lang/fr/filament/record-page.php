@@ -56,6 +56,14 @@ return [
         'over_limit' => ":field peut contenir au plus :max. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.",
         'pick' => 'Choisir une fiche',
         'clear' => 'Choisir une autre fiche',
+        'duplicate' => [
+            'checking' => 'Recherche de doublons…',
+            'count' => '{1} 1 doublon possible|[2,*] :count doublons possibles',
+            'shares' => 'Partage :value',
+            'dismiss' => 'Masquer',
+            'merge_with' => 'Fusionner avec :name',
+            'action' => 'Fusionner',
+        ],
         'search_placeholder' => [
             'company' => 'Rechercher par nom ou domaine',
             'people' => 'Rechercher par nom ou e-mail',

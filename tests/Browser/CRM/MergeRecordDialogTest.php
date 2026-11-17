@@ -144,3 +144,36 @@ it('merges a duplicate person picked from the dialog and shows emails and contac
 
     expect(People::query()->find($duplicate->getKey()))->toBeNull();
 });
+
+it('opens the merge from the duplicate prompt with the duplicate picked', function (): void {
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightlinehealth.com', 'brightline.health']);
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
+        ->assertSee('1 possible duplicate')
+        ->click('[data-duplicate-prompt] .fi-section-header')
+        ->assertSee('Shares brightlinehealth.com')
+        ->click('[data-duplicate-prompt] li button:has-text("Merge")')
+        ->assertVisible('[data-merge-dialog]')
+        ->assertSeeIn('[data-merge-left]', 'Brightline Health Inc.')
+        ->assertSeeIn('[data-merge-result]', 'brightline.health')
+        ->assertScript(MERGE_SUBMIT_DISABLED, false)
+        ->click('.fi-modal-footer-actions button[type=submit]')
+        ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
+        ->assertSee('Records merged')
+        ->assertNotPresent('[data-duplicate-prompt]')
+        ->assertNoJavaScriptErrors();
+
+    expect(Company::query()->find($duplicate->getKey()))->toBeNull();
+});
+
+it('keeps a long duplicate name inside the record rail', function (): void {
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    mergeDialogCompany($this->workspace, $this->user, str_repeat('Brightline Health Holdings International ', 4), ['brightlinehealth.com']);
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
+        ->click('[data-duplicate-prompt] .fi-section-header')
+        ->assertVisible('[data-duplicate-prompt] li button')
+        ->assertScript("[...document.querySelectorAll('[data-duplicate-prompt] li')].every((row) => row.getBoundingClientRect().right <= document.querySelector('.fi-record-rail').getBoundingClientRect().right)", true)
+        ->assertNoJavaScriptErrors();
+});
