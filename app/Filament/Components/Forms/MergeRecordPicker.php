@@ -292,18 +292,17 @@ final class MergeRecordPicker extends Field
      */
     private function sharedCount(string $key, array $pairing): int
     {
-        $relation = $this->subject()->{Str::camel($key)}();
+        $name = Str::camel($key);
+        $currentLinks = $this->currentRecord()->{$name}();
 
-        if (! $relation instanceof MorphToMany) {
+        if (! $currentLinks instanceof MorphToMany) {
             return 0;
         }
 
-        $linked = fn (Company|People $record) => $relation->newPivotStatement()
-            ->where($relation->getMorphType(), $record->getMorphClass())
-            ->where($relation->getForeignPivotKeyName(), $record->getKey());
+        $relatedKey = $currentLinks->getRelated()->getQualifiedKeyName();
 
-        return $linked($pairing['picked'])
-            ->whereIn($relation->getRelatedPivotKeyName(), $linked($this->currentRecord())->select($relation->getRelatedPivotKeyName()))
+        return $pairing['picked']->{$name}()
+            ->whereIn($relatedKey, $currentLinks->select($relatedKey))
             ->count();
     }
 

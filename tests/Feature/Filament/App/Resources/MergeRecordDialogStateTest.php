@@ -6,6 +6,7 @@ use App\Enums\WorkspaceRole;
 use App\Filament\Components\Forms\MergeRecordPicker;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Models\Note;
+use App\Models\Task;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Filament\Schemas\Components\Component;
@@ -97,6 +98,25 @@ it('counts a note linked to both records once in the result preview', function (
     $counts = collect($picker->getResultCard()['counts'])->keyBy('key');
 
     expect($counts['notes']['count'])->toBe(2);
+});
+
+it('leaves a deleted task linked to both records out of the result preview', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $kept->tasks()->attach($task->getKey());
+    $duplicate->tasks()->attach($task->getKey());
+    $task->delete();
+
+    $picker = mergeDialogPicker(
+        livewire(ViewCompany::class, ['record' => $kept->getKey()])
+            ->mountAction(mergeRecordAction())
+            ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]),
+    );
+
+    $counts = collect($picker->getResultCard()['counts'])->keyBy('key');
+
+    expect($counts['tasks']['count'])->toBe(0);
 });
 
 it('refuses the record search once the member loses merge rights', function (): void {
