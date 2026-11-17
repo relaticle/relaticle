@@ -43,16 +43,17 @@ emails in a merge comes straight back on the next sync.
 
 ## Approaches
 
-**A. One action per entity, sharing the common steps (chosen, built).** `MergeCompanies` and
-`MergePeople` in `app/Actions/Merge/` are thin. Each calls one shared step, `MergeRecords`, and passes
-it two closures: one that moves that entity's own links, and one that writes the combined values.
-`MergeRecords` owns what both entities share: the authorization checks, the transaction, the lock on
-both rows, the limit check, the sample-data rule, the shared link and history moves, the
-`RecordMerged` event and the soft delete. It composes `CombineRecordValues`, `MoveRecordLinks` and
-`MoveRecordHistory`, and the two pivot-moving steps share `MoveMorphPivot`. What differs per entity
-is written out in its own action. A company owns people and opportunities. A person is only a point
-of contact. Per-entity facts the dialog needs (the identifying list, the count chips) come from
-`CrmEntity` and `RecordIdentity`, not from a branch on the record type.
+**A. One action per entity, sharing the common steps (chosen first, then folded).** The thin
+`MergeCompanies` and `MergePeople` wrappers were built, then folded into `MergeRecords` in review:
+the two closures each wrapper passed were its only content, so `MergeRecords` now owns the whole
+merge and dispatches the per-entity differences through exhaustive `match` expressions that PHPStan
+fails the moment a third entity joins the `Company|People` union. `MergeRecords` owns the
+authorization checks, the transaction, the lock on both rows, the limit check, the sample-data rule,
+the link and history moves, the `RecordMerged` event and the soft delete. It composes
+`CombineRecordValues`, `MoveRecordLinks` and `MoveRecordHistory`, and the pivot-moving steps share
+`MoveMorphPivot`. A company owns people and opportunities. A person is only a point of contact.
+Per-entity facts the dialog needs (the identifying list, the count chips) come from `CrmEntity` and
+`RecordIdentity`, not from a branch on the record type.
 
 **B. One generic `MergeRecords` driven by data on `CrmEntity`.** Less code, but the difference
 between the entities becomes data the reader has to follow. Adding opportunities later would be one
@@ -132,15 +133,26 @@ merging the same records cannot interleave.
 - Activity history: `activity_log` rows whose subject is the duplicate move to the kept record, so its
   timeline shows the duplicate's past. Then a new `record_merged` event on the kept record names the
   duplicate and who merged it, so the timeline reads "<member> merged <duplicate> into this record".
-- `attachments` media, so rich-text values copied from the duplicate keep their images.
-  `UploadClaims` rejects a rich-text value that references media owned by another record, so the
-  media moves before the values are written.
+- `attachments` media the merged rich-text values actually reference, so a value copied from the
+  duplicate keeps its images. `UploadClaims` rejects a rich-text value that references media owned
+  by another record, so the media moves before the values are written. An image whose text lost the
+  field stays on the soft-deleted duplicate, because moving it would orphan it on the kept record
+  (builder's call, made in review).
 - Record-type custom attributes on other records that point at the duplicate are rewritten to point
   at the kept record, without listing the kept record twice.
 - Email counters (`email_count`, `inbound_email_count`, `outbound_email_count`, `meeting_count`) are
   summed, minus the emails and meetings both records were linked to, so a shared email counts once.
   `last_email_at`, `last_interaction_at` and `last_meeting_at` take the later value. (Builder's call,
-  made in review: `RecordCommunicationMetrics` only increments, and no recount exists.)
+  made in review: `RecordCommunicationMetrics` only increments, and no recount exists.) The
+  duplicate's counters are zeroed in the same update, so restoring it cannot bring back numbers its
+  moved links no longer back. A manual link that collides with the kept record's auto link promotes
+  the kept link to manual before the dedup drops the duplicate's row.
+- Repointed `people` and `opportunities` rows take `updated_at = now()`, so an API consumer syncing
+  by `updated_at` sees the move. The kept record's own `record_merged` entry stays the audit trail;
+  no per-row relation-change entries are written (builder's call, made in review).
+- A record-type attribute on the kept record that pointed at the duplicate now points at the kept
+  record itself, so a company can end up as its own parent. Kept on purpose: dropping the link would
+  silently lose that the relationship existed (decided in review of `76aa81c75`).
 
 **Company only**
 - `people.company_id` and `opportunities.company_id`.
