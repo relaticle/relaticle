@@ -45,10 +45,6 @@ final readonly class MergeRecords
 
             $this->assertWithinLimits($mergedValues);
 
-            if ($kept->creation_source === CreationSource::SAMPLE && $duplicate->creation_source !== CreationSource::SAMPLE) {
-                $kept->update(['creation_source' => $duplicate->creation_source]);
-            }
-
             $this->moveLinks->execute($kept, $duplicate, $mergedValues);
             $this->moveEntityLinks($kept, $duplicate);
             $this->moveHistory->execute($user, $kept, $duplicate);
@@ -56,6 +52,10 @@ final readonly class MergeRecords
             event(new RecordMerged($kept, $duplicate));
 
             $duplicate->delete();
+
+            if ($kept->creation_source === CreationSource::SAMPLE && $duplicate->creation_source !== CreationSource::SAMPLE) {
+                $kept->creation_source = $duplicate->creation_source;
+            }
 
             return $this->saveMergedValues($user, $kept, $mergedValues);
         });
