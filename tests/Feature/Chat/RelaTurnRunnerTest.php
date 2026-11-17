@@ -60,18 +60,22 @@ function priorTurnWithOneToolCall(): array
  */
 function listedEvalCases(?string $group = null): array
 {
-    $command = [PHP_BINARY, '-d', 'memory_limit=1G', 'vendor/bin/pest', 'tests/Evals', '--list-tests', '--no-tia'];
+    $file = tempnam(sys_get_temp_dir(), 'eval-cases');
+    $command = [PHP_BINARY, '-d', 'memory_limit=1G', 'vendor/bin/pest', 'tests/Evals', '--list-tests-xml', $file, '--no-tia'];
 
     if ($group !== null) {
         $command[] = '--group='.$group;
     }
 
-    $output = Process::path(base_path())->run($command)->throw()->output();
+    Process::path(base_path())->run($command)->throw();
 
-    $lines = array_values(array_filter(explode("\n", $output), fn (string $line): bool => str_starts_with($line, ' - ')));
-    $cases = array_map(fn (string $line): string => Str::before(substr($line, 3), '"'), $lines);
+    $cases = array_map(
+        fn (SimpleXMLElement $method): string => (string) $method['id'],
+        simplexml_load_file($file)->xpath('//*[local-name()="testMethod"]') ?: [],
+    );
+    unlink($file);
 
-    expect($lines)->not->toBeEmpty()
+    expect($cases)->not->toBeEmpty()
         ->and(array_filter($cases, fn (string $case): bool => ! str_contains($case, '::__pest_evaluable_')))->toBe([]);
 
     return array_values(array_unique($cases));
