@@ -569,7 +569,7 @@ final class AppPanelProvider extends PanelProvider
             ->collapsedSidebarWidth('3rem')
             ->navigationGroups([
                 NavigationGroup::make()
-                    ->label(__('filament/panel.navigation_groups.tasks'))
+                    ->label(fn (): string => __('filament/panel.navigation_groups.tasks'))
                     ->icon('lucide-shopping-cart'),
             ])
             ->middleware($this->middlewareStack())
@@ -711,7 +711,7 @@ final class AppPanelProvider extends PanelProvider
             // of stranding it below the workspace list.
             ->tenantMenuItems([
                 Action::make('billing')
-                    ->label(__('billing.title'))
+                    ->label(fn (): string => __('billing.title'))
                     ->icon('lucide-credit-card')
                     ->sort(-1)
                     ->url(fn (): ?string => $this->billingUrl())
@@ -730,7 +730,7 @@ final class AppPanelProvider extends PanelProvider
         // to the dashboard, silently abandoning the create-workspace wizard.
         $items = [
             Action::make('settings')
-                ->label(__('filament/panel.user_menu.settings'))
+                ->label(fn (): string => __('filament/panel.user_menu.settings'))
                 ->icon('lucide-settings')
                 ->visible(fn (): bool => $this->shouldRegisterMenuItem())
                 ->url(fn (): string => url(Settings::getUrl())),
@@ -738,7 +738,7 @@ final class AppPanelProvider extends PanelProvider
 
         if (Features::hasApiFeatures()) {
             $items[] = Action::make('api_tokens')
-                ->label(__('access-tokens.user_menu'))
+                ->label(fn (): string => __('access-tokens.user_menu'))
                 ->icon('lucide-key')
                 ->visible(fn (): bool => $this->shouldRegisterMenuItem())
                 ->url(fn (): string => url(AccessTokens::getUrl()));

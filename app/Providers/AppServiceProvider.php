@@ -52,7 +52,6 @@ use App\Support\CustomFieldSettingsSchema;
 use App\Support\Http\RequestAbility;
 use App\Support\Impersonation\ImpersonationSessionHandler;
 use App\Support\Impersonation\Impersonator;
-use App\Support\Locales;
 use App\Support\Mail\ParksInactiveRecipientsTransport;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use App\Support\Media\MediaLookup;
@@ -407,12 +406,6 @@ final class AppServiceProvider extends ServiceProvider
     {
         // The facade resolves authentication before hostname-specific sessions are configured.
         PendingActivityLog::beforeLogging(StampsActivity::apply(...));
-
-        Context::hydrated(function (ContextRepository $context): void {
-            $locale = $context->getHidden('locale');
-
-            Locales::apply(is_string($locale) ? $locale : (string) config('app.default_locale'));
-        });
 
         Context::dehydrating(function (ContextRepository $context): void {
             $administratorId = $this->app->make(Impersonator::class)->administratorId(request());

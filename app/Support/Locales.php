@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace App\Support;
 
 use Closure;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Number;
 
 final readonly class Locales
 {
     public const string COOKIE = 'locale';
+
+    public const string CONTEXT_KEY = 'locale';
 
     public static function apply(string $locale): void
     {
@@ -37,12 +40,12 @@ final readonly class Locales
         foreach (explode(',', $acceptLanguage) as $entry) {
             [$tag, $parameter] = array_pad(explode(';', trim($entry), 2), 2, null);
             $primary = strtolower(explode('-', trim($tag))[0]);
-            $weight = $parameter !== null && preg_match('/q\s*=\s*([\d.]+)/', $parameter, $match) === 1
+            $weight = $parameter !== null && preg_match('/q\s*=\s*(-?\d+(?:\.\d+)?)/', $parameter, $match) === 1
                 ? (float) $match[1]
                 : 1.0;
 
-            if ($weight > 0 && in_array($primary, config('app.available_locales'), true)) {
-                $weights[$primary] ??= $weight;
+            if ($weight > 0 && $weight <= 1 && in_array($primary, config('app.available_locales'), true)) {
+                $weights[$primary] = max($weights[$primary] ?? 0.0, $weight);
             }
         }
 
@@ -60,12 +63,17 @@ final readonly class Locales
     public static function within(string $locale, Closure $callback): mixed
     {
         $previous = app()->getLocale();
+        $previousHidden = Context::getHidden(self::CONTEXT_KEY);
         self::apply($locale);
+        Context::addHidden(self::CONTEXT_KEY, $locale);
 
         try {
             return $callback();
         } finally {
             self::apply($previous);
+            $previousHidden === null
+                ? Context::forgetHidden(self::CONTEXT_KEY)
+                : Context::addHidden(self::CONTEXT_KEY, $previousHidden);
         }
     }
 }
