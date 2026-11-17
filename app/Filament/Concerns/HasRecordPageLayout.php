@@ -282,7 +282,7 @@ trait HasRecordPageLayout
                             ->button()
                             ->color('gray')
                             ->size(Size::ExtraSmall)
-                            ->extraAttributes(fn (array $arguments): array => ['aria-label' => __('filament/record-page.merge.duplicate.merge_with', ['name' => $this->duplicateName($arguments['duplicate'] ?? null)])])
+                            ->extraAttributes(fn (array $arguments): array => ['aria-label' => __('filament/record-page.merge.duplicate.merge_with', ['name' => e($this->duplicateName($arguments['duplicate'] ?? null))])])
                             ->fillForm(fn (array $arguments): array => ['picked_id' => $this->duplicateId($arguments['duplicate'] ?? null), 'keep_picked' => false]),
                     ])
                     ->key('duplicateList'),

@@ -190,3 +190,12 @@ it('counts at most ten duplicates, each once', function (): void {
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->assertSeeText(trans_choice('filament/record-page.merge.duplicate.count', 10));
 });
+
+it('keeps a quote in the duplicate name inside the merge button label', function (): void {
+    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harbor" data-injected="1'], ['domains' => ['harborline.com']]);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertDontSeeHtml('data-injected="1"')
+        ->assertSeeHtml('aria-label="'.e(__('filament/record-page.merge.duplicate.merge_with', ['name' => 'Harbor" data-injected="1'])).'"');
+});
