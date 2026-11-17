@@ -187,7 +187,13 @@ it('anchors the picker to its button when the button is pressed while the phone 
         ->click('.fi-dropdown-list-item:has-text("Merge record")');
 
     $page->script(<<<'JS'
-        new Promise((resolve) => {
+        (() => {
+            if (window.mergePressStarted) {
+                return true;
+            }
+
+            window.mergePressStarted = true;
+
             const press = () => {
                 const sheet = document.querySelector('.fi-modal-window.fi-transition-enter');
                 const button = document.querySelector('[data-merge-picker]');
@@ -210,10 +216,11 @@ it('anchors the picker to its button when the button is pressed while the phone 
                 };
                 record();
                 button.click();
-                resolve(true);
             };
             press();
-        })
+
+            return true;
+        })()
         JS);
 
     $page->assertVisible('.fi-merge-pop')->wait(1.2);
