@@ -145,7 +145,7 @@ blog part waits for it and nothing else does.
 - `config('app.available_locales')` is `['en', 'de', 'es', 'fr']`. One owner: every picker, route
   constraint, validator and test reads it.
 - `users.locale`: nullable string. `User::effectiveLocale()` returns it when it is listed, otherwise
-  `config('app.locale')`. `User` implements `HasLocalePreference`, so Laravel sends mail and
+  `config('app.default_locale')` (`APP_LOCALE`), a key nothing overwrites at runtime. `User` implements `HasLocalePreference`, so Laravel sends mail and
   notifications, queued ones included, in the recipient's language.
 - Profile settings get a Language select. Options show each language in its own name (Deutsch,
   Español, Français, English).
@@ -206,7 +206,8 @@ any other user data. Existing workspaces keep their English rows.
 
 ### Public site URLs
 
-- English keeps its URLs. German, Spanish and French pages live under `/de`, `/es` and `/fr`:
+- English keeps its URLs, and an English URL always renders English, whatever the visitor's cookie,
+  browser or profile says. German, Spanish and French pages live under `/de`, `/es` and `/fr`:
   `/de/pricing`, `/es/help/{category}/{slug}`, `/fr/developers/{type}`, `/de/blog/{slug}`,
   `/fr/compare/relaticle-vs-{competitor}`.
 - Slugs stay English in every language (call). Localized slugs would mean a slug map per page and
@@ -303,8 +304,8 @@ srchema's Spain-Spanish fork is a starting point. Its "tú" carries over and its
 Decided by Manuk on 2026-11-17: all three languages go live at merge, fully enabled, with no
 native-speaker gate. People who find a wrong or clumsy string fix it with a pull request.
 
-- Starting points: EnjoyJazz's German (offered in #1220) and srchema's Spanish fork, both against
-  older code. Claude translates everything else with the glossary in context, then a second pass
+- Starting point: EnjoyJazz's German (offered in #1220), against older code. srchema's Spanish fork
+  was never offered, so Spanish and French start from scratch. Claude translates everything else with the glossary in context, then a second pass
   checks every file against the glossary and the writing rules.
 - If EnjoyJazz opens the German PR in time, its files are merged into this branch with their
   authorship kept, and they must pass the CLA check. This PR never waits for it.

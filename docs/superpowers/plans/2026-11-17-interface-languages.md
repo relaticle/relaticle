@@ -1,6 +1,6 @@
 # Relaticle in German, Spanish and French Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use sdd-lean (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** A user picks German, Spanish, French or English, and the app, Rela, emails, notifications, relaticle.com, the help and developer docs, and the blog all follow it, with CI failing any English string that ships without its three translations.
 
@@ -12,7 +12,8 @@
 
 ## Global Constraints
 
-- Locales: `['en', 'de', 'es', 'fr']`, read only through `config('app.available_locales')`. English is the default and keeps every existing URL.
+- Locales: `['en', 'de', 'es', 'fr']`, read only through `config('app.available_locales')`. English is the default and keeps every existing URL, and an unprefixed public URL always renders English.
+- The install's default language is `config('app.default_locale')` (env `APP_LOCALE`). Never read `config('app.locale')` as the default: `Application::setLocale()` overwrites it on every call.
 - Address: German "Sie", French "vous", Spanish neutral Latin American with "tú" (no "vosotros", no one-country words like "ordenador" or "computadora"). Locale code `es`.
 - Every translation obeys the `docs/i18n.md` glossary (Task 9), and Rela is never translated.
 - No em-dash (U+2014) in any file. The `ConventionsTest` copy checks apply to every language file.
@@ -26,9 +27,9 @@
 ## Review Focus
 
 1. A stored locale that is no longer listed (or garbage from an old row) falls back to English and never throws. Pinned in Task 1.
-2. A Livewire update request (not a full page load) renders in the user's language after they switch it. Livewire's `SupportLocales` replays the locale it memoized at mount. Pinned in Task 2.
-3. A queue worker that ran a German job runs the next job, which has no user, in English. Pinned in Task 2.
-4. `Accept-Language: de-AT,de;q=0.9` resolves to `de`, and `pt-BR,pt;q=0.9` resolves to `en`. `/de` and `/de/` both serve the German homepage, and `/developers` is never read as a `/de` URL. Pinned in Tasks 2 and 13.
+2. A user who switches language sees the whole page in it straight away. Livewire's `SupportLocales` replays the locale a component memoized at mount, so the profile save reloads the page. Pinned in Task 3.
+3. A queue worker that ran a German job runs the next job, which has no user, in the install default. Pinned in Task 2.
+4. `Accept-Language: de-AT,de;q=0.9` resolves to `de`, and `pt-BR,pt;q=0.9` resolves to `en`. `/de` and `/de/` both serve the German homepage, `/developers` is never read as a `/de` URL, and `/pricing` stays English for a German user or a German browser. Pinned in Tasks 2 and 13.
 5. A German page that links to something with no German version (a blog post not yet translated) links to the English URL, never to a German 404. Pinned in Task 16.
 
 ---
@@ -63,15 +64,15 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 ### Task 1: The language list and the user's preference
 
 **Files:**
-- Modify: `config/app.php:181-185` (add `available_locales`), `app/Models/User.php` (fillable, `HasLocalePreference`)
+- Modify: `config/app.php:181-185` (add `available_locales` and `default_locale`), `app/Models/User.php` (fillable, `HasLocalePreference`)
 - Create: `database/migrations/2026_11_18_000001_add_locale_to_users_table.php`
 - Test: `tests/Feature/Auth/UserModelTest.php`
 
 **Interfaces:**
-- Produces: `config('app.available_locales'): list<string>` = `['en', 'de', 'es', 'fr']`.
-- Produces: `users.locale` string(10) nullable. `User::effectiveLocale(): string` (stored value when listed, else `config('app.locale')`), `User::preferredLocale(): string` (returns `effectiveLocale()`).
+- Produces: `config('app.available_locales'): list<string>` = `['en', 'de', 'es', 'fr']`, and `config('app.default_locale')` = `env('APP_LOCALE', 'en')`, a key nothing writes at runtime.
+- Produces: `users.locale` string(10) nullable. `User::effectiveLocale(): string` (stored value when listed, else `config('app.default_locale')`), `User::preferredLocale(): string` (returns `effectiveLocale()`).
 
-- [ ] **Step 1: Write failing tests** in `UserModelTest.php`: `it('reads a listed stored locale')` (`locale = 'de'` → `'de'`), `it('falls back to the app locale for a null or unlisted locale')` (`null`, `'pt'`, `'zz'` → `'en'`), `it('sends notifications in the recipient language')` (`Notification::fake()`, notify a `de` user with `VerifyEmail`, `Notification::assertSentTo($user, VerifyEmail::class, fn ($n, $c, $u, $locale) => $locale === 'de')`).
+- [ ] **Step 1: Write failing tests** in `UserModelTest.php`: `it('reads a listed stored locale')` (`locale = 'de'` → `'de'`), `it('falls back to the install default for a null or unlisted locale')` (`null`, `'pt'`, `'zz'` → `'en'`, also after `app()->setLocale('fr')` ran earlier in the test), `it('sends notifications in the recipient language')` (`Notification::fake()`, notify a `de` user with `VerifyEmail`, `Notification::assertSentTo($user, VerifyEmail::class, fn ($n, $c, $u, $locale) => $locale === 'de')`).
 - [ ] **Step 2: Run** `php artisan test --compact tests/Feature/Auth/UserModelTest.php`. Expect FAIL.
 - [ ] **Step 3: Implement** the config key, migration, fillable entry and the two methods.
 - [ ] **Step 4: Run again.** Expect PASS.
@@ -86,10 +87,10 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 
 **Interfaces:**
 - Produces: `Locales::apply(string $locale): void` (sets app, `Date` and `Number` locale), `Locales::fromHeader(?string $acceptLanguage): ?string` (first listed primary subtag by q-order), `Locales::within(string $locale, Closure $callback): mixed` (restores the previous app, Date and Number locale in `finally`), `Locales::COOKIE = 'locale'`.
-- Produces: `SetUserLocale` resolves the user's `effectiveLocale()`. For a guest it tries the `locale` cookie, then `Locales::fromHeader()`, then `config('app.locale')`. It calls `Locales::apply()` and `Context::addHidden('locale', $locale)`.
-- Produces: `Context::hydrated` applies a hidden `locale` when present, and `config('app.locale')` when absent. That reset is what stops a worker leaking one job's language into the next.
+- Produces: `SetUserLocale` resolves the user's `effectiveLocale()`. For a guest it tries the `locale` cookie, then `Locales::fromHeader()`, then `config('app.default_locale')`. It calls `Locales::apply()` and `Context::addHidden('locale', $locale)`.
+- Produces: `Context::hydrated` applies a hidden `locale` when present, and `config('app.default_locale')` when absent. That reset is what stops a worker leaking one job's language into the next.
 
-- [ ] **Step 1: Write failing tests**: `it('renders the panel in the user language')` (a `de` user's `/companies` response carries `<html lang="de"`, which Filament's base layout takes from the app locale), `it('applies a language change on the next Livewire update')` (Livewire test of a panel component, switch `locale` to `fr`, `->call(...)`, assert `app()->getLocale() === 'fr'` inside the render), `it('uses the cookie then Accept-Language for a guest')` (dataset: cookie `es` → `es`; header `de-AT,de;q=0.9` → `de`; header `pt-BR,pt;q=0.9` → `en`), `it('carries the language into a queued job and resets it for the next')` (dispatch a test job from a `de` request, assert it sees `de`; run a second job with an empty context, assert `en`).
+- [ ] **Step 1: Write failing tests**: `it('renders the panel in the user language')` (a `de` user's `/companies` response carries `<html lang="de"`, which Filament's base layout takes from the app locale), `it('uses the cookie then Accept-Language for a guest')` (dataset: cookie `es` → `es`; header `de-AT,de;q=0.9` → `de`; header `pt-BR,pt;q=0.9` → `en`), `it('carries the language into a queued job and resets it for the next')` (dispatch a test job from a `de` request, assert it sees `de`; run a second job with an empty context, assert `en`).
 - [ ] **Step 2: Run** `php artisan test --compact tests/Feature/Middleware/SetUserLocaleTest.php`. Expect FAIL.
 - [ ] **Step 3: Implement** the support class, middleware and registrations.
 - [ ] **Step 4: Run again, plus** `tests/Feature/Support/LocaleServiceProviderTest.php`. Expect PASS.
@@ -104,9 +105,9 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 
 **Interfaces:**
 - Consumes: `Locales::fromHeader()`, `User::effectiveLocale()`.
-- Produces: profile option labels are endonyms: `['en' => 'English', 'de' => 'Deutsch', 'es' => 'Español', 'fr' => 'Français']`, built from `Locale::getDisplayLanguage($code, $code)` with the first letter uppercased. Validation `['nullable', Rule::in(config('app.available_locales'))]`. An empty value clears it.
+- Produces: profile option labels are endonyms: `['en' => 'English', 'de' => 'Deutsch', 'es' => 'Español', 'fr' => 'Français']`, built from `Locale::getDisplayLanguage($code, $code)` with the first letter uppercased. Validation `['nullable', Rule::in(config('app.available_locales'))]`. An empty value clears it. A save that changes the language redirects to the profile page, so every component re-mounts in it.
 
-- [ ] **Step 1: Write failing tests**: `it('saves and clears the language from the profile')`, `it('rejects a language outside the list')`, `it('stores the guest language on email sign-up')` (cookie `de` → `users.locale = 'de'`), `it('stores the guest language on social sign-up')`, `it('seeds a missing language from Accept-Language once on login')` (null + `fr-FR` header → `fr`; existing `de` stays `de`).
+- [ ] **Step 1: Write failing tests**: `it('saves and clears the language from the profile')`, `it('reloads the page in the new language after a change')` (assert the redirect, then `<html lang="fr"` on the next GET), `it('rejects a language outside the list')`, `it('stores the guest language on email sign-up')` (cookie `de` → `users.locale = 'de'`), `it('stores the guest language on social sign-up')`, `it('seeds a missing language from Accept-Language once on login')` (null + `fr-FR` header → `fr`; existing `de` stays `de`).
 - [ ] **Step 2: Run** the four files. Expect FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run again.** Expect PASS. Then walk the profile page with agent-browser in light and dark.
@@ -115,7 +116,7 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 ### Task 4: No English left in PHP: enums, notifications, ImportWizard, base components
 
 **Files:**
-- Modify: every enum in `app/Enums` and `packages/*/src/Enums` whose label, description or option methods return literals (start with `BillingStatus`, `StripeSubscriptionStatus`, `CreationSource`, `OnboardingUseCase`, `CustomFieldType`, `ProposalEntity`); `app/Notifications/**`; `app/Actions/**/NotifyTaskAssignees.php`; `app/Livewire/BaseLivewireComponent.php`; `packages/ImportWizard/src/**`; `lang/en/enums/*.php` (new, one file per enum); `phpstan.neon:33-83` (delete every i18n ignore except `app/Console` and `app/Mcp`)
+- Modify: every enum in `app/Enums` and `packages/*/src/Enums` whose label, description or option methods return literals (start with `BillingStatus`, `StripeSubscriptionStatus`, `CreationSource`, `OnboardingUseCase`, `CustomFieldType`, `ProposalEntity`); `app/Notifications/**`; `app/Actions/**/NotifyTaskAssignees.php`; `app/Livewire/BaseLivewireComponent.php`; `packages/ImportWizard/src/**`; `lang/en/enums/*.php` (new, one file per enum); `phpstan.neon:33-83` (delete every i18n ignore except `app/Console`, `app/Mcp` and `packages/Chat/src/Tools`: tool names and descriptions are read by the model, and Task 5 covers the tool strings a user sees)
 - Test: the existing tests of each touched class (find with `grep -rl '<ClassName>' tests packages/*/tests`)
 
 **Interfaces:**
@@ -146,12 +147,12 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 
 **Files:**
 - Create: `app/Console/Commands/LangExtractCommand.php` (`lang:extract`), `lang/en.json`, `packages/Cloud/lang/en.json`, `tests/Arch/TranslationsTest.php`
-- Modify: `app/Console/Commands/LocaleDiffCommand.php` (accept several roots), `app/Support/PestTiaRuntime.php` (`FILES_ARCH_TESTS_READ` gets `lang/` and `packages/*/lang`), `packages/Cloud/src/CloudServiceProvider.php:109` (`loadJsonTranslationsFrom(__DIR__.'/../lang')`)
+- Modify: `app/Console/Commands/LocaleDiffCommand.php`, `app/Support/PestTiaRuntime.php` (`FILES_ARCH_TESTS_READ` gets `lang/` and `packages/*/lang`), `packages/Cloud/src/CloudServiceProvider.php:109` (`loadJsonTranslationsFrom(__DIR__.'/../lang')`)
 - Test: `tests/Feature/Commands/LocaleDiffCommandTest.php`, `tests/Arch/TranslationsTest.php`
 
 **Interfaces:**
-- Produces: `php artisan lang:extract [--check]` scans `__()`, `trans()`, `@lang` and `@js(__())` calls with a literal first argument in `app/`, `resources/`, `packages/*/src` and `packages/*/resources`. Keys without a group dot (`'Save changes'`) go to `lang/en.json`, except under `packages/Cloud`, which go to `packages/Cloud/lang/en.json`. `--check` writes nothing and exits 1 when either file differs from the scan. `packages/SystemAdmin` is skipped.
-- Produces: `locale:diff <locale> --lang-path=<dir>` keeps working. The arch test runs it for each root: `lang`, `packages/Cloud/lang`, `packages/ImportWizard/resources/lang`, and each `lang/vendor/*`.
+- Produces: `php artisan lang:extract [--check]` scans `__()`, `trans()`, `@lang` and `@js(__())` calls with a literal first argument in `app/`, `resources/`, `packages/*/src` and `packages/*/resources`. A key is a group key when it has a `namespace::` prefix or its first dotted segment names an existing `lang/en/<group>.php` (or that package's group file). Every other key is a sentence key, periods included (`'Done. Northwind renewal is Closed Won.'`). A sentence key found under `packages/<Name>/` goes to `packages/<Name>/lang/en.json` when that package has a `lang/` directory, otherwise to `lang/en.json`. The command finds packages by glob and names none, and skips `packages/SystemAdmin`. `--check` writes nothing and exits 1 when any file differs from the scan.
+- Produces: `locale:diff <locale> --lang-path=<dir>` keeps working. The arch test finds its roots by glob (`lang`, `packages/*/lang`, `packages/*/resources/lang`, `lang/vendor/*`) and skips any that do not exist, so the self-hosted CI job, which deletes `packages/Cloud`, still passes.
 - Produces in `TranslationsTest.php`: `it('keeps the English catalogue in step with the source')` (runs `lang:extract --check`), `it('translates every English key into {locale}')` with dataset `config('app.available_locales')` minus `en` (fails until Tasks 10-12).
 
 - [ ] **Step 1: Write the failing tests** above, plus in `LocaleDiffCommandTest.php`: `it('reports a sentence key missing from the locale json')`.
@@ -203,6 +204,7 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 **Interfaces:**
 - Produces: the glossary table, one row per term, columns `English | Deutsch | Español | Français | Never use`. Terms: workspace, member, owner, admin, company, person, people, opportunity, stage, task, note, custom attribute, record, view, board, pipeline, sign in, sign up, Rela (untranslated), MCP server (untranslated), API token, mailbox.
 
+- [ ] **Step 0: Check candidate words against `tests/Arch/ConventionsTest.php`.** Its retired-word checks (bare `Contact`/`Deal` labels, `contacts`, `a contact`, `custom field`, `AI chat`, `your people`) scan all of `lang/` and are English rules. French "contact" and German "Deal" would trip them. Scope each of those checks to English files (`lang/en`, `lang/en.json`, each package's `lang/en`, English docs) in this task, and add a test case proving a French `contacts` passes and an English one still fails.
 - [ ] **Step 1: Write the glossary.** The "Never use" column is checked by the second translation pass, not by a test (call: the words differ per language and a list test would only catch exact strings). Pick each word against Filament's own `de`, `es`, `fr` lang files so the two vocabularies agree (for example Filament's word for "record").
 - [ ] **Step 2: Generate framework strings once**: `composer require --dev laravel-lang/common && php artisan lang:add de es fr` (or `lang:update`), copy only the four files per locale, then `composer remove --dev laravel-lang/common` and confirm `git diff composer.json composer.lock` is empty. Edit `validation.php` attribute names that name our records against the glossary.
 - [ ] **Step 3: Publish and translate** the vendor files listed.
@@ -216,7 +218,7 @@ One task per language, same shape. Task 10 is `de`, Task 11 is `es`, Task 12 is 
 **Files (per locale `xx`):**
 - Create: `lang/xx/**` mirroring `lang/en/**`, `lang/xx.json`, `packages/ImportWizard/resources/lang/xx/**`, `packages/Cloud/lang/xx/{billing,inactivity,mail}.php` (`admin.php` is read only by the internal admin panel and stays English), `lang/xx/enums/**`, the onboarding fixtures under `packages/OnboardSeed/resources/fixtures/xx/` from Task 8
 - Modify: `lang/.snapshots/xx.json` via `php artisan locale:diff xx --update-snapshot`
-- Starting points: German from EnjoyJazz's PR on #1220 if it is open by then (merge its commits, keep authorship). Spanish from `srjingles/crm.srjingles.com` `lang/es` and `lang/es.json` (convert Spain-only words, keep "tú").
+- Starting points: German from EnjoyJazz's PR on #1220 if it is open by then (merge its commits, keep authorship). Spanish and French are translated from scratch. srchema's fork was never offered, so it is not copied.
 
 - [ ] **Step 1: Translate** in batches of one lang file group at a time, with the glossary and the address rule in context. Placeholders (`:name`, `:count`), pipe plurals and HTML stay intact.
 - [ ] **Step 2: Second pass**: check every file against the glossary's "Never use" column, the address rule and the writing rules.
@@ -236,10 +238,11 @@ One task per language, same shape. Task 10 is `de`, Task 11 is `es`, Task 12 is 
 - Test: `packages/Cloud/tests/Feature/Marketing/LocalizedPagesTest.php` (create), `PublicPagesTest.php`, `MarketingNavigationTest.php`, `PrimaryHostRedirectTest.php`, `tests/Smoke/RouteTest.php`
 
 **Interfaces:**
+- Produces: the unprefixed public routes carry `SetPublicLocale:en`, so English URLs render English for every visitor, whatever their cookie, header or profile says.
 - Produces: `LocalizedUrl::route(string $name, array $parameters = [], ?string $locale = null): string` (current locale by default; `en` uses the unprefixed name), `LocalizedUrl::alternates(): array<string, string>` (locale → URL of the current route in that locale, plus `'x-default'` → English), `LocalizedUrl::current(string $locale): string`.
-- Produces: `SetPublicLocale` applies the locale with `Locales::apply()` and queues the `Locales::COOKIE` cookie for a year.
+- Produces: `SetPublicLocale` applies the locale with `Locales::apply()` and queues the `Locales::COOKIE` cookie for a year, on English pages too (call: the language of the last page read is the best guess for sign-up).
 
-- [ ] **Step 1: Write failing tests** in `LocalizedPagesTest.php`: `it('serves every public page under each prefix')` (dataset of every named public GET route × `de`, `es`, `fr`, 200), `it('keeps every English URL unchanged')` (snapshot of `route()` output for each public name), `it('serves /de and /de/ as the German home')`, `it('does not treat /developers as a German URL')`, `it('emits hreflang for all four languages plus x-default and a self canonical')`, `it('sets html lang and og:locale from the prefix')`, `it('keeps links on a German page German')` (every `href` on `/de/pricing` pointing at a public page starts with `/de`), `it('sets the locale cookie')`, `it('serves the German Markdown response under /de')` (`Accept: text/markdown` on `/de/pricing` returns the German page).
+- [ ] **Step 1: Write failing tests** in `LocalizedPagesTest.php`: `it('serves every public page under each prefix')` (dataset of every named public GET route × `de`, `es`, `fr`, 200), `it('keeps every English URL unchanged')` (snapshot of `route()` output for each public name), `it('serves /de and /de/ as the German home')`, `it('does not treat /developers as a German URL')`, `it('emits hreflang for all four languages plus x-default and a self canonical')`, `it('sets html lang and og:locale from the prefix')`, `it('keeps links on a German page German')` (every `href` on `/de/pricing` pointing at a public page starts with `/de`), `it('sets the locale cookie')`, `it('keeps /pricing English for a German cookie, browser and signed-in user')`, `it('serves the German Markdown response under /de')` (`Accept: text/markdown` on `/de/pricing` returns the German page).
 - [ ] **Step 2: Run** `php artisan test --compact packages/Cloud/tests/Feature/Marketing/LocalizedPagesTest.php`. Expect FAIL.
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run** the new file, the four existing ones, and `tests/Smoke/RouteTest.php`. Expect PASS. Check the switcher with agent-browser in light, dark and a 390px viewport.
