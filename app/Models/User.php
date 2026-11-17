@@ -31,6 +31,7 @@ use Filament\Models\Contracts\HasDefaultTenant;
 use Filament\Models\Contracts\HasTenants;
 use Filament\Panel;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Appends;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
@@ -61,6 +62,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property string $name
  * @property string $email
  * @property string|null $timezone
+ * @property string|null $locale
  * @property string|null $password
  * @property string|null $profile_photo_path
  * @property-read string $profile_photo_url
@@ -88,6 +90,7 @@ use Laravel\Sanctum\HasApiTokens;
     'name',
     'email',
     'timezone',
+    'locale',
     'password',
     'ai_preferences',
     'notification_preferences',
@@ -102,7 +105,7 @@ use Laravel\Sanctum\HasApiTokens;
     'rejected_subscriber_profile_hash',
 ])]
 #[ObservedBy(UserObserver::class)]
-final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasTenants, MustVerifyEmail, PasskeyUser
+final class User extends Authenticatable implements FilamentUser, HasAvatar, HasDefaultTenant, HasLocalePreference, HasTenants, MustVerifyEmail, PasskeyUser
 {
     use HasApiTokens;
 
@@ -194,6 +197,18 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
     public function effectiveTimezone(): string
     {
         return $this->timezone ?? (string) config('app.timezone');
+    }
+
+    public function effectiveLocale(): string
+    {
+        return in_array($this->locale, config('app.available_locales'), true)
+            ? $this->locale
+            : (string) config('app.default_locale');
+    }
+
+    public function preferredLocale(): string
+    {
+        return $this->effectiveLocale();
     }
 
     /**
