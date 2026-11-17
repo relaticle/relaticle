@@ -56,6 +56,8 @@
             if (this.results.length === 0 && this.query === '') {
                 await this.search()
                 await this.$nextTick()
+                // x-show reveals the list on the next animation frame, and WebKit paints before it runs.
+                await new Promise(requestAnimationFrame)
             }
 
             const sheet = $refs.trigger?.closest('.fi-modal-window')
