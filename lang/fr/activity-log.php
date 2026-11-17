@@ -6,8 +6,8 @@ return [
     'events' => [
         'record_merged' => [
             'label' => 'Fusionné',
-            'description' => ':name a été fusionné dans cet enregistrement',
-            'description_by' => ':causer a fusionné :name dans cet enregistrement',
+            'description' => 'La fiche :name a été fusionnée dans celle-ci',
+            'description_by' => ':causer a fusionné la fiche :name dans celle-ci',
         ],
     ],
 ];
