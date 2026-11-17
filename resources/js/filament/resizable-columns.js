@@ -278,11 +278,10 @@
             left += parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth
             return offset
         })
-        // Pins stick only while the widest other column and the actions column still fit beside them, so none is cut off.
+        // Pins stick only while the widest other column still fits beside them, so it is not cut off.
         const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
-        const actions = table.querySelector('thead .fi-ta-actions-header-cell')?.offsetWidth ?? 0
         const widest = Math.min(window.filamentData.defaultColumnWidth, Math.max(0, ...headersOf(table).filter((th) => !pinned.includes(th)).map((th) => parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth)))
-        const active = pinned.length > 0 && left + actions + widest <= room && !showsCards(table)
+        const active = pinned.length > 0 && left + widest <= room && !showsCards(table)
 
         table.classList.toggle('fi-ta-has-pinned', active)
         table.querySelectorAll('[data-column-pinned-last]').forEach((cell) => cell.removeAttribute('data-column-pinned-last'))

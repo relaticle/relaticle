@@ -8,15 +8,15 @@
     @apply block max-w-full truncate;
 }
 
-/* 64px only fits an ActionGroup trigger. `width: auto` drops Filament's w-1, so the actions
-   column takes the space the data columns leave and the table still fills its wrapper. */
+/* The actions column renders no trigger. `width: auto` drops Filament's w-1, so it takes the space
+   the data columns leave, and collapses to nothing when the table overflows. */
 .fi-ta-resizable-table .fi-ta-selection-cell {
     @apply sm:w-13 sm:min-w-13 sm:max-w-13;
 }
 
 .fi-ta-resizable-table .fi-ta-actions-header-cell,
 .fi-ta-resizable-table td:has(> .fi-ta-actions) {
-    @apply w-auto min-w-16 overflow-hidden;
+    @apply w-auto min-w-0 overflow-hidden;
 }
 
 /* Below sm the list stacks into cards, so the columns give up the widths and dividers the server stamped on them,
