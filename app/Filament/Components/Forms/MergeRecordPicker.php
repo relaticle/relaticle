@@ -19,8 +19,11 @@ use Filament\Schemas\Components\Utilities\Set;
 use Filament\Support\Components\Attributes\Exposed;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 
@@ -53,8 +56,11 @@ final class MergeRecordPicker extends Field
     #[Renderless]
     public function searchRecords(string $search = ''): array
     {
+        $subject = $this->subject();
+        abort_unless(Gate::allows('update', $subject) && Gate::allows('delete', $subject), 403);
+
         $records = $this->searchQuery()
-            ->whereKeyNot($this->subject()->getKey())
+            ->whereKeyNot($subject->getKey())
             ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $match): Builder => $this->matching($match, $search)))
             ->orderBy('name')
             ->limit(25)
