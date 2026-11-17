@@ -81,6 +81,16 @@ final readonly class RecordCommunicationMetrics
             'last_interaction_at' => $latest('last_interaction_at'),
             'last_meeting_at' => $latest('last_meeting_at'),
         ]);
+
+        DB::table($duplicate->getTable())->where('id', $duplicate->getKey())->update([
+            'email_count' => 0,
+            'inbound_email_count' => 0,
+            'outbound_email_count' => 0,
+            'meeting_count' => 0,
+            'last_email_at' => null,
+            'last_interaction_at' => null,
+            'last_meeting_at' => null,
+        ]);
     }
 
     /**

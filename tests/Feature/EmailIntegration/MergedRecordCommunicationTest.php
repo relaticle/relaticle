@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Actions\Merge\MoveMorphPivot;
+use App\Enums\WorkspaceRole;
 use App\Events\RecordMerged;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
@@ -25,7 +27,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 
-mutates(MoveMergedRecordCommunicationListener::class, MoveMergedRecordCommunication::class, RecordCommunicationMetrics::class);
+mutates(MoveMergedRecordCommunicationListener::class, MoveMergedRecordCommunication::class, RecordCommunicationMetrics::class, MoveMorphPivot::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -158,16 +160,50 @@ it('moves the communication of merged records while the email feature is off', f
     Feature::flushCache();
     Event::forget(RecordMerged::class);
     (new EmailIntegrationServiceProvider(app()))->boot();
+    $contactColumn = $type === 'company' ? 'company_id' : 'contact_id';
     $kept = communicationRecord($type);
-    $duplicate = communicationRecord($type);
+    $duplicate = communicationRecord($type, ['email_count' => 2]);
     $email = communicationEmail();
     $duplicate->emails()->attach($email->getKey());
+    $meeting = communicationMeeting('2026-03-01 10:00:00');
+    DB::table('meetingables')->insert(['meeting_id' => $meeting->getKey(), 'meetingable_type' => $type, 'meetingable_id' => $duplicate->getKey(), 'link_source' => 'auto', 'created_at' => now(), 'updated_at' => now()]);
+    $participant = EmailParticipant::factory()->create(['email_id' => $email->getKey(), 'role' => EmailParticipantRole::FROM, $contactColumn => $duplicate->getKey()]);
+    $attendee = MeetingAttendee::factory()->create(['meeting_id' => $meeting->getKey(), $contactColumn => $duplicate->getKey()]);
 
     mergeCommunication($type, $kept, $duplicate);
 
     expect(mergeLinkedIds('emailables', 'email_id', $kept))->toBe([$email->getKey()])
-        ->and(mergeLinkedIds('emailables', 'email_id', $duplicate))->toBe([]);
+        ->and(mergeLinkedIds('emailables', 'email_id', $duplicate))->toBe([])
+        ->and(mergeLinkedIds('meetingables', 'meeting_id', $kept))->toBe([$meeting->getKey()])
+        ->and($participant->refresh()->{$contactColumn})->toBe($kept->getKey())
+        ->and($attendee->refresh()->{$contactColumn})->toBe($kept->getKey())
+        ->and((int) DB::table($kept->getTable())->where('id', $kept->getKey())->value('email_count'))->toBe(2)
+        ->and((int) DB::table($duplicate->getTable())->where('id', $duplicate->getKey())->value('email_count'))->toBe(0);
 })->with(['company', 'people']);
+
+it('zeroes the duplicate\'s counters so a restore cannot double count', function (string $type): void {
+    $kept = communicationRecord($type, ['email_count' => 1]);
+    $duplicate = communicationRecord($type, [
+        'email_count' => 4, 'inbound_email_count' => 2, 'outbound_email_count' => 2,
+        'meeting_count' => 3, 'last_email_at' => '2026-01-10 09:00:00',
+        'last_meeting_at' => '2026-02-01 10:00:00', 'last_interaction_at' => '2026-02-01 10:00:00',
+    ]);
+
+    mergeCommunication($type, $kept, $duplicate);
+
+    $row = DB::table($duplicate->getTable())->where('id', $duplicate->getKey())->first();
+
+    expect((int) $row->email_count)->toBe(0)
+        ->and((int) $row->inbound_email_count)->toBe(0)
+        ->and((int) $row->outbound_email_count)->toBe(0)
+        ->and((int) $row->meeting_count)->toBe(0)
+        ->and($row->last_email_at)->toBeNull()
+        ->and($row->last_meeting_at)->toBeNull()
+        ->and($row->last_interaction_at)->toBeNull()
+        ->and((int) DB::table($kept->getTable())->where('id', $kept->getKey())->value('email_count'))->toBe(5);
+})->with(['company', 'people']);
+
+
 
 it('never lets a combined counter go below zero', function (string $type): void {
     $kept = communicationRecord($type, ['email_count' => 0, 'inbound_email_count' => 0, 'meeting_count' => 0]);
