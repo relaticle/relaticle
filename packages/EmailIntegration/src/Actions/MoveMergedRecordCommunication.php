@@ -34,6 +34,9 @@ final readonly class MoveMergedRecordCommunication
             $this->sharedMeetings($morph, $kept, $duplicate)->count(),
         );
 
+        $this->keepManualLinks('emailables', 'email_id', 'emailable', $kept, $duplicate);
+        $this->keepManualLinks('meetingables', 'meeting_id', 'meetingable', $kept, $duplicate);
+
         $this->movePivot->execute('emailables', 'email_id', 'emailable', $kept, $duplicate);
         $this->movePivot->execute('meetingables', 'meeting_id', 'meetingable', $kept, $duplicate);
 
@@ -42,6 +45,16 @@ final readonly class MoveMergedRecordCommunication
         foreach (['email_participants', 'meeting_attendees'] as $table) {
             DB::table($table)->where($column, $duplicate->getKey())->update([$column => $kept->getKey()]);
         }
+    }
+
+    private function keepManualLinks(string $table, string $itemColumn, string $prefix, Company|People $kept, Company|People $duplicate): void
+    {
+        $morph = $kept->getMorphClass();
+
+        $this->linkedTo($table, $prefix, $morph, $kept)
+            ->where('link_source', '!=', 'manual')
+            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $duplicate)->where('link_source', 'manual')->select($itemColumn))
+            ->update(['link_source' => 'manual']);
     }
 
     /**

@@ -256,3 +256,14 @@ it('issues the same number of queries however many emails and meetings the two r
 
     expect(mergeQueryCountWithSharedCommunication(9))->toBe(mergeQueryCountWithSharedCommunication(2));
 });
+it('keeps a manual link when it collides with the kept record\'s auto link', function (string $type): void {
+    $kept = communicationRecord($type);
+    $duplicate = communicationRecord($type);
+    $shared = communicationEmail();
+    $kept->emails()->attach($shared->getKey(), ['link_source' => 'auto']);
+    $duplicate->emails()->attach($shared->getKey(), ['link_source' => 'manual']);
+
+    mergeCommunication($type, $kept, $duplicate);
+
+    expect(DB::table('emailables')->where('emailable_type', $type)->where('emailable_id', $kept->getKey())->value('link_source'))->toBe('manual');
+})->with(['company', 'people']);
