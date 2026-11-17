@@ -132,18 +132,20 @@ it('never overwrites a filled value with an empty one', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/kept']]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
 
-    mergeWith($kept, $duplicate);
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue($kept, 'linkedin'))->toBe(['https://linkedin.com/company/kept']);
+    expect(mergeCompanyValue($kept, 'linkedin'))->toBe(['https://linkedin.com/company/kept'])
+        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
 });
 
 it('keeps the value of the kept company where both hold one', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/kept']]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/duplicate']]);
 
-    mergeWith($kept, $duplicate);
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue($kept, 'linkedin'))->toBe(['https://linkedin.com/company/kept']);
+    expect(mergeCompanyValue($kept, 'linkedin'))->toBe(['https://linkedin.com/company/kept'])
+        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
 });
 
 it('combines multi-select values with the kept record first', function (): void {
