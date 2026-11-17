@@ -149,7 +149,7 @@
                     x-bind:class="active === index && 'bg-gray-50 dark:bg-white/5'"
                     x-on:mouseenter="active = index"
                     x-on:click="choose(result.id)"
-                    class="flex min-h-menu-row cursor-pointer items-center gap-2 rounded-menu-item px-2 py-1.5 text-sm text-gray-950 dark:text-white"
+                    class="flex h-menu-row cursor-pointer items-center gap-2 rounded-menu-item px-2 text-sm text-gray-950 dark:text-white"
                 >
                     <span
                         x-data="{ failed: false }"
