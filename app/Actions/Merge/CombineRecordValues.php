@@ -23,12 +23,6 @@ final readonly class CombineRecordValues
         private WorkspaceCustomFields $workspaceFields,
     ) {}
 
-    private const array LIST_TYPES = [
-        CustomFieldType::MULTI_SELECT,
-        CustomFieldType::CHECKBOX_LIST,
-        CustomFieldType::TAGS_INPUT,
-    ];
-
     public function execute(Company|People $kept, Company|People $duplicate): MergedValues
     {
         $kept->loadMissing('customFieldValues.customField');
@@ -173,8 +167,7 @@ final readonly class CombineRecordValues
 
     private function isList(CustomField $field): bool
     {
-        return in_array(CustomFieldType::tryFrom($field->type), self::LIST_TYPES, true)
-            || $field->settings->allow_multiple;
+        return CustomFieldType::tryFrom($field->type)?->holdsList() === true || $field->settings->allow_multiple;
     }
 
     private function limit(CustomField $field): ?int
