@@ -266,9 +266,7 @@ trait HasRecordPageLayout
             ->data(['lazy' => 'on-load'])
             ->key('duplicatePrompt')
             ->extraAttributes(['class' => 'fi-record-duplicates'])
-            ->visible(fn (): bool => ! $record instanceof Opportunity
-                && MergeRecordAction::canMerge($record)
-                && ! session()->has(DuplicateRecordsPrompt::dismissedKey($record)));
+            ->visible(fn (): bool => ! $record instanceof Opportunity && MergeRecordAction::canMerge($record));
     }
 
     private function duplicateId(mixed $id): ?string

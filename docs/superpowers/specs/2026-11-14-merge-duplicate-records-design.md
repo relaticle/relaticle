@@ -53,8 +53,8 @@ emails in a merge comes straight back on the next sync.
    be mounted. A row's **Merge** dispatches `merge-duplicate` to the page, which mounts its own
    `MergeRecordAction` named `mergeDuplicate`, since that action needs the record page. `duplicateId()`
    accepts only an id from the list, falling back to the first duplicate. Both merge entry points read
-   `MergeRecordAction::canMerge()`. The header's dismiss writes a session key for the record, so the
-   section stays hidden for that record until the session ends.
+   `MergeRecordAction::canMerge()`. The section has no dismiss: a dismiss kept per record hid the
+   prompt on one record of a pair and not the other, which read as a bug.
 
 ## Approaches
 
@@ -242,7 +242,7 @@ Rollback and race tests, per entity:
 case, every record that matches any value listed and counted, the dialog opened with the row's record
 picked, an id outside the list falling back to the first duplicate, no prompt for an unshared value, a
 trashed record, another workspace or a member who cannot merge, the prompt keeping the duplicate left
-after a merge, and a dismiss that hides it for that record only.
+after a merge.
 
 `MergeRecordDialogStateTest` covers the dialog's "no longer available" message: absent before a pick, shown when the picked record is deleted while the dialog is open.
 

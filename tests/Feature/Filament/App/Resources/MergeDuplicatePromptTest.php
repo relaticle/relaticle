@@ -11,7 +11,6 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use App\Queries\Crm\DuplicateRecordQuery;
-use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
@@ -165,21 +164,6 @@ it('picks the first duplicate when the row names a record that is not one', func
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->call('mergeDuplicate', $unrelated->getKey())
         ->assertSchemaStateSet(['picked_id' => $duplicate->getKey()]);
-});
-
-it('hides the prompt on the dismissed record only', function (): void {
-    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
-    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics'], ['domains' => ['harborline.com']]);
-
-    duplicatePrompt($company)
-        ->callAction(TestAction::make('dismissDuplicate')->schemaComponent('duplicates', schema: 'content'))
-        ->assertViewHas('hasDuplicates', false);
-
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
-
-    livewire(ViewCompany::class, ['record' => $duplicate->getKey()])
-        ->assertSchemaComponentVisible('duplicatePrompt', 'infolist');
 });
 
 it('shows no prompt when the domains attribute is switched off', function (): void {
