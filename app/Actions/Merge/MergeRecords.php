@@ -127,15 +127,13 @@ final readonly class MergeRecords
 
     private function assertWithinLimits(MergedValues $mergedValues): void
     {
-        $over = Arr::first($mergedValues->overLimit);
+        $message = Arr::first($mergedValues->overLimit);
 
-        if ($over === null) {
+        if ($message === null) {
             return;
         }
 
-        throw ValidationException::withMessages([
-            'duplicate_id' => __('filament/record-page.merge.over_limit', ['field' => $over['label'], 'max' => $over['limit']]),
-        ]);
+        throw ValidationException::withMessages(['duplicate_id' => $message]);
     }
 
     private function unavailable(): ValidationException

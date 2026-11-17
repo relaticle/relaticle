@@ -48,7 +48,7 @@ final readonly class CombineRecordValues
             $limit = $this->limit($field);
 
             if ($limit !== null && is_array($value) && count($value) > $limit) {
-                $overLimit[$field->code] = ['label' => $field->name, 'limit' => $limit];
+                $overLimit[$field->code] = __('filament/record-page.merge.over_limit', ['field' => $field->name, 'max' => $limit]);
             }
         }
 

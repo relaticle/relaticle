@@ -9,13 +9,13 @@ final readonly class MergedValues
     /**
      * @param  array<string, mixed>  $attributes
      * @param  array<string, mixed>  $customFields
-     * @param  array<string, array{label: string, limit: int}>  $overLimit
+     * @param  array<string, string>  $overLimit
      * @param  list<string>  $attachmentUuids
      */
     public function __construct(
         public array $attributes,
         public array $customFields,
         public array $overLimit,
-        public array $attachmentUuids = [],
+        public array $attachmentUuids,
     ) {}
 }
