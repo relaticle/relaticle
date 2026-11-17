@@ -60,6 +60,7 @@ return [
             'count' => '{1} 1 doublon possible|[2,*] :count doublons possibles',
             'shares' => 'Partage :value',
             'dismiss' => 'Masquer',
+            'merge_with' => 'Fusionner avec :name',
             'action' => 'Fusionner',
         ],
         'search_placeholder' => [

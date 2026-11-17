@@ -282,6 +282,7 @@ trait HasRecordPageLayout
                             ->button()
                             ->color('gray')
                             ->size(Size::ExtraSmall)
+                            ->extraAttributes(fn (array $arguments): array => ['aria-label' => __('filament/record-page.merge.duplicate.merge_with', ['name' => $this->duplicateName($arguments['duplicate'] ?? null)])])
                             ->fillForm(fn (array $arguments): array => ['duplicate_id' => $this->duplicateId($arguments['duplicate'] ?? null), 'keep' => 'current']),
                     ])
                     ->key('duplicateList'),
@@ -289,6 +290,13 @@ trait HasRecordPageLayout
             ->key('duplicatePrompt')
             ->extraAttributes(['data-duplicate-prompt' => true])
             ->visible(fn (): bool => $this->duplicates() !== []);
+    }
+
+    private function duplicateName(mixed $id): string
+    {
+        $duplicate = collect($this->duplicates())->first(fn (array $duplicate): bool => (string) $duplicate['record']->getKey() === $id);
+
+        return (string) ($duplicate['record']->name ?? '');
     }
 
     private function duplicateId(mixed $id): ?string

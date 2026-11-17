@@ -60,6 +60,7 @@ return [
             'count' => '{1} 1 possible duplicate|[2,*] :count possible duplicates',
             'shares' => 'Shares :value',
             'dismiss' => 'Dismiss',
+            'merge_with' => 'Merge with :name',
             'action' => 'Merge',
         ],
         'search_placeholder' => [

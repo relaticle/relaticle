@@ -50,6 +50,7 @@ it('names a company that shares a domain and opens the merge with it picked', fu
         ->assertSeeText(trans_choice('filament/record-page.merge.duplicate.count', 1))
         ->assertSeeText('Harborline Logistics')
         ->assertSeeText(__('filament/record-page.merge.duplicate.shares', ['value' => 'harborline.com']))
+        ->assertSeeHtml('aria-label="'.__('filament/record-page.merge.duplicate.merge_with', ['name' => 'Harborline Logistics']).'"')
         ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $duplicate->getKey()]))
         ->assertSchemaStateSet(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current'])
         ->callMountedAction()
