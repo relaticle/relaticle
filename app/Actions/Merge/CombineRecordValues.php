@@ -10,7 +10,6 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
-use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\EmailAddress;
@@ -61,11 +60,11 @@ final readonly class CombineRecordValues
         $attributes = ['name' => $this->pick($kept->name, $duplicate->name)];
 
         if ($kept instanceof Company && $duplicate instanceof Company) {
-            $attributes['account_owner_id'] = $this->pick($this->currentMemberId($kept, $kept->account_owner_id), $this->currentMemberId($kept, $duplicate->account_owner_id));
+            $attributes['account_owner_id'] = $this->currentMemberId($kept, $kept->account_owner_id) ?? $this->currentMemberId($kept, $duplicate->account_owner_id);
         }
 
         if ($kept instanceof People && $duplicate instanceof People) {
-            $attributes['company_id'] = $this->pick($this->liveCompanyId($kept, $kept->company_id), $this->liveCompanyId($kept, $duplicate->company_id));
+            $attributes['company_id'] = $this->liveCompanyId($kept, $kept->company_id) ?? $this->liveCompanyId($kept, $duplicate->company_id);
         }
 
         return $attributes;
@@ -77,9 +76,7 @@ final readonly class CombineRecordValues
             return null;
         }
 
-        $isMember = User::query()->memberOf($kept->loadMissing('workspace')->workspace)->whereKey($userId)->exists();
-
-        return $isMember ? $userId : null;
+        return $kept->loadMissing('workspace')->workspace->hasMemberNow($userId) ? $userId : null;
     }
 
     private function liveCompanyId(People $kept, ?string $companyId): ?string
