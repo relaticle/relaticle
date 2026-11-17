@@ -201,6 +201,33 @@ it('blocks a merge that would give a company more than five domains', function (
         ->and(mergeCompanyValue($kept, 'domains'))->toHaveCount(3);
 });
 
+it('blocks a merge over a field\'s own maximum and says one value when the limit is one', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'code' => 'regions',
+        'name' => 'Regions',
+        'type' => 'multi-select',
+        'settings' => new CustomFieldSettingsData(allow_multiple: true, max_values: 1),
+    ]);
+    $options = collect(['NA', 'EU'])->map(fn (string $name, int $index): string => CustomFieldOption::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'custom_field_id' => $field->getKey(),
+        'name' => $name,
+        'sort_order' => $index + 1,
+    ])->getKey());
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $kept->saveCustomFieldValue($field, [$options[0]]);
+    $duplicate->saveCustomFieldValue($field, [$options[1]]);
+
+    mergeWith($kept, $duplicate)->assertHasActionErrors([
+        'picked_id' => 'Regions can hold one value. Together these records have more. Remove some first.',
+    ]);
+
+    expect(Company::query()->whereKey($duplicate->getKey())->exists())->toBeTrue();
+});
+
 it('bumps updated_at on repointed people and opportunities', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
