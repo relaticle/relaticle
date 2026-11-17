@@ -22,6 +22,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Queries\Crm\DuplicateRecordQuery;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -31,13 +32,14 @@ use Filament\Infolists\Components\Entry;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Actions;
-use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\FontWeight;
+use Filament\Support\Enums\IconSize;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\TextSize;
 use Filament\Support\Enums\Width;
@@ -244,44 +246,84 @@ trait HasRecordPageLayout
             ->extraAttributes(['class' => 'fi-record-rail-quick-actions']);
     }
 
-    private function duplicatePrompt(): Callout
+    private function duplicatePrompt(): Section
     {
-        return Callout::make(__('filament/record-page.merge.duplicate.heading'))
-            ->description(function (): ?string {
-                $duplicate = $this->duplicate();
-
-                return $duplicate === null ? null : CrmEntity::tryFromModel($duplicate['record'])?->identity()?->duplicateNotice($duplicate['record']->name, $duplicate['value']);
-            })
-            ->warning()
-            ->actions([
-                MergeRecordAction::make('mergeDuplicate')
-                    ->label(__('filament/record-page.merge.duplicate.action'))
-                    ->button()
+        return Section::make(fn (): string => trans_choice('filament/record-page.merge.duplicate.count', count($this->duplicates())))
+            ->icon('lucide-circle-alert')
+            ->iconSize(IconSize::Small)
+            ->iconColor('warning')
+            ->contained(false)
+            ->compact()
+            ->collapsible()
+            ->collapsed()
+            ->headerActions([
+                Action::make('dismissDuplicate')
+                    ->label(__('filament/record-page.merge.duplicate.dismiss'))
+                    ->icon('lucide-x')
+                    ->iconSize(IconSize::Small)
+                    ->iconButton()
                     ->color('gray')
                     ->size(Size::Small)
-                    ->fillForm(fn (): array => ['duplicate_id' => ($this->duplicate()['record'] ?? null)?->getKey(), 'keep' => 'current']),
+                    ->action(function (): void {
+                        session()->put($this->dismissedDuplicateKey(), true);
+                    }),
+            ])
+            ->schema([
+                View::make('filament.app.duplicate-prompt')
+                    ->viewData(fn (): array => ['duplicates' => array_map(fn (array $duplicate): array => [
+                        'id' => (string) $duplicate['record']->getKey(),
+                        'name' => $duplicate['record']->name,
+                        'url' => filament()->getModelResource($duplicate['record'])::getUrl('view', ['record' => $duplicate['record']]),
+                        'value' => $duplicate['value'],
+                    ], $this->duplicates())])
+                    ->registerActions([
+                        MergeRecordAction::make('mergeDuplicate')
+                            ->label(__('filament/record-page.merge.duplicate.action'))
+                            ->button()
+                            ->color('gray')
+                            ->size(Size::ExtraSmall)
+                            ->fillForm(fn (array $arguments): array => ['duplicate_id' => $this->duplicateId($arguments['duplicate'] ?? null), 'keep' => 'current']),
+                    ])
+                    ->key('duplicateList'),
             ])
             ->key('duplicatePrompt')
-            ->visible(fn (): bool => $this->duplicate() !== null);
+            ->extraAttributes(['data-duplicate-prompt' => true])
+            ->visible(fn (): bool => $this->duplicates() !== []);
+    }
+
+    private function duplicateId(mixed $id): ?string
+    {
+        $ids = array_map(fn (array $duplicate): string => (string) $duplicate['record']->getKey(), $this->duplicates());
+
+        return in_array($id, $ids, true) ? $id : ($ids[0] ?? null);
     }
 
     /**
-     * @return array{record: Company|People, value: string}|null
+     * @return list<array{record: Company|People, value: string}>
      */
-    private function duplicate(): ?array
+    private function duplicates(): array
     {
-        return once(function (): ?array {
+        if (session()->has($this->dismissedDuplicateKey())) {
+            return [];
+        }
+
+        return once(function (): array {
             $record = $this->crmRecord();
 
             if ($record instanceof Opportunity || ! MergeRecordAction::canMerge($record)) {
-                return null;
+                return [];
             }
 
             /** @var User $user */
             $user = Filament::auth()->user();
 
-            return resolve(DuplicateRecordQuery::class)->first($user, $record);
+            return resolve(DuplicateRecordQuery::class)->get($user, $record);
         });
+    }
+
+    private function dismissedDuplicateKey(): string
+    {
+        return 'dismissed_duplicate_prompts.'.$this->crmRecord()->getKey();
     }
 
     private function quickCreateAction(CreateAction $action, string $label): CreateAction

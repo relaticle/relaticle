@@ -57,11 +57,9 @@ return [
         'pick' => 'Choisir une fiche',
         'clear' => 'Choisir une autre fiche',
         'duplicate' => [
-            'heading' => 'Doublon possible',
-            'notice' => [
-                'company' => ':name a aussi le domaine :value.',
-                'people' => ":name a aussi l'e-mail :value.",
-            ],
+            'count' => '{1} 1 doublon possible|[2,*] :count doublons possibles',
+            'shares' => 'Partage :value',
+            'dismiss' => 'Masquer',
             'action' => 'Fusionner',
         ],
         'search_placeholder' => [

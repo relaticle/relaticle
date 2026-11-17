@@ -44,14 +44,6 @@ enum RecordIdentity
         };
     }
 
-    public function duplicateNotice(string $name, string $value): string
-    {
-        return match ($this) {
-            self::Domains => __('filament/record-page.merge.duplicate.notice.company', ['name' => $name, 'value' => $value]),
-            self::Emails => __('filament/record-page.merge.duplicate.notice.people', ['name' => $name, 'value' => $value]),
-        };
-    }
-
     public function searchPlaceholder(): string
     {
         return match ($this) {

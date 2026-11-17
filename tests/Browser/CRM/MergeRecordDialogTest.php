@@ -150,8 +150,10 @@ it('opens the merge from the duplicate prompt with the duplicate picked', functi
     $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightlinehealth.com', 'brightline.health']);
 
     visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
-        ->assertSee('Brightline Health Inc. also has the domain brightlinehealth.com.')
-        ->click('.fi-callout button:has-text("Merge")')
+        ->assertSee('1 possible duplicate')
+        ->click('[data-duplicate-prompt] .fi-section-header')
+        ->assertSee('Shares brightlinehealth.com')
+        ->click('[data-duplicate-prompt] li button:has-text("Merge")')
         ->assertVisible('[data-merge-dialog]')
         ->assertSeeIn('[data-merge-left]', 'Brightline Health Inc.')
         ->assertSeeIn('[data-merge-result]', 'brightline.health')
@@ -159,7 +161,7 @@ it('opens the merge from the duplicate prompt with the duplicate picked', functi
         ->click('.fi-modal-footer-actions button[type=submit]')
         ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
         ->assertSee('Records merged')
-        ->assertDontSee('Possible duplicate')
+        ->assertNotPresent('[data-duplicate-prompt]')
         ->assertNoJavaScriptErrors();
 
     expect(Company::query()->find($duplicate->getKey()))->toBeNull();

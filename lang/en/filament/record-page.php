@@ -57,11 +57,9 @@ return [
         'pick' => 'Choose a record',
         'clear' => 'Choose a different record',
         'duplicate' => [
-            'heading' => 'Possible duplicate',
-            'notice' => [
-                'company' => ':name also has the domain :value.',
-                'people' => ':name also has the email :value.',
-            ],
+            'count' => '{1} 1 possible duplicate|[2,*] :count possible duplicates',
+            'shares' => 'Shares :value',
+            'dismiss' => 'Dismiss',
             'action' => 'Merge',
         ],
         'search_placeholder' => [
