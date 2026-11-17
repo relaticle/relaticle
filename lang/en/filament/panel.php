@@ -196,8 +196,6 @@ return [
             'move_down' => 'Move down',
             'settings' => 'View settings',
             'add_attribute' => 'Add attribute to view',
-            'add_column' => 'Add column',
-            'create_attribute_type' => 'Create :type attribute',
             'search_attributes' => 'Search :entity attributes…',
             'all_attributes_in_view' => 'Every attribute is already in this view',
             'no_attribute_matches' => 'No attribute matches your search',

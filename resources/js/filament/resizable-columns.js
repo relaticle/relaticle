@@ -195,9 +195,6 @@
         measureStickyHeaders()
     }
 
-    // The actions column's header carries the Add column menu when the page offers one, and Filament then drops its class.
-    const ACTIONS_HEADER = '.fi-ta-actions-header-cell, th:has(> .fi-ta-add-column)'
-
     // Every data column carries an exact width. Under `table-layout: fixed` the actions column,
     // which has only a floor, takes whatever space is left so the table still fills its wrapper.
     function computeMinTableWidth(table) {
@@ -205,7 +202,7 @@
         table.querySelectorAll('thead th').forEach((th) => {
             const saved = th.dataset.resizableWidth
             if (saved) { total += parseInt(saved, 10); return }
-            if (th.matches(`.fi-ta-selection-cell, ${ACTIONS_HEADER}`)) { total += parseFloat(getComputedStyle(th).minWidth); return }
+            if (th.matches('.fi-ta-selection-cell, .fi-ta-actions-header-cell')) { total += parseFloat(getComputedStyle(th).minWidth); return }
             total += Math.round(th.offsetWidth)
         })
         return total
@@ -283,7 +280,7 @@
         })
         // Pins stick only while the widest other column and the actions column still fit beside them, so none is cut off.
         const room = table.closest('.fi-ta-content-ctn')?.clientWidth || Infinity
-        const actions = table.querySelector(`thead :is(${ACTIONS_HEADER})`)?.offsetWidth ?? 0
+        const actions = table.querySelector('thead .fi-ta-actions-header-cell')?.offsetWidth ?? 0
         const widest = Math.min(window.filamentData.defaultColumnWidth, Math.max(0, ...headersOf(table).filter((th) => !pinned.includes(th)).map((th) => parseInt(th.dataset.resizableWidth, 10) || th.offsetWidth)))
         const active = pinned.length > 0 && left + actions + widest <= room && !showsCards(table)
 
@@ -1021,137 +1018,6 @@
         })
     }
 
-    // The Add column menu the actions column's header opens: show a hidden attribute, or create one of a picked type.
-    // It sits outside the table, so the table's sideways scroll never clips it, and is placed under its trigger.
-    function registerAddColumn() {
-        window.Alpine.data('tableAddColumn', () => {
-            let panel
-
-            return {
-                ...window.viewSettingsAddPanel({
-                    root: () => panel,
-                    items: '[data-view-settings-add-item]',
-                    key: 'attribute',
-                    back: '[data-view-settings-search]',
-                    pick: 'show',
-                }),
-                creating: false,
-                trigger: null,
-                placed: false,
-                top: 0,
-                left: 0,
-
-                init() {
-                    panel = this.$el
-                },
-
-                // There is no back button here, so a touch screen focuses nothing rather than zoom into the search box.
-                focusAddStart() {
-                    if (!window.avoidsSearchFocus()) panel.querySelector('[data-view-settings-search]')?.focus()
-                },
-
-                open(trigger) {
-                    if (this.trigger === trigger) {
-                        this.close(true)
-
-                        return
-                    }
-
-                    this.close(false)
-                    this.trigger = trigger
-                    this.creating = false
-                    this.query = ''
-                    this.placed = false
-                    trigger.setAttribute('aria-expanded', 'true')
-
-                    // Measured a frame after Alpine reveals it: before that its size reads 0.
-                    this.$nextTick(() => requestAnimationFrame(() => {
-                        if (this.trigger !== trigger) return
-
-                        this.place()
-                        this.placed = true
-                        this.focusAddStart()
-                    }))
-                },
-
-                place() {
-                    const rect = this.trigger.getBoundingClientRect()
-                    const viewportWidth = document.documentElement.clientWidth
-                    const viewportHeight = document.documentElement.clientHeight
-                    const below = rect.bottom + 4
-                    const above = rect.top - 4 - panel.offsetHeight
-
-                    this.left = Math.max(8, Math.min(rect.left, viewportWidth - panel.offsetWidth - 8))
-                    this.top = below + panel.offsetHeight <= viewportHeight - 8 || above < 8 ? Math.min(below, Math.max(8, viewportHeight - panel.offsetHeight - 8)) : above
-                },
-
-                close(returnFocus) {
-                    if (this.trigger === null) return
-
-                    const trigger = this.trigger
-                    this.trigger = null
-                    trigger.setAttribute('aria-expanded', 'false')
-
-                    if (returnFocus && trigger.isConnected) trigger.focus()
-                },
-
-                openCreate() {
-                    this.creating = true
-                    this.$nextTick(() => requestAnimationFrame(() => {
-                        this.place()
-                        panel.querySelector('[data-add-column-type]')?.focus()
-                    }))
-                },
-
-                closeCreate() {
-                    this.creating = false
-                    this.$nextTick(() => requestAnimationFrame(() => {
-                        this.place()
-                        panel.querySelector('[data-view-settings-create]')?.focus()
-                    }))
-                },
-
-                stepTypes(delta) {
-                    stepFocus([...panel.querySelectorAll('[data-add-column-type]')], delta)
-                },
-
-                create(type) {
-                    labelFocus = { target: (table) => table.querySelector('[data-add-column-trigger]'), opened: false }
-                    this.$wire.mountAction('createTableAttribute', { type })
-                },
-
-                async show(name) {
-                    if (this.pending.includes(name)) return
-
-                    this.pending.push(name)
-
-                    try {
-                        await this.$wire.toggleTableColumn(name)
-                    } finally {
-                        this.pending = this.pending.filter((pending) => pending !== name)
-                        this.revision++
-                    }
-
-                    // The morph redraws the header, so the menu follows the new trigger or closes when none is left.
-                    const trigger = document.querySelector('[data-add-column-trigger]')
-
-                    if (!trigger || this.addItems().length === 0 && !panel.querySelector('[data-view-settings-create]')) {
-                        this.trigger = null
-
-                        return
-                    }
-
-                    this.trigger = trigger
-                    trigger.setAttribute('aria-expanded', 'true')
-                    this.$nextTick(() => requestAnimationFrame(() => {
-                        this.place()
-                        this.focusAddStart()
-                    }))
-                },
-            }
-        })
-    }
-
     function registerResizableColumn() {
         wireStickyHeaders()
         window.Alpine.data('resizableColumn', (columnName, columnId, min, max) => ({
@@ -1392,12 +1258,10 @@
         registerResizableColumn()
         registerColumnMenu()
         registerViewSettings()
-        registerAddColumn()
     } else {
         document.addEventListener('alpine:init', registerDragAnimation)
         document.addEventListener('alpine:init', registerResizableColumn)
         document.addEventListener('alpine:init', registerColumnMenu)
         document.addEventListener('alpine:init', registerViewSettings)
-        document.addEventListener('alpine:init', registerAddColumn)
     }
 })()
