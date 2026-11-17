@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Enums;
 
 use App\Enums\CrmEntity;
-use Illuminate\Support\Str;
 
 enum ProposalEntity: string
 {
@@ -28,20 +27,12 @@ enum ProposalEntity: string
 
     public function singularName(): string
     {
-        return match ($this) {
-            self::Company => CrmEntity::Company->singularName(),
-            self::People => CrmEntity::People->singularName(),
-            self::Opportunity => CrmEntity::Opportunity->singularName(),
-            self::Task => CrmEntity::Task->singularName(),
-            self::Note => CrmEntity::Note->singularName(),
-            self::Email => 'Email',
-            self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete => 'Email Draft',
-            self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Email',
-            self::WorkspaceInvitation => 'Teammate',
-            self::CustomField => 'Custom Attribute',
-            self::SampleData => 'Sample Data',
-            self::WebAccess => 'Web Search',
-        };
+        return __("enums/proposal-entity.singular.{$this->value}");
+    }
+
+    public function plural(int $count): string
+    {
+        return trans_choice("enums/proposal-entity.plural.{$this->value}", $count);
     }
 
     public function titleKey(): string
@@ -111,16 +102,12 @@ enum ProposalEntity: string
 
     public function createTitle(): string
     {
-        return Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.$this->singularName();
+        return __("enums/proposal-entity.create_title.{$this->value}");
     }
 
     public function createSummary(string $title): string
     {
-        return match ($this) {
-            self::WorkspaceInvitation => "Invite \"{$title}\"",
-            self::WebAccess => "Search the web for \"{$title}\"",
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData => Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.Str::lower($this->singularName())." \"{$title}\"",
-        };
+        return __("enums/proposal-entity.create_summary.{$this->value}", ['title' => $title]);
     }
 
     public function action(PendingActionOperation $operation, int $count = 1): string
@@ -154,7 +141,7 @@ enum ProposalEntity: string
             self::EmailDraftDelete => trans_choice('Delete draft|Delete :count drafts', $count, ['count' => $count]),
             self::SampleData => __('Remove sample data'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField => $operation === PendingActionOperation::Delete
-                ? __('Delete :count :entities', ['count' => $count, 'entities' => Str::plural(Str::lower($this->singularName()), $count)])
+                ? __('Delete :count :entities', ['count' => $count, 'entities' => $this->plural($count)])
                 : __('Approve'),
             self::EmailDraft => __('Approve'),
             self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
@@ -292,7 +279,7 @@ enum ProposalEntity: string
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => __(':verb :count :entities', [
                 'verb' => $operation->done(),
                 'count' => ':count',
-                'entities' => Str::plural(Str::lower($this->singularName()), $count),
+                'entities' => $this->plural($count),
             ]),
         };
     }
@@ -301,7 +288,7 @@ enum ProposalEntity: string
     {
         return __('Moved :count :entities to :value', [
             'count' => ':count',
-            'entities' => Str::plural(Str::lower($this->singularName()), $count),
+            'entities' => $this->plural($count),
             'value' => ':value',
         ]);
     }

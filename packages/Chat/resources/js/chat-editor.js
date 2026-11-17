@@ -71,7 +71,7 @@ export function chatEditor({ placeholder, onSubmit, onChange, onArrowUp, autofoc
                     Paragraph,
                     Text,
                     HardBreak.configure({ keepMarks: false }),
-                    Placeholder.configure({ placeholder: placeholder ?? 'Ask anything…' }),
+                    Placeholder.configure({ placeholder }),
                     ChatMention.configure({
                         HTMLAttributes: { class: 'mention' },
                         suggestion: createMentionSuggestion({ texts: mentionTexts }),

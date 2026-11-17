@@ -134,7 +134,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories = null, proposalTexts = {} }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories, proposalTexts }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -1252,28 +1252,21 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         } catch (_) { /* clipboard blocked, silently ignore */ }
     },
 
-    // Injected translated labels (chat-interface.blade.php); defaults keep the
-    // module standalone.
-    feedbackCategories: feedbackCategories || [
-        { value: 'inaccurate', label: 'Inaccurate' },
-        { value: 'did_not_follow', label: "Didn't do what I asked" },
-        { value: 'too_slow', label: 'Too slow' },
-        { value: 'other', label: 'Other' },
-    ],
+    feedbackCategories,
 
     // Injected copy for decided proposals: outcome icons and words come from
     // ProposalOutcome, the per-entity verbs from ProposalEntity::receipts().
     proposalTexts: {
         outcomes: {},
-        head: { one: ':count change', other: ':count changes' },
-        justNow: 'just now',
-        leftOut: '(:fields left out)',
+        head: { one: '', other: '' },
+        justNow: '',
+        leftOut: '',
         localOutcomes: {},
         settleOrder: [],
-        changes: { one: ':count change', other: ':count changes' },
+        changes: { one: '', other: '' },
         receipts: {},
-        proposeAgain: 'Propose again',
-        proposeAgainPrompt: 'Propose again: :summary',
+        proposeAgain: '',
+        proposeAgainPrompt: '',
         ...proposalTexts,
     },
 

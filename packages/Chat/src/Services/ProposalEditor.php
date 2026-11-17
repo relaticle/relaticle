@@ -109,9 +109,9 @@ final readonly class ProposalEditor
 
         if (array_key_exists($titleKey, $editedCore)) {
             $value = trim((string) $editedCore[$titleKey]);
-            $label = $titleKey === 'title' ? 'Title' : 'Name';
+            $label = $titleKey === 'title' ? __('Title') : __('Name');
 
-            throw_if($value === '', RuntimeException::class, "{$label} is required.");
+            throw_if($value === '', RuntimeException::class, __(':label is required.', ['label' => $label]));
         }
 
         if ($entity === ProposalEntity::Company && array_key_exists('account_owner_id', $editedCore)) {
@@ -245,7 +245,7 @@ final readonly class ProposalEditor
             return $pendingAction->action_data;
         }
 
-        throw_if($index === null, RuntimeException::class, 'A batch item index is required');
+        throw_if($index === null, RuntimeException::class, __('A batch item index is required'));
 
         return $payload->batchRecordAt($index);
     }
@@ -255,7 +255,7 @@ final readonly class ProposalEditor
         throw_if(
             $pendingAction->operation !== PendingActionOperation::Create,
             RuntimeException::class,
-            'Only pending create proposals can be edited',
+            __('Only pending create proposals can be edited'),
         );
 
         if ($pendingAction->isPending() && $pendingAction->isExpired()) {
@@ -263,9 +263,9 @@ final readonly class ProposalEditor
                 'status' => PendingActionStatus::Expired,
                 'resolved_at' => now(),
             ]);
-            throw new RuntimeException('This action has expired');
+            throw new RuntimeException(__('This action has expired'));
         }
 
-        throw_unless($pendingAction->isPending(), RuntimeException::class, 'This action has already been resolved');
+        throw_unless($pendingAction->isPending(), RuntimeException::class, __('This action has already been resolved'));
     }
 }
