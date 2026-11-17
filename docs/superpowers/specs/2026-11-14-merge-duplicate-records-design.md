@@ -146,7 +146,8 @@ merging the same records cannot interleave.
   A link the kept record already has is dropped instead of moved, because each table is unique on
   (item, type, id).
 - Activity history: `activity_log` rows whose subject is the duplicate move to the kept record, so its
-  timeline shows the duplicate's past. Then a new `record_merged` event on the kept record names the
+  timeline shows the duplicate's past. Its `created`, `deleted` and `restored` rows stay on the duplicate,
+  because the timeline names the current subject and they would read as the kept record's own. Then a new `record_merged` event on the kept record names the
   duplicate and who merged it, so the timeline reads "<member> merged <duplicate> into this record".
 - `attachments` media the merged rich-text values actually reference, so a value copied from the
   duplicate keeps its images. `UploadClaims` rejects a rich-text value that references media owned

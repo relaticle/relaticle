@@ -343,7 +343,8 @@ it('rolls back every moved link and the history when the final write fails valid
     $duplicate->notes()->attach($note->getKey());
     $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
     $logo = mergeMedia($duplicate, Company::LOGO_MEDIA_COLLECTION);
-    $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->pluck('id');
+    $duplicate->update(['name' => 'Brightline Health Inc']);
+    $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
 
     Event::listen(RecordMerged::class, fn (): int => $this->workspace->users()->detach($member));
     mergeWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
@@ -572,7 +573,7 @@ it('moves the duplicate\'s history to the kept company and adds a merged entry',
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health']);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
     $duplicate->update(['name' => 'Brightline Health Inc']);
-    $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->pluck('id');
+    $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
     $unrelated = mergeCompanyRecord($this->workspace, $this->user);
     $unrelatedRows = Activity::query()->where('subject_id', $unrelated->getKey())->pluck('id');
 
@@ -586,7 +587,19 @@ it('moves the duplicate\'s history to the kept company and adds a merged entry',
         ->and($merged->causer_id)->toBe($this->user->getKey())
         ->and($merged->workspace_id)->toBe($this->workspace->getKey())
         ->and(Activity::query()->whereKey($unrelatedRows)->pluck('subject_id')->unique()->all())->toBe([$unrelated->getKey()])
-        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->pluck('event')->all())->toBe(['deleted']);
+        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted']);
+});
+
+it('shows only the kept company\'s own creation on its timeline', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire Group']);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire Group']);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $html = livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => $kept->getKey()])->html();
+
+    expect(substr_count($html, 'data-event="created"'))->toBe(1)
+        ->and(substr_count($html, 'data-event="record_merged"'))->toBe(1);
 });
 
 it('shows the merge on the kept company\'s timeline', function (): void {
@@ -604,8 +617,9 @@ it('keeps the moved history out of the kept company\'s batches but grouped toget
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health']);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
     $duplicate->update(['name' => 'Brightline Health Inc']);
+    $duplicate->update(['name' => 'Brightline Health, Inc']);
     $keptBatches = Activity::query()->where('subject_id', $kept->getKey())->pluck('batch_uuid')->unique()->all();
-    $duplicateRows = Activity::query()->where('subject_id', $duplicate->getKey())->pluck('id');
+    $duplicateRows = Activity::query()->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
 
     expect($keptBatches)->toHaveCount(1)
         ->and(Activity::query()->whereKey($duplicateRows)->pluck('batch_uuid')->unique()->all())->toBe($keptBatches);
@@ -614,9 +628,9 @@ it('keeps the moved history out of the kept company\'s batches but grouped toget
 
     $movedBatches = Activity::query()->whereKey($duplicateRows)->pluck('batch_uuid')->unique();
 
-    expect($movedBatches)->toHaveCount(1)
-        ->and($movedBatches->first())->not->toBe($keptBatches[0])
-        ->and(Activity::query()->where('subject_id', $kept->getKey())->where('event', 'created')->pluck('batch_uuid')->unique())->toHaveCount(2);
+    expect($duplicateRows)->toHaveCount(2)
+        ->and($movedBatches)->toHaveCount(1)
+        ->and($movedBatches->first())->not->toBe($keptBatches[0]);
 });
 
 it('keeps the image of the kept company\'s own rich-text value when it wins the field', function (): void {

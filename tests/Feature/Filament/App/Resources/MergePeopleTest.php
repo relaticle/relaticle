@@ -77,7 +77,8 @@ it('rolls back every moved link and the history when the final write fails valid
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
     $duplicate->notes()->attach($note->getKey());
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
-    $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->pluck('id');
+    $duplicate->update(['name' => 'Dana W']);
+    $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
 
     Event::listen(RecordMerged::class, fn (): int => DB::table('companies')->where('id', $company->getKey())->update(['deleted_at' => now()]));
     mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
@@ -250,7 +251,7 @@ it('moves the duplicate\'s history to the kept person and adds a merged entry', 
     $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.']);
     $duplicate->update(['name' => 'Dana W']);
-    $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->pluck('id');
+    $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
@@ -261,7 +262,7 @@ it('moves the duplicate\'s history to the kept person and adds a merged entry', 
         ->and($merged->properties['duplicate_name'])->toBe('Dana W')
         ->and($merged->causer_id)->toBe($this->user->getKey())
         ->and($merged->workspace_id)->toBe($this->workspace->getKey())
-        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->pluck('event')->all())->toBe(['deleted']);
+        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted']);
 });
 
 it('repoints record-type attributes on other records to the kept person', function (): void {
