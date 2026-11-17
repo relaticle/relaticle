@@ -8,11 +8,14 @@ use App\Models\User;
 use App\Support\CurrentWorkspace;
 use App\Support\Locales;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Number;
+use Livewire\Livewire;
+use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(SetUserLocale::class, Locales::class);
 
@@ -171,4 +174,39 @@ it('labels the panel navigation group in the user language', function (): void {
     expect(Filament::getPanel('app')->getNavigationGroups())->each(
         fn ($group) => $group->getLabel()->toBe('Aufgabengruppe'),
     );
+});
+
+it('keeps a path-mounted admin Livewire update in the install default', function (): void {
+    config(['app.sysadmin_domain' => null]);
+    $admin = SystemAdministrator::factory()->create();
+    $this->actingAs($admin, 'sysadmin');
+
+    $page = $this->get('/sysadmin')->assertOk()->getContent();
+    preg_match('/wire:snapshot="([^"]+)"/', $page, $match);
+    $snapshot = html_entity_decode($match[1]);
+    Auth::shouldUse('web');
+    app()->forgetScopedInstances();
+
+    $this->withHeaders([
+        'X-Livewire' => '1',
+        'Referer' => url('/sysadmin'),
+        'Accept-Language' => 'de',
+    ])->postJson(Livewire::getUpdateUri(), [
+        'components' => [['snapshot' => $snapshot, 'updates' => [], 'calls' => []]],
+    ])->assertOk();
+
+    expect(Context::hasHidden('locale'))->toBeFalse()
+        ->and(Number::format(1234.5))->toBe('1,234.5');
+});
+
+it('restores the outer job language after a nested synchronous job', function (): void {
+    Locales::apply('fr');
+    Context::addHidden('locale', 'de');
+
+    dispatch(function (): void {
+        dispatch(fn () => null);
+        Cache::put('after-inner', app()->getLocale());
+    });
+
+    expect(Cache::get('after-inner'))->toBe('de');
 });

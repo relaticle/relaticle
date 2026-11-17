@@ -11,6 +11,7 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Context;
+use Livewire\Livewire;
 use Symfony\Component\HttpFoundation\Response;
 
 final readonly class SetUserLocale
@@ -19,7 +20,7 @@ final readonly class SetUserLocale
 
     public function handle(Request $request, Closure $next): Response
     {
-        if ($this->isStaffRequest($request)) {
+        if ($this->isStaffRequest()) {
             Locales::apply((string) config('app.default_locale'));
             Context::forgetHidden(Locales::CONTEXT_KEY);
 
@@ -34,11 +35,14 @@ final readonly class SetUserLocale
         return $next($request);
     }
 
-    private function isStaffRequest(Request $request): bool
+    private function isStaffRequest(): bool
     {
+        $path = '/'.ltrim(Livewire::originalPath(), '/');
+        $adminPath = '/'.trim((string) config('app.sysadmin_path'), '/');
+
         return Auth::getDefaultDriver() === 'sysadmin'
             || $this->currentWorkspace->readsAcrossWorkspaces()
-            || (! config('app.sysadmin_domain') && $request->is(config('app.sysadmin_path'), config('app.sysadmin_path').'/*'));
+            || (! config('app.sysadmin_domain') && $adminPath !== '/' && ($path === $adminPath || str_starts_with($path, $adminPath.'/')));
     }
 
     private function resolve(Request $request): string

@@ -15,35 +15,38 @@ use Illuminate\Support\Facades\Context;
 #[Singleton]
 final class ScopeJobLocaleListener
 {
-    private ?string $previous = null;
+    /** @var array<int, string> */
+    private array $previous = [];
 
     public function handle(JobProcessing|JobProcessed|JobExceptionOccurred|JobAttempted $event): void
     {
+        $key = spl_object_id($event->job);
+
         if ($event instanceof JobProcessing) {
-            $this->enter();
+            $this->enter($key);
 
             return;
         }
 
-        $this->leave();
+        $this->leave($key);
     }
 
-    private function enter(): void
+    private function enter(int $key): void
     {
-        $this->previous ??= app()->getLocale();
+        $this->previous[$key] = app()->getLocale();
 
         $locale = Context::getHidden(Locales::CONTEXT_KEY);
 
         Locales::apply(is_string($locale) ? $locale : (string) config('app.default_locale'));
     }
 
-    private function leave(): void
+    private function leave(int $key): void
     {
-        if ($this->previous === null) {
+        if (! isset($this->previous[$key])) {
             return;
         }
 
-        Locales::apply($this->previous);
-        $this->previous = null;
+        Locales::apply($this->previous[$key]);
+        unset($this->previous[$key]);
     }
 }
