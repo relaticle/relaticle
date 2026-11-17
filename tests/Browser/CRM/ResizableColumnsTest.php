@@ -296,12 +296,15 @@ it('keeps the table head pinned while the rows scroll', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
-it('puts the horizontal scrollbar at the bottom of the screen with few records', function (): void {
+it('puts the horizontal scrollbar at the bottom of the screen with few records and collapses the empty actions column', function (): void {
+    $widestActionsCell = '(() => Math.max(...[...document.querySelectorAll("th.fi-ta-actions-header-cell, td:has(> .fi-ta-actions)")].map((cell) => Math.round(cell.getBoundingClientRect().width))))()';
+
     $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar');
 
     $page->assertScript(tableAreaBottomGap(), true)
         ->assertScript('(() => { const c = document.querySelector(".fi-ta-content-ctn"); return c.scrollWidth > c.clientWidth; })()', true)
+        ->assertScript($widestActionsCell, 0)
         ->assertScript(pageScrollsVertically(), false)
         ->assertNoJavaScriptErrors();
 });
@@ -404,17 +407,6 @@ it('keeps a dragged width on a column that sets its own width, and the actions c
         ->assertVisible(headerSelector('custom_fields.emails').' .column-resize-handle-bar')
         ->assertScript(headerWidth('custom_fields.emails'), $before + 100)
         ->assertScript($actionsWidth, $actionsBefore - 100)
-        ->assertNoJavaScriptErrors();
-});
-
-it('collapses the actions column when the table overflows its wrapper', function (): void {
-    $overflows = '(() => { const wrapper = document.querySelector(".fi-ta-content-ctn"); return wrapper.scrollWidth > wrapper.clientWidth })()';
-    $widestActionsCell = '(() => Math.max(...[...document.querySelectorAll("th.fi-ta-actions-header-cell, td:has(> .fi-ta-actions)")].map((cell) => Math.round(cell.getBoundingClientRect().width))))()';
-
-    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
-        ->assertVisible(headerSelector('created_at').' .column-resize-handle-bar')
-        ->assertScript($overflows, true)
-        ->assertScript($widestActionsCell, 0)
         ->assertNoJavaScriptErrors();
 });
 
