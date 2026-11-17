@@ -930,30 +930,26 @@ describe('connect email', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->callAction('skipMailbox')
+            ->call('skipMailbox')
             ->assertSee(__('filament/pages/workspaces.create_workspace.headings.use_case'));
 
         expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::UseCase);
     });
 
-    it('stays on the connect step until the owner confirms the skip', function (): void {
-        $workspace = workspaceInSetup(User::factory()->create());
+    it('records which way the owner leaves the connect step', function (): void {
+        workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->mountAction('skipMailbox')
-            ->assertMountedActionModalSee([
-                __('filament/pages/workspaces.setup_workspace.email.skip_confirm.heading'),
-                __('filament/pages/workspaces.setup_workspace.email.benefit_records'),
-            ]);
-
-        expect($workspace->fresh()->onboarding_step)->toBe(WorkspaceSetupStep::Email);
+            ->assertSeeHtml("name: 'mailbox_google_started'")
+            ->assertSeeHtml("name: 'mailbox_microsoft_started'")
+            ->assertSeeHtml("name: 'mailbox_skipped'");
     });
 
     it('lets the owner go back to connect from the use case while no mailbox is connected', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->callAction('skipMailbox')
+            ->call('skipMailbox')
             ->assertSee(__('filament/pages/workspaces.create_workspace.actions.back'))
             ->call('backToMailbox')
             ->assertSee(__('filament/pages/workspaces.setup_workspace.email.heading'));
@@ -965,7 +961,7 @@ describe('connect email', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
         livewire(SetupWorkspace::class)
-            ->callAction('skipMailbox')
+            ->call('skipMailbox')
             ->call('backToMailbox')
             ->assertSuccessful()
             ->call('backToMailbox')
@@ -978,7 +974,7 @@ describe('connect email', function (): void {
         $user = User::factory()->create();
         $workspace = workspaceInSetup($user);
 
-        livewire(SetupWorkspace::class)->callAction('skipMailbox');
+        livewire(SetupWorkspace::class)->call('skipMailbox');
 
         ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create([
             'user_id' => $user->getKey(),
@@ -996,7 +992,7 @@ describe('connect email', function (): void {
     it('offers no way back to connect when the feature is off', function (): void {
         $workspace = workspaceInSetup(User::factory()->create());
 
-        livewire(SetupWorkspace::class)->callAction('skipMailbox');
+        livewire(SetupWorkspace::class)->call('skipMailbox');
 
         Feature::define(EmailIntegration::class, false);
         Feature::flushCache();

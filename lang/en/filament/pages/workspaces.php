@@ -84,11 +84,6 @@ return [
             'benefit_timeline' => 'Emails and meetings on the right record',
             'benefit_send' => 'Send from Relaticle with your own address',
             'skip' => "I'll add people and companies myself",
-            'skip_confirm' => [
-                'heading' => 'Continue without your mailbox?',
-                'description' => 'Connecting your mailbox does this work for you.',
-                'submit' => "Yes, I'm sure",
-            ],
         ],
         'sharing' => [
             'heading' => 'Choose what your team sees',

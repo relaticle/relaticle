@@ -565,7 +565,7 @@ function onboardWorkspace(User $user, array $workspace, array $useCase = ['onboa
     $setup = livewire(SetupWorkspace::class);
 
     if ($created->onboarding_step === WorkspaceSetupStep::Email) {
-        $setup->callAction('skipMailbox');
+        $setup->call('skipMailbox');
     }
 
     $setup->fillForm($useCase)->call('saveUseCase')->assertHasNoFormErrors();
