@@ -21,6 +21,8 @@ final readonly class AppEventRenderer implements TimelineRenderer
         return $this->viewFactory->make('activity-log.entries.app-event', [
             'entry' => $entry,
             'palette' => $palette,
+            'title' => $palette->title(),
+            'description' => $palette->description($entry),
         ]);
     }
 }
