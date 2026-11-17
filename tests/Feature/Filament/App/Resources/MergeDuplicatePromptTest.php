@@ -52,7 +52,7 @@ it('names a company that shares a domain and opens the merge with it picked', fu
         ->assertSeeText(__('filament/record-page.merge.duplicate.shares', ['value' => 'harborline.com']))
         ->assertSeeHtml('aria-label="'.__('filament/record-page.merge.duplicate.merge_with', ['name' => 'Harborline Logistics']).'"')
         ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $duplicate->getKey()]))
-        ->assertSchemaStateSet(['duplicate_id' => $duplicate->getKey(), 'keep' => 'current'])
+        ->assertSchemaStateSet(['picked_id' => $duplicate->getKey(), 'keep_picked' => false])
         ->callMountedAction()
         ->assertHasNoErrors();
 
@@ -70,7 +70,7 @@ it('names a person that shares an email in another case', function (): void {
         ->assertSeeText('Dana R.')
         ->assertSeeText(__('filament/record-page.merge.duplicate.shares', ['value' => 'dana@harborline.com']))
         ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $duplicate->getKey()]))
-        ->assertSchemaStateSet(['duplicate_id' => $duplicate->getKey()]);
+        ->assertSchemaStateSet(['picked_id' => $duplicate->getKey()]);
 });
 
 it('shows no prompt without a live duplicate in the same workspace', function (string $case): void {
@@ -137,7 +137,7 @@ it('opens the merge with the record of the row picked', function (): void {
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $second->getKey()]))
-        ->assertSchemaStateSet(['duplicate_id' => $second->getKey()]);
+        ->assertSchemaStateSet(['picked_id' => $second->getKey()]);
 });
 
 it('picks the first duplicate when the row names a record that is not one', function (): void {
@@ -147,7 +147,7 @@ it('picks the first duplicate when the row names a record that is not one', func
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $unrelated->getKey()]))
-        ->assertSchemaStateSet(['duplicate_id' => $duplicate->getKey()]);
+        ->assertSchemaStateSet(['picked_id' => $duplicate->getKey()]);
 });
 
 it('hides the prompt on the dismissed record only', function (): void {
