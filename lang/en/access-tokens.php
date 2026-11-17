@@ -62,6 +62,8 @@ return [
         'permissions' => [
             'title' => 'Access Token Permissions',
             'action_label' => 'Permissions',
+            'tooltip' => 'Edit Permissions',
+            'heading' => 'Permissions: :name',
         ],
         'delete' => [
             'title' => 'Delete Access Token',

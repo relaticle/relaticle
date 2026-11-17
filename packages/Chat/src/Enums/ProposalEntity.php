@@ -62,11 +62,11 @@ enum ProposalEntity: string
     public function titleLabel(): string
     {
         return match ($this) {
-            self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => 'Name',
-            self::Task, self::Note => 'Title',
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Subject',
-            self::WorkspaceInvitation => 'Email',
-            self::WebAccess => 'Search',
+            self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => __('enums/proposal-entity.title_label.name'),
+            self::Task, self::Note => __('enums/proposal-entity.title_label.title'),
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => __('enums/proposal-entity.title_label.subject'),
+            self::WorkspaceInvitation => __('enums/proposal-entity.title_label.email'),
+            self::WebAccess => __('enums/proposal-entity.title_label.search'),
         };
     }
 

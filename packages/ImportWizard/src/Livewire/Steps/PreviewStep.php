@@ -317,16 +317,16 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ->icon($icon)
             ->disabled(fn (): bool => $resolvingMatches || $matchesIncomplete)
             ->requiresConfirmation()
-            ->modalHeading('Start import')
-            ->modalDescription('Are you sure that you want to start running this import?')
-            ->modalSubmitActionLabel('Start import')
+            ->modalHeading(__('import-wizard-new::actions.start_import.heading'))
+            ->modalDescription(__('import-wizard-new::actions.start_import.description'))
+            ->modalSubmitActionLabel(__('import-wizard-new::actions.start_import.submit'))
             ->action(fn () => $this->startImport());
     }
 
     public function downloadFailedRowsAction(): Action
     {
         return Action::make('downloadFailedRows')
-            ->label('Download Failed Rows')
+            ->label(__('import-wizard-new::actions.download_failed_rows'))
             ->color('danger')
             ->icon('lucide-download')
             ->visible(fn (): bool => $this->isCompleted && $this->import()->failed_rows > 0)

@@ -23,17 +23,17 @@ enum OnboardingReferralSource: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Google => 'Google',
-            self::GitHub => 'GitHub',
-            self::LinkedIn => 'LinkedIn',
-            self::X => 'X.com',
-            self::Reddit => 'Reddit',
-            self::YouTube => 'YouTube',
-            self::FriendsCoworker => 'Friends / Coworker',
-            self::Newsletter => 'Newsletter',
-            self::AI => 'AI',
-            self::Podcast => 'Podcast',
-            self::Other => 'Other',
+            self::Google => __('enums/onboarding-referral-source.google'),
+            self::GitHub => __('enums/onboarding-referral-source.github'),
+            self::LinkedIn => __('enums/onboarding-referral-source.linkedin'),
+            self::X => __('enums/onboarding-referral-source.x'),
+            self::Reddit => __('enums/onboarding-referral-source.reddit'),
+            self::YouTube => __('enums/onboarding-referral-source.youtube'),
+            self::FriendsCoworker => __('enums/onboarding-referral-source.friends_coworker'),
+            self::Newsletter => __('enums/onboarding-referral-source.newsletter'),
+            self::AI => __('enums/onboarding-referral-source.ai'),
+            self::Podcast => __('enums/onboarding-referral-source.podcast'),
+            self::Other => __('enums/onboarding-referral-source.other'),
         };
     }
 

@@ -14,8 +14,8 @@ enum EmailDirection: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::INBOUND => 'Received',
-            self::OUTBOUND => 'Sent',
+            self::INBOUND => __('enums/email-direction.inbound'),
+            self::OUTBOUND => __('enums/email-direction.outbound'),
         };
     }
 }

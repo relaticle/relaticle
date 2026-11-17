@@ -20,13 +20,13 @@ enum OnboardingUseCase: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Sales => 'Sales',
-            self::CustomerSuccess => 'Customer Success',
-            self::Recruiting => 'Recruiting',
-            self::Marketing => 'Marketing',
-            self::Fundraising => 'Fundraising',
-            self::Investing => 'Investing',
-            self::Other => 'Other',
+            self::Sales => __('enums/onboarding-use-case.sales'),
+            self::CustomerSuccess => __('enums/onboarding-use-case.customer_success'),
+            self::Recruiting => __('enums/onboarding-use-case.recruiting'),
+            self::Marketing => __('enums/onboarding-use-case.marketing'),
+            self::Fundraising => __('enums/onboarding-use-case.fundraising'),
+            self::Investing => __('enums/onboarding-use-case.investing'),
+            self::Other => __('enums/onboarding-use-case.other'),
         };
     }
 
@@ -92,13 +92,13 @@ enum OnboardingUseCase: string implements HasLabel
     public function getDescription(): string
     {
         return match ($this) {
-            self::Sales => 'Track deals, manage pipeline stages, and close revenue',
-            self::CustomerSuccess => 'Manage renewals, health scores, and customer relationships',
-            self::Recruiting => 'Manage candidates, interviews, and hiring workflows',
-            self::Marketing => 'Track campaigns, leads, and marketing performance',
-            self::Fundraising => 'Manage investor outreach, rounds, and due diligence',
-            self::Investing => 'Track deal flow, portfolio companies, and investment pipeline',
-            self::Other => 'Organize contacts, companies, and tasks your way',
+            self::Sales => __('enums/onboarding-use-case.descriptions.sales'),
+            self::CustomerSuccess => __('enums/onboarding-use-case.descriptions.customer_success'),
+            self::Recruiting => __('enums/onboarding-use-case.descriptions.recruiting'),
+            self::Marketing => __('enums/onboarding-use-case.descriptions.marketing'),
+            self::Fundraising => __('enums/onboarding-use-case.descriptions.fundraising'),
+            self::Investing => __('enums/onboarding-use-case.descriptions.investing'),
+            self::Other => __('enums/onboarding-use-case.descriptions.other'),
         };
     }
 

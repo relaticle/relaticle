@@ -308,7 +308,7 @@ final class MappingStep extends Component implements HasActions, HasForms
         $needsConfirmation = ! $this->hasMatchableFieldMapped();
 
         $action = Action::make('continue')
-            ->label('Continue')
+            ->label(__('import-wizard-new::actions.continue.label'))
             ->color('primary')
             ->disabled(fn (): bool => ! $this->canProceed())
             ->action(function (): void {
@@ -323,10 +323,10 @@ final class MappingStep extends Component implements HasActions, HasForms
                 ->modalWidth(Width::Large)
                 ->modalIcon('lucide-triangle-exclamation-point')
                 ->modalIconColor('warning')
-                ->modalHeading('Avoid creating duplicate records')
+                ->modalHeading(__('import-wizard-new::actions.continue.heading'))
                 ->modalDescription($this->buildMatchWarningDescription())
-                ->modalSubmitActionLabel('Continue without mapping')
-                ->modalCancelActionLabel('Go Back');
+                ->modalSubmitActionLabel(__('import-wizard-new::actions.continue.submit'))
+                ->modalCancelActionLabel(__('import-wizard-new::actions.continue.back'));
         }
 
         return $action;
