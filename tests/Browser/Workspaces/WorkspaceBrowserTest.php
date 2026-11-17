@@ -23,8 +23,6 @@ it('can create a new workspace through the browser', function (): void {
         ->assertDontSee('How did you hear about us?')
         ->assertScript('new Promise(resolve => { const ready = () => document.querySelector(\'[x-data^="filamentActionModals"]\')?._x_dataStack !== undefined; const poll = () => ready() ? resolve(true) : setTimeout(poll, 25); poll(); })', true)
         ->press("I'll add people and companies myself")
-        ->waitForText('Continue without your mailbox?')
-        ->press('button:visible:has-text("Yes, I\'m sure")')
         ->waitForText('Help us customize your workspace')
         ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[for$="onboarding_use_case-other"]')
