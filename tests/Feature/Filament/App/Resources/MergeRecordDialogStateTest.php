@@ -72,8 +72,6 @@ it('renders the dialog heading as markup, not as escaped text', function (): voi
         ->not->toContain('&lt;span');
 });
 
-
-
 it('escapes a hostile record name inside the dialog heading markup', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => '<img src=x onerror=alert(1)>']);
 

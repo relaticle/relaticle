@@ -203,8 +203,6 @@ it('zeroes the duplicate\'s counters so a restore cannot double count', function
         ->and((int) DB::table($kept->getTable())->where('id', $kept->getKey())->value('email_count'))->toBe(5);
 })->with(['company', 'people']);
 
-
-
 it('never lets a combined counter go below zero', function (string $type): void {
     $kept = communicationRecord($type, ['email_count' => 0, 'inbound_email_count' => 0, 'meeting_count' => 0]);
     $duplicate = communicationRecord($type, ['email_count' => 0, 'inbound_email_count' => 0, 'meeting_count' => 0]);
