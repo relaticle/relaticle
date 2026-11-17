@@ -13,6 +13,7 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Tables\Concerns\CreatesTableAttribute;
 use App\Filament\Tables\Concerns\HasColumnMenu;
 use App\Filament\Tables\ResizableColumns;
+use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\SavedView;
@@ -901,4 +902,58 @@ it('pins the create attribute button below the add panel list for an owner and h
     actAsMember($this);
 
     expect(new Crawler(livewire(ListCompanies::class)->html())->filter('[data-view-settings-create]')->count())->toBe(0);
+});
+
+it('opens the create attribute form on the type picked from the Add column menu, and leaves it changeable', function (): void {
+    $component = livewire(ListCompanies::class)
+        ->mountAction('createTableAttribute', ['type' => 'select'])
+        ->assertActionDataSet(['type' => 'select']);
+
+    $before = columnOrder($component);
+
+    $component->callMountedAction(['name' => 'Lead score', 'type' => 'number'])->assertHasNoActionErrors();
+
+    expect(CustomField::query()->where('entity_type', 'company')->where('name', 'Lead score')->sole()->type)->toBe('number')
+        ->and(newAttributeColumns($component, $before))->toHaveCount(1);
+});
+
+it('falls back to text when the Add column menu sends a type that cannot be created', function (string $type): void {
+    livewire(ListCompanies::class)
+        ->mountAction('createTableAttribute', ['type' => $type])
+        ->assertActionDataSet(['type' => 'text']);
+})->with(['unknown' => 'nope', 'empty' => '']);
+
+it('puts the Add column button in the actions column header and its menu beside the table', function (): void {
+    Filament::bootCurrentPanel();
+    Company::factory()->recycle($this->user)->create();
+
+    $component = openList(ListCompanies::class);
+    $hidden = collect($component->get('tableColumns'))->firstWhere(fn (array $item): bool => ! $item['isToggled'] && $item['isToggleable']);
+    $page = new Crawler($component->html());
+
+    expect($page->filter('thead th > .fi-ta-add-column [data-add-column-trigger]')->count())->toBe(1)
+        ->and($page->filter('table [data-add-column]')->count())->toBe(0)
+        ->and($page->filter('[data-add-column] [data-view-settings-create]')->count())->toBe(1)
+        ->and($page->filter('[data-add-column] [data-add-column-type]')->count())->toBeGreaterThan(0);
+
+    if ($hidden !== null) {
+        expect($page->filter("[data-add-column] [data-attribute=\"{$hidden['name']}\"]")->count())->toBe(1);
+    }
+});
+
+it('offers no Add column button to a member when every attribute is already shown', function (): void {
+    Filament::bootCurrentPanel();
+    Company::factory()->recycle($this->user)->create();
+    actAsMember($this);
+
+    $component = openList(ListCompanies::class);
+
+    collect($component->get('tableColumns'))
+        ->filter(fn (array $item): bool => ! $item['isToggled'] && $item['isToggleable'])
+        ->each(fn (array $item) => $component->call('toggleTableColumn', $item['name']));
+
+    $page = new Crawler($component->html());
+
+    expect($page->filter('[data-add-column-trigger]')->count())->toBe(0)
+        ->and($page->filter('[data-add-column]')->count())->toBe(0);
 });
