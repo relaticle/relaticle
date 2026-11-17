@@ -64,9 +64,12 @@ final readonly class RecordCommunicationMetrics
 
     /**
      * @param  Collection<int, Email>  $sharedEmails
+     * @param  Collection<int, Meeting>  $sharedMeetings
      */
-    public function combineMergedRecords(Company|People $kept, Company|People $duplicate, Collection $sharedEmails, int $sharedMeetings): void
+    public function combineMergedRecords(Company|People $kept, Company|People $duplicate, Collection $sharedEmails, Collection $sharedMeetings): void
     {
+        $sharedEmails = $sharedEmails->filter($this->visibility->countsTowardCommunicationIntelligence(...));
+        $sharedMeetings = $sharedMeetings->filter($this->visibility->meetingCountsTowardCommunicationIntelligence(...));
         $sharedInbound = $sharedEmails->where('direction', EmailDirection::INBOUND)->count();
 
         $summed = fn (string $column, int $shared): int => max(0, (int) $kept->getAttribute($column) + (int) $duplicate->getAttribute($column) - $shared);
@@ -76,7 +79,7 @@ final readonly class RecordCommunicationMetrics
             'email_count' => $summed('email_count', $sharedEmails->count()),
             'inbound_email_count' => $summed('inbound_email_count', $sharedInbound),
             'outbound_email_count' => $summed('outbound_email_count', $sharedEmails->count() - $sharedInbound),
-            'meeting_count' => $summed('meeting_count', $sharedMeetings),
+            'meeting_count' => $summed('meeting_count', $sharedMeetings->count()),
             'last_email_at' => $latest('last_email_at'),
             'last_interaction_at' => $latest('last_interaction_at'),
             'last_meeting_at' => $latest('last_meeting_at'),

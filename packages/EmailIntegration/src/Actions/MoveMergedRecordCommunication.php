@@ -12,13 +12,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Meeting;
-use Relaticle\EmailIntegration\Services\EmailVisibilityService;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 
 final readonly class MoveMergedRecordCommunication
 {
     public function __construct(
-        private EmailVisibilityService $visibility,
         private RecordCommunicationMetrics $metrics,
         private MoveMorphPivot $movePivot,
     ) {}
@@ -31,7 +29,7 @@ final readonly class MoveMergedRecordCommunication
             $kept,
             $duplicate,
             $this->sharedEmails($morph, $kept, $duplicate),
-            $this->sharedMeetings($morph, $kept, $duplicate)->count(),
+            $this->sharedMeetings($morph, $kept, $duplicate),
         );
 
         $this->keepManualLinks('emailables', 'email_id', 'emailable', $kept, $duplicate);
@@ -66,8 +64,7 @@ final readonly class MoveMergedRecordCommunication
             ->withoutGlobalScopes()
             ->with('participants')
             ->whereKey($this->sharedIds('emailables', 'email_id', 'emailable', $morph, $kept, $duplicate))
-            ->get()
-            ->filter(fn (Email $email): bool => $this->visibility->countsTowardCommunicationIntelligence($email));
+            ->get();
     }
 
     /**
@@ -79,8 +76,7 @@ final readonly class MoveMergedRecordCommunication
             ->withoutGlobalScopes()
             ->with(['attendees.contact', 'connectedAccount'])
             ->whereKey($this->sharedIds('meetingables', 'meeting_id', 'meetingable', $morph, $kept, $duplicate))
-            ->get()
-            ->filter(fn (Meeting $meeting): bool => $this->visibility->meetingCountsTowardCommunicationIntelligence($meeting));
+            ->get();
     }
 
     /**
