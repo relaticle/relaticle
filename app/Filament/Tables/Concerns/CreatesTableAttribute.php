@@ -49,7 +49,7 @@ trait CreatesTableAttribute
             ->modalSubmitActionLabel(__('filament/panel.tables.views.create_attribute_submit'))
             ->authorize(fn (): bool => $this->canCreateTableAttribute())
             ->mountUsing(fn (Schema $schema): Schema => $schema->fill())
-            ->schema(fn (): array => $this->tableAttributeFields($type))
+            ->schema(fn (array $arguments): array => $this->tableAttributeFields($type, $this->presetAttributeType($arguments)))
             ->action(fn (array $data, Schema $schema) => $created($this->createTableAttribute($type instanceof CustomFieldType ? [...$data, 'type' => $type->value] : $data, $schema)));
     }
 
@@ -61,10 +61,21 @@ trait CreatesTableAttribute
             && $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage);
     }
 
+    // The table's Add column menu opens the form on the type the member picked, and the type stays changeable.
+    /**
+     * @param  array<string, mixed>  $arguments
+     */
+    private function presetAttributeType(array $arguments): ?CustomFieldType
+    {
+        $type = (string) ($arguments['type'] ?? '');
+
+        return in_array($type, CustomFieldDefinitionValidator::creatableTypes(), true) ? CustomFieldType::tryFrom($type) : null;
+    }
+
     /**
      * @return list<Select|TextInput|Repeater>
      */
-    private function tableAttributeFields(?CustomFieldType $type): array
+    private function tableAttributeFields(?CustomFieldType $type, ?CustomFieldType $preset = null): array
     {
         return [
             TextInput::make('name')
@@ -77,7 +88,7 @@ trait CreatesTableAttribute
                 ->options($this->tableAttributeTypeOptions())
                 ->allowHtml()
                 ->native(false)
-                ->default(($type ?? CustomFieldType::TEXT)->value)
+                ->default(($type ?? $preset ?? CustomFieldType::TEXT)->value)
                 ->disabled($type instanceof CustomFieldType)
                 ->required()
                 ->selectablePlaceholder(false)
@@ -104,16 +115,24 @@ trait CreatesTableAttribute
      */
     private function tableAttributeTypeOptions(): array
     {
-        $options = [];
+        return array_map(
+            fn (array $type): string => $type['icon'] === null ? e($type['label']) : $this->typeOptionHtml($type['icon'], $type['label'])->toHtml(),
+            $this->tableAttributeTypes(),
+        );
+    }
+
+    /**
+     * @return array<string, array{label: string, icon: ?string}>
+     */
+    protected function tableAttributeTypes(): array
+    {
+        $types = [];
 
         foreach (CustomFieldDefinitionValidator::creatableTypes() as $key) {
-            $label = CustomFieldsType::getFieldType($key)->label;
-            $icon = CustomFieldType::tryFrom($key)?->icon();
-
-            $options[$key] = $icon === null ? e($label) : $this->typeOptionHtml($icon, $label)->toHtml();
+            $types[$key] = ['label' => CustomFieldsType::getFieldType($key)->label, 'icon' => CustomFieldType::tryFrom($key)?->icon()];
         }
 
-        return $options;
+        return $types;
     }
 
     private function typeOptionHtml(string $icon, string $label): Htmlable

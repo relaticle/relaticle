@@ -409,6 +409,11 @@ final class AppPanelProvider extends PanelProvider
                 TablesRenderHook::TOOLBAR_BEFORE,
                 fn (): View|Factory => view('filament.app.tables.column-menu'),
                 scopes: $listPages,
+            )
+            ->renderHook(
+                TablesRenderHook::TOOLBAR_BEFORE,
+                fn (): View|Factory => view('filament.app.tables.add-column-menu-hook'),
+                scopes: $listPages,
             );
     }
 
