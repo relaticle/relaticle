@@ -53,7 +53,7 @@ return [
         'swap' => 'Swap records',
         'submit' => 'Merge records',
         'unavailable' => 'That record is no longer available to merge.',
-        'over_limit' => '{1} :field can hold one value. Together these records have more. Remove some first.|[2,*] :field can hold :max values. Together these records have more. Remove some first.',
+        'over_limit' => ':field can hold at most :max. Together these records have more. Remove some first.',
         'pick' => 'Choose a record',
         'clear' => 'Choose a different record',
         'search_placeholder' => [

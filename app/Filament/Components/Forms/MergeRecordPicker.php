@@ -127,7 +127,7 @@ final class MergeRecordPicker extends Field
         $overLimit = $this->pairing()['values']->overLimit ?? [];
 
         return array_values(array_map(
-            fn (array $over): string => trans_choice('filament/record-page.merge.over_limit', $over['limit'], ['field' => $over['label'], 'max' => $over['limit']]),
+            fn (array $over): string => __('filament/record-page.merge.over_limit', ['field' => $over['label'], 'max' => $over['limit']]),
             $overLimit,
         ));
     }

@@ -53,7 +53,7 @@ return [
         'swap' => 'Inverser les fiches',
         'submit' => 'Fusionner les fiches',
         'unavailable' => "Cette fiche n'est plus disponible pour la fusion.",
-        'over_limit' => "{1} :field peut contenir une seule valeur. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.|[2,*] :field peut contenir :max valeurs. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.",
+        'over_limit' => ":field peut contenir au plus :max. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.",
         'pick' => 'Choisir une fiche',
         'clear' => 'Choisir une autre fiche',
         'search_placeholder' => [

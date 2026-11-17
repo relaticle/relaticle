@@ -224,7 +224,7 @@ it('blocks a merge over a field\'s own maximum and says one value when the limit
     $duplicate->saveCustomFieldValue($field, [$options[1]]);
 
     mergeWith($kept, $duplicate)->assertHasActionErrors([
-        'picked_id' => 'Regions can hold one value. Together these records have more. Remove some first.',
+        'picked_id' => 'Regions can hold at most 1. Together these records have more. Remove some first.',
     ]);
 
     expect(Company::query()->whereKey($duplicate->getKey())->exists())->toBeTrue();

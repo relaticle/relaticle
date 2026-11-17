@@ -134,7 +134,7 @@ final readonly class MergeRecords
         }
 
         throw ValidationException::withMessages([
-            'duplicate_id' => trans_choice('filament/record-page.merge.over_limit', $over['limit'], ['field' => $over['label'], 'max' => $over['limit']]),
+            'duplicate_id' => __('filament/record-page.merge.over_limit', ['field' => $over['label'], 'max' => $over['limit']]),
         ]);
     }
 
