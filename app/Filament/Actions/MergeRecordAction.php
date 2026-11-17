@@ -57,7 +57,7 @@ final class MergeRecordAction extends Action
                     $kept = $this->merge($data);
                 } catch (ValidationException $exception) {
                     throw ValidationException::withMessages([
-                        $this->picker()->getStatePath() => $exception->errors()['duplicate_id'] ?? Arr::flatten($exception->errors()),
+                        $this->picker()->getStatePath() => Arr::flatten($exception->errors()),
                     ]);
                 }
 
@@ -87,9 +87,9 @@ final class MergeRecordAction extends Action
             ->disabled($this->picker()->isBlocked())
             ->icon('lucide-merge')
             ->label(__('filament/record-page.merge.submit'))
+            // Filament's capture-phase disabled-button listener blocks the click once pointer events return.
             ->extraAttributes([
                 'class' => 'aria-disabled:pointer-events-auto aria-disabled:cursor-not-allowed aria-disabled:opacity-50',
-                'x-on:click' => "if (\$el.getAttribute('aria-disabled') === 'true') { \$event.preventDefault(); \$event.stopImmediatePropagation() }",
             ]);
     }
 
