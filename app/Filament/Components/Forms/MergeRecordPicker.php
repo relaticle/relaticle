@@ -209,7 +209,9 @@ final class MergeRecordPicker extends Field
 
     private function currentRecord(): Company|People
     {
-        return $this->currentWithCounts ??= $this->entities()->whereKey($this->subject()->getKey())->firstOrFail();
+        return $this->currentWithCounts ??= $this->subject()
+            ->loadMissing('customFieldValues.customField')
+            ->loadCount(array_keys($this->entity()->mergeCountRelations()));
     }
 
     /**
@@ -328,12 +330,9 @@ final class MergeRecordPicker extends Field
      */
     private function details(Company|People $record): array
     {
-        $fieldId = $this->identityField()?->getKey();
-        $value = $record->customFieldValues
-            ->first(fn (CustomFieldValue $fieldValue): bool => $fieldValue->custom_field_id === $fieldId)
-            ?->getValue();
+        $field = $this->identityField();
 
-        return $this->links($value);
+        return $this->links($field instanceof CustomField ? $record->getCustomFieldValue($field) : null);
     }
 
     /**
@@ -388,10 +387,12 @@ final class MergeRecordPicker extends Field
 
     private function identityField(): ?CustomField
     {
-        $subject = $this->subject();
+        return once(function (): ?CustomField {
+            $subject = $this->subject();
 
-        return resolve(WorkspaceCustomFields::class)
-            ->forEntity($subject->loadMissing('workspace')->workspace, $subject->getMorphClass())
-            ->firstWhere('code', $this->identity()->fieldCode());
+            return resolve(WorkspaceCustomFields::class)
+                ->forEntity($subject->loadMissing('workspace')->workspace, $subject->getMorphClass())
+                ->firstWhere('code', $this->identity()->fieldCode());
+        });
     }
 }
