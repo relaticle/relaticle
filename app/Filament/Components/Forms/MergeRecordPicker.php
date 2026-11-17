@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Components\Forms;
 
 use App\Actions\Merge\CombineRecordValues;
+use App\Data\LinkOption;
 use App\Data\MergedValues;
 use App\Enums\CrmEntity;
 use App\Enums\RecordIdentity;
@@ -12,6 +13,7 @@ use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\People;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
 use Filament\Forms\Components\Field;
 use Filament\Models\Contracts\HasAvatar;
@@ -57,6 +59,8 @@ final class MergeRecordPicker extends Field
     {
         $subject = $this->subject();
         abort_unless(Gate::allows('update', $subject) && Gate::allows('delete', $subject), 403);
+
+        $search = mb_substr(trim($search), 0, 100);
 
         $records = $this->searchQuery()
             ->whereKeyNot($subject->getKey())
@@ -340,7 +344,7 @@ final class MergeRecordPicker extends Field
     private function details(Company|People $record): array
     {
         $value = $record->customFieldValues
-            ->first(fn (CustomFieldValue $fieldValue): bool => $fieldValue->customField->code === $this->detailCode())
+            ->first(fn (CustomFieldValue $fieldValue): bool => $fieldValue->custom_field_id === $this->identityField()?->getKey())
             ?->getValue();
 
         return $this->links($value);
@@ -365,10 +369,7 @@ final class MergeRecordPicker extends Field
      */
     private function matching(Builder $query, string $search): Builder
     {
-        $identity = CustomField::query()
-            ->forMorphEntity($this->subject()->getMorphClass())
-            ->where('code', $this->detailCode())
-            ->first();
+        $identity = $this->identityField();
 
         $query->where('name', 'ilike', '%'.LikePattern::escape($search).'%');
 
@@ -387,12 +388,24 @@ final class MergeRecordPicker extends Field
      */
     private function searchQuery(): Builder
     {
-        return $this->subject()->newQuery()
-            ->when($this->subject() instanceof HasAvatar, fn (Builder $query): Builder => $query->with('media'))
+        $subject = $this->subject();
+        $identity = $this->identityField();
+
+        return $subject->newQuery()
+            ->with(LinkOption::marks($subject))
             ->select(['id', 'name'])
-            ->with([
-                'customFieldValues' => fn (Relation $values): Relation => $values->whereRelation('customField', 'code', $this->detailCode()),
+            ->when($identity instanceof CustomField, fn (Builder $query): Builder => $query->with([
+                'customFieldValues' => fn (Relation $values): Relation => $values->where('custom_field_id', $identity->getKey()),
                 'customFieldValues.customField',
-            ]);
+            ]));
+    }
+
+    private function identityField(): ?CustomField
+    {
+        $subject = $this->subject();
+
+        return resolve(WorkspaceCustomFields::class)
+            ->forEntity($subject->loadMissing('workspace')->workspace, $subject->getMorphClass())
+            ->firstWhere('code', $this->detailCode());
     }
 }
