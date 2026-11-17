@@ -179,6 +179,17 @@ it('finds a person by name or by any of their emails', function (string $term, a
     'nothing' => ['zzz', []],
 ]);
 
+it('shows no search detail for a person whose name is their email address', function (): void {
+    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    mergePersonRecord($this->workspace, $this->user, ['name' => '247496536@bcc.example'], ['emails' => ['247496536@bcc.example']]);
+
+    $results = mergeSearch(ViewPeople::class, $kept, '247496536')->effects['returns'][0];
+
+    expect($results)->toHaveCount(1)
+        ->and($results[0]['name'])->toBe('247496536@bcc.example')
+        ->and($results[0]['detail'])->toBeNull();
+});
+
 it('leaves the current person, a trashed person and another workspace\'s person out of the search', function (): void {
     $foreignOwner = User::factory()->withWorkspace()->create();
     $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Current']);

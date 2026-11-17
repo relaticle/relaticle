@@ -66,12 +66,16 @@ final class MergeRecordPicker extends Field
             ->limit(25)
             ->get();
 
-        return array_values($records->map(fn (Company|People $record): array => [
-            'id' => $record->getKey(),
-            'name' => $record->name,
-            'detail' => $this->details($record)[0]['label'] ?? null,
-            'logo' => $this->image($record),
-        ])->all());
+        return array_values($records->map(function (Company|People $record): array {
+            $detail = $this->details($record)[0]['label'] ?? null;
+
+            return [
+                'id' => $record->getKey(),
+                'name' => $record->name,
+                'detail' => $detail === $record->name ? null : $detail,
+                'logo' => $this->image($record),
+            ];
+        })->all());
     }
 
     public function isBlocked(): bool
