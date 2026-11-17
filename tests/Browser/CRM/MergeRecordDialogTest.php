@@ -83,7 +83,7 @@ it('disables merging and names the list over its limit', function (): void {
     $page = openMergeDialog($this->user, $this->workspace, $current);
 
     pickInMergeDialog($page, 'Holdings', 'Acme Holdings')
-        ->assertSeeIn('[data-merge-over-limit]', 'Domains can hold 5 values')
+        ->assertSeeIn('[data-merge-over-limit]', 'Domains can hold at most 5')
         ->assertScript(MERGE_SUBMIT_DISABLED, true)
         ->assertNoJavaScriptErrors();
 });
