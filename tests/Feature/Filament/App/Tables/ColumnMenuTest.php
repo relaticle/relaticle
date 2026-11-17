@@ -905,13 +905,15 @@ it('pins the create attribute button below the add panel list for an owner and h
 });
 
 it('opens the create attribute form on the type picked from the Add column menu, and leaves it changeable', function (): void {
-    $component = livewire(ListCompanies::class)
+    livewire(ListCompanies::class)
         ->mountAction('createTableAttribute', ['type' => 'select'])
         ->assertActionDataSet(['type' => 'select']);
 
+    $component = livewire(ListCompanies::class);
     $before = columnOrder($component);
 
-    $component->callMountedAction(['name' => 'Lead score', 'type' => 'number'])->assertHasNoActionErrors();
+    $component->callAction('createTableAttribute', data: ['name' => 'Lead score', 'type' => 'number'], arguments: ['type' => 'select'])
+        ->assertHasNoActionErrors();
 
     expect(CustomField::query()->where('entity_type', 'company')->where('name', 'Lead score')->sole()->type)->toBe('number')
         ->and(newAttributeColumns($component, $before))->toHaveCount(1);

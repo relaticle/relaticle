@@ -13,7 +13,7 @@
     x-bind:style="{ top: `${top}px`, left: `${left}px` }"
     role="group"
     aria-label="{{ __('filament/panel.tables.views.add_column') }}"
-    class="fi-dropdown-panel fi-view-settings-panel fi-ta-add-column-menu"
+    class="fi-dropdown-panel fi-ta-add-column-menu"
     data-add-column
 >
     <div class="fi-view-settings-view" x-show="! creating">
