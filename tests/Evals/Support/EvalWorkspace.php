@@ -162,6 +162,11 @@ final readonly class EvalWorkspace
         });
     }
 
+    public function onHostedTrial(): void
+    {
+        $this->workspace->forceFill(['trial_ends_at' => now()->addDays(10)])->save();
+    }
+
     public function withoutActivityRows(): void
     {
         DB::table('activity_log')->where('workspace_id', $this->workspace->getKey())->delete();

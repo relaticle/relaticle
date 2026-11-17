@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Tests\Evals\Scorers\CalledAnyOf;
 use Tests\Evals\Scorers\FirstToolCalled;
 use Tests\Evals\Scorers\TextMatches;
+use Tests\Evals\Support\EvalModels;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\RelaTurn;
 
@@ -35,6 +36,10 @@ it('declines an out of scope request in one sentence and offers one CRM action',
 })->group('guard');
 
 it('asks for web access once when the user wants the web', function (): void {
+    if (EvalModels::runner() === 'plan') {
+        $this->markTestSkipped('The plan runner serves Rela through the claude-code provider, which WebAccess never offers the web.');
+    }
+
     $w = EvalWorkspace::seed();
 
     expect((new RelaTurn($w))(...))
@@ -44,7 +49,9 @@ it('asks for web access once when the user wants the web', function (): void {
 })->group('guard');
 
 it('answers a credit question from the balance tool', function (): void {
+    withHostedBilling();
     $w = EvalWorkspace::seed();
+    $w->onHostedTrial();
 
     expect((new RelaTurn($w))(...))
         ->prompt('How many AI credits do I have left?')
