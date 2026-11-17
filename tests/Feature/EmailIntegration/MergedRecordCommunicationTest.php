@@ -254,6 +254,7 @@ it('issues the same number of queries however many emails and meetings the two r
 
     expect(mergeQueryCountWithSharedCommunication(9))->toBe(mergeQueryCountWithSharedCommunication(2));
 });
+
 it('keeps a manual link when it collides with the kept record\'s auto link', function (string $type): void {
     $kept = communicationRecord($type);
     $duplicate = communicationRecord($type);
@@ -265,6 +266,7 @@ it('keeps a manual link when it collides with the kept record\'s auto link', fun
 
     expect(DB::table('emailables')->where('emailable_type', $type)->where('emailable_id', $kept->getKey())->value('link_source'))->toBe('manual');
 })->with(['company', 'people']);
+
 it('rolls back the moved communication when the merge fails at the final write', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
@@ -273,7 +275,7 @@ it('rolls back the moved communication when the merge fails at the final write',
     $email = communicationEmail();
     $duplicate->emails()->attach($email->getKey());
 
-    Event::listen(RecordMerged::class, fn () => $this->workspace->users()->detach($member));
+    Event::listen(RecordMerged::class, fn (): int => $this->workspace->users()->detach($member));
     livewire(ViewCompany::class, ['record' => $kept->getKey()])
         ->callAction(mergeRecordAction(), data: ['picked_id' => $duplicate->getKey(), 'keep_picked' => false])
         ->assertHasActionErrors(['picked_id']);
