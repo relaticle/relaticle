@@ -141,5 +141,5 @@ it('merges when Enter is pressed outside the search once a record is picked', fu
         ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
         ->assertNoJavaScriptErrors();
 
-    expect(Company::query()->find($duplicate->getKey()))->toBeNull();
+    expect(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });

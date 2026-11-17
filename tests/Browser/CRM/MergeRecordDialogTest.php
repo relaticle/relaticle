@@ -55,7 +55,7 @@ it('merges a duplicate picked from the dialog into the current company', functio
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
 
-    expect(Company::query()->find($duplicate->getKey()))->toBeNull();
+    expect(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });
 
 it('keeps the other company when the member swaps the two', function (): void {
@@ -73,7 +73,7 @@ it('keeps the other company when the member swaps the two', function (): void {
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
 
-    expect(Company::query()->find($current->getKey()))->toBeNull();
+    expect(Company::withTrashed()->find($current->getKey())?->trashed())->toBeTrue();
 });
 
 it('disables merging and names the list over its limit', function (): void {
@@ -142,7 +142,7 @@ it('merges a duplicate person picked from the dialog and shows emails and contac
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
 
-    expect(People::query()->find($duplicate->getKey()))->toBeNull();
+    expect(People::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });
 
 it('opens the merge from the duplicate prompt with the duplicate picked', function (): void {
@@ -164,7 +164,7 @@ it('opens the merge from the duplicate prompt with the duplicate picked', functi
         ->assertNotPresent('[data-duplicate-prompt]')
         ->assertNoJavaScriptErrors();
 
-    expect(Company::query()->find($duplicate->getKey()))->toBeNull();
+    expect(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });
 
 it('keeps a long duplicate name inside the record rail', function (): void {
