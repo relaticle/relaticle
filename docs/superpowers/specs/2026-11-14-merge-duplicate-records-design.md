@@ -166,6 +166,8 @@ merging the same records cannot interleave.
 - Repointed `people` and `opportunities` rows take `updated_at = now()`, so an API consumer syncing
   by `updated_at` sees the move. The kept record's own `record_merged` entry stays the audit trail;
   no per-row relation-change entries are written (builder's call, made in review).
+  Records whose record-type attribute is repointed keep their `updated_at`: the rewrite touches only
+  `custom_field_values`, so a consumer syncing by `updated_at` does not see it (decided in review).
 - A record-type attribute on the kept record that pointed at the duplicate now points at the kept
   record itself, so a company can end up as its own parent. Kept on purpose: dropping the link would
   silently lose that the relationship existed (decided in review of `76aa81c75`).
