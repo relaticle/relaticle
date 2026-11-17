@@ -49,7 +49,7 @@ final readonly class MergeRecords
                 $kept->update(['creation_source' => $duplicate->creation_source]);
             }
 
-            $this->moveLinks->execute($kept, $duplicate);
+            $this->moveLinks->execute($kept, $duplicate, $mergedValues);
             $this->moveEntityLinks($kept, $duplicate);
             $this->moveHistory->execute($user, $kept, $duplicate);
 

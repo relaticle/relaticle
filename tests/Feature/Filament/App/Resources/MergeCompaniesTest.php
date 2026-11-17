@@ -609,7 +609,8 @@ it('keeps the image of the kept company\'s own rich-text value when it wins the 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
     expect(mergeCompanyValue($kept, 'brief'))->toContain($keptImage->uuid)
-        ->and(Media::query()->where('uuid', $keptImage->uuid)->value('model_id'))->toBe($kept->getKey());
+        ->and(Media::query()->where('uuid', $keptImage->uuid)->value('model_id'))->toBe($kept->getKey())
+        ->and(Media::query()->where('uuid', $duplicateImage->uuid)->value('model_id'))->toBe($duplicate->getKey());
 });
 
 it('counts domains the way the field stores them before applying the limit', function (): void {

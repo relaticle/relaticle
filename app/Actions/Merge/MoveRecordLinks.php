@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Merge;
 
+use App\Data\MergedValues;
 use App\Enums\CustomFieldType;
 use App\Enums\MediaCollection;
 use App\Models\Company;
@@ -15,23 +16,27 @@ final readonly class MoveRecordLinks
 {
     public function __construct(private MoveMorphPivot $movePivot) {}
 
-    public function execute(Company|People $kept, Company|People $duplicate): void
+    public function execute(Company|People $kept, Company|People $duplicate, MergedValues $mergedValues): void
     {
         $morph = $kept->getMorphClass();
 
         $this->movePivot->execute('noteables', 'note_id', 'noteable', $kept, $duplicate);
         $this->movePivot->execute('taskables', 'task_id', 'taskable', $kept, $duplicate);
-        $this->moveAttachments($morph, $kept, $duplicate);
+        $this->moveAttachments($morph, $kept, $duplicate, $mergedValues->attachmentUuids);
         $this->repointRecordAttributes($morph, $kept, $duplicate);
     }
 
-    private function moveAttachments(string $morph, Company|People $kept, Company|People $duplicate): void
+    /**
+     * @param  list<string>  $referencedUuids
+     */
+    private function moveAttachments(string $morph, Company|People $kept, Company|People $duplicate, array $referencedUuids): void
     {
         DB::table('media')
             ->where('workspace_id', $kept->workspace_id)
             ->where('model_type', $morph)
             ->where('model_id', $duplicate->getKey())
             ->where('collection_name', MediaCollection::Attachments->value)
+            ->whereIn('uuid', $referencedUuids)
             ->update(['model_id' => $kept->getKey()]);
     }
 

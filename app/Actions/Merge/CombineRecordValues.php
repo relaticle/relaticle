@@ -13,9 +13,12 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
 use App\Support\EmailAddress;
+use App\Support\Media\MediaLookup;
 
 final readonly class CombineRecordValues
 {
+    public function __construct(private MediaLookup $mediaLookup) {}
+
     private const array LIST_TYPES = [
         CustomFieldType::MULTI_SELECT,
         CustomFieldType::CHECKBOX_LIST,
@@ -29,6 +32,7 @@ final readonly class CombineRecordValues
 
         $customFields = [];
         $overLimit = [];
+        $attachmentUuids = [];
 
         foreach ($this->activeFields($kept) as $field) {
             $value = $this->combine(
@@ -39,6 +43,8 @@ final readonly class CombineRecordValues
 
             $customFields[$field->code] = $value;
 
+            array_push($attachmentUuids, ...$this->mediaLookup->referencedUuids($field->type, $value));
+
             $limit = $this->limit($field);
 
             if ($limit !== null && is_array($value) && count($value) > $limit) {
@@ -46,7 +52,7 @@ final readonly class CombineRecordValues
             }
         }
 
-        return new MergedValues($this->attributes($kept, $duplicate), $customFields, $overLimit);
+        return new MergedValues($this->attributes($kept, $duplicate), $customFields, $overLimit, array_values(array_unique($attachmentUuids)));
     }
 
     /**
