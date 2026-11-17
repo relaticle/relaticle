@@ -14,6 +14,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\WorkspaceCustomField;
 
 mutates(DuplicateRecordQuery::class, HasRecordPageLayout::class);
 
@@ -163,4 +164,29 @@ it('hides the prompt on the dismissed record only', function (): void {
 
     livewire(ViewCompany::class, ['record' => $duplicate->getKey()])
         ->assertSchemaComponentVisible('duplicatePrompt', 'infolist');
+});
+
+it('shows no prompt when the domains attribute is switched off', function (): void {
+    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics'], ['domains' => ['harborline.com']]);
+    WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains')->update(['active' => false]);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
+});
+
+it('counts at most ten duplicates, each once', function (): void {
+    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com', 'harborline.io']]);
+    foreach (range(1, 6) as $number) {
+        mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.com', 'harborline.io']]);
+    }
+    foreach (range(7, 12) as $number) {
+        mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.io']]);
+    }
+    foreach (range(13, 15) as $number) {
+        mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.com']]);
+    }
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSeeText(trans_choice('filament/record-page.merge.duplicate.count', 10));
 });
