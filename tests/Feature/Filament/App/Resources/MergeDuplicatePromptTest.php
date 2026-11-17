@@ -12,6 +12,8 @@ use App\Models\People;
 use App\Models\User;
 use App\Queries\Crm\DuplicateRecordQuery;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportTesting\Testable;
@@ -164,6 +166,19 @@ it('picks the first duplicate when the row names a record that is not one', func
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->call('mergeDuplicate', $unrelated->getKey())
         ->assertSchemaStateSet(['picked_id' => $duplicate->getKey()]);
+});
+
+it('shows no prompt and reports the error when the duplicate scan fails', function (): void {
+    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics'], ['domains' => ['harborline.com']]);
+    Exceptions::fake();
+    DB::connection()->beforeExecuting(function (string $query): void {
+        throw_if(str_contains($query, 'jsonb_array_elements_text'), RuntimeException::class, 'canceling statement due to statement timeout');
+    });
+
+    duplicatePrompt($company)->assertViewHas('hasDuplicates', false);
+
+    Exceptions::assertReported(RuntimeException::class);
 });
 
 it('shows no prompt when the domains attribute is switched off', function (): void {

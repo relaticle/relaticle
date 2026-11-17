@@ -68,6 +68,10 @@ final class DuplicateRecordsPrompt extends BaseLivewireComponent
      */
     private function duplicates(): array
     {
-        return once(fn (): array => resolve(DuplicateRecordQuery::class)->get($this->authUser(), $this->record, self::SHOWN + 1));
+        // The prompt is advisory, so a failed scan hides it instead of breaking the record page.
+        return once(fn (): array => rescue(
+            fn (): array => resolve(DuplicateRecordQuery::class)->get($this->authUser(), $this->record, self::SHOWN + 1),
+            [],
+        ));
     }
 }
