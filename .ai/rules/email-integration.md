@@ -163,7 +163,7 @@ and a migration queues that command. A new path that ends a membership fires
 `tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php` fails when a removal
 leaves a token, a syncing mailbox or a queued email behind.
 
-`MoveMergedRecordCommunicationListener` is the second listener registered
+`MoveMergedRecordCommunicationListener` is also registered
 outside the feature flag: a merge with sync off must still move emailables,
 meetingables, participants, attendees and counters off the soft-deleted
 duplicate. It runs synchronously inside the merge transaction on
