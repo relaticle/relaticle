@@ -6,17 +6,20 @@ use App\Enums\WorkspaceRole;
 use App\Filament\Concerns\HasRecordPageLayout;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
+use App\Livewire\App\Records\DuplicateRecordsPrompt;
 use App\Models\Company;
+use App\Models\People;
 use App\Models\User;
 use App\Queries\Crm\DuplicateRecordQuery;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportTesting\Testable;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(DuplicateRecordQuery::class, HasRecordPageLayout::class);
+mutates(DuplicateRecordQuery::class, DuplicateRecordsPrompt::class, HasRecordPageLayout::class);
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -33,45 +36,56 @@ afterEach(function (): void {
     TenantContextService::setTenantId(null);
 });
 
-/**
- * @param  array<string, mixed>  $arguments
- */
-function mergeDuplicateAction(string $name = 'mergeDuplicate', array $arguments = []): TestAction
+function duplicatePrompt(Company|People $record): Testable
 {
-    $component = $name === 'mergeDuplicate' ? 'duplicatePrompt.duplicateList' : 'duplicatePrompt';
+    return livewire(DuplicateRecordsPrompt::class, ['record' => $record->fresh()]);
+}
 
-    return TestAction::make($name)->arguments($arguments)->schemaComponent($component, schema: 'infolist');
+function duplicateCount(int $count): string
+{
+    return trans_choice('filament/record-page.merge.duplicate.count', $count);
 }
 
 it('names a company that shares a domain and opens the merge with it picked', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics'], ['domains' => ['WWW.Harborline.com']]);
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSeeText(trans_choice('filament/record-page.merge.duplicate.count', 1))
+    duplicatePrompt($company)
+        ->assertSeeText(duplicateCount(1))
         ->assertSeeText('Harborline Logistics')
         ->assertSeeText(__('filament/record-page.merge.duplicate.shares', ['value' => 'harborline.com']))
-        ->assertSeeHtml('aria-label="'.__('filament/record-page.merge.duplicate.merge_with', ['name' => 'Harborline Logistics']).'"')
-        ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $duplicate->getKey()]))
+        ->assertSeeHtml('aria-label="'.__('filament/record-page.merge.duplicate.merge_with', ['name' => 'Harborline Logistics']).'"');
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->call('mergeDuplicate', $duplicate->getKey())
         ->assertSchemaStateSet(['picked_id' => $duplicate->getKey(), 'keep_picked' => false])
         ->callMountedAction()
         ->assertHasNoErrors();
 
     expect($duplicate->fresh()->trashed())->toBeTrue();
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
+    duplicatePrompt($company)->assertDontSeeText(duplicateCount(1));
 });
 
 it('names a person that shares an email in another case', function (): void {
     $person = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Reyes'], ['emails' => ['dana@harborline.com']]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana R.'], ['emails' => ['other@harborline.com', 'Dana@Harborline.com']]);
 
-    livewire(ViewPeople::class, ['record' => $person->getKey()])
+    duplicatePrompt($person)
         ->assertSeeText('Dana R.')
-        ->assertSeeText(__('filament/record-page.merge.duplicate.shares', ['value' => 'dana@harborline.com']))
-        ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $duplicate->getKey()]))
+        ->assertSeeText(__('filament/record-page.merge.duplicate.shares', ['value' => 'dana@harborline.com']));
+
+    livewire(ViewPeople::class, ['record' => $person->getKey()])
+        ->call('mergeDuplicate', $duplicate->getKey())
         ->assertSchemaStateSet(['picked_id' => $duplicate->getKey()]);
+});
+
+it('shows the check while it loads on the record page', function (): void {
+    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
+
+    livewire(ViewCompany::class, ['record' => $company->getKey()])
+        ->assertSchemaComponentVisible('duplicatePrompt', 'infolist')
+        ->assertSeeText(__('filament/record-page.merge.duplicate.checking'));
 });
 
 it('shows no prompt without a live duplicate in the same workspace', function (string $case): void {
@@ -88,8 +102,9 @@ it('shows no prompt without a live duplicate in the same workspace', function (s
         })(),
     };
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
+    duplicatePrompt($company)
+        ->assertViewHas('hasDuplicates', false)
+        ->assertDontSeeHtml('data-duplicate-prompt');
 })->with(['unshared', 'trashed', 'other workspace']);
 
 it('hides the prompt from a member who cannot merge', function (): void {
@@ -101,7 +116,8 @@ it('hides the prompt from a member who cannot merge', function (): void {
     $this->actingAs($viewer);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
+        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist')
+        ->assertDontSeeText(__('filament/record-page.merge.duplicate.checking'));
 });
 
 it('keeps the prompt for the duplicate that is left after a merge', function (): void {
@@ -110,13 +126,13 @@ it('keeps the prompt for the duplicate that is left after a merge', function ():
         ->map(fn (string $name): Company => mergeCompanyRecord($this->workspace, $this->user, ['name' => $name], ['domains' => ['harborline.com']]));
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $duplicates->first()->getKey()]))
+        ->call('mergeDuplicate', $duplicates->first()->getKey())
         ->callMountedAction();
 
     expect($duplicates->first()->fresh()->trashed())->toBeTrue();
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSeeText(trans_choice('filament/record-page.merge.duplicate.count', 1))
+    duplicatePrompt($company)
+        ->assertSeeText(duplicateCount(1))
         ->assertSeeText('Harborline Two');
 });
 
@@ -126,8 +142,8 @@ it('lists every record that matches any of its domains', function (): void {
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Two'], ['domains' => ['harborline.io']]);
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Three'], ['domains' => ['harborline.com', 'harborline.io']]);
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSeeText(trans_choice('filament/record-page.merge.duplicate.count', 3))
+    duplicatePrompt($company)
+        ->assertSeeText(duplicateCount(3))
         ->assertSeeTextInOrder(['Harborline One', 'Harborline Three', 'Harborline Two']);
 });
 
@@ -137,7 +153,7 @@ it('opens the merge with the record of the row picked', function (): void {
     $second = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Two'], ['domains' => ['harborline.com']]);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $second->getKey()]))
+        ->call('mergeDuplicate', $second->getKey())
         ->assertSchemaStateSet(['picked_id' => $second->getKey()]);
 });
 
@@ -147,7 +163,7 @@ it('picks the first duplicate when the row names a record that is not one', func
     $unrelated = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind'], ['domains' => ['northwind.com']]);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->mountAction(mergeDuplicateAction(arguments: ['duplicate' => $unrelated->getKey()]))
+        ->call('mergeDuplicate', $unrelated->getKey())
         ->assertSchemaStateSet(['picked_id' => $duplicate->getKey()]);
 });
 
@@ -155,9 +171,9 @@ it('hides the prompt on the dismissed record only', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics'], ['domains' => ['harborline.com']]);
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->callAction(mergeDuplicateAction('dismissDuplicate'))
-        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
+    duplicatePrompt($company)
+        ->callAction(TestAction::make('dismissDuplicate')->schemaComponent('duplicates', schema: 'content'))
+        ->assertViewHas('hasDuplicates', false);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
@@ -171,8 +187,7 @@ it('shows no prompt when the domains attribute is switched off', function (): vo
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics'], ['domains' => ['harborline.com']]);
     WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains')->update(['active' => false]);
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
+    duplicatePrompt($company)->assertViewHas('hasDuplicates', false);
 });
 
 it('counts at most ten duplicates, each once', function (): void {
@@ -187,15 +202,14 @@ it('counts at most ten duplicates, each once', function (): void {
         mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.com']]);
     }
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertSeeText(trans_choice('filament/record-page.merge.duplicate.count', 10));
+    duplicatePrompt($company)->assertSeeText(duplicateCount(10));
 });
 
 it('keeps a quote in the duplicate name inside the merge button label', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harbor" data-injected="1'], ['domains' => ['harborline.com']]);
 
-    livewire(ViewCompany::class, ['record' => $company->getKey()])
+    duplicatePrompt($company)
         ->assertDontSeeHtml('data-injected="1"')
         ->assertSeeHtml('aria-label="'.e(__('filament/record-page.merge.duplicate.merge_with', ['name' => 'Harbor" data-injected="1'])).'"');
 });

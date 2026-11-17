@@ -45,12 +45,16 @@ emails in a merge comes straight back on the next sync.
    emails through `EntitiesByFieldValueQuery` with `CanonicalValue::spellings()`, the match the upsert API
    and the restore conflict already use: case-insensitive, with `www.` and a scheme folded into one domain.
    It returns up to 10 records, grouped by the value they share and oldest first within each value.
-   The section is a native `Section` in the record rail under the quick actions. Its rows are a small
-   view, `filament.app.duplicate-prompt`, because an action inside a `RepeatableEntry` item cannot be
-   mounted. Each row's **Merge** is a `MergeRecordAction` named `mergeDuplicate`. The row passes its
-   record id, and `duplicateId()` accepts only an id from the list, falling back to the first duplicate.
-   Both merge entry points read `MergeRecordAction::canMerge()`. The header's dismiss writes a session
-   key for the record, so the section stays hidden for that record until the session ends.
+   The section is `App\Livewire\App\Records\DuplicateRecordsPrompt`, deferred with `lazy: on-load` in
+   the record rail under the quick actions, so the page never waits on the scan and its own requests
+   never repeat it. At 100,000 companies the scan took about 240 ms a request locally. While it runs, a
+   "Checking for duplicates" row shows, and with none found the slot takes no space. The section is a
+   native `Section` and its rows a small view, because an action inside a `RepeatableEntry` item cannot
+   be mounted. A row's **Merge** dispatches `merge-duplicate` to the page, which mounts its own
+   `MergeRecordAction` named `mergeDuplicate`, since that action needs the record page. `duplicateId()`
+   accepts only an id from the list, falling back to the first duplicate. Both merge entry points read
+   `MergeRecordAction::canMerge()`. The header's dismiss writes a session key for the record, so the
+   section stays hidden for that record until the session ends.
 
 ## Approaches
 

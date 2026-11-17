@@ -20,7 +20,7 @@ final readonly class DuplicateRecordQuery
     public function __construct(private EntitiesByFieldValueQuery $entitiesByFieldValue) {}
 
     /**
-     * @return list<array{record: Company|People, value: string}>
+     * @return array<string, array{record: Company|People, value: string}>
      */
     public function get(User $user, Company|People $record): array
     {
@@ -30,7 +30,7 @@ final readonly class DuplicateRecordQuery
             return [];
         }
 
-        return array_values(collect(CanonicalValue::each($field, $record->getCustomFieldValue($field)))
+        return collect(CanonicalValue::each($field, $record->loadMissing('customFieldValues.customField')->getCustomFieldValue($field)))
             ->flatMap(fn (string $value): array => $this->entitiesByFieldValue
                 ->get($record::class, $field, CanonicalValue::spellings($field, $value), self::LIMIT + 1)
                 ->reject(fn (Company|People $match): bool => $match->is($record))
@@ -38,7 +38,8 @@ final readonly class DuplicateRecordQuery
                 ->all())
             ->unique(fn (array $match): string => (string) $match['record']->getKey())
             ->take(self::LIMIT)
-            ->all());
+            ->keyBy(fn (array $match): string => (string) $match['record']->getKey())
+            ->all();
     }
 
     private function identityField(Company|People $record): ?CustomField

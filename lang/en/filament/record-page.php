@@ -57,6 +57,7 @@ return [
         'pick' => 'Choose a record',
         'clear' => 'Choose a different record',
         'duplicate' => [
+            'checking' => 'Checking for duplicates…',
             'count' => '{1} 1 possible duplicate|[2,*] :count possible duplicates',
             'shares' => 'Shares :value',
             'dismiss' => 'Dismiss',

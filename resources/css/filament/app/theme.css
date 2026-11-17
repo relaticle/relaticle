@@ -1636,6 +1636,16 @@ html.fi-record-stacked .fi-record-layout {
     }
 }
 
+/* With no duplicates found, the deferred section's slot takes no grid row, so it adds no gap. */
+.fi-grid-col:has(> .fi-sc-component > .fi-record-duplicates):not(:has([data-duplicate-prompt], [data-duplicate-checking])) {
+    &,
+    & .fi-sc-component,
+    & .fi-record-duplicates,
+    & .fi-record-duplicates > div {
+        @apply contents;
+    }
+}
+
 .fi-record-header {
     @apply max-sm:flex-wrap max-sm:gap-y-2;
 
