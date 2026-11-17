@@ -194,7 +194,9 @@ it('keeps a long menu above the window edge and scrolls only its list', function
         SavedView::factory()->for($this->user)->for($this->workspace)->create(['name' => "Pipeline {$index}"]);
     }
 
-    Company::factory()->recycle([$this->user, $this->workspace])->count(12)->create();
+    if (str_contains($path, '%company%')) {
+        Company::factory()->recycle([$this->user, $this->workspace])->count(12)->create();
+    }
 
     if ($region) {
         addCompanyRegionField($this->user);
