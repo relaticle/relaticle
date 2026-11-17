@@ -185,7 +185,8 @@ either capability in the workspace.
   domains now belong to the kept record, so restore hits the existing `RestoreConflictMessage`, which
   is the right outcome.
 - **Force-deleting the duplicate later** is safe. `people.company_id` and `opportunities.company_id`
-  cascade on a hard delete, but nothing points at the duplicate any more.
+  are set null on a hard delete (`ON DELETE SET NULL`), and nothing points at the duplicate any
+  more anyway.
 - **Old Rela conversations and chat proposals** that mention the duplicate keep its ID. They show it
   as deleted, as they would after any delete.
 - **Email relink.** Changing the kept record's emails or domains already queues
