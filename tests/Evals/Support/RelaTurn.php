@@ -22,6 +22,7 @@ use Relaticle\Chat\Support\DisplayBlocks;
 use Relaticle\Chat\Support\ResolvedActionText;
 use Relaticle\Chat\Support\StoredSteps;
 use RuntimeException;
+use Tests\Evals\Support\ClaudeCode\ClaudeCodeGateway;
 use Throwable;
 
 final class RelaTurn
@@ -34,6 +35,11 @@ final class RelaTurn
 
     /** @var list<TurnEnvelope> */
     public static array $turns = [];
+
+    public static int $skipped = 0;
+
+    /** @var array<string, array{turn: int, error: string}> */
+    private static array $failedConversations = [];
 
     private readonly string $modelId;
 
@@ -74,17 +80,27 @@ final class RelaTurn
     public function __invoke(string $prompt): string
     {
         [$conversationId, $resumesTurnId] = $this->nextConversation();
+
+        if (isset(self::$failedConversations[$conversationId])) {
+            self::$skipped++;
+
+            throw new RuntimeException(sprintf('turn %d failed: %s', self::$failedConversations[$conversationId]['turn'], self::$failedConversations[$conversationId]['error']));
+        }
+
         $previousId = $this->latestAssistantRow($conversationId)?->id;
         $turnId = (string) Str::ulid();
 
-        try {
-            $envelope = $this->runWithRetries($prompt, $conversationId, $turnId, $previousId, $resumesTurnId);
-        } catch (Throwable $e) {
-            $envelope = TurnEnvelope::failed($e->getMessage());
-        }
+        $envelope = $this->runWithRetries($prompt, $conversationId, $turnId, $previousId, $resumesTurnId)
+            ->withRunner(EvalModels::runner(), ClaudeCodeGateway::takeRecords());
 
         self::$last = $this->envelope = $envelope;
         self::$turns[] = $envelope;
+
+        if ($envelope->error !== null) {
+            self::$failedConversations[$conversationId] = ['turn' => count(self::$turns), 'error' => $envelope->error];
+        }
+
+        EvalModels::assertServed($this->modelId, $envelope->servedModel);
 
         return $envelope->toJson();
     }
@@ -93,6 +109,8 @@ final class RelaTurn
     {
         self::$last = null;
         self::$turns = [];
+        self::$skipped = 0;
+        self::$failedConversations = [];
     }
 
     public function envelope(): TurnEnvelope
@@ -117,9 +135,25 @@ final class RelaTurn
             inputTokens: (int) ($usage['input_tokens'] ?? 0),
             outputTokens: (int) ($usage['output_tokens'] ?? 0),
             durationMs: (int) ($meta['duration_ms'] ?? 0),
-            error: null,
+            error: ($meta['error'] ?? false) === true ? self::storedErrorOf($meta) : null,
             stepsText: self::stepsTextOf($row->steps),
+            servedModel: (string) ($meta['model'] ?? ''),
+            cacheReadTokens: (int) ($usage['cache_read_input_tokens'] ?? 0),
+            cacheWriteTokens: (int) ($usage['cache_write_input_tokens'] ?? 0),
+            reasoningTokens: (int) ($usage['reasoning_tokens'] ?? 0),
+            steps: count(self::decodeList($row->steps)),
+            parallelToolCalls: count(array_filter(self::decodeList($row->steps), fn (mixed $step): bool => is_array($step) && count((array) ($step['tool_calls'] ?? [])) >= 2)),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     */
+    private static function storedErrorOf(array $meta): string
+    {
+        $failure = is_array($meta['failure'] ?? null) ? $meta['failure'] : [];
+
+        return (string) ($failure['message'] ?? $failure['class'] ?? 'The turn stored an error row.');
     }
 
     /**
@@ -127,12 +161,20 @@ final class RelaTurn
      */
     private static function stepsTextOf(mixed $steps): array
     {
-        $decoded = is_array($steps) ? $steps : json_decode((string) ($steps ?: '[]'), true);
-
         return array_values(array_map(
             fn (mixed $step): string => is_array($step) ? (string) ($step['content'] ?? '') : '',
-            is_array($decoded) ? $decoded : [],
+            self::decodeList($steps),
         ));
+    }
+
+    /**
+     * @return array<mixed>
+     */
+    private static function decodeList(mixed $value): array
+    {
+        $decoded = is_array($value) ? $value : json_decode((string) ($value ?: '[]'), true);
+
+        return is_array($decoded) ? $decoded : [];
     }
 
     /**
@@ -165,15 +207,22 @@ final class RelaTurn
     private function runWithRetries(string $prompt, string $conversationId, string $turnId, ?string $previousId, ?string $resumesTurnId): TurnEnvelope
     {
         $retryable = false;
-        $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $resumesTurnId, $retryable);
+        $extraAttempts = 0;
 
-        for ($retry = 0; $retry < self::MAX_RETRIES && $retryable; $retry++) {
-            Sleep::for(self::RETRY_DELAY_SECONDS)->seconds();
-
+        try {
             $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $resumesTurnId, $retryable);
+
+            while ($retryable && $extraAttempts < self::MAX_RETRIES) {
+                $extraAttempts++;
+                Sleep::for(self::RETRY_DELAY_SECONDS)->seconds();
+
+                $envelope = $this->runOnce($prompt, $conversationId, $turnId, $previousId, $resumesTurnId, $retryable);
+            }
+        } catch (Throwable $e) {
+            $envelope = TurnEnvelope::failed($e->getMessage());
         }
 
-        return $envelope;
+        return $envelope->withRetries($extraAttempts);
     }
 
     private function runOnce(string $prompt, string $conversationId, string $turnId, ?string $previousId, ?string $resumesTurnId, bool &$retryable): TurnEnvelope
@@ -193,6 +242,7 @@ final class RelaTurn
         } finally {
             Event::forget(ChatStreamRetrying::class);
             Event::forget(ChatStreamFailed::class);
+            ClaudeCodeGateway::releaseAll();
         }
 
         $row = $this->latestAssistantRow($conversationId);

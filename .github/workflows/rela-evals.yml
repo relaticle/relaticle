@@ -100,7 +100,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: rela-evals-${{ matrix.model }}
-          path: storage/evals/*.json
+          path: |
+            storage/evals/*.json
+            storage/evals/**
           if-no-files-found: error
 
       - name: Fail when the harness ran no turn
@@ -114,4 +116,3 @@ jobs:
             if ($ran === []) { fwrite(STDERR, "every case reported no turn ran: the harness is broken\n"); exit(1); }
             echo count($ran), " of ", count($report["cases"]), " cases ran a turn\n";
           '
-          if-no-files-found: warn

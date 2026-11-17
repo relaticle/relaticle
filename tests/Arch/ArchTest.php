@@ -364,6 +364,22 @@ foreach ([
         ->toUse('Relaticle\Cloud');
 }
 
+foreach ([
+    'App',
+    'Relaticle\Chat',
+    'Relaticle\Cloud',
+    'Relaticle\Documentation',
+    'Relaticle\EmailIntegration',
+    'Relaticle\ImportWizard',
+    'Relaticle\OnboardSeed',
+    'Relaticle\SystemAdmin',
+] as $shippedLayer) {
+    arch("{$shippedLayer} never reaches the Claude Code test gateway")
+        ->expect($shippedLayer)
+        ->not
+        ->toUse('Tests\Evals\Support\ClaudeCode');
+}
+
 arch('email integration owns its controllers, jobs, policies and timeline entries')
     ->expect('Relaticle\EmailIntegration')
     ->not

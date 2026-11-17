@@ -37,7 +37,7 @@ trait ReadsEnvelope
     }
 
     /**
-     * @return list<array{name: string, arguments: array<string, mixed>}>
+     * @return list<array{name: string, arguments: array<string, mixed>, step: int}>
      */
     private function toolCalls(string $output): array
     {
