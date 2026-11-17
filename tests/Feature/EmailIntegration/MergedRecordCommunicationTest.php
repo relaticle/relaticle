@@ -267,3 +267,21 @@ it('keeps a manual link when it collides with the kept record\'s auto link', fun
 
     expect(DB::table('emailables')->where('emailable_type', $type)->where('emailable_id', $kept->getKey())->value('link_source'))->toBe('manual');
 })->with(['company', 'people']);
+it('rolls back the moved communication when the merge fails at the final write', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $kept = communicationRecord('company', ['account_owner_id' => $member->getKey()]);
+    $duplicate = communicationRecord('company', ['email_count' => 2]);
+    $email = communicationEmail();
+    $duplicate->emails()->attach($email->getKey());
+
+    Event::listen(RecordMerged::class, fn () => $this->workspace->users()->detach($member));
+    livewire(ViewCompany::class, ['record' => $kept->getKey()])
+        ->callAction(mergeRecordAction(), data: ['picked_id' => $duplicate->getKey(), 'keep_picked' => false])
+        ->assertHasActionErrors(['picked_id']);
+
+    expect(mergeLinkedIds('emailables', 'email_id', $duplicate))->toBe([$email->getKey()])
+        ->and(mergeLinkedIds('emailables', 'email_id', $kept))->toBe([])
+        ->and((int) DB::table('companies')->where('id', $duplicate->getKey())->value('email_count'))->toBe(2)
+        ->and(Company::query()->find($duplicate->getKey()))->not->toBeNull();
+});
