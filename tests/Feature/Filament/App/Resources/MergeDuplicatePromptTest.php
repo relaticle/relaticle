@@ -63,7 +63,7 @@ it('names a company that shares a domain and opens the merge with it picked', fu
 
     expect($duplicate->fresh()->trashed())->toBeTrue();
 
-    duplicatePrompt($company)->assertDontSeeText(duplicateCount(1));
+    duplicatePrompt($company)->assertViewHas('hasDuplicates', false);
 });
 
 it('names a person that shares an email in another case', function (): void {
@@ -174,7 +174,7 @@ it('shows no prompt when the domains attribute is switched off', function (): vo
     duplicatePrompt($company)->assertViewHas('hasDuplicates', false);
 });
 
-it('counts at most ten duplicates, each once', function (): void {
+it('counts at most ten duplicates', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com', 'harborline.io']]);
     foreach (range(1, 6) as $number) {
         mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.com', 'harborline.io']]);
