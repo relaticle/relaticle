@@ -74,6 +74,15 @@ it('renders the dialog heading as markup, not as escaped text', function (): voi
 
 
 
+it('escapes a hostile record name inside the dialog heading markup', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => '<img src=x onerror=alert(1)>']);
+
+    $dialog = mergeDialogHtml(livewire(ViewCompany::class, ['record' => $kept->getKey()])->mountAction(mergeRecordAction()));
+
+    expect($dialog)->toContain('&lt;img src=x onerror=alert(1)&gt;')
+        ->not->toContain('<img src=x');
+});
+
 it('counts a note linked to both records once in the result preview', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
