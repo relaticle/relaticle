@@ -7,9 +7,7 @@
     class="@container grid gap-4"
     data-merge-dialog
     x-on:keydown.enter.window="
-        const openModals = document.querySelectorAll('.fi-modal-open')
-
-        if ($el.offsetParent === null || openModals[openModals.length - 1] !== $el.closest('.fi-modal') || $event.target.closest('input, textarea, select, button, a, [contenteditable]')) {
+        if (! isTopmost() || $event.target.closest('input, textarea, select, button, a, [contenteditable]')) {
             return
         }
 
