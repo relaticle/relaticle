@@ -63,7 +63,7 @@ final readonly class MoveMergedRecordCommunication
         return Email::query()
             ->withoutGlobalScopes()
             ->with('participants')
-            ->whereKey($this->sharedIds('emailables', 'email_id', 'emailable', $morph, $kept, $duplicate))
+            ->whereIn('id', $this->sharedIds('emailables', 'email_id', 'emailable', $morph, $kept, $duplicate))
             ->get();
     }
 
@@ -75,19 +75,15 @@ final readonly class MoveMergedRecordCommunication
         return Meeting::query()
             ->withoutGlobalScopes()
             ->with(['attendees.contact', 'connectedAccount'])
-            ->whereKey($this->sharedIds('meetingables', 'meeting_id', 'meetingable', $morph, $kept, $duplicate))
+            ->whereIn('id', $this->sharedIds('meetingables', 'meeting_id', 'meetingable', $morph, $kept, $duplicate))
             ->get();
     }
 
-    /**
-     * @return array<int, string>
-     */
-    private function sharedIds(string $table, string $itemColumn, string $prefix, string $morph, Company|People $kept, Company|People $duplicate): array
+    private function sharedIds(string $table, string $itemColumn, string $prefix, string $morph, Company|People $kept, Company|People $duplicate): Builder
     {
         return $this->linkedTo($table, $prefix, $morph, $duplicate)
             ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $kept)->select($itemColumn))
-            ->pluck($itemColumn)
-            ->all();
+            ->select($itemColumn);
     }
 
     private function linkedTo(string $table, string $prefix, string $morph, Company|People $record): Builder
