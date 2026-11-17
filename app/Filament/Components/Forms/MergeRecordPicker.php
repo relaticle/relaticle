@@ -28,7 +28,7 @@ use Livewire\Attributes\Renderless;
 
 /**
  * @phpstan-type Card array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
- * @phpstan-type Pairing array{picked: Company|People, current: Company|People, values: MergedValues}
+ * @phpstan-type Pairing array{picked: Company|People, values: MergedValues}
  */
 final class MergeRecordPicker extends Field
 {
@@ -192,7 +192,7 @@ final class MergeRecordPicker extends Field
         $values = resolve(CombineRecordValues::class)
             ->execute(...$keepsPicked ? [$picked, $current] : [$current, $picked]);
 
-        return ['picked' => $picked, 'current' => $current, 'values' => $values];
+        return ['picked' => $picked, 'values' => $values];
     }
 
     private function subject(): Company|People
@@ -269,15 +269,16 @@ final class MergeRecordPicker extends Field
     private function resultCard(array $pairing): array
     {
         $values = $pairing['values'];
-        $kept = $this->keepPickedState() ? $pairing['picked'] : $pairing['current'];
-        $dropped = $kept === $pairing['picked'] ? $pairing['current'] : $pairing['picked'];
+        $picked = $pairing['picked'];
+        $current = $this->currentRecord();
+        [$kept, $dropped] = $this->keepPickedState() ? [$picked, $current] : [$current, $picked];
 
         return $this->cardData(
             (string) $values->attributes['name'],
             $this->image($kept) ?? $this->image($dropped),
             $this->links($values->customFields[$this->detailCode()] ?? []),
-            fn (string $key): int => (int) $pairing['picked']->getAttribute("{$key}_count")
-                + (int) $pairing['current']->getAttribute("{$key}_count")
+            fn (string $key): int => (int) $picked->getAttribute("{$key}_count")
+                + (int) $current->getAttribute("{$key}_count")
                 - $this->sharedCount($key, $pairing),
         );
     }
@@ -298,7 +299,7 @@ final class MergeRecordPicker extends Field
             ->where($relation->getForeignPivotKeyName(), $record->getKey());
 
         return $linked($pairing['picked'])
-            ->whereIn($relation->getRelatedPivotKeyName(), $linked($pairing['current'])->select($relation->getRelatedPivotKeyName()))
+            ->whereIn($relation->getRelatedPivotKeyName(), $linked($this->currentRecord())->select($relation->getRelatedPivotKeyName()))
             ->count();
     }
 
