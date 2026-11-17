@@ -38,6 +38,7 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
                 $this->rasterPhotoOnDisk($user),
             ],
             'timezone' => ['nullable', 'string', 'max:64', 'timezone'],
+            'locale' => ['nullable', Rule::in(config('app.available_locales'))],
         ])->validateWithBag('updateProfileInformation');
 
         $this->assertEmailChangeIsVerified($user, (string) $input['email']);
@@ -55,6 +56,8 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
                 'name' => $input['name'],
                 'email' => $input['email'],
                 ...$this->timezoneAttribute($input),
+                ...$this->localeAttribute($input),
+                ...$this->localeAttribute($input),
             ])->save();
         }
     }
@@ -103,6 +106,7 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
             'email' => $input['email'],
             'email_verified_at' => null,
             ...$this->timezoneAttribute($input),
+            ...$this->localeAttribute($input),
         ])->save();
 
         $user->sendEmailVerificationNotification();
@@ -123,5 +127,20 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
         }
 
         return ['timezone' => blank($input['timezone']) ? null : (string) $input['timezone']];
+    }
+
+    /**
+     * Same contract as the timezone: an empty value clears it, an absent key leaves it alone.
+     *
+     * @param  array<string, mixed>  $input
+     * @return array<string, string|null>
+     */
+    private function localeAttribute(array $input): array
+    {
+        if (! array_key_exists('locale', $input)) {
+            return [];
+        }
+
+        return ['locale' => blank($input['locale']) ? null : (string) $input['locale']];
     }
 }

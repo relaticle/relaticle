@@ -19,6 +19,13 @@ final readonly class Locales
         Number::useLocale($locale);
     }
 
+    public static function current(): ?string
+    {
+        $locale = app()->getLocale();
+
+        return in_array($locale, config('app.available_locales'), true) ? $locale : null;
+    }
+
     public static function fromHeader(?string $acceptLanguage): ?string
     {
         if ($acceptLanguage === null) {

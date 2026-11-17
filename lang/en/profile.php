@@ -18,6 +18,11 @@ return [
             'helper_text' => 'Dates and times across the app are shown in this timezone.',
             'placeholder' => 'Select a timezone',
         ],
+        'locale' => [
+            'label' => 'Language',
+            'helper_text' => 'The app, emails and notifications use this language.',
+            'placeholder' => 'Select a language',
+        ],
         'current_password' => [
             'label' => 'Current Password',
         ],

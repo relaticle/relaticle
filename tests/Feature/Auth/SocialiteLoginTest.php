@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use App\Support\Locales;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
@@ -95,6 +96,18 @@ test('callback from socialite provider creates new user when user does not exist
     $this->assertAuthenticated();
 
     $response->assertRedirect(url()->getAppUrl());
+});
+
+test('a provider signup stores the guest language', function (): void {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('lang-1', 'Lang User', 'lang@example.com'),
+    );
+
+    $this->withUnencryptedCookies([Locales::COOKIE => 'de'])
+        ->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    expect(User::where('email', 'lang@example.com')->sole()->locale)->toBe('de');
 });
 
 test('a provider signup records which provider it used', function (): void {

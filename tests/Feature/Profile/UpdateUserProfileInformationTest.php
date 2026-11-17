@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Fortify\UpdateUserProfileInformation;
 use App\Actions\Profile\RequestEmailChange;
 use App\Enums\SocialiteProvider;
+use App\Filament\Pages\EditProfile;
 use App\Livewire\App\Profile\UpdateProfileInformation as UpdateProfileInformationComponent;
 use App\Models\User;
 use App\Models\UserSocialAccount;
@@ -12,6 +13,7 @@ use App\Notifications\Auth\NoticeOfEmailChangeRequest;
 use App\Notifications\Auth\VerifyEmailChange;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\SameOriginUrl;
+use Filament\Facades\Filament;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -809,5 +811,71 @@ describe('the raw profile-information route', function () {
         expect($user->fresh())
             ->name->toBe('Renamed Over Http')
             ->email->toBe('owner@example.com');
+    });
+});
+
+describe('language', function () {
+    test('saves and clears the language from the profile', function () {
+        $user = User::factory()->withPersonalWorkspace()->create(['email' => 'lang@example.com', 'locale' => null]);
+        $this->actingAs($user);
+        Filament::setTenant($user->currentWorkspace);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['name' => $user->name, 'email' => 'lang@example.com', 'locale' => 'de'])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh()->locale)->toBe('de');
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->assertFormSet(['locale' => 'de'])
+            ->fillForm(['name' => $user->name, 'email' => 'lang@example.com', 'locale' => null])
+            ->call('updateProfile')
+            ->assertHasNoFormErrors();
+
+        expect($user->fresh()->locale)->toBeNull();
+    });
+
+    test('reloads the page in the new language after a change', function () {
+        $user = User::factory()->withPersonalWorkspace()->create(['email' => 'reload@example.com', 'locale' => 'en']);
+        $this->actingAs($user);
+        Filament::setTenant($user->currentWorkspace);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['name' => $user->name, 'email' => 'reload@example.com', 'locale' => 'fr'])
+            ->call('updateProfile')
+            ->assertRedirect(EditProfile::getUrl(tenant: $user->currentWorkspace));
+
+        $this->get(EditProfile::getUrl(tenant: $user->currentWorkspace))->assertSeeHtml('lang="fr"');
+    });
+
+    test('stays on the page when the language is unchanged', function () {
+        $user = User::factory()->withWorkspace()->create(['email' => 'same@example.com', 'locale' => 'de']);
+        $this->actingAs($user);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['name' => 'Renamed', 'email' => 'same@example.com', 'locale' => 'de'])
+            ->call('updateProfile')
+            ->assertNoRedirect();
+    });
+
+    test('rejects a language outside the list', function () {
+        $user = User::factory()->withWorkspace()->create(['locale' => 'de']);
+
+        expect(fn () => $this->action->update($user, [
+            'name' => $user->name,
+            'email' => $user->email,
+            'locale' => 'xx',
+        ]))->toThrow(ValidationException::class);
+
+        expect($user->fresh()->locale)->toBe('de');
+    });
+
+    test('action leaves the language untouched when the key is absent from input', function () {
+        $user = User::factory()->withWorkspace()->create(['locale' => 'es']);
+
+        $this->action->update($user, ['name' => 'Renamed', 'email' => $user->email]);
+
+        expect($user->fresh()->locale)->toBe('es');
     });
 });

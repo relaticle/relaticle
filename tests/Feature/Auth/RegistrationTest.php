@@ -6,6 +6,7 @@ use App\Filament\Pages\Auth\Login;
 use App\Models\User;
 use App\Rules\IndisposableMailHost;
 use App\Support\Email\MailExchangers;
+use App\Support\Locales;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
@@ -442,4 +443,20 @@ it('does not consume analytics flags when tracking is disabled', function (): vo
 
     expect(view('filament.app.analytics')->render())->toBe('');
     expect(session()->get('fathom.track_signup'))->toBeTrue();
+});
+
+it('stores the guest language on email sign-up', function (): void {
+    $email = 'lang-'.uniqid().'@gmail.com';
+    Locales::apply('de');
+
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    Locales::apply(config('app.default_locale'));
+
+    expect(User::query()->where('email', $email)->sole()->locale)->toBe('de');
 });

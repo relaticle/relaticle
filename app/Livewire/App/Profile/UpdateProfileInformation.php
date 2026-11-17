@@ -8,6 +8,7 @@ use App\Actions\Fortify\UpdateUserProfileInformation as UpdateUserProfileInforma
 use App\Actions\Profile\RemoveUserProfilePhoto;
 use App\Actions\Profile\RequestEmailChange;
 use App\Filament\Actions\ConfirmIdentityAction;
+use App\Filament\Pages\EditProfile;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
@@ -32,6 +33,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use League\Flysystem\UnableToCheckFileExistence;
+use Locale;
 use Throwable;
 
 final class UpdateProfileInformation extends BaseLivewireComponent
@@ -41,7 +43,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
 
     public function mount(): void
     {
-        $data = $this->authUser()->only(['name', 'email', 'timezone']);
+        $data = $this->authUser()->only(['name', 'email', 'timezone', 'locale']);
         $data['email'] = $this->confirmedEmailTarget() ?? $data['email'];
 
         $this->form->fill($data);
@@ -61,6 +63,22 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             $offset = Date::now($identifier)->format('P');
 
             $options[$identifier] = "{$identifier} (UTC{$offset})";
+        }
+
+        return $options;
+    }
+
+    /**
+     * Each language is named in itself, so a reader can find theirs in any interface language.
+     *
+     * @return array<string, string>
+     */
+    private function localeOptions(): array
+    {
+        $options = [];
+
+        foreach (config('app.available_locales') as $code) {
+            $options[$code] = mb_ucfirst(Locale::getDisplayLanguage($code, $code));
         }
 
         return $options;
@@ -111,6 +129,12 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                             ->options($this->timezoneOptions())
                             ->searchable()
                             ->native(false),
+                        Select::make('locale')
+                            ->label(__('profile.form.locale.label'))
+                            ->helperText(__('profile.form.locale.helper_text'))
+                            ->placeholder(__('profile.form.locale.placeholder'))
+                            ->options($this->localeOptions())
+                            ->native(false),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('profile.actions.save'))
@@ -139,6 +163,8 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         $newEmail = $data['email'];
         $data['email'] = $this->authUser()->email;
 
+        $previousLocale = $this->authUser()->locale;
+
         resolve(UpdateUserProfileInformationAction::class)->update($this->authUser(), $data);
 
         if ($newEmail !== $this->authUser()->email) {
@@ -148,6 +174,10 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         }
 
         $this->sendNotification();
+
+        if ($this->authUser()->locale !== $previousLocale) {
+            $this->redirect(EditProfile::getUrl(tenant: Filament::getTenant()), navigate: false);
+        }
     }
 
     public function confirmEmailChangeAction(): ConfirmIdentityAction
@@ -208,7 +238,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         }
 
         $this->form->fill([
-            ...$this->authUser()->only(['name', 'email', 'timezone']),
+            ...$this->authUser()->only(['name', 'email', 'timezone', 'locale']),
             'profile_photo_path' => null,
         ]);
 
