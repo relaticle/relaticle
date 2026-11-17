@@ -38,6 +38,7 @@ use App\Http\Middleware\DenySearchIndexing;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\RedirectToWorkspaceSetup;
+use App\Http\Middleware\SetUserLocale;
 use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Http\Middleware\SuperviseImpersonation;
 use App\Livewire\App\AppDatabaseNotifications;
@@ -273,6 +274,27 @@ final class AppPanelProvider extends PanelProvider
     private function isCurrentPanel(): bool
     {
         return Filament::getCurrentPanel()?->getId() === 'app';
+    }
+
+    /**
+     * @return list<class-string|string>
+     */
+    private function middlewareStack(): array
+    {
+        return [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            'auth.context',
+            AuthenticateSession::class,
+            SetUserLocale::class,
+            ShareErrorsFromSession::class,
+            PreventRequestForgery::class,
+            SubstituteBindings::class,
+            DisableBladeIconComponents::class,
+            DispatchServingFilamentEvent::class,
+            DenySearchIndexing::class,
+        ];
     }
 
     /**
@@ -550,19 +572,7 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.navigation_groups.tasks'))
                     ->icon('lucide-shopping-cart'),
             ])
-            ->middleware([
-                EncryptCookies::class,
-                AddQueuedCookiesToResponse::class,
-                StartSession::class,
-                'auth.context',
-                AuthenticateSession::class,
-                ShareErrorsFromSession::class,
-                PreventRequestForgery::class,
-                SubstituteBindings::class,
-                DisableBladeIconComponents::class,
-                DispatchServingFilamentEvent::class,
-                DenySearchIndexing::class,
-            ])
+            ->middleware($this->middlewareStack())
             ->authGuard('web')
             ->authPasswordBroker('users')
             ->authMiddleware($this->authMiddleware())

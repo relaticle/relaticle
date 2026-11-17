@@ -17,6 +17,7 @@ use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Tables\ResizableColumns;
 use App\Http\Middleware\PreventRequestForgery;
 use App\Http\Middleware\ReadAcrossWorkspaces;
+use App\Http\Middleware\SetUserLocale;
 use App\Http\Responses\LoginResponse;
 use App\Jobs\CompleteExport;
 use App\Livewire\FilamentNotifications;
@@ -51,6 +52,7 @@ use App\Support\CustomFieldSettingsSchema;
 use App\Support\Http\RequestAbility;
 use App\Support\Impersonation\ImpersonationSessionHandler;
 use App\Support\Impersonation\Impersonator;
+use App\Support\Locales;
 use App\Support\Mail\ParksInactiveRecipientsTransport;
 use App\Support\Markdown\TableAwareLeagueDriver;
 use App\Support\Media\MediaLookup;
@@ -406,6 +408,12 @@ final class AppServiceProvider extends ServiceProvider
         // The facade resolves authentication before hostname-specific sessions are configured.
         PendingActivityLog::beforeLogging(StampsActivity::apply(...));
 
+        Context::hydrated(function (ContextRepository $context): void {
+            $locale = $context->getHidden('locale');
+
+            Locales::apply(is_string($locale) ? $locale : (string) config('app.default_locale'));
+        });
+
         Context::dehydrating(function (ContextRepository $context): void {
             $administratorId = $this->app->make(Impersonator::class)->administratorId(request());
 
@@ -518,7 +526,7 @@ final class AppServiceProvider extends ServiceProvider
         Livewire::component(Notifications::class, FilamentNotifications::class);
 
         // Livewire matches persistent middleware by class, so the panel's alias alone skips update requests.
-        Livewire::addPersistentMiddleware(ReadAcrossWorkspaces::class);
+        Livewire::addPersistentMiddleware([ReadAcrossWorkspaces::class, SetUserLocale::class]);
 
         ImportWizard::continueUrlUsing((new ContinueWithSetupChat)(...));
     }

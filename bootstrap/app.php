@@ -13,6 +13,7 @@ use App\Http\Middleware\RequireIdentityConfirmation;
 use App\Http\Middleware\RequireOperationGrant;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetApiWorkspaceContext;
+use App\Http\Middleware\SetUserLocale;
 use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\SuperviseImpersonation;
@@ -20,6 +21,7 @@ use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
 use App\Models\ActivityLog\Activity;
 use App\Models\Notification;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\SetUpPanel;
 use Filament\Notifications\Notification as FilamentNotification;
@@ -112,6 +114,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global rather than the web group: Filament panel routes do not run the web group.
         $middleware->append(SecurityHeaders::class);
 
+        $middleware->encryptCookies(except: [Locales::COOKIE]);
+
         $middleware->authenticateSessions();
 
         $middleware->web(
@@ -121,6 +125,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 EnsureAuthenticationComplete::class,
                 StopImpersonationOnLogout::class,
                 SuperviseImpersonation::class,
+                SetUserLocale::class,
             ],
         );
 
