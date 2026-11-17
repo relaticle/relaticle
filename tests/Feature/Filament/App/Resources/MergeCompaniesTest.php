@@ -258,19 +258,6 @@ it('makes the kept company real data when the duplicate was real', function (): 
     expect(Company::query()->whereKey($kept->getKey())->exists())->toBeTrue();
 });
 
-it('refuses a duplicate deleted after the page opened', function (): void {
-    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept'], ['icp' => true]);
-    $duplicate = mergeCompanyRecord($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/gone']]);
-
-    $page = livewire(ViewCompany::class, ['record' => $kept->getKey()]);
-    $duplicate->delete();
-    $page->callAction(mergeRecordAction(), data: ['picked_id' => $duplicate->getKey(), 'keep_picked' => false])
-        ->assertHasActionErrors(['picked_id']);
-
-    expect(mergeCompanyValue($kept, 'linkedin'))->toBeNull()
-        ->and($kept->refresh()->name)->toBe('Kept');
-});
-
 it('shows the unavailable error when the duplicate is deleted after it was picked in the dialog', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept'], ['icp' => true]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/gone']]);
