@@ -74,6 +74,24 @@ it('renders the dialog heading as markup, not as escaped text', function (): voi
 
 
 
+it('counts a note linked to both records once in the result preview', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    [$shared, $onlyDuplicate] = Note::factory()->count(2)->recycle([$this->user, $this->workspace])->create()->all();
+    $kept->notes()->attach($shared->getKey());
+    $duplicate->notes()->attach([$shared->getKey(), $onlyDuplicate->getKey()]);
+
+    $picker = mergeDialogPicker(
+        livewire(ViewCompany::class, ['record' => $kept->getKey()])
+            ->mountAction(mergeRecordAction())
+            ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]),
+    );
+
+    $counts = collect($picker->getResultCard()['counts'])->keyBy('key');
+
+    expect($counts['notes']['count'])->toBe(2);
+});
+
 it('refuses the record search once the member loses merge rights', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $admin = User::factory()->create();
