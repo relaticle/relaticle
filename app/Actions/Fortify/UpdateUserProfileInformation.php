@@ -57,7 +57,6 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
                 'email' => $input['email'],
                 ...$this->timezoneAttribute($input),
                 ...$this->localeAttribute($input),
-                ...$this->localeAttribute($input),
             ])->save();
         }
     }

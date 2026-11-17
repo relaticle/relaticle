@@ -49,12 +49,6 @@ final readonly class SetUserLocale
             return $user->effectiveLocale();
         }
 
-        $cookie = $request->cookie(Locales::COOKIE);
-
-        if (is_string($cookie) && in_array($cookie, config('app.available_locales'), true)) {
-            return $cookie;
-        }
-
-        return Locales::fromHeader($request->header('Accept-Language')) ?? (string) config('app.default_locale');
+        return Locales::fromRequest($request) ?? (string) config('app.default_locale');
     }
 }

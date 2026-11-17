@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Support;
 
 use Closure;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Number;
@@ -22,11 +23,15 @@ final readonly class Locales
         Number::useLocale($locale);
     }
 
-    public static function current(): ?string
+    public static function fromRequest(Request $request): ?string
     {
-        $locale = app()->getLocale();
+        $cookie = $request->cookie(self::COOKIE);
 
-        return in_array($locale, config('app.available_locales'), true) ? $locale : null;
+        if (is_string($cookie) && in_array($cookie, config('app.available_locales'), true)) {
+            return $cookie;
+        }
+
+        return self::fromHeader($request->header('Accept-Language'));
     }
 
     public static function fromHeader(?string $acceptLanguage): ?string

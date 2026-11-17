@@ -14,7 +14,9 @@ use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\EmailProbeLimiter;
 use App\Support\EmailAddress;
+use App\Support\Locales;
 use App\Support\SameOriginUrl;
+use Closure;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use DateTimeZone;
 use Filament\Actions\Action;
@@ -43,10 +45,23 @@ final class UpdateProfileInformation extends BaseLivewireComponent
 
     public function mount(): void
     {
-        $data = $this->authUser()->only(['name', 'email', 'timezone', 'locale']);
+        $data = $this->profileState();
         $data['email'] = $this->confirmedEmailTarget() ?? $data['email'];
 
         $this->form->fill($data);
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    private function profileState(): array
+    {
+        $user = $this->authUser();
+
+        return [
+            ...$user->only(['name', 'email', 'timezone']),
+            'locale' => in_array($user->locale, config('app.available_locales'), true) ? $user->locale : null,
+        ];
     }
 
     /**
@@ -163,8 +178,6 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         $newEmail = $data['email'];
         $data['email'] = $this->authUser()->email;
 
-        $previousLocale = $this->authUser()->locale;
-
         resolve(UpdateUserProfileInformationAction::class)->update($this->authUser(), $data);
 
         if ($newEmail !== $this->authUser()->email) {
@@ -173,9 +186,21 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             return;
         }
 
-        $this->sendNotification();
+        $this->inUserLocale(fn () => $this->sendNotification());
+        $this->reloadWhenLanguageChanged();
+    }
 
-        if ($this->authUser()->locale !== $previousLocale) {
+    /**
+     * @param  Closure(): void  $callback
+     */
+    private function inUserLocale(Closure $callback): void
+    {
+        Locales::within($this->authUser()->effectiveLocale(), $callback);
+    }
+
+    private function reloadWhenLanguageChanged(): void
+    {
+        if ($this->authUser()->effectiveLocale() !== app()->getLocale()) {
             $this->redirect(EditProfile::getUrl(tenant: Filament::getTenant()), navigate: false);
         }
     }
@@ -197,7 +222,8 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                 $this->form->validate();
             })
             ->confirmedUsing(function (?string $operationTarget): void {
-                $this->sendEmailChangeVerification((string) $operationTarget);
+                $this->inUserLocale(fn () => $this->sendEmailChangeVerification((string) $operationTarget));
+                $this->reloadWhenLanguageChanged();
             });
     }
 
@@ -238,7 +264,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         }
 
         $this->form->fill([
-            ...$this->authUser()->only(['name', 'email', 'timezone', 'locale']),
+            ...$this->profileState(),
             'profile_photo_path' => null,
         ]);
 

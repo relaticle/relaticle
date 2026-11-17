@@ -110,6 +110,18 @@ test('a provider signup stores the guest language', function (): void {
     expect(User::where('email', 'lang@example.com')->sole()->locale)->toBe('de');
 });
 
+test('a provider signup stores no language when the guest sent no listed one', function (): void {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('lang-2', 'Lang User', 'nolang@example.com'),
+    );
+
+    $this->withHeaders(['Accept-Language' => 'ja-JP,ja;q=0.9'])
+        ->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    expect(User::where('email', 'nolang@example.com')->sole()->locale)->toBeNull();
+});
+
 test('a provider signup records which provider it used', function (): void {
     config(['relaticle.features.signup_challenge' => true]);
     Feature::flushCache();

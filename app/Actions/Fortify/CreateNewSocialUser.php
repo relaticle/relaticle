@@ -33,7 +33,7 @@ final readonly class CreateNewSocialUser implements CreatesNewSocialUsers
         return DB::transaction(fn () => tap(User::query()->create([
             'name' => $input['name'],
             'email' => $input['email'],
-            'locale' => Locales::current(),
+            'locale' => Locales::fromRequest(request()),
         ]), function (User $user): void {
             event(new Registered($user));
             if ($user->markEmailAsVerified()) {

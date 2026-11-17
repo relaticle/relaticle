@@ -16,7 +16,7 @@ final readonly class CreateNewUser
             'name' => $this->guessNameFromEmail($email),
             'email' => $email,
             'password' => $password,
-            'locale' => Locales::current(),
+            'locale' => Locales::fromRequest(request()),
         ]);
     }
 
