@@ -67,14 +67,14 @@ final readonly class MergeRecords
             $kept instanceof Company => $this->moveCompanyLinks($kept, (string) $duplicate->getKey()),
             $kept instanceof People => DB::table('opportunities')
                 ->where('contact_id', $duplicate->getKey())
-                ->update(['contact_id' => $kept->getKey()]),
+                ->update(['contact_id' => $kept->getKey(), 'updated_at' => now()]),
         };
     }
 
     private function moveCompanyLinks(Company $kept, string $duplicateId): void
     {
-        DB::table('people')->where('company_id', $duplicateId)->update(['company_id' => $kept->getKey()]);
-        DB::table('opportunities')->where('company_id', $duplicateId)->update(['company_id' => $kept->getKey()]);
+        DB::table('people')->where('company_id', $duplicateId)->update(['company_id' => $kept->getKey(), 'updated_at' => now()]);
+        DB::table('opportunities')->where('company_id', $duplicateId)->update(['company_id' => $kept->getKey(), 'updated_at' => now()]);
         $this->moveLogoIfKeptHasNone($kept, $duplicateId);
     }
 

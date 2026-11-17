@@ -201,6 +201,21 @@ it('blocks a merge that would give a company more than five domains', function (
         ->and(mergeCompanyValue($kept, 'domains'))->toHaveCount(3);
 });
 
+it('bumps updated_at on repointed people and opportunities', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
+    $personTouchedAt = $person->refresh()->updated_at;
+    $opportunityTouchedAt = $opportunity->refresh()->updated_at;
+    $this->travelTo(now()->addHour());
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect($person->refresh()->updated_at->greaterThan($personTouchedAt))->toBeTrue()
+        ->and($opportunity->refresh()->updated_at->greaterThan($opportunityTouchedAt))->toBeTrue();
+});
+
 it('makes the kept company real data when the duplicate was real', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['creation_source' => CreationSource::SAMPLE]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['creation_source' => CreationSource::WEB]);
