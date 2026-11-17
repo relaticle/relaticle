@@ -2,6 +2,8 @@
     class="relative flex h-full min-h-56 items-center justify-center rounded-xl border border-dashed border-gray-300 dark:border-white/20"
     x-data="{
         open: false,
+        opening: 0,
+        pending: null,
         active: 0,
         query: '',
         results: [],
@@ -42,14 +44,21 @@
 
             document.querySelector('[data-merge-dialog] [data-merge-clear]')?.focus()
         },
+        dismiss() {
+            this.pending = null
+            this.open = false
+        },
         async show() {
+            // The popover opens only once its rows are in the DOM, so it never paints and then grows.
+            const ticket = this.pending = ++this.opening
             this.active = 0
 
             if (this.results.length === 0 && this.query === '') {
-                this.search()
+                await this.search()
+                await this.$nextTick()
             }
 
-            const sheet = $refs.trigger.closest('.fi-modal-window')
+            const sheet = $refs.trigger?.closest('.fi-modal-window')
 
             const giveUp = performance.now() + 600
 
@@ -57,6 +66,11 @@
                 await new Promise(requestAnimationFrame)
             }
 
+            if (this.pending !== ticket || ! $refs.trigger) {
+                return
+            }
+
+            this.pending = null
             this.place()
             this.open = true
             this.$nextTick(() => this.$refs.search.focus({ preventScroll: true }))
@@ -83,9 +97,9 @@
     }"
     x-on:resize.window="open && place()"
     x-on:scroll.window.capture="open && place()"
-    x-on:keydown.escape="if (open) { $event.stopPropagation(); open = false; $refs.trigger.focus() }"
-    x-on:keydown.tab="open = false"
-    x-on:click.outside="open = false"
+    x-on:keydown.escape="if (open || pending) { $event.stopPropagation(); dismiss(); $refs.trigger?.focus() }"
+    x-on:keydown.tab="dismiss()"
+    x-on:click.outside="dismiss()"
 >
     <button
         type="button"
