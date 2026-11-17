@@ -22,20 +22,20 @@ final readonly class CombineRecordValues
         private WorkspaceCustomFields $workspaceFields,
     ) {}
 
-    public function execute(Company|People $kept, Company|People $duplicate): MergedValues
+    public function execute(Company|People $priority, Company|People $other, Company|People|null $merged = null): MergedValues
     {
-        $kept->loadMissing('customFieldValues.customField');
-        $duplicate->loadMissing('customFieldValues.customField');
+        $priority->loadMissing('customFieldValues.customField');
+        $other->loadMissing('customFieldValues.customField');
 
         $customFields = [];
         $overLimit = [];
         $attachmentUuids = [];
 
-        foreach ($this->activeFields($kept) as $field) {
+        foreach ($this->activeFields($priority) as $field) {
             $value = $this->combine(
                 $field,
-                $this->swapDuplicateForKept(field: $field, value: $kept->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
-                $this->swapDuplicateForKept(field: $field, value: $duplicate->getCustomFieldValue($field), kept: $kept, duplicate: $duplicate),
+                $this->swapOriginalsForMerged($field, $priority->getCustomFieldValue($field), $priority, $other, $merged),
+                $this->swapOriginalsForMerged($field, $other->getCustomFieldValue($field), $priority, $other, $merged),
             );
 
             $customFields[$field->code] = $value;
@@ -49,37 +49,37 @@ final readonly class CombineRecordValues
             }
         }
 
-        return new MergedValues($this->attributes($kept, $duplicate), $customFields, $overLimit, array_values(array_unique($attachmentUuids)));
+        return new MergedValues($this->attributes($priority, $other), $customFields, $overLimit, array_values(array_unique($attachmentUuids)));
     }
 
     /**
      * @return array<string, mixed>
      */
-    private function attributes(Company|People $kept, Company|People $duplicate): array
+    private function attributes(Company|People $priority, Company|People $other): array
     {
-        $attributes = ['name' => $this->pick($kept->name, $duplicate->name)];
+        $attributes = ['name' => $this->pick($priority->name, $other->name)];
 
-        if ($kept instanceof Company && $duplicate instanceof Company) {
-            $attributes['account_owner_id'] = $this->currentMemberId($kept, $kept->account_owner_id) ?? $this->currentMemberId($kept, $duplicate->account_owner_id);
+        if ($priority instanceof Company && $other instanceof Company) {
+            $attributes['account_owner_id'] = $this->currentMemberId($priority, $priority->account_owner_id) ?? $this->currentMemberId($priority, $other->account_owner_id);
         }
 
-        if ($kept instanceof People && $duplicate instanceof People) {
-            $attributes['company_id'] = $this->liveCompanyId($kept, $kept->company_id) ?? $this->liveCompanyId($kept, $duplicate->company_id);
+        if ($priority instanceof People && $other instanceof People) {
+            $attributes['company_id'] = $this->liveCompanyId($priority, $priority->company_id) ?? $this->liveCompanyId($priority, $other->company_id);
         }
 
         return $attributes;
     }
 
-    private function currentMemberId(Company $kept, ?string $userId): ?string
+    private function currentMemberId(Company $record, ?string $userId): ?string
     {
         if ($userId === null) {
             return null;
         }
 
-        return $kept->loadMissing('workspace')->workspace->hasMemberNow($userId) ? $userId : null;
+        return $record->loadMissing('workspace')->workspace->hasMemberNow($userId) ? $userId : null;
     }
 
-    private function liveCompanyId(People $kept, ?string $companyId): ?string
+    private function liveCompanyId(People $record, ?string $companyId): ?string
     {
         if ($companyId === null) {
             return null;
@@ -87,7 +87,7 @@ final readonly class CombineRecordValues
 
         $isLive = Company::query()
             ->withoutGlobalScope(WorkspaceScope::class)
-            ->where('workspace_id', $kept->workspace_id)
+            ->where('workspace_id', $record->workspace_id)
             ->whereKey($companyId)
             ->exists();
 
@@ -104,14 +104,16 @@ final readonly class CombineRecordValues
             ->where('active', true);
     }
 
-    private function swapDuplicateForKept(CustomField $field, mixed $value, Company|People $kept, Company|People $duplicate): mixed
+    private function swapOriginalsForMerged(CustomField $field, mixed $value, Company|People $priority, Company|People $other, Company|People|null $merged): mixed
     {
-        if (! $this->linksToSameEntity($field, $kept) || ! is_array($value)) {
+        if ($merged === null || ! $this->linksToSameEntity($field, $merged) || ! is_array($value)) {
             return $value;
         }
 
+        $originalIds = [$priority->getKey(), $other->getKey()];
+
         $linkedIds = array_map(
-            fn (mixed $linkedId): mixed => $linkedId === $duplicate->getKey() ? $kept->getKey() : $linkedId,
+            fn (mixed $linkedId): mixed => in_array($linkedId, $originalIds, true) ? $merged->getKey() : $linkedId,
             $value,
         );
 
@@ -124,13 +126,13 @@ final readonly class CombineRecordValues
             && $field->lookup_type === $record->getMorphClass();
     }
 
-    private function combine(CustomField $field, mixed $keptValue, mixed $duplicateValue): mixed
+    private function combine(CustomField $field, mixed $priorityValue, mixed $otherValue): mixed
     {
-        if ($this->isList($field) && is_array($keptValue) && is_array($duplicateValue)) {
-            return $this->unique($field, [...$keptValue, ...$duplicateValue]);
+        if ($this->isList($field) && is_array($priorityValue) && is_array($otherValue)) {
+            return $this->unique($field, [...$priorityValue, ...$otherValue]);
         }
 
-        return $this->pick($keptValue, $duplicateValue);
+        return $this->pick($priorityValue, $otherValue);
     }
 
     /**
@@ -176,9 +178,9 @@ final readonly class CombineRecordValues
         return $field->settings->max_values;
     }
 
-    private function pick(mixed $keptValue, mixed $duplicateValue): mixed
+    private function pick(mixed $priorityValue, mixed $otherValue): mixed
     {
-        return $this->isFilled($keptValue) ? $keptValue : $duplicateValue;
+        return $this->isFilled($priorityValue) ? $priorityValue : $otherValue;
     }
 
     private function isFilled(mixed $value): bool

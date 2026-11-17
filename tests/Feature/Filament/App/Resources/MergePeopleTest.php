@@ -70,7 +70,7 @@ function mergePeopleWith(People $current, People $picked, bool $keepPicked = fal
         ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
 }
 
-it('rolls back every moved link and the history when the final write fails validation', function (): void {
+it('rolls back the new person, every moved link and the history when the final write fails validation', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $kept = mergePersonRecord($this->workspace, $this->user, ['company_id' => null]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['company_id' => $company->getKey()]);
@@ -87,6 +87,7 @@ it('rolls back every moved link and the history when the final write fails valid
 
     expect($duplicateRows)->not->toBeEmpty()
         ->and(People::query()->find($duplicate->getKey()))->not->toBeNull()
+        ->and(People::withTrashed()->count())->toBe(2)
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
         ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([$task->getKey()])
         ->and($opportunity->refresh()->contact_id)->toBe($duplicate->getKey())
@@ -94,16 +95,19 @@ it('rolls back every moved link and the history when the final write fails valid
         ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
 });
 
-it('combines emails with the kept person first and without repeats', function (): void {
+it('creates a new person with the current person\'s emails first and without repeats', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'dana@gmail.com']]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.'], ['emails' => ['dana@gmail.com', 'whitfield@outlook.com']]);
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect($kept->refresh()->name)->toBe('Dana Whitfield')
-        ->and(mergePersonValue($kept, 'emails'))->toBe(['dana@brightline.com', 'dana@gmail.com', 'whitfield@outlook.com'])
-        ->and(People::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue()
-        ->and(People::query()->find($kept->getKey()))->not->toBeNull();
+    $merged = mergedRecord();
+
+    expect($merged->getKey())->not->toBeIn([$kept->getKey(), $duplicate->getKey()])
+        ->and($merged->name)->toBe('Dana Whitfield')
+        ->and(mergePersonValue($merged, 'emails'))->toBe(['dana@brightline.com', 'dana@gmail.com', 'whitfield@outlook.com'])
+        ->and(People::withTrashed()->find($kept->getKey())->trashed())->toBeTrue()
+        ->and(People::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
 });
 
 it('combines tags without repeating one that differs only in letter case or spacing', function (): void {
@@ -119,7 +123,7 @@ it('combines tags without repeating one that differs only in letter case or spac
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergePersonValue($kept, 'segments'))->toBe(['VIP', 'Enterprise', 'Partner']);
+    expect(mergePersonValue(mergedRecord(), 'segments'))->toBe(['VIP', 'Enterprise', 'Partner']);
 });
 
 it('blocks a merge that would give a person more than five emails', function (): void {
@@ -129,20 +133,21 @@ it('blocks a merge that would give a person more than five emails', function ():
     mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
 
     expect(People::query()->whereKey($duplicate->getKey())->exists())->toBeTrue()
+        ->and(People::query()->count())->toBe(2)
         ->and(mergePersonValue($kept, 'emails'))->toHaveCount(3);
 });
 
-it('keeps the phone number of the kept person where both hold one', function (): void {
+it('keeps the current person\'s phone number where both hold one', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, [], ['phone_number' => ['+14155550101']]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['phone_number' => ['+14155550199'], 'job_title' => 'VP Sales']);
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergePersonValue($kept, 'phone_number'))->toBe(['+14155550101'])
-        ->and(mergePersonValue($kept, 'job_title'))->toBe('VP Sales');
+    expect(mergePersonValue(mergedRecord(), 'phone_number'))->toBe(['+14155550101'])
+        ->and(mergePersonValue(mergedRecord(), 'job_title'))->toBe('VP Sales');
 });
 
-it('fills the company from the duplicate only when the kept person has none', function (): void {
+it('fills the company from the other person only when the current person has none', function (): void {
     $acme = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme']);
     $globex = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Globex']);
     $withoutCompany = mergePersonRecord($this->workspace, $this->user);
@@ -151,13 +156,14 @@ it('fills the company from the duplicate only when the kept person has none', fu
     $duplicateTwo = mergePersonRecord($this->workspace, $this->user, ['company_id' => $globex->getKey()]);
 
     mergePeopleWith($withoutCompany, $duplicateOne)->assertHasNoActionErrors();
+    $fromEmpty = mergedRecord();
     mergePeopleWith($withCompany, $duplicateTwo)->assertHasNoActionErrors();
 
-    expect($withoutCompany->refresh()->company_id)->toBe($globex->getKey())
-        ->and($withCompany->refresh()->company_id)->toBe($acme->getKey());
+    expect($fromEmpty->company_id)->toBe($globex->getKey())
+        ->and(mergedRecord()->company_id)->toBe($acme->getKey());
 });
 
-it('treats the kept person\'s soft-deleted company as empty and takes the duplicate\'s live company', function (bool $duplicateHasCompany): void {
+it('treats the current person\'s soft-deleted company as empty and takes the other person\'s live company', function (bool $duplicateHasCompany): void {
     $gone = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $live = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $kept = mergePersonRecord($this->workspace, $this->user, ['company_id' => $gone->getKey()]);
@@ -166,8 +172,7 @@ it('treats the kept person\'s soft-deleted company as empty and takes the duplic
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect($kept->refresh()->company_id)->toBe($duplicateHasCompany ? $live->getKey() : null)
-        ->and(People::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+    expect(mergedRecord()->company_id)->toBe($duplicateHasCompany ? $live->getKey() : null);
 })->with([true, false]);
 
 it('finds a person by name or by any of their emails', function (string $term, array $found): void {
@@ -204,20 +209,22 @@ it('leaves the current person, a trashed person and another workspace\'s person 
     expect(mergeSearchNames(ViewPeople::class, $kept, 'Dana'))->toBe(['Dana Live']);
 });
 
-it('keeps the other person when the member swaps the two', function (): void {
+it('lets the other person win when the member swaps the two', function (): void {
     $current = mergePersonRecord($this->workspace, $this->user, ['name' => 'Sam'], ['emails' => ['sam@one.com']]);
     $other = mergePersonRecord($this->workspace, $this->user, ['name' => 'Samuel'], ['emails' => ['samuel@two.com']]);
 
-    mergePeopleWith($current, $other, keepPicked: true)
-        ->assertHasNoActionErrors()
-        ->assertRedirect(PeopleResource::getUrl('view', ['record' => $other]));
+    $page = mergePeopleWith($current, $other, keepPicked: true)->assertHasNoActionErrors();
+    $merged = mergedRecord();
 
-    expect(People::query()->find($other->getKey())->name)->toBe('Samuel')
+    $page->assertRedirect(PeopleResource::getUrl('view', ['record' => $merged]));
+
+    expect($merged->name)->toBe('Samuel')
         ->and(People::withTrashed()->find($current->getKey())->trashed())->toBeTrue()
-        ->and(mergePersonValue($other, 'emails'))->toBe(['samuel@two.com', 'sam@one.com']);
+        ->and(People::withTrashed()->find($other->getKey())->trashed())->toBeTrue()
+        ->and(mergePersonValue($merged, 'emails'))->toBe(['samuel@two.com', 'sam@one.com']);
 });
 
-it('moves the duplicate\'s notes and tasks and keeps a shared one once', function (): void {
+it('moves both people\'s notes and tasks and keeps a shared one once', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user);
     $duplicate = mergePersonRecord($this->workspace, $this->user);
     [$onlyDuplicate, $shared, $onlyKept] = Note::factory()->count(3)->recycle([$this->user, $this->workspace])->create()->all();
@@ -228,14 +235,17 @@ it('moves the duplicate\'s notes and tasks and keeps a shared one once', functio
     $kept->tasks()->attach($sharedTask->getKey());
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+    $merged = mergedRecord();
 
-    expect(mergeLinkedIds('noteables', 'note_id', $kept))->toBe(collect([$onlyDuplicate, $shared, $onlyKept])->map->getKey()->sort()->values()->all())
-        ->and(mergeLinkedIds('taskables', 'task_id', $kept))->toBe(collect([$taskOnDuplicate, $sharedTask])->map->getKey()->sort()->values()->all())
+    expect(mergeLinkedIds('noteables', 'note_id', $merged))->toBe(collect([$onlyDuplicate, $shared, $onlyKept])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('taskables', 'task_id', $merged))->toBe(collect([$taskOnDuplicate, $sharedTask])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('noteables', 'note_id', $kept))->toBe([])
+        ->and(mergeLinkedIds('taskables', 'task_id', $kept))->toBe([])
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([])
         ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([]);
 });
 
-it('moves the opportunities the duplicate is the point of contact for', function (): void {
+it('moves the opportunities either person is the point of contact for', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user);
     $duplicate = mergePersonRecord($this->workspace, $this->user);
     $bystander = mergePersonRecord($this->workspace, $this->user);
@@ -245,12 +255,12 @@ it('moves the opportunities the duplicate is the point of contact for', function
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect($theirs->refresh()->contact_id)->toBe($kept->getKey())
-        ->and($mine->refresh()->contact_id)->toBe($kept->getKey())
+    expect($theirs->refresh()->contact_id)->toBe(mergedRecord()->getKey())
+        ->and($mine->refresh()->contact_id)->toBe(mergedRecord()->getKey())
         ->and($other->refresh()->contact_id)->toBe($bystander->getKey());
 });
 
-it('moves the duplicate\'s history to the kept person and adds a merged entry', function (): void {
+it('moves both people\'s history to the new person and adds one merged entry', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.']);
     $duplicate->update(['name' => 'Dana W']);
@@ -258,17 +268,19 @@ it('moves the duplicate\'s history to the kept person and adds a merged entry', 
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    $merged = Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->sole();
+    $mergedId = mergedRecord()->getKey();
+    $merged = Activity::query()->where('subject_id', $mergedId)->where('event', 'record_merged')->sole();
 
     expect($duplicateRows)->not->toBeEmpty()
-        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$kept->getKey()])
-        ->and($merged->properties['duplicate_name'])->toBe('Dana W')
+        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$mergedId])
+        ->and($merged->properties['merged_names'])->toBe(['Dana Whitfield', 'Dana W'])
         ->and($merged->causer_id)->toBe($this->user->getKey())
         ->and($merged->workspace_id)->toBe($this->workspace->getKey())
-        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted']);
+        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted'])
+        ->and(Activity::query()->where('subject_id', $kept->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted']);
 });
 
-it('repoints record-type attributes on other records to the kept person', function (): void {
+it('repoints record-type attributes on other records to the new person', function (): void {
     $field = CustomField::factory()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'opportunity',
@@ -291,13 +303,14 @@ it('repoints record-type attributes on other records to the kept person', functi
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
     $read = fn (Opportunity $opportunity): mixed => Opportunity::query()->with('customFieldValues.customField')->findOrFail($opportunity->getKey())->getCustomFieldValue($field);
+    $merged = mergedRecord();
 
-    expect($read($both))->toBe([$kept->getKey()])
-        ->and($read($onlyDuplicate))->toBe([$other->getKey(), $kept->getKey()])
+    expect($read($both))->toBe([$merged->getKey()])
+        ->and($read($onlyDuplicate))->toBe([$other->getKey(), $merged->getKey()])
         ->and($read($unrelated))->toBe([$other->getKey()]);
 });
 
-it('points the kept person\'s own record attribute at itself instead of the duplicate', function (): void {
+it('points the new person\'s record attribute at itself where an original named the other', function (): void {
     $field = CustomField::factory()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'people',
@@ -316,7 +329,9 @@ it('points the kept person\'s own record attribute at itself instead of the dupl
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergePersonValue($kept, 'colleagues'))->toBe([$kept->getKey(), $partner->getKey(), $supplier->getKey()]);
+    $merged = mergedRecord();
+
+    expect(mergePersonValue($merged, 'colleagues'))->toBe([$merged->getKey(), $partner->getKey(), $supplier->getKey()]);
 });
 
 it('copies a rich-text value with its image from the duplicate', function (): void {
@@ -341,36 +356,39 @@ it('copies a rich-text value with its image from the duplicate', function (): vo
 
     $image = Media::query()->where('uuid', $image->uuid)->firstOrFail();
 
-    expect(mergePersonValue($kept, 'brief'))->toContain($image->uuid)
-        ->and($image->model_id)->toBe($kept->getKey())
+    $merged = mergedRecord();
+
+    expect(mergePersonValue($merged, 'brief'))->toContain($image->uuid)
+        ->and($image->model_id)->toBe($merged->getKey())
         ->and($image->collection_name)->toBe(MediaCollection::Attachments->value);
 });
 
-it('shows who merged the duplicate on the kept person\'s timeline', function (): void {
+it('shows who merged the two people on the new person\'s timeline', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.']);
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    livewire(ActivityLogLivewire::class, ['subjectClass' => People::class, 'subjectKey' => $kept->getKey()])
-        ->assertSee(e($this->user->name.' merged Dana W. into this record'), escape: false)
+    livewire(ActivityLogLivewire::class, ['subjectClass' => People::class, 'subjectKey' => mergedRecord()->getKey()])
+        ->assertSee(e($this->user->name.' merged Dana Whitfield and Dana W. into this record'), escape: false)
         ->assertSeeHtml('data-event="record_merged"');
 });
 
-it('makes the kept person real data when the duplicate was real', function (): void {
+it('makes the new person real data when the other person was real', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, ['creation_source' => CreationSource::SAMPLE]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['creation_source' => CreationSource::WEB]);
 
     mergePeopleWith($kept, $duplicate);
+    $merged = mergedRecord();
 
-    expect($kept->refresh()->creation_source)->toBe(CreationSource::WEB);
+    expect($merged->creation_source)->toBe(CreationSource::WEB);
 
     resolve(RemoveSampleData::class)->execute($this->user, $this->workspace);
 
-    expect(People::query()->whereKey($kept->getKey())->exists())->toBeTrue();
+    expect(People::query()->whereKey($merged->getKey())->exists())->toBeTrue();
 });
 
-it('hides merge from a member who cannot update and delete the person', function (): void {
+it('hides merge from a member who cannot create and delete people', function (): void {
     $person = mergePersonRecord($this->workspace, $this->user);
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
@@ -458,7 +476,7 @@ it('counts emails case-insensitively before applying the limit', function (): vo
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergePersonValue($kept, 'emails'))->toBe(['a1@x.com', 'a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com']);
+    expect(mergePersonValue(mergedRecord(), 'emails'))->toBe(['a1@x.com', 'a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com']);
 });
 
 it('locks both people with one select in id order, whichever one is kept', function (): void {

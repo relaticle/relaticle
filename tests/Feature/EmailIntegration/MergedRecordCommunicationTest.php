@@ -104,13 +104,15 @@ it('moves emails, meetings, participants and attendees and keeps a shared link o
     $attendee = MeetingAttendee::factory()->create(['meeting_id' => $duplicateMeeting->getKey(), $contactColumn => $duplicate->getKey()]);
 
     mergeCommunication($type, $kept, $duplicate);
+    $merged = mergedRecord();
 
-    expect(mergeLinkedIds('emailables', 'email_id', $kept))->toBe(collect([$onlyKept, $onlyDuplicate, $shared])->map->getKey()->sort()->values()->all())
+    expect(mergeLinkedIds('emailables', 'email_id', $merged))->toBe(collect([$onlyKept, $onlyDuplicate, $shared])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('emailables', 'email_id', $kept))->toBe([])
         ->and(mergeLinkedIds('emailables', 'email_id', $duplicate))->toBe([])
-        ->and(mergeLinkedIds('meetingables', 'meeting_id', $kept))->toBe(collect([$sharedMeeting, $duplicateMeeting])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('meetingables', 'meeting_id', $merged))->toBe(collect([$sharedMeeting, $duplicateMeeting])->map->getKey()->sort()->values()->all())
         ->and(mergeLinkedIds('meetingables', 'meeting_id', $duplicate))->toBe([])
-        ->and($participant->refresh()->{$contactColumn})->toBe($kept->getKey())
-        ->and($attendee->refresh()->{$contactColumn})->toBe($kept->getKey());
+        ->and($participant->refresh()->{$contactColumn})->toBe($merged->getKey())
+        ->and($attendee->refresh()->{$contactColumn})->toBe($merged->getKey());
 })->with(['company', 'people']);
 
 it('adds up the counters without counting a shared email or meeting twice', function (string $type): void {
@@ -137,29 +139,31 @@ it('adds up the counters without counting a shared email or meeting twice', func
     }
 
     mergeCommunication($type, $kept, $duplicate);
+    $merged = mergedRecord();
 
-    $row = DB::table($kept->getTable())->where('id', $kept->getKey())->first();
+    $row = DB::table($merged->getTable())->where('id', $merged->getKey())->first();
 
     expect([$row->email_count, $row->inbound_email_count, $row->outbound_email_count, $row->meeting_count])->toBe([3, 2, 1, 2])
         ->and([$row->last_email_at, $row->last_meeting_at, $row->last_interaction_at])->toBe(['2026-03-05 09:00:00', '2026-02-01 10:00:00', '2026-03-05 09:00:00']);
 })->with(['company', 'people']);
 
-it('keeps the kept record\'s dates when the duplicate has none', function (): void {
+it('keeps the current record\'s dates when the other has none', function (): void {
     $kept = communicationRecord('company', ['email_count' => 1, 'inbound_email_count' => 1, 'last_email_at' => '2026-01-10 09:00:00']);
     $duplicate = communicationRecord('company');
 
     mergeCommunication('company', $kept, $duplicate);
+    $merged = mergedRecord();
 
-    expect($kept->fresh()->email_count)->toBe(1)
-        ->and($kept->fresh()->last_email_at->toDateTimeString())->toBe('2026-01-10 09:00:00')
-        ->and($kept->fresh()->last_meeting_at)->toBeNull();
+    expect($merged->fresh()->email_count)->toBe(1)
+        ->and($merged->fresh()->last_email_at->toDateTimeString())->toBe('2026-01-10 09:00:00')
+        ->and($merged->fresh()->last_meeting_at)->toBeNull();
 });
 
 it('moves the communication of merged records while the email feature is off', function (string $type): void {
     config()->set('relaticle.features.email_integration', false);
     Feature::flushCache();
     Event::forget(RecordMerged::class);
-    (new EmailIntegrationServiceProvider(app()))->boot();
+    new EmailIntegrationServiceProvider(app())->boot();
     $contactColumn = $type === 'company' ? 'company_id' : 'contact_id';
     $kept = communicationRecord($type);
     $duplicate = communicationRecord($type, ['email_count' => 2]);
@@ -171,17 +175,18 @@ it('moves the communication of merged records while the email feature is off', f
     $attendee = MeetingAttendee::factory()->create(['meeting_id' => $meeting->getKey(), $contactColumn => $duplicate->getKey()]);
 
     mergeCommunication($type, $kept, $duplicate);
+    $merged = mergedRecord();
 
-    expect(mergeLinkedIds('emailables', 'email_id', $kept))->toBe([$email->getKey()])
+    expect(mergeLinkedIds('emailables', 'email_id', $merged))->toBe([$email->getKey()])
         ->and(mergeLinkedIds('emailables', 'email_id', $duplicate))->toBe([])
-        ->and(mergeLinkedIds('meetingables', 'meeting_id', $kept))->toBe([$meeting->getKey()])
-        ->and($participant->refresh()->{$contactColumn})->toBe($kept->getKey())
-        ->and($attendee->refresh()->{$contactColumn})->toBe($kept->getKey())
-        ->and((int) DB::table($kept->getTable())->where('id', $kept->getKey())->value('email_count'))->toBe(2)
+        ->and(mergeLinkedIds('meetingables', 'meeting_id', $merged))->toBe([$meeting->getKey()])
+        ->and($participant->refresh()->{$contactColumn})->toBe($merged->getKey())
+        ->and($attendee->refresh()->{$contactColumn})->toBe($merged->getKey())
+        ->and((int) DB::table($merged->getTable())->where('id', $merged->getKey())->value('email_count'))->toBe(2)
         ->and((int) DB::table($duplicate->getTable())->where('id', $duplicate->getKey())->value('email_count'))->toBe(0);
 })->with(['company', 'people']);
 
-it('zeroes the duplicate\'s counters so a restore cannot double count', function (string $type): void {
+it('zeroes both originals\' counters so a restore cannot double count', function (string $type): void {
     $kept = communicationRecord($type, ['email_count' => 1]);
     $duplicate = communicationRecord($type, [
         'email_count' => 4, 'inbound_email_count' => 2, 'outbound_email_count' => 2,
@@ -190,6 +195,7 @@ it('zeroes the duplicate\'s counters so a restore cannot double count', function
     ]);
 
     mergeCommunication($type, $kept, $duplicate);
+    $merged = mergedRecord();
 
     $row = DB::table($duplicate->getTable())->where('id', $duplicate->getKey())->first();
 
@@ -200,7 +206,8 @@ it('zeroes the duplicate\'s counters so a restore cannot double count', function
         ->and($row->last_email_at)->toBeNull()
         ->and($row->last_meeting_at)->toBeNull()
         ->and($row->last_interaction_at)->toBeNull()
-        ->and((int) DB::table($kept->getTable())->where('id', $kept->getKey())->value('email_count'))->toBe(5);
+        ->and((int) DB::table($kept->getTable())->where('id', $kept->getKey())->value('email_count'))->toBe(0)
+        ->and((int) DB::table($merged->getTable())->where('id', $merged->getKey())->value('email_count'))->toBe(5);
 })->with(['company', 'people']);
 
 it('never lets a combined counter go below zero', function (string $type): void {
@@ -215,8 +222,9 @@ it('never lets a combined counter go below zero', function (string $type): void 
     }
 
     mergeCommunication($type, $kept, $duplicate);
+    $merged = mergedRecord();
 
-    $row = DB::table($kept->getTable())->where('id', $kept->getKey())->first();
+    $row = DB::table($merged->getTable())->where('id', $merged->getKey())->first();
 
     expect([$row->email_count, $row->inbound_email_count, $row->outbound_email_count, $row->meeting_count])->toBe([0, 0, 0, 0]);
 })->with(['company', 'people']);
@@ -255,7 +263,7 @@ it('issues the same number of queries however many emails and meetings the two r
     expect(mergeQueryCountWithSharedCommunication(9))->toBe(mergeQueryCountWithSharedCommunication(2));
 });
 
-it('keeps a manual link when it collides with the kept record\'s auto link', function (string $type): void {
+it('keeps a manual link when it collides with the current record\'s auto link', function (string $type): void {
     $kept = communicationRecord($type);
     $duplicate = communicationRecord($type);
     $shared = communicationEmail();
@@ -263,8 +271,9 @@ it('keeps a manual link when it collides with the kept record\'s auto link', fun
     $duplicate->emails()->attach($shared->getKey(), ['link_source' => 'manual']);
 
     mergeCommunication($type, $kept, $duplicate);
+    $merged = mergedRecord();
 
-    expect(DB::table('emailables')->where('emailable_type', $type)->where('emailable_id', $kept->getKey())->value('link_source'))->toBe('manual');
+    expect(DB::table('emailables')->where('emailable_type', $type)->where('emailable_id', $merged->getKey())->value('link_source'))->toBe('manual');
 })->with(['company', 'people']);
 
 it('rolls back the moved communication when the merge fails at the final write', function (): void {

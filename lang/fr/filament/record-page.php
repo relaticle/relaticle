@@ -48,7 +48,7 @@ return [
     ],
     'merge' => [
         'heading' => 'Fusionner',
-        'notice' => "La fiche de droite l'emporte lorsque les deux fiches contiennent une valeur.",
+        'notice' => "La fusion crée une nouvelle fiche. La fiche de droite l'emporte lorsque les deux fiches contiennent une valeur.",
         'search' => 'Rechercher',
         'swap' => 'Inverser les fiches',
         'submit' => 'Fusionner les fiches',

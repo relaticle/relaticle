@@ -16,31 +16,31 @@ final readonly class MoveRecordLinks
 {
     public function __construct(private MoveMorphPivot $movePivot) {}
 
-    public function execute(Company|People $kept, Company|People $duplicate, MergedValues $mergedValues): void
+    public function execute(Company|People $merged, Company|People $original, MergedValues $mergedValues): void
     {
-        $morph = $kept->getMorphClass();
+        $morph = $merged->getMorphClass();
 
-        $this->movePivot->execute('noteables', 'note_id', 'noteable', $kept, $duplicate);
-        $this->movePivot->execute('taskables', 'task_id', 'taskable', $kept, $duplicate);
-        $this->moveAttachments($morph, $kept, $duplicate, $mergedValues->attachmentUuids);
-        $this->repointRecordAttributes($morph, $kept, $duplicate);
+        $this->movePivot->execute('noteables', 'note_id', 'noteable', $merged, $original);
+        $this->movePivot->execute('taskables', 'task_id', 'taskable', $merged, $original);
+        $this->moveAttachments($morph, $merged, $original, $mergedValues->attachmentUuids);
+        $this->repointRecordAttributes($morph, $merged, $original);
     }
 
     /**
      * @param  list<string>  $referencedUuids
      */
-    private function moveAttachments(string $morph, Company|People $kept, Company|People $duplicate, array $referencedUuids): void
+    private function moveAttachments(string $morph, Company|People $merged, Company|People $original, array $referencedUuids): void
     {
         DB::table('media')
-            ->where('workspace_id', $kept->workspace_id)
+            ->where('workspace_id', $merged->workspace_id)
             ->where('model_type', $morph)
-            ->where('model_id', $duplicate->getKey())
+            ->where('model_id', $original->getKey())
             ->where('collection_name', MediaCollection::Attachments->value)
             ->whereIn('uuid', $referencedUuids)
-            ->update(['model_id' => $kept->getKey()]);
+            ->update(['model_id' => $merged->getKey()]);
     }
 
-    private function repointRecordAttributes(string $morph, Company|People $kept, Company|People $duplicate): void
+    private function repointRecordAttributes(string $morph, Company|People $merged, Company|People $original): void
     {
         DB::update(
             'update custom_field_values set json_value = ('
@@ -55,9 +55,9 @@ final readonly class MoveRecordLinks
                 .'select id from custom_fields where tenant_id = ? and type = ? and lookup_type = ?'
             .') and exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element = ?)',
             [
-                $duplicate->getKey(), $kept->getKey(),
-                $kept->workspace_id, $kept->workspace_id, CustomFieldType::RECORD->value, $morph,
-                $duplicate->getKey(),
+                $original->getKey(), $merged->getKey(),
+                $merged->workspace_id, $merged->workspace_id, CustomFieldType::RECORD->value, $morph,
+                $original->getKey(),
             ],
         );
     }

@@ -138,8 +138,9 @@ it('merges when Enter is pressed outside the search once a record is picked', fu
 
     $page->keys('[data-merge-dialog]', 'Enter')
         ->assertSee('Records merged')
-        ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
         ->assertNoJavaScriptErrors();
+
+    $page->assertPathIs("/app/{$this->workspace->slug}/companies/".mergedRecord()->getKey());
 
     expect(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });

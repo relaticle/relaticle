@@ -36,7 +36,7 @@ final class MergeRecordAction extends Action
     public static function canMerge(Model $record): bool
     {
         return ($record instanceof Company || $record instanceof People)
-            && Gate::allows('update', $record)
+            && Gate::allows('create', $record::class)
             && Gate::allows('delete', $record);
     }
 
@@ -59,7 +59,7 @@ final class MergeRecordAction extends Action
             ->successNotificationTitle(__('filament/record-page.notifications.records_merged'))
             ->action(function (array $data, ViewRecord $livewire): void {
                 try {
-                    $kept = $this->merge($data);
+                    $merged = $this->merge($data);
                 } catch (ValidationException $exception) {
                     throw ValidationException::withMessages([
                         $this->picker()->getStatePath() => Arr::flatten($exception->errors()),
@@ -68,7 +68,7 @@ final class MergeRecordAction extends Action
 
                 $this->success();
 
-                $url = $livewire::getResource()::getUrl('view', ['record' => $kept]);
+                $url = $livewire::getResource()::getUrl('view', ['record' => $merged]);
 
                 $livewire->redirect($url, navigate: FilamentView::hasSpaMode($url));
             });
@@ -111,12 +111,12 @@ final class MergeRecordAction extends Action
             throw ValidationException::withMessages(['picked_id' => __('filament/record-page.merge.unavailable')]);
         }
 
-        [$kept, $duplicate] = ($data['keep_picked'] ?? false) === true ? [$picked, $current] : [$current, $picked];
+        [$priority, $other] = ($data['keep_picked'] ?? false) === true ? [$picked, $current] : [$current, $picked];
 
         /** @var User $user */
         $user = Filament::auth()->user();
 
-        return resolve(MergeRecords::class)->execute($user, $kept, $duplicate);
+        return resolve(MergeRecords::class)->execute($user, $priority, $other);
     }
 
     private function subject(): Company|People

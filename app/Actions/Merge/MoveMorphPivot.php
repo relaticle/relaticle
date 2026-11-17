@@ -11,15 +11,15 @@ use Illuminate\Support\Facades\DB;
 
 final readonly class MoveMorphPivot
 {
-    public function execute(string $table, string $itemColumn, string $prefix, Company|People $kept, Company|People $duplicate): void
+    public function execute(string $table, string $itemColumn, string $prefix, Company|People $merged, Company|People $original): void
     {
-        $morph = $kept->getMorphClass();
+        $morph = $merged->getMorphClass();
 
-        $this->linkedTo($table, $prefix, $morph, $duplicate)
-            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $kept)->select($itemColumn))
+        $this->linkedTo($table, $prefix, $morph, $original)
+            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $merged)->select($itemColumn))
             ->delete();
 
-        $this->linkedTo($table, $prefix, $morph, $duplicate)->update([$prefix.'_id' => $kept->getKey()]);
+        $this->linkedTo($table, $prefix, $morph, $original)->update([$prefix.'_id' => $merged->getKey()]);
     }
 
     private function linkedTo(string $table, string $prefix, string $morph, Company|People $record): Builder

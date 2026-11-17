@@ -32,6 +32,7 @@ use App\Support\ActivityLog\MergedActivityRenderer;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Database\Events\TransactionBeginning;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
@@ -95,37 +96,58 @@ function mergeMultiSelect(Workspace $workspace): CustomField
     return $field;
 }
 
-it('keeps the current company and fills its empty values from the duplicate', function (): void {
+it('creates a new company from both and fills the current company\'s empty values from the other', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health'], ['domains' => ['brightlinehealth.com']]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health Inc.'], ['icp' => true, 'domains' => ['brightline.health', 'brightlinehealth.com']]);
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect($kept->refresh()->name)->toBe('Brightline Health')
-        ->and(mergeCompanyValue($kept, 'icp'))->toBeTrue()
-        ->and(mergeCompanyValue($kept, 'domains'))->toBe(['brightlinehealth.com', 'brightline.health'])
-        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue()
-        ->and(Company::query()->find($kept->getKey()))->not->toBeNull();
+    $merged = mergedRecord();
+
+    expect($merged->getKey())->not->toBeIn([$kept->getKey(), $duplicate->getKey()])
+        ->and($merged->name)->toBe('Brightline Health')
+        ->and(mergeCompanyValue($merged, 'icp'))->toBeTrue()
+        ->and(mergeCompanyValue($merged, 'domains'))->toBe(['brightlinehealth.com', 'brightline.health'])
+        ->and(Company::withTrashed()->find($kept->getKey())->trashed())->toBeTrue()
+        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
 });
 
-it('keeps the other company when the member swaps the two', function (): void {
+it('gives the new company the current company\'s creator and source, and no onboarding turn', function (): void {
+    $creator = User::factory()->create();
+    $this->workspace->users()->attach($creator, ['role' => WorkspaceRole::Member->value]);
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['creation_source' => CreationSource::MCP, 'creator_id' => $creator->getKey()]);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['creation_source' => CreationSource::WEB]);
+    Cache::flush();
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(mergedRecord()->creator_id)->toBe($creator->getKey())
+        ->and(mergedRecord()->creation_source)->toBe(CreationSource::MCP)
+        ->and(Cache::has("chat:assistant-arrival-scheduled:{$this->workspace->getKey()}"))->toBeFalse();
+});
+
+it('lets the other company win when the member swaps the two', function (): void {
     $current = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind'], ['domains' => ['northwind.com']]);
     $other = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind Traders'], ['domains' => ['northwindtraders.com']]);
 
-    mergeWith($current, $other, keepPicked: true)
-        ->assertHasNoActionErrors()
-        ->assertRedirect(CompanyResource::getUrl('view', ['record' => $other]));
+    $page = mergeWith($current, $other, keepPicked: true)->assertHasNoActionErrors();
+    $merged = mergedRecord();
 
-    expect(Company::query()->find($other->getKey())->name)->toBe('Northwind Traders')
+    $page->assertRedirect(CompanyResource::getUrl('view', ['record' => $merged]));
+
+    expect($merged->name)->toBe('Northwind Traders')
         ->and(Company::withTrashed()->find($current->getKey())->trashed())->toBeTrue()
-        ->and(mergeCompanyValue($other, 'domains'))->toBe(['northwindtraders.com', 'northwind.com']);
+        ->and(Company::withTrashed()->find($other->getKey())->trashed())->toBeTrue()
+        ->and(mergeCompanyValue($merged, 'domains'))->toBe(['northwindtraders.com', 'northwind.com']);
 });
 
-it('redirects to the kept company after a merge', function (): void {
+it('redirects to the new company after a merge', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
 
-    mergeWith($kept, $duplicate)->assertRedirect(CompanyResource::getUrl('view', ['record' => $kept]));
+    $page = mergeWith($kept, $duplicate);
+
+    $page->assertRedirect(CompanyResource::getUrl('view', ['record' => mergedRecord()]));
 });
 
 it('never overwrites a filled value with an empty one', function (): void {
@@ -134,18 +156,16 @@ it('never overwrites a filled value with an empty one', function (): void {
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue($kept, 'linkedin'))->toBe(['https://linkedin.com/company/kept'])
-        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+    expect(mergeCompanyValue(mergedRecord(), 'linkedin'))->toBe(['https://linkedin.com/company/kept']);
 });
 
-it('keeps the value of the kept company where both hold one', function (): void {
+it('keeps the current company\'s value where both hold one', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/kept']]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, [], ['linkedin' => ['https://linkedin.com/company/duplicate']]);
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue($kept, 'linkedin'))->toBe(['https://linkedin.com/company/kept'])
-        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+    expect(mergeCompanyValue(mergedRecord(), 'linkedin'))->toBe(['https://linkedin.com/company/kept']);
 });
 
 it('combines multi-select values with the kept record first', function (): void {
@@ -159,10 +179,10 @@ it('combines multi-select values with the kept record first', function (): void 
 
     mergeWith($kept, $duplicate);
 
-    expect(mergeCompanyValue($kept, 'segments'))->toBe([$enterprise, $eu]);
+    expect(mergeCompanyValue(mergedRecord(), 'segments'))->toBe([$enterprise, $eu]);
 });
 
-it('hides merge from a member who cannot update and delete the record', function (): void {
+it('hides merge from a member who cannot create and delete records', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user);
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
@@ -194,7 +214,7 @@ it('refuses the merge when the member loses merge rights while the dialog is ope
         ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
 });
 
-it('offers merge to a member who can update and delete the record', function (): void {
+it('offers merge to a member who can create and delete records', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])->assertActionVisible(mergeRecordAction());
@@ -222,6 +242,7 @@ it('blocks a merge that would give a company more than five domains', function (
     mergeWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
 
     expect(Company::query()->whereKey($duplicate->getKey())->exists())->toBeTrue()
+        ->and(Company::query()->count())->toBe(2)
         ->and(mergeCompanyValue($kept, 'domains'))->toHaveCount(3);
 });
 
@@ -267,17 +288,18 @@ it('bumps updated_at on repointed people and opportunities', function (): void {
         ->and($opportunity->refresh()->updated_at->greaterThan($opportunityTouchedAt))->toBeTrue();
 });
 
-it('makes the kept company real data when the duplicate was real', function (): void {
+it('makes the new company real data when the other company was real', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['creation_source' => CreationSource::SAMPLE]);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['creation_source' => CreationSource::WEB]);
 
     mergeWith($kept, $duplicate);
+    $merged = mergedRecord();
 
-    expect($kept->refresh()->creation_source)->toBe(CreationSource::WEB);
+    expect($merged->creation_source)->toBe(CreationSource::WEB);
 
     resolve(RemoveSampleData::class)->execute($this->user, $this->workspace);
 
-    expect(Company::query()->whereKey($kept->getKey())->exists())->toBeTrue();
+    expect(Company::query()->whereKey($merged->getKey())->exists())->toBeTrue();
 });
 
 it('shows the unavailable error when the duplicate is deleted after it was picked in the dialog', function (): void {
@@ -332,8 +354,7 @@ it('leaves the owner empty when the duplicate\'s owner is not a workspace member
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect($kept->refresh()->account_owner_id)->toBeNull()
-        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+    expect(mergedRecord()->account_owner_id)->toBeNull();
 });
 
 it('takes the duplicate\'s owner when the kept company has none and the owner is still a member', function (): void {
@@ -342,7 +363,7 @@ it('takes the duplicate\'s owner when the kept company has none and the owner is
 
     mergeWith($kept, $duplicate);
 
-    expect($kept->refresh()->account_owner_id)->toBe($this->user->getKey());
+    expect(mergedRecord()->account_owner_id)->toBe($this->user->getKey());
 });
 
 it('drops the kept company\'s owner who left the workspace and takes the duplicate\'s member owner', function (bool $duplicateHasOwner): void {
@@ -352,11 +373,10 @@ it('drops the kept company\'s owner who left the workspace and takes the duplica
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect($kept->refresh()->account_owner_id)->toBe($duplicateHasOwner ? $this->user->getKey() : null)
-        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+    expect(mergedRecord()->account_owner_id)->toBe($duplicateHasOwner ? $this->user->getKey() : null);
 })->with([true, false]);
 
-it('rolls back every moved link and the history when the final write fails validation', function (): void {
+it('rolls back the new company, every moved link and the history when the final write fails validation', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['account_owner_id' => $member->getKey()]);
@@ -375,6 +395,7 @@ it('rolls back every moved link and the history when the final write fails valid
 
     expect($duplicateRows)->not->toBeEmpty()
         ->and(Company::query()->find($duplicate->getKey()))->not->toBeNull()
+        ->and(Company::withTrashed()->count())->toBe(2)
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
         ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([$task->getKey()])
         ->and(mergeLinkedIds('noteables', 'note_id', $kept))->toBe([])
@@ -441,7 +462,7 @@ it('keeps the current company again when the member picks a different duplicate 
         ->assertSet('mountedActions.0.data.keep_picked', false);
 });
 
-it('moves the duplicate\'s notes and tasks and keeps a shared one once', function (): void {
+it('moves both companies\' notes and tasks and keeps a shared one once', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
     [$onlyDuplicate, $shared, $onlyKept] = Note::factory()->count(3)->recycle([$this->user, $this->workspace])->create()->all();
@@ -452,9 +473,12 @@ it('moves the duplicate\'s notes and tasks and keeps a shared one once', functio
     $kept->tasks()->attach($sharedTask->getKey());
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+    $merged = mergedRecord();
 
-    expect(mergeLinkedIds('noteables', 'note_id', $kept))->toBe(collect([$onlyDuplicate, $shared, $onlyKept])->map->getKey()->sort()->values()->all())
-        ->and(mergeLinkedIds('taskables', 'task_id', $kept))->toBe(collect([$taskOnDuplicate, $sharedTask])->map->getKey()->sort()->values()->all())
+    expect(mergeLinkedIds('noteables', 'note_id', $merged))->toBe(collect([$onlyDuplicate, $shared, $onlyKept])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('taskables', 'task_id', $merged))->toBe(collect([$taskOnDuplicate, $sharedTask])->map->getKey()->sort()->values()->all())
+        ->and(mergeLinkedIds('noteables', 'note_id', $kept))->toBe([])
+        ->and(mergeLinkedIds('taskables', 'task_id', $kept))->toBe([])
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([])
         ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([]);
 });
@@ -480,12 +504,14 @@ it('copies a rich-text value with its image from the duplicate', function (): vo
 
     $image = Media::query()->where('uuid', $image->uuid)->firstOrFail();
 
-    expect(mergeCompanyValue($kept, 'brief'))->toContain($image->uuid)
-        ->and($image->model_id)->toBe($kept->getKey())
+    $merged = mergedRecord();
+
+    expect(mergeCompanyValue($merged, 'brief'))->toContain($image->uuid)
+        ->and($image->model_id)->toBe($merged->getKey())
         ->and($image->collection_name)->toBe(MediaCollection::Attachments->value);
 });
 
-it('repoints record-type attributes on other records to the kept company', function (): void {
+it('repoints record-type attributes on other records to the new company', function (): void {
     $field = CustomField::factory()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'opportunity',
@@ -508,9 +534,10 @@ it('repoints record-type attributes on other records to the kept company', funct
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
     $read = fn (Opportunity $opportunity): mixed => Opportunity::query()->with('customFieldValues.customField')->findOrFail($opportunity->getKey())->getCustomFieldValue($field);
+    $merged = mergedRecord();
 
-    expect($read($both))->toBe([$kept->getKey()])
-        ->and($read($onlyDuplicate))->toBe([$other->getKey(), $kept->getKey()])
+    expect($read($both))->toBe([$merged->getKey()])
+        ->and($read($onlyDuplicate))->toBe([$other->getKey(), $merged->getKey()])
         ->and($read($unrelated))->toBe([$other->getKey()]);
 });
 
@@ -537,11 +564,10 @@ it('repoints a record-type attribute that also holds a non-string element', func
 
     $stored = DB::table('custom_field_values')->where('custom_field_id', $field->getKey())->where('entity_id', $opportunity->getKey())->value('json_value');
 
-    expect(json_decode((string) $stored, true))->toBe([123, null, $kept->getKey()])
-        ->and(Company::withTrashed()->find($duplicate->getKey())->trashed())->toBeTrue();
+    expect(json_decode((string) $stored, true))->toBe([123, null, mergedRecord()->getKey()]);
 });
 
-it('points the kept company\'s own record attributes at itself instead of the duplicate', function (): void {
+it('points the new company\'s record attributes at itself where an original named the other', function (): void {
     foreach (['related_companies' => true, 'parent_company' => false] as $code => $allowMultiple) {
         CustomField::factory()->create([
             'tenant_id' => $this->workspace->getKey(),
@@ -563,12 +589,13 @@ it('points the kept company\'s own record attributes at itself instead of the du
     $duplicate->saveCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'parent_company'), [$kept->getKey()]);
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+    $merged = mergedRecord();
 
-    expect(mergeCompanyValue($kept, 'related_companies'))->toBe([$kept->getKey(), $partner->getKey(), $supplier->getKey()])
-        ->and(mergeCompanyValue($kept, 'parent_company'))->toBe([$kept->getKey()]);
+    expect(mergeCompanyValue($merged, 'related_companies'))->toBe([$merged->getKey(), $partner->getKey(), $supplier->getKey()])
+        ->and(mergeCompanyValue($merged, 'parent_company'))->toBe([$merged->getKey()]);
 });
 
-it('moves the duplicate\'s people and opportunities to the kept company', function (): void {
+it('moves the people and opportunities to the new company', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
     $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
@@ -576,11 +603,11 @@ it('moves the duplicate\'s people and opportunities to the kept company', functi
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect($person->refresh()->company_id)->toBe($kept->getKey())
-        ->and($opportunity->refresh()->company_id)->toBe($kept->getKey());
+    expect($person->refresh()->company_id)->toBe(mergedRecord()->getKey())
+        ->and($opportunity->refresh()->company_id)->toBe(mergedRecord()->getKey());
 });
 
-it('takes the duplicate\'s logo only when the kept company has none', function (bool $keptHasLogo): void {
+it('takes the other company\'s logo only when the current company has none', function (bool $keptHasLogo): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
     $keptLogo = $keptHasLogo ? mergeMedia($kept, Company::LOGO_MEDIA_COLLECTION) : null;
@@ -590,11 +617,12 @@ it('takes the duplicate\'s logo only when the kept company has none', function (
 
     $logos = Media::query()->where('model_type', 'company')->where('collection_name', Company::LOGO_MEDIA_COLLECTION)->get();
 
-    expect($logos->where('model_id', $kept->getKey())->pluck('id')->all())->toBe([($keptLogo ?? $duplicateLogo)->getKey()])
+    expect($logos->where('model_id', mergedRecord()->getKey())->pluck('id')->all())->toBe([($keptLogo ?? $duplicateLogo)->getKey()])
+        ->and($logos->where('model_id', $kept->getKey())->pluck('id')->all())->toBe([])
         ->and($logos->where('model_id', $duplicate->getKey())->pluck('id')->all())->toBe($keptHasLogo ? [$duplicateLogo->getKey()] : []);
 })->with([true, false]);
 
-it('moves the duplicate\'s history to the kept company and adds a merged entry', function (): void {
+it('moves both companies\' history to the new company and adds one merged entry', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health']);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
     $duplicate->update(['name' => 'Brightline Health Inc']);
@@ -604,37 +632,41 @@ it('moves the duplicate\'s history to the kept company and adds a merged entry',
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    $merged = Activity::query()->where('subject_id', $kept->getKey())->where('event', 'record_merged')->sole();
+    $mergedId = mergedRecord()->getKey();
+    $merged = Activity::query()->where('subject_id', $mergedId)->where('event', 'record_merged')->sole();
 
     expect($duplicateRows)->not->toBeEmpty()
-        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$kept->getKey()])
-        ->and($merged->properties['duplicate_name'])->toBe('Brightline Health Inc')
+        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$mergedId])
+        ->and($merged->properties['merged_names'])->toBe(['Brightline Health', 'Brightline Health Inc'])
         ->and($merged->causer_id)->toBe($this->user->getKey())
         ->and($merged->workspace_id)->toBe($this->workspace->getKey())
         ->and(Activity::query()->whereKey($unrelatedRows)->pluck('subject_id')->unique()->all())->toBe([$unrelated->getKey()])
-        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted']);
+        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted'])
+        ->and(Activity::query()->where('subject_id', $kept->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'deleted']);
 });
 
-it('shows only the kept company\'s own creation on its timeline', function (): void {
-    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire Group']);
-    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire Group']);
+it('writes only the merged entry for the new company itself', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire Group'], ['domains' => ['abshire.com']]);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire Group'], ['icp' => true, 'domains' => ['abshire.io']]);
+    $originalRows = Activity::query()->whereIn('subject_id', [$kept->getKey(), $duplicate->getKey()])->pluck('id');
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    $html = livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => $kept->getKey()])->html();
+    $html = livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => mergedRecord()->getKey()])->html();
 
-    expect(substr_count($html, 'data-event="created"'))->toBe(1)
+    expect(Activity::query()->where('subject_id', mergedRecord()->getKey())->whereKeyNot($originalRows)->pluck('event')->all())->toBe(['record_merged'])
+        ->and(substr_count($html, 'data-event="created"'))->toBe(0)
         ->and(substr_count($html, 'data-event="record_merged"'))->toBe(1);
 });
 
-it('shows the merge on the kept company\'s timeline', function (): void {
+it('shows the merge on the new company\'s timeline', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health']);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => $kept->getKey()])
-        ->assertSee(e($this->user->name.' merged Brightline Health Inc. into this record'), escape: false)
+    livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => mergedRecord()->getKey()])
+        ->assertSee(e($this->user->name.' merged Brightline Health and Brightline Health Inc. into this record'), escape: false)
         ->assertSeeHtml('data-event="record_merged"');
 });
 
@@ -658,7 +690,7 @@ it('keeps the moved history out of the kept company\'s batches but grouped toget
         ->and($movedBatches->first())->not->toBe($keptBatches[0]);
 });
 
-it('keeps the image of the kept company\'s own rich-text value when it wins the field', function (): void {
+it('keeps the image of the current company\'s rich-text value when it wins the field', function (): void {
     $field = CustomField::factory()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'company',
@@ -678,8 +710,8 @@ it('keeps the image of the kept company\'s own rich-text value when it wins the 
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue($kept, 'brief'))->toContain($keptImage->uuid)
-        ->and(Media::query()->where('uuid', $keptImage->uuid)->value('model_id'))->toBe($kept->getKey())
+    expect(mergeCompanyValue(mergedRecord(), 'brief'))->toContain($keptImage->uuid)
+        ->and(Media::query()->where('uuid', $keptImage->uuid)->value('model_id'))->toBe(mergedRecord()->getKey())
         ->and(Media::query()->where('uuid', $duplicateImage->uuid)->value('model_id'))->toBe($duplicate->getKey());
 });
 
@@ -689,7 +721,7 @@ it('counts domains the way the field stores them before applying the limit', fun
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue($kept, 'domains'))->toBe(['a1.com', 'a2.com', 'a3.com', 'b1.com', 'b2.com']);
+    expect(mergeCompanyValue(mergedRecord(), 'domains'))->toBe(['a1.com', 'a2.com', 'a3.com', 'b1.com', 'b2.com']);
 });
 
 it('locks both companies with one select in id order, whichever one is kept', function (): void {

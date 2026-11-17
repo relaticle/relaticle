@@ -1,7 +1,7 @@
 # Merge duplicate companies and people
 
 **Date:** 2026-11-14
-**Status:** Phase 1 built (PR #1193), Phase 2 built. Reworked 2026-11-17: the merge creates a new record (decision 5), not yet built
+**Status:** Phase 1 built (PR #1193), Phase 2 built. Reworked 2026-11-17: the merge creates a new record (decision 5), built
 **Issue:** #885
 
 ## Summary
@@ -33,7 +33,7 @@ emails in a merge comes straight back on the next sync.
 | 8 | Build shape | Approach A below |
 | 9 | More than 5 domains or emails | Block the merge. The dialog names the list over the limit (`getMaxValues()`, 5) so the member trims it first. Dropping extras would let mailbox sync recreate the duplicate |
 | 10 | Sample data | The new record takes the priority record's `creation_source`. When that is `CreationSource::SAMPLE` and the other record's is not, it takes the other record's, so `RemoveSampleData` never deletes what was merged |
-| 11 | The new record's creator and dates | `creator_id` and `creation_source` come from the priority record (decision 10 for the sample case), so a mailbox-synced record stays automated. `created_at` is the merge time |
+| 11 | The new record's creator and dates | `creator_id` and `creation_source` come from the same original: the priority record, or the other one in decision 10's sample case. A mailbox-synced record stays automated. `created_at` is the merge time |
 | 12 | The new record's timeline | No `created` row. One `record_merged` entry names both originals and who merged them, and both originals' history moves onto it |
 | 13 | Old URLs of the originals | No redirect. An old URL opens the soft-deleted original, as after any delete. A `merged_into_id` pointer with a redirect on the record page was weighed and left out for now: it needs a migration |
 
@@ -161,12 +161,14 @@ All of it runs in one database transaction.
 4. Move everything listed under What moves, from `priority` first and then from `other`. The order
    decides ties: a link both originals hold keeps `priority`'s row, and `priority`'s logo moves.
    `RecordMerged` fires once per original.
-5. Soft-delete both originals through the model, so each writes its own `deleted` activity row.
+5. Move both originals' history, then write one `record_merged` entry on the new record. It stores
+   both names (`merged_names`) and who merged them, so the timeline reads "<member> merged
+   <priority> and <other> into this record".
+6. Soft-delete both originals through the model, so each writes its own `deleted` activity row.
    Their own custom attribute values stay on them.
-6. Write the combined values to the new record through `UpdateCompany` or `UpdatePeople`, with
-   activity logging off, so the timeline gets no `updated` row listing every value.
-7. Write one `record_merged` entry on the new record. It names both originals and who merged them,
-   so the timeline reads "<member> merged <priority> and <other> into this record".
+7. Write the combined values to the new record through `UpdateCompany` or `UpdatePeople`, with
+   activity logging off, so the timeline gets no `updated` or `custom_field_changes` row listing
+   every value.
 
 ## What moves
 
@@ -188,7 +190,9 @@ Each step runs once per original, into the new record.
   at the new record, without listing it twice when a record pointed at both originals.
 - Email counters (`email_count`, `inbound_email_count`, `outbound_email_count`, `meeting_count`):
   the new record starts at zero and takes each original's counts in turn, minus the emails and
-  meetings already linked from the first, so a shared email counts once. `last_email_at`,
+  meetings already linked from the first, so a shared email counts once.
+  `RecordCommunicationMetrics::combineMergedRecords()` reloads the new record before it sums,
+  because the first original's counts are already in its row. `last_email_at`,
   `last_interaction_at` and `last_meeting_at` take the later value. Each original's counters are
   zeroed in the same update, so restoring it cannot bring back numbers its moved links no longer
   back. A manual link that collides with an auto link already moved promotes it to manual before
@@ -312,5 +316,11 @@ The picker joins the `MenusTest` dataset, so its rows, icons and height cap foll
 - How the search ranks results. Built as name order, 25 results
 - The `record_merged` icon and copy, following `AppEventPalette`. Built as `lucide-merge`, with the
   title and description in `AppEventPalette::title()` and `description()`
-- Renaming the `kept` and `duplicate` parameters, the `RecordMerged` properties and the dialog's
-  `keep_picked` field to fit the new rule
+- Renaming the `kept` and `duplicate` parameters to fit the new rule. Built as `priority` and `other`
+  for the originals and `merged` for the new record, and `RecordMerged` carries `merged` and
+  `original`. The dialog's `keep_picked` field keeps its name: true still means the picked record
+  wins
+- The dialog copy. The notice reads "Merging creates a new record. The record on the right wins
+  where both records hold a value."
+- How the preview combines values without a new record. `CombineRecordValues` takes the new record
+  as an optional third argument, and the preview leaves it out

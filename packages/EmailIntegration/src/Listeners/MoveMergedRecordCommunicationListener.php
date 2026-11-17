@@ -13,6 +13,6 @@ final readonly class MoveMergedRecordCommunicationListener
 
     public function handle(RecordMerged $event): void
     {
-        $this->move->execute($event->kept, $event->duplicate);
+        $this->move->execute($event->merged, $event->original);
     }
 }

@@ -63,9 +63,10 @@ it('names a company that shares a domain and opens the merge with it picked', fu
         ->callMountedAction()
         ->assertHasNoErrors();
 
-    expect($duplicate->fresh()->trashed())->toBeTrue();
+    expect($company->fresh()->trashed())->toBeTrue()
+        ->and($duplicate->fresh()->trashed())->toBeTrue();
 
-    duplicatePrompt($company)->assertViewHas('hasDuplicates', false);
+    duplicatePrompt(mergedRecord())->assertViewHas('hasDuplicates', false);
 });
 
 it('names a person that shares an email in another case', function (): void {
@@ -121,7 +122,7 @@ it('hides the prompt from a member who cannot merge', function (): void {
         ->assertDontSeeText(__('filament/record-page.merge.duplicate.checking'));
 });
 
-it('keeps the prompt for the duplicate that is left after a merge', function (): void {
+it('prompts on the new record for the duplicate that is left after a merge', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
     $duplicates = collect(['Harborline One', 'Harborline Two'])
         ->map(fn (string $name): Company => mergeCompanyRecord($this->workspace, $this->user, ['name' => $name], ['domains' => ['harborline.com']]));
@@ -132,7 +133,7 @@ it('keeps the prompt for the duplicate that is left after a merge', function ():
 
     expect($duplicates->first()->fresh()->trashed())->toBeTrue();
 
-    duplicatePrompt($company)
+    duplicatePrompt(mergedRecord())
         ->assertSeeText(duplicateCount(1))
         ->assertSeeText('Harborline Two');
 });

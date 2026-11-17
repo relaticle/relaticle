@@ -25,7 +25,7 @@ afterEach(function (): void {
     TenantContextService::setTenantId(null);
 });
 
-it('merges a duplicate picked from the dialog into the current company', function (): void {
+it('merges the current company and a duplicate picked from the dialog into a new company', function (): void {
     $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
     $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightline.health']);
     mergeDialogCompany($this->workspace, $this->user, 'Northwind Traders');
@@ -51,14 +51,16 @@ it('merges a duplicate picked from the dialog into the current company', functio
         ->assertSeeIn('[data-merge-result]', 'brightline.health')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
         ->click('.fi-modal-footer-actions button[type=submit]')
-        ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
 
-    expect(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
+    $page->assertPathIs("/app/{$this->workspace->slug}/companies/".mergedRecord()->getKey());
+
+    expect(Company::withTrashed()->find($kept->getKey())?->trashed())->toBeTrue()
+        ->and(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });
 
-it('keeps the other company when the member swaps the two', function (): void {
+it('lets the other company win when the member swaps the two', function (): void {
     $current = mergeDialogCompany($this->workspace, $this->user, 'Northwind', ['northwind.com']);
     $other = mergeDialogCompany($this->workspace, $this->user, 'Northwind Traders', ['northwindtraders.com']);
 
@@ -69,11 +71,14 @@ it('keeps the other company when the member swaps the two', function (): void {
         ->assertSeeIn('[data-merge-right]', 'Northwind Traders')
         ->assertSeeIn('[data-merge-left] [data-merge-name]', 'Northwind')
         ->click('.fi-modal-footer-actions button[type=submit]')
-        ->assertPathIs("/app/{$this->workspace->slug}/companies/{$other->getKey()}")
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
 
-    expect(Company::withTrashed()->find($current->getKey())?->trashed())->toBeTrue();
+    $page->assertPathIs("/app/{$this->workspace->slug}/companies/".mergedRecord()->getKey());
+
+    expect(mergedRecord()->name)->toBe('Northwind Traders')
+        ->and(Company::withTrashed()->find($current->getKey())?->trashed())->toBeTrue()
+        ->and(Company::withTrashed()->find($other->getKey())?->trashed())->toBeTrue();
 });
 
 it('disables merging and names the list over its limit', function (): void {
@@ -138,18 +143,20 @@ it('merges a duplicate person picked from the dialog and shows emails and contac
         ->assertScript('document.querySelector("[data-merge-result] [data-merge-counts] li .sr-only").textContent', '1 opportunity as point of contact')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
         ->click('.fi-modal-footer-actions button[type=submit]')
-        ->assertPathIs("/app/{$this->workspace->slug}/people/{$kept->getKey()}")
         ->assertSee('Records merged')
         ->assertNoJavaScriptErrors();
 
-    expect(People::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
+    $page->assertPathIs("/app/{$this->workspace->slug}/people/".mergedRecord()->getKey());
+
+    expect(People::withTrashed()->find($kept->getKey())?->trashed())->toBeTrue()
+        ->and(People::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });
 
 it('opens the merge from the duplicate prompt with the duplicate picked', function (): void {
     $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
     $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightlinehealth.com', 'brightline.health']);
 
-    visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
         ->assertSee('1 possible duplicate')
         ->click('[data-duplicate-prompt] .fi-section-header')
         ->assertSee('Shares brightlinehealth.com')
@@ -159,10 +166,11 @@ it('opens the merge from the duplicate prompt with the duplicate picked', functi
         ->assertSeeIn('[data-merge-result]', 'brightline.health')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
         ->click('.fi-modal-footer-actions button[type=submit]')
-        ->assertPathIs("/app/{$this->workspace->slug}/companies/{$kept->getKey()}")
         ->assertSee('Records merged')
         ->assertNotPresent('[data-duplicate-prompt]')
         ->assertNoJavaScriptErrors();
+
+    $page->assertPathIs("/app/{$this->workspace->slug}/companies/".mergedRecord()->getKey());
 
     expect(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
 });

@@ -66,16 +66,19 @@ final readonly class RecordCommunicationMetrics
      * @param  Collection<int, Email>  $sharedEmails
      * @param  Collection<int, Meeting>  $sharedMeetings
      */
-    public function combineMergedRecords(Company|People $kept, Company|People $duplicate, Collection $sharedEmails, Collection $sharedMeetings): void
+    public function combineMergedRecords(Company|People $merged, Company|People $original, Collection $sharedEmails, Collection $sharedMeetings): void
     {
+        // The record takes one original at a time, so its counters already hold the first one's.
+        $merged->refresh();
+
         $sharedEmails = $sharedEmails->filter($this->visibility->countsTowardCommunicationIntelligence(...));
         $sharedMeetings = $sharedMeetings->filter($this->visibility->meetingCountsTowardCommunicationIntelligence(...));
         $sharedInbound = $sharedEmails->where('direction', EmailDirection::INBOUND)->count();
 
-        $summed = fn (string $column, int $shared): int => max(0, (int) $kept->getAttribute($column) + (int) $duplicate->getAttribute($column) - $shared);
-        $latest = fn (string $column): ?CarbonInterface => collect([$kept->getAttribute($column), $duplicate->getAttribute($column)])->filter()->max();
+        $summed = fn (string $column, int $shared): int => max(0, (int) $merged->getAttribute($column) + (int) $original->getAttribute($column) - $shared);
+        $latest = fn (string $column): ?CarbonInterface => collect([$merged->getAttribute($column), $original->getAttribute($column)])->filter()->max();
 
-        DB::table($kept->getTable())->where('id', $kept->getKey())->update([
+        DB::table($merged->getTable())->where('id', $merged->getKey())->update([
             'email_count' => $summed('email_count', $sharedEmails->count()),
             'inbound_email_count' => $summed('inbound_email_count', $sharedInbound),
             'outbound_email_count' => $summed('outbound_email_count', $sharedEmails->count() - $sharedInbound),
@@ -85,7 +88,7 @@ final readonly class RecordCommunicationMetrics
             'last_meeting_at' => $latest('last_meeting_at'),
         ]);
 
-        DB::table($duplicate->getTable())->where('id', $duplicate->getKey())->update([
+        DB::table($original->getTable())->where('id', $original->getKey())->update([
             'email_count' => 0,
             'inbound_email_count' => 0,
             'outbound_email_count' => 0,

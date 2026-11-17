@@ -48,7 +48,7 @@ return [
     ],
     'merge' => [
         'heading' => 'Merge',
-        'notice' => 'The record on the right wins where both records hold a value.',
+        'notice' => 'Merging creates a new record. The record on the right wins where both records hold a value.',
         'search' => 'Search',
         'swap' => 'Swap records',
         'submit' => 'Merge records',

@@ -2,7 +2,9 @@
 
 declare(strict_types=1);
 
+use App\ActivityLog\AppEventPalette;
 use App\Filament\Components\Forms\MergeRecordPicker;
+use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
@@ -82,4 +84,11 @@ function mergeMedia(Company|People $record, string $collection): Media
         ->usingFileName('image.png')
         ->withAttributes(['workspace_id' => $record->workspace_id])
         ->toMediaCollection($collection);
+}
+
+function mergedRecord(): Company|People
+{
+    $subject = Activity::query()->where('event', AppEventPalette::RecordMerged->value)->latest('id')->firstOrFail()->subject;
+
+    return $subject instanceof Company || $subject instanceof People ? $subject : throw new RuntimeException('No merged record');
 }
