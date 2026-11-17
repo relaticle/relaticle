@@ -205,6 +205,15 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         }
     }
 
+    public function unmountAction(bool|string|null $cancelParentActions = null): void
+    {
+        parent::unmountAction($cancelParentActions);
+
+        if (blank($this->mountedActions)) {
+            $this->reloadWhenLanguageChanged();
+        }
+    }
+
     public function confirmEmailChangeAction(): ConfirmIdentityAction
     {
         return ConfirmIdentityAction::make('confirmEmailChange')

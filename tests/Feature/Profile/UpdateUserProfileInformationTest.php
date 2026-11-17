@@ -919,6 +919,28 @@ describe('language', function () {
             ->assertRedirect(EditProfile::getUrl(tenant: $user->currentWorkspace));
     });
 
+    test('reloads in the new language when the email confirmation is dismissed', function () {
+        Notification::fake();
+
+        $user = User::factory()->withPersonalWorkspace()->create([
+            'email' => 'dismiss@example.com',
+            'email_verified_at' => now(),
+            'locale' => 'en',
+        ]);
+        $this->actingAs($user);
+        Filament::setTenant($user->currentWorkspace);
+
+        Livewire::test(UpdateProfileInformationComponent::class)
+            ->fillForm(['name' => $user->name, 'email' => 'dismiss-new@example.com', 'locale' => 'es'])
+            ->call('updateProfile')
+            ->assertActionMounted('confirmEmailChange')
+            ->assertNoRedirect()
+            ->unmountAction()
+            ->assertRedirect(EditProfile::getUrl(tenant: $user->currentWorkspace));
+
+        expect($user->fresh())->locale->toBe('es')->email->toBe('dismiss@example.com');
+    });
+
     test('a stored language that is no longer listed does not block saving', function () {
         $user = User::factory()->withWorkspace()->create(['email' => 'stale@example.com', 'locale' => 'xx']);
         $this->actingAs($user);
