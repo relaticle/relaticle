@@ -80,7 +80,7 @@ Merge  [Brightline Health]                                              ✕
 - The dialog body is one form field, `MergeRecordPicker`, which `MergeRecordAction` puts in its
   schema as `picked_id` next to a hidden `keep_picked` boolean (false until ⇄). The field renders
   the cards from `resources/views/filament/app/merge-record.blade.php` and its partials (card,
-  heading, mark, picker, alert).
+  heading, mark, picker).
 - The record the member opened from sits on the right: the priority slot.
 - The left slot's **+** opens a search list of live records of the same entity in the workspace,
   excluding the current one. It matches the name, and for companies any domain, for people any email.

@@ -58,7 +58,7 @@
 | `app/Filament/Actions/MergeRecordAction.php` (create) | The ⋯ menu item, the dialog heading and the submit |
 | `app/Filament/Components/Forms/MergeRecordPicker.php` (create) | The dialog's form field: search, pairing, cards and over-limit messages |
 | `resources/views/filament/app/merge-record.blade.php` (create) | The three-card dialog body |
-| `resources/views/filament/app/merge-record/{card,heading,mark,picker,alert}.blade.php` (create) | The card, the dialog heading, the logo or icon mark, the search list and the alert |
+| `resources/views/filament/app/merge-record/{card,heading,mark,picker}.blade.php` (create) | The card, the dialog heading, the logo or icon mark and the search list |
 | `app/Filament/Concerns/HasRecordPageLayout.php` (modify) | Adds the action first in the ⋯ menu |
 | `app/ActivityLog/AppEventPalette.php` (modify) | `RecordMerged` case with `title()` and `description()` |
 | `app/Support/ActivityLog/MergedActivityRenderer.php` (modify) | Takes `AppEventRenderer` in its constructor and renders app events through it |
@@ -382,7 +382,7 @@ Run: `... vendor/bin/pest --compact tests/Feature/Filament/App/Resources/MergeCo
 ### Task 7: The merge dialog
 
 **Files:**
-- Create: `app/Filament/Components/Forms/MergeRecordPicker.php`, `app/Enums/RecordIdentity.php`, `resources/views/filament/app/merge-record.blade.php`, `resources/views/filament/app/merge-record/{card,heading,mark,picker,alert}.blade.php`, `tests/Browser/CRM/MergeRecordDialogTest.php`, `tests/Browser/CRM/MergeRecordDialogKeyboardTest.php`, `tests/Browser/CRM/MergeRecordDialogLayoutTest.php`, `tests/Feature/Filament/App/Resources/MergeRecordDialogStateTest.php`
+- Create: `app/Filament/Components/Forms/MergeRecordPicker.php`, `app/Enums/RecordIdentity.php`, `resources/views/filament/app/merge-record.blade.php`, `resources/views/filament/app/merge-record/{card,heading,mark,picker}.blade.php`, `tests/Browser/CRM/MergeRecordDialogTest.php`, `tests/Browser/CRM/MergeRecordDialogKeyboardTest.php`, `tests/Browser/CRM/MergeRecordDialogLayoutTest.php`, `tests/Feature/Filament/App/Resources/MergeRecordDialogStateTest.php`
 - Modify: `app/Filament/Actions/MergeRecordAction.php`, `app/Enums/CrmEntity.php`, `tests/Browser/Panel/MenusTest.php`
 
 **Interfaces:**

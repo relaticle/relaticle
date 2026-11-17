@@ -74,14 +74,14 @@
     </div>
 
     @if ($isUnavailable())
-        @include('filament.app.merge-record.alert', ['marker' => 'data-merge-error', 'message' => __('filament/record-page.merge.unavailable')])
+        <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="__('filament/record-page.merge.unavailable')" role="alert" data-merge-error />
     @endif
 
     @error($getStatePath())
-        @include('filament.app.merge-record.alert', ['marker' => 'data-merge-error', 'message' => $message])
+        <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="$message" role="alert" data-merge-error />
     @enderror
 
     @foreach ($getOverLimitMessages() as $overLimitMessage)
-        @include('filament.app.merge-record.alert', ['marker' => 'data-merge-over-limit', 'message' => $overLimitMessage])
+        <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="$overLimitMessage" role="alert" data-merge-over-limit />
     @endforeach
 </div>
