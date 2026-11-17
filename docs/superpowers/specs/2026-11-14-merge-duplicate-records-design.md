@@ -51,8 +51,9 @@ emails in a merge comes straight back on the next sync.
    "Checking for duplicates" row shows, and with none found the slot takes no space. The section is a
    native `Section` and its rows a small view, because an action inside a `RepeatableEntry` item cannot
    be mounted. A row's **Merge** dispatches `merge-duplicate` to the page, which mounts its own
-   `MergeRecordAction` named `mergeDuplicate`, since that action needs the record page. `duplicateId()`
-   accepts only an id from the list, falling back to the first duplicate. Both merge entry points read
+   `MergeRecordAction` named `mergeDuplicate`, since that action needs the record page. The row's id goes
+   straight into the dialog: the picker and the action resolve it in the workspace like any picked record,
+   so a second scan to check it would add nothing (decided in review). Both merge entry points read
    `MergeRecordAction::canMerge()`. The section has no dismiss: a dismiss kept per record hid the
    prompt on one record of a pair and not the other, which read as a bug.
 
@@ -242,7 +243,7 @@ Rollback and race tests, per entity:
 
 `MergeDuplicatePromptTest` covers the duplicate prompt: a shared domain and a shared email in another
 case, every record that matches any value listed and counted, the dialog opened with the row's record
-picked, an id outside the list falling back to the first duplicate, no prompt for an unshared value, a
+picked, a crafted call naming another workspace's record refused, no prompt for an unshared value, a
 trashed record, another workspace or a member who cannot merge, the prompt keeping the duplicate left
 after a merge.
 

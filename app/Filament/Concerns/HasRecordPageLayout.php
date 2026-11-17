@@ -21,13 +21,10 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
-use App\Models\User;
-use App\Queries\Crm\DuplicateRecordQuery;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
-use Filament\Facades\Filament;
 use Filament\Infolists\Components\Entry;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Resources\RelationManagers\RelationManager;
@@ -255,7 +252,7 @@ trait HasRecordPageLayout
     {
         return MergeRecordAction::make('mergeDuplicate')
             ->record($this->getRecord())
-            ->fillForm(fn (array $arguments): array => ['picked_id' => $this->duplicateId($arguments['duplicate'] ?? null), 'keep_picked' => false]);
+            ->fillForm(fn (array $arguments): array => ['picked_id' => $arguments['duplicate'] ?? null, 'keep_picked' => false]);
     }
 
     private function duplicatePrompt(): Livewire
@@ -267,21 +264,6 @@ trait HasRecordPageLayout
             ->key('duplicatePrompt')
             ->extraAttributes(['class' => 'fi-record-duplicates'])
             ->visible(fn (): bool => MergeRecordAction::canMerge($record));
-    }
-
-    private function duplicateId(mixed $id): ?string
-    {
-        $record = $this->crmRecord();
-
-        if ($record instanceof Opportunity) {
-            return null;
-        }
-
-        /** @var User $user */
-        $user = Filament::auth()->user();
-        $duplicates = resolve(DuplicateRecordQuery::class)->get($user, $record, DuplicateRecordsPrompt::SHOWN);
-
-        return is_string($id) && isset($duplicates[$id]) ? $id : array_key_first($duplicates);
     }
 
     private function quickCreateAction(CreateAction $action, string $label): CreateAction

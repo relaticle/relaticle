@@ -158,14 +158,18 @@ it('opens the merge with the record of the row picked', function (): void {
         ->assertSchemaStateSet(['picked_id' => $second->getKey()]);
 });
 
-it('picks the first duplicate when the row names a record that is not one', function (): void {
+it('refuses to merge another workspace\'s record named by a crafted prompt call', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
-    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline One'], ['domains' => ['harborline.com']]);
-    $unrelated = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind'], ['domains' => ['northwind.com']]);
+    $foreignOwner = User::factory()->withWorkspace()->create();
+    $foreign = Company::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create(['name' => 'Harborline Abroad']);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->call('mergeDuplicate', $unrelated->getKey())
-        ->assertSchemaStateSet(['picked_id' => $duplicate->getKey()]);
+        ->call('mergeDuplicate', $foreign->getKey())
+        ->callMountedAction()
+        ->assertHasActionErrors(['picked_id']);
+
+    expect(Company::query()->withoutGlobalScopes()->find($foreign->getKey())?->trashed())->toBeFalse()
+        ->and(Company::query()->find($company->getKey()))->not->toBeNull();
 });
 
 it('shows no prompt and reports the error when the duplicate scan fails', function (): void {
