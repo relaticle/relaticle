@@ -22,7 +22,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
@@ -299,7 +298,7 @@ final class MergeRecordPicker extends Field
             return 0;
         }
 
-        $linked = fn (Company|People $record) => DB::table($relation->getTable())
+        $linked = fn (Company|People $record) => $relation->newPivotStatement()
             ->where($relation->getMorphType(), $record->getMorphClass())
             ->where($relation->getForeignPivotKeyName(), $record->getKey());
 
