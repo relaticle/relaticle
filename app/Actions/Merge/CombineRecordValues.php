@@ -12,12 +12,16 @@ use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Models\User;
 use App\Support\CustomFields\CanonicalValue;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\EmailAddress;
 use App\Support\Media\MediaLookup;
 
 final readonly class CombineRecordValues
 {
-    public function __construct(private MediaLookup $mediaLookup) {}
+    public function __construct(
+        private MediaLookup $mediaLookup,
+        private WorkspaceCustomFields $workspaceFields,
+    ) {}
 
     private const array LIST_TYPES = [
         CustomFieldType::MULTI_SELECT,
@@ -104,13 +108,9 @@ final readonly class CombineRecordValues
      */
     private function activeFields(Company|People $record): iterable
     {
-        return CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $record->workspace_id)
-            ->where('entity_type', $record->getMorphClass())
-            ->where('active', true)
-            ->orderBy('sort_order')
-            ->get();
+        return $this->workspaceFields
+            ->forEntity($record->loadMissing('workspace')->workspace, $record->getMorphClass())
+            ->where('active', true);
     }
 
     private function swapDuplicateForKept(CustomField $field, mixed $value, Company|People $kept, Company|People $duplicate): mixed
