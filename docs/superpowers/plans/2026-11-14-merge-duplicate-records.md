@@ -1,5 +1,7 @@
 # Merge Duplicate Records (Phase 1) Implementation Plan
 
+> **Superseded in part (2026-11-17):** the merge now creates a new record and deletes both originals. See `2026-11-17-merge-into-new-record.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or
 > superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`)
 > syntax for tracking.

@@ -1,15 +1,16 @@
 # Merge duplicate companies and people
 
 **Date:** 2026-11-14
-**Status:** Phase 1 built (PR #1193), Phase 2 built
+**Status:** Phase 1 built (PR #1193), Phase 2 built. Reworked 2026-11-17: the merge creates a new record (decision 5), not yet built
 **Issue:** #885
 
 ## Summary
 
 A member merges two duplicate companies, or two duplicate people, into one record. They open
-**Merge record** from the record page's ⋯ menu, pick the duplicate, and confirm. The record they
-started on survives with its own ID and URL. The duplicate's values fill the gaps, its emails or
-domains join the kept record's, everything linked to it moves across, and it is soft-deleted.
+**Merge record** from the record page's ⋯ menu, pick the duplicate, and confirm. The merge creates
+a new record from the two. The priority record's values win, the other record's values fill the
+gaps, both lists of emails or domains are combined, everything linked to either record moves to the
+new one, and both originals are soft-deleted.
 
 ## Why
 
@@ -26,12 +27,15 @@ emails in a merge comes straight back on the next sync.
 | 2 | Records per merge | Two. Three duplicates take two merges |
 | 3 | Where it starts | **Merge record** is the first item in the record page's ⋯ menu. Companies and people only |
 | 4 | Dialog | The current record fills the priority slot, the other slot starts empty with a **+** that opens a search, a ⇄ button swaps the two, and a third card previews the result |
-| 5 | Which record survives | The priority record keeps its ID and URL. A new ID would break every saved link, API reference and Rela mention to both records, and double the links to move |
+| 5 | Which record survives | Neither. The merge creates a new record and soft-deletes both originals (changed 2026-11-17 on the repo owner's call). The cost is accepted: every outside reference to either ID (bookmarks, API and MCP clients, Rela mentions, saved views by ID) now points at a deleted record |
 | 6 | Duplicate prompt | Phase 2, a separate PR: a record-page section listing the duplicates, each with a Merge that opens the dialog with it picked. A duplicates review page is out of scope |
 | 7 | Rela, API, MCP | Out of scope. Panel only |
 | 8 | Build shape | Approach A below |
 | 9 | More than 5 domains or emails | Block the merge. The dialog names the list over the limit (`getMaxValues()`, 5) so the member trims it first. Dropping extras would let mailbox sync recreate the duplicate |
-| 10 | Sample data | When the kept record is `CreationSource::SAMPLE` and the duplicate is not, the kept record takes the duplicate's source, so `RemoveSampleData` never deletes what was merged into it |
+| 10 | Sample data | The new record takes the priority record's `creation_source`. When that is `CreationSource::SAMPLE` and the other record's is not, it takes the other record's, so `RemoveSampleData` never deletes what was merged |
+| 11 | The new record's creator and dates | `creator_id` and `creation_source` come from the priority record (decision 10 for the sample case), so a mailbox-synced record stays automated. `created_at` is the merge time |
+| 12 | The new record's timeline | No `created` row. One `record_merged` entry names both originals and who merged them, and both originals' history moves onto it |
+| 13 | Old URLs of the originals | No redirect. An old URL opens the soft-deleted original, as after any delete. A `merged_into_id` pointer with a redirect on the record page was weighed and left out for now: it needs a migration |
 
 ## Phases
 
@@ -65,7 +69,7 @@ the two closures each wrapper passed were its only content, so `MergeRecords` no
 merge and dispatches the per-entity differences through exhaustive `match` expressions that PHPStan
 fails the moment a third entity joins the `Company|People` union. `MergeRecords` owns the
 authorization checks, the transaction, the lock on both rows, the limit check, the sample-data rule,
-the link and history moves, the `RecordMerged` event and the soft delete. It composes
+creating the new record, the link and history moves, the `RecordMerged` events and both soft deletes. It composes
 `CombineRecordValues`, `MoveRecordLinks` and `MoveRecordHistory`, and the pivot-moving steps share
 `MoveMorphPivot`. A company owns people and opportunities. A person is only a point of contact.
 Per-entity facts the dialog needs (the identifying list, the count chips) come from `CrmEntity` and
@@ -107,150 +111,180 @@ Merge  [Brightline Health]                                              ✕
 - The list is positioned by hand, not with `x-float`, because `x-float` caps the list to the dialog's
   height and the list must float past the dialog's edge. On a phone it waits for the sheet to finish
   rising before it measures where to sit.
-- ⇄ swaps the two. Whichever record is on the right is the one kept.
+- ⇄ swaps the two. Whichever record is on the right has priority.
 - Each source card shows the name, the identifying list (domains or emails) and counts of linked
   records. The result card shows the combined values and counts, and updates live as the pick or the
   swap changes.
 - **Merge records** stays disabled until a second record is picked, and while a combined list is over
   its limit. An alert names the list over the limit.
-- After the merge, the member lands on the kept record's page with a "Records merged" notification.
-  If the kept record is the other one (after ⇄), they are redirected to it.
+- The result card previews the new record.
+- After the merge, the member is always redirected to the new record's page with a "Records merged"
+  notification, because the page they opened it from is now a deleted record.
 
 ## The merge rule
 
-`kept` is the priority record, `duplicate` the other one.
+`priority` is the record on the right, `other` the one on the left. Both are originals, and the
+merge writes their combined values to a new record.
 
 **Single values** (name, account owner, a person's company, every single-value custom attribute):
-`kept`'s value when it holds one, otherwise `duplicate`'s. "Holds one" means not null, not an empty
+`priority`'s value when it holds one, otherwise `other`'s. "Holds one" means not null, not an empty
 string and not an empty list.
 
-**Lists that identify the record** (company `domains`, people `emails`): `kept`'s values first, then
-`duplicate`'s, with duplicates removed after the field's own normalization. Order matters:
-`FetchFaviconForCompany` takes the first domain, so `kept`'s logo source stays the same.
+**Lists that identify the record** (company `domains`, people `emails`): `priority`'s values first,
+then `other`'s, with duplicates removed after the field's own normalization. Order matters:
+`FetchFaviconForCompany` takes the first domain, so `priority`'s logo source stays the first.
 
 **Other multi-value custom attributes** (multi-select, checkbox list, tags, and any field whose
-`allow_multiple` setting is on): combined the same way, `kept`'s first. A field that holds a list but
-allows one value, such as a person's phone, follows the single-value rule. The limit is the field's
-own `max_values` (5 for domains and emails), and record-type fields have none. (Refined while
-planning.)
+`allow_multiple` setting is on): combined the same way, `priority`'s first. A field that holds a list
+but allows one value, such as a person's phone, follows the single-value rule. The limit is the
+field's own `max_values` (5 for domains and emails), and record-type fields have none.
+
+**Record-type values that name an original** are rewritten to the new record. When one original
+pointed at the other, the new record points at itself. Kept on purpose: dropping the link would
+silently lose that the relationship existed.
 
 The preview and the merge read this rule from one place, so the card cannot promise what the merge
 does not do.
 
+## The merge, in order
+
+All of it runs in one database transaction.
+
+1. Lock both originals with one select in id order (`lockForUpdate`), so two members merging the
+   same records, in either direction, wait instead of interleaving or deadlocking.
+2. Combine the values and check the limits.
+3. Insert the new record with its name, workspace, `creator_id` and `creation_source` (decisions 10
+   and 11), with model events muted. That writes no `created` activity row, runs no
+   `CompanyObserver::created` or `PeopleObserver::created`, and queues no favicon fetch before the
+   record has domains. `ScheduleAssistantArrivalTurn` would otherwise start an onboarding turn for a
+   record whose source is `mcp`.
+4. Move everything listed under What moves, from `priority` first and then from `other`. The order
+   decides ties: a link both originals hold keeps `priority`'s row, and `priority`'s logo moves.
+   `RecordMerged` fires once per original.
+5. Soft-delete both originals through the model, so each writes its own `deleted` activity row.
+   Their own custom attribute values stay on them.
+6. Write the combined values to the new record through `UpdateCompany` or `UpdatePeople`, with
+   activity logging off, so the timeline gets no `updated` row listing every value.
+7. Write one `record_merged` entry on the new record. It names both originals and who merged them,
+   so the timeline reads "<member> merged <priority> and <other> into this record".
+
 ## What moves
 
-All of it runs in one database transaction, with both rows locked (`lockForUpdate`) so two members
-merging the same records cannot interleave.
+Each step runs once per original, into the new record.
 
 **Both entities**
 - Note, task, email and meeting links (`noteables`, `taskables`, `emailables`, `meetingables`).
-  A link the kept record already has is dropped instead of moved, because each table is unique on
-  (item, type, id).
-- Activity history: `activity_log` rows whose subject is the duplicate move to the kept record, so its
-  timeline shows the duplicate's past. Its `created`, `deleted` and `restored` rows stay on the duplicate,
-  because the timeline names the current subject and they would read as the kept record's own. Then a new `record_merged` event on the kept record names the
-  duplicate and who merged it, so the timeline reads "<member> merged <duplicate> into this record".
-- `attachments` media the merged rich-text values actually reference, so a value copied from the
-  duplicate keeps its images. `UploadClaims` rejects a rich-text value that references media owned
-  by another record, so the media moves before the values are written. An image whose text lost the
-  field stays on the soft-deleted duplicate, because moving it would orphan it on the kept record
-  (builder's call, made in review).
-- Record-type custom attributes on other records that point at the duplicate are rewritten to point
-  at the kept record, without listing the kept record twice.
-- Email counters (`email_count`, `inbound_email_count`, `outbound_email_count`, `meeting_count`) are
-  summed, minus the emails and meetings both records were linked to, so a shared email counts once.
-  `last_email_at`, `last_interaction_at` and `last_meeting_at` take the later value. (Builder's call,
-  made in review: `RecordCommunicationMetrics` only increments, and no recount exists.) The
-  duplicate's counters are zeroed in the same update, so restoring it cannot bring back numbers its
-  moved links no longer back. A manual link that collides with the kept record's auto link promotes
-  the kept link to manual before the dedup drops the duplicate's row.
+  A link the new record already holds from the first original is dropped instead of moved, because
+  each table is unique on (item, type, id).
+- Activity history: `activity_log` rows whose subject is an original move to the new record, so its
+  timeline shows both pasts. The originals' `created`, `deleted` and `restored` rows stay on them,
+  because the timeline names the current subject and they would read as the new record's own. Moved
+  batches are rehashed so the two originals' batches never fold together.
+- `attachments` media the combined rich-text values actually reference, so a copied value keeps its
+  images. `UploadClaims` rejects a rich-text value that references media owned by another record,
+  so the media moves before the values are written. An image whose text lost the field stays on its
+  soft-deleted original.
+- Record-type custom attributes on other records that point at an original are rewritten to point
+  at the new record, without listing it twice when a record pointed at both originals.
+- Email counters (`email_count`, `inbound_email_count`, `outbound_email_count`, `meeting_count`):
+  the new record starts at zero and takes each original's counts in turn, minus the emails and
+  meetings already linked from the first, so a shared email counts once. `last_email_at`,
+  `last_interaction_at` and `last_meeting_at` take the later value. Each original's counters are
+  zeroed in the same update, so restoring it cannot bring back numbers its moved links no longer
+  back. A manual link that collides with an auto link already moved promotes it to manual before
+  the dedup drops the second row.
 - Repointed `people` and `opportunities` rows take `updated_at = now()`, so an API consumer syncing
-  by `updated_at` sees the move. The kept record's own `record_merged` entry stays the audit trail;
-  no per-row relation-change entries are written (builder's call, made in review).
-  Records whose record-type attribute is repointed keep their `updated_at`: the rewrite touches only
-  `custom_field_values`, so a consumer syncing by `updated_at` does not see it (decided in review).
-- A record-type attribute on the kept record that pointed at the duplicate now points at the kept
-  record itself, so a company can end up as its own parent. Kept on purpose: dropping the link would
-  silently lose that the relationship existed (decided in review of `76aa81c75`).
+  by `updated_at` sees the move. The `record_merged` entry is the audit trail; no per-row
+  relation-change entries are written. Records whose record-type attribute is repointed keep their
+  `updated_at`: the rewrite touches only `custom_field_values`.
 
 **Company only**
 - `people.company_id` and `opportunities.company_id`.
 - `email_participants.company_id` and `meeting_attendees.company_id`.
-- The logo stays the kept record's. When the kept record has none, the duplicate's moves across.
+- The logo: `priority`'s moves. When it has none, `other`'s moves.
 
 **Person only**
 - `opportunities.contact_id`.
 - `email_participants.contact_id` and `meeting_attendees.contact_id`.
 
 Emails, meetings, their participants and attendees, and the communication counters belong to
-`packages/EmailIntegration`. Core dispatches `App\Events\RecordMerged` inside the transaction. The
-package's listener, `MoveMergedRecordCommunicationListener`, makes one call to the package action
+`packages/EmailIntegration`. Core dispatches `App\Events\RecordMerged` inside the transaction, once
+per original, carrying the new record and that original. The package's listener,
+`MoveMergedRecordCommunicationListener`, makes one call to the package action
 `MoveMergedRecordCommunication`, which moves its own rows and sums the counters through
-`RecordCommunicationMetrics`. (Refined while planning: core never names the package.)
-
-**Then** the duplicate is soft-deleted through the model, so its own `deleted` activity row is written.
-The duplicate's own custom attribute values are left on it.
+`RecordCommunicationMetrics`. Core never names the package.
 
 ## Authorization
 
-The member needs `update` on the kept record and `delete` on the duplicate (`CompanyPolicy`,
-`PeoplePolicy`). Both records must be in the same workspace, different from each other, and live. The
-action checks all of this itself, as every action does. The menu item is hidden when the member lacks
-either capability in the workspace.
+The member needs `create` on the entity and `delete` on both originals (`CompanyPolicy`,
+`PeoplePolicy`). Both originals must be in the same workspace, different from each other, and live.
+The action checks all of this itself, as every action does. `MergeRecordAction::canMerge()` hides
+the menu item and the duplicate prompt from a member who lacks `create` on the entity or `delete` on
+the current record.
 
 ## Known effects
 
-- **Restoring the duplicate** brings back an empty shell: its links already moved. Its emails or
-  domains now belong to the kept record, so restore hits the existing `RestoreConflictMessage`, which
+- **Old URLs** of either original open its soft-deleted page, which no longer shows the moved links
+  (decision 13). Notification links and Rela record chips that name an original land there too.
+- **The REST API, the MCP server and Rela** treat both original IDs as deleted. A pending Rela
+  proposal that names an original fails at approval, as after any delete.
+- **Saved views and filters** that name an original by ID (for example "Company is any of ...")
+  stop matching it. They are not rewritten. Rewriting `saved_views` and `table_preferences` JSON is
+  its own change.
+- **Sort by created date.** The new record's `created_at` is the merge time, so it sorts as the
+  newest record, and the duplicate prompt, which lists oldest first, lists it last.
+- **Restoring an original** brings back an empty shell: its links already moved. Its emails or
+  domains now belong to the new record, so restore hits the existing `RestoreConflictMessage`, which
   is the right outcome.
-- **Force-deleting the duplicate later** is safe. `people.company_id` and `opportunities.company_id`
-  are set null on a hard delete (`ON DELETE SET NULL`), and nothing points at the duplicate any
-  more anyway.
-- **Old Rela conversations and chat proposals** that mention the duplicate keep its ID. They show it
-  as deleted, as they would after any delete.
-- **Email relink.** Changing the kept record's emails or domains already queues
-  `RelinkRecordHistoryJob`. It only links participants that are unlinked, which is why the merge moves
-  the linked ones itself.
-- **Saved views and filters** that name the duplicate by ID (for example "Company is any of ...")
-  stop matching it. They are not rewritten. (Call made in review: rewriting `saved_views` and
-  `table_preferences` JSON is its own change.)
-- **Favicon.** `CompanyObserver::saved` refetches the logo only when the first domain changed. With
-  the kept record's domains first, it changes only when the kept record had none.
+- **Force-deleting an original later** is safe. `people.company_id` and `opportunities.company_id`
+  are set null on a hard delete (`ON DELETE SET NULL`), and nothing points at it any more anyway.
+- **Email relink.** Changing a record's emails or domains already queues `RelinkRecordHistoryJob`.
+  It only links participants that are unlinked, which is why the merge moves the linked ones itself.
+- **Favicon.** `CompanyObserver::saved` runs when the values are written. It refetches only when the
+  moved logo was not fetched from the new record's first domain, which is `priority`'s first domain
+  when it has one.
 
 ## Tests
 
 Feature tests through the record page (Livewire `ViewCompany` and `ViewPeople`), for each entity:
-- values: kept wins, gaps filled from the duplicate, lists combined in order, and an empty value on
-  the duplicate never overwrites a filled one on the kept record
-- every link listed above moves, and a link both records share ends up once
-- history moves and a `record_merged` event is written, and the timeline names who merged
-- record-type attributes on a third record are repointed
-- authorization: a member without `update` on the kept record or `delete` on the duplicate is
-  refused, and a record from another workspace cannot be picked
-- the duplicate is soft-deleted and the kept record keeps its ID
+- the merge creates a new record, both originals are soft-deleted, and the member is redirected to
+  the new record
+- the new record takes `priority`'s `creator_id` and `creation_source`, and `other`'s source when
+  `priority` is sample data and `other` is not
+- values: `priority` wins, gaps filled from `other`, lists combined in order, an empty value on
+  `other` never overwrites a filled one, and a record-type value naming an original names the new
+  record
+- every link listed above moves from both originals, and a link both originals share ends up once
+- history from both originals moves, the timeline has no `created` or `updated` row from the merge,
+  and one `record_merged` entry names both originals and who merged them
+- record-type attributes on a third record that point at either original are repointed
+- no onboarding turn is scheduled when `priority`'s source is `mcp`
+- authorization: a member without `create` on the entity or `delete` on either original is refused,
+  and a record from another workspace cannot be picked
 - the search finds a record by name, domain or email and leaves out the current, trashed and
   other-workspace records
 
 Communication tests (`MergedRecordCommunicationTest`) cover emails, meetings, participants and
-attendees, the summed counters with a shared email or meeting counted once, and the merge with the
-email feature off.
+attendees moving from both originals, the counters summed into the new record with a shared email or
+meeting counted once, both originals' counters zeroed, and the merge with the email feature off.
 
 Rollback and race tests, per entity:
-- a failed final write rolls back every moved link and the history
-- both records are locked with one select in id order, pinned with `DB::listen`, whichever one is kept
-- a duplicate or kept record that vanishes at the start of the transaction gives the "no longer
-  available" error and changes nothing
+- a failed final write rolls back the new record, every moved link and the history
+- both originals are locked with one select in id order, pinned with `DB::listen`, whichever has
+  priority
+- an original that vanishes at the start of the transaction gives the "no longer available" error,
+  creates nothing and changes nothing
 
 `MergeDuplicatePromptTest` covers the duplicate prompt: a shared domain and a shared email in another
 case, every record that matches any value listed and counted, the dialog opened with the row's record
 picked, a crafted call naming another workspace's record refused, no prompt for an unshared value, a
-trashed record, another workspace or a member who cannot merge, the prompt keeping the duplicate left
-after a merge.
+trashed record, another workspace or a member who cannot merge, and the prompt on the new record
+listing a third duplicate left after a merge.
 
 `MergeRecordDialogStateTest` covers the dialog's "no longer available" message: absent before a pick, shown when the picked record is deleted while the dialog is open.
 
 Three browser test files, run in Chromium and in WebKit (`--browser safari`):
-- `MergeRecordDialogTest`: the main flows. Open, search, pick, swap, merge, land on the kept record,
+- `MergeRecordDialogTest`: the main flows. Open, search, pick, swap, merge, land on the new record,
   the over-limit block, and the merge opened from the duplicate prompt
 - `MergeRecordDialogKeyboardTest`: Esc, arrows, Enter, focus after a pick and tabbing out of the list
 - `MergeRecordDialogLayoutTest`: the row layout on laptop and desktop, the stacked phone layout, and
@@ -266,6 +300,7 @@ The picker joins the `MenusTest` dataset, so its rows, icons and height cap foll
   linked to a merged company or person do move, as listed under What moves
 - Merging from Rela, the REST API or the MCP server
 - Undoing a merge
+- Redirecting an original's old URL to the new record (decision 13)
 - Per-field choice of which value wins
 
 ## Left to the builder
@@ -277,3 +312,5 @@ The picker joins the `MenusTest` dataset, so its rows, icons and height cap foll
 - How the search ranks results. Built as name order, 25 results
 - The `record_merged` icon and copy, following `AppEventPalette`. Built as `lucide-merge`, with the
   title and description in `AppEventPalette::title()` and `description()`
+- Renaming the `kept` and `duplicate` parameters, the `RecordMerged` properties and the dialog's
+  `keep_picked` field to fit the new rule
