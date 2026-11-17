@@ -206,7 +206,7 @@ it('keeps a long menu above the window edge and scrolls only its list', function
 
     runMenuSteps($page, $steps);
 
-    $page->click($open)->assertVisible($panel);
+    $page->click($open)->assertVisible($panel)->assertPresent("{$list} > *");
 
     expect($page->script(menuRoom($panel, $list)))->toBe([
         'height' => true,

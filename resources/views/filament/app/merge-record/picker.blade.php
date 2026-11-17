@@ -4,7 +4,7 @@
         open: false,
         active: 0,
         query: '',
-        results: @js($searchRecords()),
+        results: [],
         request: 0,
         async search() {
             const request = ++this.request
@@ -44,6 +44,10 @@
         },
         async show() {
             this.active = 0
+
+            if (this.results.length === 0 && this.query === '') {
+                this.search()
+            }
 
             const sheet = $refs.trigger.closest('.fi-modal-window')
 
