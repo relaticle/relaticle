@@ -8,12 +8,12 @@
     @apply block max-w-full truncate;
 }
 
-/* The actions column renders no trigger. `width: auto` drops Filament's w-1, so it takes the space
-   the data columns leave, and collapses to nothing when the table overflows. */
 .fi-ta-resizable-table .fi-ta-selection-cell {
     @apply sm:w-13 sm:min-w-13 sm:max-w-13;
 }
 
+/* The actions column renders no trigger. `width: auto` drops Filament's w-1, so it takes the space
+   the data columns leave, and collapses to nothing when the table overflows. */
 .fi-ta-resizable-table .fi-ta-actions-header-cell,
 .fi-ta-resizable-table td:has(> .fi-ta-actions) {
     @apply w-auto min-w-0 overflow-hidden;
