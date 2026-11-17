@@ -6,13 +6,9 @@ namespace App\Events;
 
 use App\Models\Company;
 use App\Models\People;
-use Illuminate\Foundation\Events\Dispatchable;
-use Illuminate\Queue\SerializesModels;
 
+// Fires mid-transaction, before the duplicate is deleted. Listeners must stay synchronous.
 final readonly class RecordMerged
 {
-    use Dispatchable;
-    use SerializesModels;
-
     public function __construct(public Company|People $kept, public Company|People $duplicate) {}
 }
