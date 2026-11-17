@@ -211,7 +211,7 @@ final class MergeRecordPicker extends Field
     {
         return $this->currentWithCounts ??= $this->subject()
             ->loadMissing('customFieldValues.customField')
-            ->loadCount(array_keys($this->entity()->mergeCountRelations()));
+            ->loadCount(array_keys($this->entity()->mergeCountIcons()));
     }
 
     /**
@@ -221,7 +221,7 @@ final class MergeRecordPicker extends Field
     {
         return $this->subject()->newQuery()
             ->with(['customFieldValues.customField'])
-            ->withCount(array_keys($this->entity()->mergeCountRelations()));
+            ->withCount(array_keys($this->entity()->mergeCountIcons()));
     }
 
     private function image(Model $record): ?string
@@ -316,13 +316,13 @@ final class MergeRecordPicker extends Field
      */
     private function counts(callable $count): array
     {
-        $relations = $this->entity()->mergeCountRelations();
+        $icons = $this->entity()->mergeCountIcons();
 
         return array_map(function (string $relation, string $icon) use ($count): array {
             $key = Str::snake($relation);
 
             return ['key' => $key, 'icon' => $icon, 'count' => $count($key)];
-        }, array_keys($relations), $relations);
+        }, array_keys($icons), $icons);
     }
 
     /**

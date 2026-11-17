@@ -192,7 +192,7 @@ enum CrmEntity: string
     }
 
     /** @return array<string, string> */
-    public function mergeCountRelations(): array
+    public function mergeCountIcons(): array
     {
         return match ($this) {
             self::Company => [
