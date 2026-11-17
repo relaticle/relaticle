@@ -16,14 +16,12 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 
 final readonly class DuplicateRecordQuery
 {
-    private const int LIMIT = 10;
-
     public function __construct(private EntitiesByFieldValueQuery $entitiesByFieldValue) {}
 
     /**
      * @return array<string, array{record: Company|People, value: string}>
      */
-    public function get(User $user, Company|People $record): array
+    public function get(User $user, Company|People $record, int $limit): array
     {
         $field = $this->identityField($record);
 
@@ -39,12 +37,12 @@ final readonly class DuplicateRecordQuery
 
         $spellings = collect($values)->flatMap(fn (string $value): array => CanonicalValue::spellings($field, $value))->unique()->values()->all();
 
-        return $this->entitiesByFieldValue->get($record::class, $field, $spellings, self::LIMIT + 1)
+        return $this->entitiesByFieldValue->get($record::class, $field, $spellings, $limit + 1)
             ->reject(fn (Company|People $match): bool => $match->is($record))
             ->load(['customFieldValues' => fn (Relation $values): Relation => $values->where('custom_field_id', $field->getKey()), 'customFieldValues.customField'])
             ->map(fn (Company|People $match): array => ['record' => $match, 'value' => $this->sharedValue($field, $values, $match)])
             ->sortBy(fn (array $match): int => (int) array_search($match['value'], $values, true))
-            ->take(self::LIMIT)
+            ->take($limit)
             ->keyBy(fn (array $match): string => (string) $match['record']->getKey())
             ->all();
     }

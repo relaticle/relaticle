@@ -279,7 +279,7 @@ trait HasRecordPageLayout
 
         /** @var User $user */
         $user = Filament::auth()->user();
-        $duplicates = resolve(DuplicateRecordQuery::class)->get($user, $record);
+        $duplicates = resolve(DuplicateRecordQuery::class)->get($user, $record, DuplicateRecordsPrompt::SHOWN);
 
         return is_string($id) && isset($duplicates[$id]) ? $id : array_key_first($duplicates);
     }

@@ -59,6 +59,7 @@ return [
         'duplicate' => [
             'checking' => 'Checking for duplicates…',
             'count' => '{1} 1 possible duplicate|[2,*] :count possible duplicates',
+            'count_over' => ':count+ possible duplicates',
             'shares' => 'Shares :value',
             'merge_with' => 'Merge with :name',
             'action' => 'Merge',

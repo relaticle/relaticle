@@ -17,13 +17,15 @@ use Livewire\Attributes\Locked;
 
 final class DuplicateRecordsPrompt extends BaseLivewireComponent
 {
+    public const int SHOWN = 10;
+
     #[Locked]
     public Company|People $record;
 
     public function content(Schema $schema): Schema
     {
         return $schema->components([
-            Section::make(fn (): string => trans_choice('filament/record-page.merge.duplicate.count', count($this->duplicates())))
+            Section::make(fn (): string => $this->countLabel())
                 ->icon('lucide-circle-alert')
                 ->iconSize(IconSize::Small)
                 ->iconColor('warning')
@@ -33,7 +35,7 @@ final class DuplicateRecordsPrompt extends BaseLivewireComponent
                 ->collapsed()
                 ->schema([
                     View::make('livewire.app.records.duplicate-records-list')
-                        ->viewData(fn (): array => ['duplicates' => $this->duplicates()]),
+                        ->viewData(fn (): array => ['duplicates' => array_slice($this->duplicates(), 0, self::SHOWN, preserve_keys: true)]),
                 ])
                 ->key('duplicates')
                 ->extraAttributes(['data-duplicate-prompt' => true]),
@@ -52,11 +54,20 @@ final class DuplicateRecordsPrompt extends BaseLivewireComponent
         ]);
     }
 
+    private function countLabel(): string
+    {
+        $count = count($this->duplicates());
+
+        return $count > self::SHOWN
+            ? __('filament/record-page.merge.duplicate.count_over', ['count' => self::SHOWN])
+            : trans_choice('filament/record-page.merge.duplicate.count', $count);
+    }
+
     /**
      * @return array<string, array{record: Company|People, value: string}>
      */
     private function duplicates(): array
     {
-        return once(fn (): array => resolve(DuplicateRecordQuery::class)->get($this->authUser(), $this->record));
+        return once(fn (): array => resolve(DuplicateRecordQuery::class)->get($this->authUser(), $this->record, self::SHOWN + 1));
     }
 }

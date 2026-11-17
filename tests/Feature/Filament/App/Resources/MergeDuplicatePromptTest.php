@@ -174,7 +174,7 @@ it('shows no prompt when the domains attribute is switched off', function (): vo
     duplicatePrompt($company)->assertViewHas('hasDuplicates', false);
 });
 
-it('counts at most ten duplicates', function (): void {
+it('counts more than ten duplicates as ten plus', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com', 'harborline.io']]);
     foreach (range(1, 6) as $number) {
         mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.com', 'harborline.io']]);
@@ -183,6 +183,17 @@ it('counts at most ten duplicates', function (): void {
         mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.io']]);
     }
     foreach (range(13, 15) as $number) {
+        mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.com']]);
+    }
+
+    $prompt = duplicatePrompt($company)->assertSeeText(__('filament/record-page.merge.duplicate.count_over', ['count' => 10]));
+
+    expect(substr_count($prompt->html(), 'wire:key="duplicate-'))->toBe(10);
+});
+
+it('counts exactly ten duplicates without a plus', function (): void {
+    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
+    foreach (range(1, 10) as $number) {
         mergeCompanyRecord($this->workspace, $this->user, ['name' => "Harborline {$number}"], ['domains' => ['harborline.com']]);
     }
 

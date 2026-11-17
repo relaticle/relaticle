@@ -59,6 +59,7 @@ return [
         'duplicate' => [
             'checking' => 'Recherche de doublons…',
             'count' => '{1} 1 doublon possible|[2,*] :count doublons possibles',
+            'count_over' => ':count+ doublons possibles',
             'shares' => 'Partage :value',
             'merge_with' => 'Fusionner avec :name',
             'action' => 'Fusionner',
