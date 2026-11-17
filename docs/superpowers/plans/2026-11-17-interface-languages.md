@@ -186,9 +186,10 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 
 **Interfaces:**
 - Consumes: `Locales::within()`, `User::effectiveLocale()`.
+- Produces: `TaskField::doneNames(): list<string>` (the `Done` option label in every `available_locales` language, read with `__($key, [], $locale)`) and `TaskField::isDone(string $name): bool`. `DONE_STATUS` is removed, and its seven readers switch: `app/Actions/Task/CompleteTask.php:35`, `app/Services/Notifications/DigestService.php:173`, `packages/Chat/src/Services/MyTasksService.php:130`, `app/Queries/Crm/CrmSummaryQuery.php:124`, `app/Filament/Components/Infolists/RecordOverview.php:316`, `app/Support/CustomFieldOptionPlan.php:552,571,579`. SQL readers use `whereIn(..., TaskField::doneNames())`. The one test that names the constant (`tests/Feature/Filament/RecordPageLayoutTest.php`) switches too.
 - Produces: `CreateWorkspaceCustomFields::handle()` runs inside `Locales::within($workspace->owner->effectiveLocale(), ...)` (`Workspace::owner()`, `app/Models/Workspace.php:728`). Option colours map from a stable option key to colour, so a German stage keeps its colour. `OnboardSeedManager::generateFor()` reads fixtures from `fixtures/{locale}/` when that tree exists, else `fixtures/`.
 
-- [ ] **Step 1: Write failing tests**: `it('creates built-in attributes and stages in the creator language')` (a `de` creator → stage options are the `de` lines; inject them with `addLines()` until Task 10 lands, then assert real German), `it('keeps stage colours in every language')`, `it('seeds sample notes and tasks in the creator language')`, `it('leaves existing workspaces untouched')`.
+- [ ] **Step 1: Write failing tests**: `it('creates built-in attributes and stages in the creator language')` (a `de` creator → stage options are the `de` lines; inject them with `addLines()` until Task 10 lands, then assert real German), `it('keeps stage colours in every language')`, `it('seeds sample notes and tasks in the creator language')`, `it('leaves existing workspaces untouched')`, `it('completes a task in a German workspace whose status reads Erledigt')` (through `CompleteTask`), `it('counts German done tasks in the digest, My Tasks and the CRM summary')`.
 - [ ] **Step 2: Run, expect FAIL.**
 - [ ] **Step 3: Implement.**
 - [ ] **Step 4: Run.** Expect PASS.

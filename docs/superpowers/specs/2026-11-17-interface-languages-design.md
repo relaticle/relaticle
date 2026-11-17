@@ -196,6 +196,24 @@ any other user data. Existing workspaces keep their English rows.
   workspace data-language setting (nobody has asked for it yet; it can be added on top of this
   later), and leaving English (the mixed screen this design exists to remove).
 
+### Recognising a finished task in every language
+
+Decided by Manuk on 2026-11-18 (option A of five). Seven places find the task status "Done" by its
+English name (`TaskField::DONE_STATUS`): `CompleteTask`, `DigestService`, `MyTasksService`,
+`CrmSummaryQuery`, `RecordOverview` and two in `CustomFieldOptionPlan`. Issue #556 records why
+that is fragile. A German workspace seeded with "Erledigt" would never count a task as done.
+
+- One owner on `TaskField`: `doneNames()` returns the "Done" label in every available language,
+  and `isDone(string $name)` tests a name against it. The seven call sites use them, with
+  `whereIn` in the SQL ones.
+- A rename still breaks it, exactly as it does today. Giving options a stable meaning stays with
+  #556, and an app-side option-meaning table (option C) is the step that fixes renames too.
+- Prior art, read 2026-11-18: Twenty stores a stable option `value` (`DONE`) on records and never
+  matches labels. It ships 35 locales but does not translate option labels yet (its issue #27239 is
+  open). Attio models a finished task as an `is_completed` boolean, and its default deal stages are
+  English titles with no outcome flag. Neither translates seeded options, so this design goes
+  further than both.
+
 ### Rela
 
 - Replies follow the language of the user's latest typed message (today's rule). A turn with no
