@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
+use App\Actions\Merge\CombineRecordValues;
 use App\Actions\Merge\MergeRecords;
+use App\Actions\Merge\MoveMorphPivot;
+use App\Actions\Merge\MoveRecordHistory;
+use App\Actions\Merge\MoveRecordLinks;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\ActivityLog\AppEventPalette;
 use App\Enums\CreationSource;
@@ -10,6 +14,7 @@ use App\Enums\CrmEntity;
 use App\Enums\MediaCollection;
 use App\Enums\RecordIdentity;
 use App\Enums\WorkspaceRole;
+use App\Events\RecordMerged;
 use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Components\Forms\MergeRecordPicker;
 use App\Filament\Resources\OpportunityResource\Pages\ViewOpportunity;
@@ -37,7 +42,7 @@ use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergeRecords::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
+mutates(MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, MoveRecordHistory::class, MoveMorphPivot::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
 
 beforeEach(function (): void {
     Queue::fake();
@@ -64,6 +69,26 @@ function mergePeopleWith(People $current, People $picked, bool $keepPicked = fal
     return livewire(ViewPeople::class, ['record' => $current->getKey()])
         ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
 }
+
+it('rolls back every moved link and the history when the final write fails validation', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $kept = mergePersonRecord($this->workspace, $this->user, ['company_id' => null]);
+    $duplicate = mergePersonRecord($this->workspace, $this->user, ['company_id' => $company->getKey()]);
+    $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
+    $duplicate->notes()->attach($note->getKey());
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
+    $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->pluck('id');
+
+    Event::listen(RecordMerged::class, fn (): int => DB::table('companies')->where('id', $company->getKey())->update(['deleted_at' => now()]));
+    mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
+
+    expect($duplicateRows)->not->toBeEmpty()
+        ->and(People::query()->find($duplicate->getKey()))->not->toBeNull()
+        ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
+        ->and($opportunity->refresh()->contact_id)->toBe($duplicate->getKey())
+        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$duplicate->getKey()])
+        ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
+});
 
 it('combines emails with the kept person first and without repeats', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield'], ['emails' => ['dana@brightline.com', 'dana@gmail.com']]);
