@@ -166,3 +166,14 @@ it('opens the merge from the duplicate prompt with the duplicate picked', functi
 
     expect(Company::query()->find($duplicate->getKey()))->toBeNull();
 });
+
+it('keeps a long duplicate name inside the record rail', function (): void {
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    mergeDialogCompany($this->workspace, $this->user, str_repeat('Brightline Health Holdings International ', 4), ['brightlinehealth.com']);
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
+        ->click('[data-duplicate-prompt] .fi-section-header')
+        ->assertVisible('[data-duplicate-prompt] li button')
+        ->assertScript("[...document.querySelectorAll('[data-duplicate-prompt] li')].every((row) => row.getBoundingClientRect().right <= document.querySelector('.fi-record-rail').getBoundingClientRect().right)", true)
+        ->assertNoJavaScriptErrors();
+});

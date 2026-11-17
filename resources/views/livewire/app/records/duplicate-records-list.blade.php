@@ -2,7 +2,7 @@
     /** @var array<string, array{record: \App\Models\Company|\App\Models\People, value: string}> $duplicates */
 @endphp
 
-<ul class="grid gap-1.5">
+<ul class="grid grid-cols-1 gap-1.5">
     @foreach ($duplicates as $id => $duplicate)
         <li wire:key="duplicate-{{ $id }}" class="flex items-center gap-2.5 rounded-lg py-2 ps-2.5 pe-2 ring-1 ring-gray-950/5 dark:ring-white/10">
             <div class="min-w-0 flex-1">
