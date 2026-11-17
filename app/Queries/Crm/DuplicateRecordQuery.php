@@ -12,6 +12,7 @@ use App\Models\People;
 use App\Models\User;
 use App\Queries\CustomFields\EntitiesByFieldValueQuery;
 use App\Support\CustomFields\CanonicalValue;
+use Illuminate\Database\Eloquent\Relations\Relation;
 
 final readonly class DuplicateRecordQuery
 {
@@ -40,7 +41,7 @@ final readonly class DuplicateRecordQuery
 
         return $this->entitiesByFieldValue->get($record::class, $field, $spellings, self::LIMIT + 1)
             ->reject(fn (Company|People $match): bool => $match->is($record))
-            ->load('customFieldValues.customField')
+            ->load(['customFieldValues' => fn (Relation $values): Relation => $values->where('custom_field_id', $field->getKey()), 'customFieldValues.customField'])
             ->map(fn (Company|People $match): array => ['record' => $match, 'value' => $this->sharedValue($field, $values, $match)])
             ->sortBy(fn (array $match): int => (int) array_search($match['value'], $values, true))
             ->take(self::LIMIT)
