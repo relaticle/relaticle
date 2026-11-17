@@ -270,12 +270,12 @@ trait HasRecordPageLayout
             ])
             ->schema([
                 View::make('filament.app.duplicate-prompt')
-                    ->viewData(fn (): array => ['duplicates' => array_map(fn (array $duplicate): array => [
-                        'id' => (string) $duplicate['record']->getKey(),
+                    ->viewData(fn (): array => ['duplicates' => array_map(fn (string $id, array $duplicate): array => [
+                        'id' => $id,
                         'name' => $duplicate['record']->name,
                         'url' => filament()->getModelResource($duplicate['record'])::getUrl('view', ['record' => $duplicate['record']]),
                         'value' => $duplicate['value'],
-                    ], $this->duplicates())])
+                    ], array_keys($this->duplicates()), $this->duplicates())])
                     ->registerActions([
                         MergeRecordAction::make('mergeDuplicate')
                             ->label(__('filament/record-page.merge.duplicate.action'))
@@ -294,20 +294,16 @@ trait HasRecordPageLayout
 
     private function duplicateName(mixed $id): string
     {
-        $duplicate = collect($this->duplicates())->first(fn (array $duplicate): bool => (string) $duplicate['record']->getKey() === $id);
-
-        return (string) ($duplicate['record']->name ?? '');
+        return is_string($id) ? (string) ($this->duplicates()[$id]['record']->name ?? '') : '';
     }
 
     private function duplicateId(mixed $id): ?string
     {
-        $ids = array_map(fn (array $duplicate): string => (string) $duplicate['record']->getKey(), $this->duplicates());
-
-        return in_array($id, $ids, true) ? $id : ($ids[0] ?? null);
+        return is_string($id) && isset($this->duplicates()[$id]) ? $id : array_key_first($this->duplicates());
     }
 
     /**
-     * @return list<array{record: Company|People, value: string}>
+     * @return array<string, array{record: Company|People, value: string}>
      */
     private function duplicates(): array
     {
@@ -325,7 +321,9 @@ trait HasRecordPageLayout
             /** @var User $user */
             $user = Filament::auth()->user();
 
-            return resolve(DuplicateRecordQuery::class)->get($user, $record);
+            return collect(resolve(DuplicateRecordQuery::class)->get($user, $record))
+                ->keyBy(fn (array $duplicate): string => (string) $duplicate['record']->getKey())
+                ->all();
         });
     }
 
