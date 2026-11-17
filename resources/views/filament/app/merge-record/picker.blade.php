@@ -99,7 +99,8 @@
     }"
     x-on:resize.window="open && place()"
     x-on:scroll.window.capture="open && place()"
-    x-on:keydown.escape="if (open || pending) { $event.stopPropagation(); dismiss(); $refs.trigger?.focus() }"
+    {{-- Captured on the window: WebKit leaves a clicked button unfocused, so Esc during loading starts at the body. --}}
+    x-on:keydown.escape.window.capture="if (open || pending) { $event.stopPropagation(); dismiss(); $refs.trigger?.focus() }"
     x-on:keydown.tab="dismiss()"
     x-on:click.outside="dismiss()"
 >
