@@ -172,6 +172,28 @@ it('hides merge from a member who cannot update and delete the record', function
     livewire(ViewCompany::class, ['record' => $company->getKey()])->assertActionHidden(mergeRecordAction());
 });
 
+it('refuses the merge when the member loses merge rights while the dialog is open', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline']);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics']);
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->switchWorkspace($this->workspace);
+    $this->actingAs($admin);
+
+    $dialog = livewire(ViewCompany::class, ['record' => $kept->getKey()])
+        ->mountAction(mergeRecordAction())
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
+
+    $this->workspace->users()->updateExistingPivot($admin->getKey(), ['role' => WorkspaceRole::Viewer->value]);
+    $this->actingAs($admin->fresh());
+
+    $dialog->callMountedAction();
+
+    expect(Company::query()->find($duplicate->getKey()))->not->toBeNull()
+        ->and($kept->refresh()->name)->toBe('Harborline')
+        ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
+});
+
 it('offers merge to a member who can update and delete the record', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user);
 
