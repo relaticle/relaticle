@@ -9,6 +9,8 @@ use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(MergeRecordAction::class);
 
+pest()->group('webkit');
+
 beforeEach(function (): void {
     $this->withVite();
     $this->user = User::factory()->withWorkspace()->create();
