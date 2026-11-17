@@ -9,6 +9,7 @@ use App\Data\LinkOption;
 use App\Data\MergedValues;
 use App\Enums\CrmEntity;
 use App\Enums\RecordIdentity;
+use App\Filament\Actions\MergeRecordAction;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldValue;
@@ -24,7 +25,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Renderless;
 
@@ -58,7 +58,7 @@ final class MergeRecordPicker extends Field
     public function searchRecords(string $search = ''): array
     {
         $subject = $this->subject();
-        abort_unless(Gate::allows('update', $subject) && Gate::allows('delete', $subject), 403);
+        abort_unless(MergeRecordAction::canMerge($subject), 403);
 
         $search = mb_substr(trim($search), 0, 100);
 
@@ -97,7 +97,7 @@ final class MergeRecordPicker extends Field
 
     public function keepsPicked(): bool
     {
-        return $this->pairing() !== null && $this->keepPickedState();
+        return $this->pairing() !== null && $this->keepPickedFlag();
     }
 
     /**
@@ -144,7 +144,7 @@ final class MergeRecordPicker extends Field
         return $this->entity()->icon();
     }
 
-    private function keepPickedState(): bool
+    private function keepPickedFlag(): bool
     {
         return ($this->makeGetUtility())('keep_picked') === true;
     }
@@ -170,7 +170,7 @@ final class MergeRecordPicker extends Field
             return null;
         }
 
-        $keepsPicked = $this->keepPickedState();
+        $keepsPicked = $this->keepPickedFlag();
 
         $key = "{$pickedId}|{$keepsPicked}";
 
@@ -219,23 +219,7 @@ final class MergeRecordPicker extends Field
     {
         return $this->subject()->newQuery()
             ->with(['customFieldValues.customField'])
-            ->withCount($this->entity()->mergeCountRelations());
-    }
-
-    private function countIcon(string $relation): string
-    {
-        if ($relation === 'people') {
-            return 'lucide-users';
-        }
-
-        $related = $this->subject()->{$relation}()->getRelated();
-
-        return (CrmEntity::tryFromModel($related) ?? abort(404))->icon();
-    }
-
-    private function detailCode(): string
-    {
-        return $this->identity()->fieldCode();
+            ->withCount(array_keys($this->entity()->mergeCountRelations()));
     }
 
     private function image(Model $record): ?string
@@ -275,12 +259,12 @@ final class MergeRecordPicker extends Field
         $values = $pairing['values'];
         $picked = $pairing['picked'];
         $current = $this->currentRecord();
-        [$kept, $dropped] = $this->keepPickedState() ? [$picked, $current] : [$current, $picked];
+        [$kept, $dropped] = $this->keepPickedFlag() ? [$picked, $current] : [$current, $picked];
 
         return $this->cardData(
             (string) $values->attributes['name'],
             $this->image($kept) ?? $this->image($dropped),
-            $this->links($values->customFields[$this->detailCode()] ?? []),
+            $this->links($values->customFields[$this->identity()->fieldCode()] ?? []),
             fn (string $key): int => (int) $picked->getAttribute("{$key}_count")
                 + (int) $current->getAttribute("{$key}_count")
                 - $this->sharedCount($key, $pairing),
@@ -330,11 +314,13 @@ final class MergeRecordPicker extends Field
      */
     private function counts(callable $count): array
     {
-        return array_map(function (string $relation) use ($count): array {
+        $relations = $this->entity()->mergeCountRelations();
+
+        return array_map(function (string $relation, string $icon) use ($count): array {
             $key = Str::snake($relation);
 
-            return ['key' => $key, 'icon' => $this->countIcon($relation), 'count' => $count($key)];
-        }, $this->entity()->mergeCountRelations());
+            return ['key' => $key, 'icon' => $icon, 'count' => $count($key)];
+        }, array_keys($relations), $relations);
     }
 
     /**
@@ -342,8 +328,9 @@ final class MergeRecordPicker extends Field
      */
     private function details(Company|People $record): array
     {
+        $fieldId = $this->identityField()?->getKey();
         $value = $record->customFieldValues
-            ->first(fn (CustomFieldValue $fieldValue): bool => $fieldValue->custom_field_id === $this->identityField()?->getKey())
+            ->first(fn (CustomFieldValue $fieldValue): bool => $fieldValue->custom_field_id === $fieldId)
             ?->getValue();
 
         return $this->links($value);
@@ -405,6 +392,6 @@ final class MergeRecordPicker extends Field
 
         return resolve(WorkspaceCustomFields::class)
             ->forEntity($subject->loadMissing('workspace')->workspace, $subject->getMorphClass())
-            ->firstWhere('code', $this->detailCode());
+            ->firstWhere('code', $this->identity()->fieldCode());
     }
 }

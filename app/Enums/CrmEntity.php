@@ -191,12 +191,21 @@ enum CrmEntity: string
         };
     }
 
-    /** @return list<string> */
+    /** @return array<string, string> */
     public function mergeCountRelations(): array
     {
         return match ($this) {
-            self::Company => ['people', 'opportunities', 'notes', 'tasks'],
-            self::People => ['contactOpportunities', 'notes', 'tasks'],
+            self::Company => [
+                'people' => 'lucide-users',
+                'opportunities' => self::Opportunity->icon(),
+                'notes' => self::Note->icon(),
+                'tasks' => self::Task->icon(),
+            ],
+            self::People => [
+                'contactOpportunities' => self::Opportunity->icon(),
+                'notes' => self::Note->icon(),
+                'tasks' => self::Task->icon(),
+            ],
             self::Opportunity, self::Task, self::Note => [],
         };
     }

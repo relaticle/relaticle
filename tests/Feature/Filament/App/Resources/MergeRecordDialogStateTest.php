@@ -97,7 +97,13 @@ it('counts a note linked to both records once in the result preview', function (
 
     $counts = collect($picker->getResultCard()['counts'])->keyBy('key');
 
-    expect($counts['notes']['count'])->toBe(2);
+    expect($counts['notes']['count'])->toBe(2)
+        ->and($counts->map(fn (array $count): string => $count['icon'])->all())->toBe([
+            'people' => 'lucide-users',
+            'opportunities' => 'lucide-circle-dollar-sign',
+            'notes' => 'lucide-file-text',
+            'tasks' => 'lucide-clipboard-check',
+        ]);
 });
 
 it('leaves a deleted task linked to both records out of the result preview', function (): void {
