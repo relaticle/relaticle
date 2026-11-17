@@ -363,6 +363,8 @@ it('rolls back every moved link and the history when the final write fails valid
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
     $duplicate->notes()->attach($note->getKey());
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $duplicate->tasks()->attach($task->getKey());
     $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
     $logo = mergeMedia($duplicate, Company::LOGO_MEDIA_COLLECTION);
     $duplicate->update(['name' => 'Brightline Health Inc']);
@@ -374,6 +376,7 @@ it('rolls back every moved link and the history when the final write fails valid
     expect($duplicateRows)->not->toBeEmpty()
         ->and(Company::query()->find($duplicate->getKey()))->not->toBeNull()
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
+        ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([$task->getKey()])
         ->and(mergeLinkedIds('noteables', 'note_id', $kept))->toBe([])
         ->and($person->refresh()->company_id)->toBe($duplicate->getKey())
         ->and($logo->refresh()->model_id)->toBe($duplicate->getKey())

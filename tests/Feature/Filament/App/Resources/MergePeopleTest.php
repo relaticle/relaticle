@@ -76,6 +76,8 @@ it('rolls back every moved link and the history when the final write fails valid
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['company_id' => $company->getKey()]);
     $note = Note::factory()->recycle([$this->user, $this->workspace])->create();
     $duplicate->notes()->attach($note->getKey());
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $duplicate->tasks()->attach($task->getKey());
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
     $duplicate->update(['name' => 'Dana W']);
     $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
@@ -86,6 +88,7 @@ it('rolls back every moved link and the history when the final write fails valid
     expect($duplicateRows)->not->toBeEmpty()
         ->and(People::query()->find($duplicate->getKey()))->not->toBeNull()
         ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
+        ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([$task->getKey()])
         ->and($opportunity->refresh()->contact_id)->toBe($duplicate->getKey())
         ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$duplicate->getKey()])
         ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
