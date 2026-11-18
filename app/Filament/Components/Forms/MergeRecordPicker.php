@@ -370,7 +370,7 @@ final class MergeRecordPicker extends Field
 
         return $subject->newQuery()
             ->with(LinkOption::marks($subject))
-            ->select(['id', 'name'])
+            ->select(LinkOption::columns($subject, 'name'))
             ->when($identity instanceof CustomField, fn (Builder $query): Builder => $query->with([
                 'customFieldValues' => fn (Relation $values): Relation => $values->where('custom_field_id', $identity->getKey()),
                 'customFieldValues.customField',
