@@ -165,8 +165,8 @@ leaves a token, a syncing mailbox or a queued email behind.
 
 `MoveMergedRecordCommunicationListener` is also registered
 outside the feature flag: a merge with sync off must still move emailables,
-meetingables, participants, attendees and counters off the soft-deleted
-duplicate. It runs synchronously inside the merge transaction on
+meetingables, participants, attendees and counters off both soft-deleted
+originals onto the new record. It runs synchronously inside the merge transaction on
 `App\Events\RecordMerged`, and
 `tests/Feature/EmailIntegration/MergedRecordCommunicationTest.php` fails when
 the flag-off merge leaves a dangling row.
