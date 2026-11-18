@@ -276,6 +276,27 @@ final class AppPanelProvider extends PanelProvider
     }
 
     /**
+     * @return list<class-string|string>
+     */
+    private function panelMiddleware(): array
+    {
+        return [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            'auth.context',
+            'auth.lifetime',
+            AuthenticateSession::class,
+            ShareErrorsFromSession::class,
+            PreventRequestForgery::class,
+            SubstituteBindings::class,
+            DisableBladeIconComponents::class,
+            DispatchServingFilamentEvent::class,
+            DenySearchIndexing::class,
+        ];
+    }
+
+    /**
      * @return list<class-string>
      */
     private function authMiddleware(): array
@@ -550,19 +571,7 @@ final class AppPanelProvider extends PanelProvider
                     ->label(__('filament/panel.navigation_groups.tasks'))
                     ->icon('lucide-shopping-cart'),
             ])
-            ->middleware([
-                EncryptCookies::class,
-                AddQueuedCookiesToResponse::class,
-                StartSession::class,
-                'auth.context',
-                AuthenticateSession::class,
-                ShareErrorsFromSession::class,
-                PreventRequestForgery::class,
-                SubstituteBindings::class,
-                DisableBladeIconComponents::class,
-                DispatchServingFilamentEvent::class,
-                DenySearchIndexing::class,
-            ])
+            ->middleware($this->panelMiddleware())
             ->authGuard('web')
             ->authPasswordBroker('users')
             ->authMiddleware($this->authMiddleware())

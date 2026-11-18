@@ -681,6 +681,36 @@ it('removes foreign authentication from protected panel requests', function (str
     expect($stored)->not->toHaveKey(Auth::guard($foreignGuard)->getName());
 })->with(['web', 'sysadmin']);
 
+it('ends a staff session 24 hours after sign-in despite activity', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $cookies = [];
+    signInIsolatedStaff($cookies, SystemAdministrator::factory()->create());
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
+
+    foreach (range(1, 47) as $ignored) {
+        $this->travelTo(now()->addMinutes(30));
+        isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
+    }
+
+    $this->travelTo(now()->addMinutes(31));
+
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertStatus(419);
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertUnauthorized();
+});
+
+it('ends a staff session after 60 idle minutes', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $cookies = [];
+    signInIsolatedStaff($cookies, SystemAdministrator::factory()->create());
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
+
+    $this->travelTo(now()->addMinutes(59));
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
+
+    $this->travelTo(now()->addMinutes(61));
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertUnauthorized();
+});
+
 it('requires second factor enrollment on an existing staff Livewire page', function (): void {
     $cookies = [];
     $administrator = SystemAdministrator::factory()->create();

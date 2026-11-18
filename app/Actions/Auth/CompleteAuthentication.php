@@ -54,6 +54,7 @@ final readonly class CompleteAuthentication
         $session->regenerateToken();
 
         AuthenticationSession::markComplete($user);
+        AuthenticationSession::markStarted();
 
         if ($pending['method'] !== AuthMethod::REMEMBERED->value) {
             $session->put('fathom.track_login_completed', (string) Str::uuid());

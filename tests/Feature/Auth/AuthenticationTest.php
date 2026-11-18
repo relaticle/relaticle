@@ -225,6 +225,61 @@ it('sets no remember-me cookie on password sign-in', function (): void {
     expect(collect($response->headers->getCookies())->map->getName()->filter(fn (string $name): bool => str_starts_with($name, 'remember_web_')))->toBeEmpty();
 });
 
+it('stamps the sign-in time when a password sign-in completes', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+
+    expect(session('auth.started_at'))->toBe(now()->getTimestamp());
+});
+
+it('ends a customer session 90 days after sign-in despite activity', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+
+    $this->travelTo(now()->addDays(89));
+    $this->get($dashboard)->assertOk();
+
+    $this->travelTo(now()->addDay()->addMinute());
+    $this->get($dashboard)->assertRedirect(Filament::getPanel('app')->getLoginUrl());
+
+    $this->assertGuest('web');
+});
+
+it('stamps a session that has no start time instead of ending it', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+
+    $this->actingAs($user)
+        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
+        ->assertOk();
+
+    expect(session('auth.started_at'))->toBe(now()->getTimestamp());
+});
+
+it('answers a Livewire update from a capped session as an expired session', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+    $page = $this->actingAs($user)->get($dashboard)->assertOk()->getContent();
+    preg_match('/wire:snapshot="([^"]+)"/', $page, $matches);
+    app()->forgetScopedInstances();
+
+    $this->travelTo(now()->addDays(90)->addMinute());
+
+    $this->withHeaders(['X-Livewire' => '1', 'Referer' => $dashboard])->postJson(route('default-livewire.update'), ['components' => [[
+        'snapshot' => html_entity_decode($matches[1]),
+        'updates' => [],
+        'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
+    ]]])->assertStatus(419);
+
+    $this->assertGuest('web');
+});
+
 it('ignores an old remember-me cookie once the session is gone', function (): void {
     $user = User::factory()->withWorkspace()->create(['remember_token' => 'issued-before-the-change']);
     $recaller = Auth::guard('web')->getRecallerName();

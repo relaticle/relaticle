@@ -19,6 +19,8 @@ final readonly class AuthenticationSession
 
     private const string COMPLETED_KEY = 'auth.completed';
 
+    private const string STARTED_AT_KEY = 'auth.started_at';
+
     private const string OPERATION_KEY = 'auth.operation';
 
     private const string ATTEMPT_KEY = 'auth.attempt';
@@ -549,6 +551,18 @@ final readonly class AuthenticationSession
         }
 
         return hash_equals($marker['fingerprint'], self::completionFingerprint($user));
+    }
+
+    public static function markStarted(): void
+    {
+        session()->put(self::STARTED_AT_KEY, now()->getTimestamp());
+    }
+
+    public static function startedAt(): ?int
+    {
+        $startedAt = session()->get(self::STARTED_AT_KEY);
+
+        return is_int($startedAt) ? $startedAt : null;
     }
 
     public static function markComplete(User $user): void
