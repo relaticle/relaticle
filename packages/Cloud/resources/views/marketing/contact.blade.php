@@ -57,7 +57,7 @@
                         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ session('success') }}</p>
                     </div>
                 @else
-                    <form method="POST" action="{{ route('contact.store', $inquiry ? ['plan' => $inquiryKey] : []) }}" class="max-w-2xl space-y-6">
+                    <form method="POST" action="{{ LocalizedUrl::route('contact.store', $inquiry ? ['plan' => $inquiryKey] : []) }}" class="max-w-2xl space-y-6">
                         @csrf
                         <x-honeypot />
 

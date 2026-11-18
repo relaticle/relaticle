@@ -15,6 +15,7 @@ use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
 use Relaticle\Cloud\Marketing\Http\Controllers\PrivacyPolicyController;
 use Relaticle\Cloud\Marketing\Http\Controllers\TermsOfServiceController;
 use Relaticle\Cloud\Marketing\Http\Middleware\AddVaryAcceptHeader;
+use Spatie\Honeypot\ProtectAgainstSpam;
 use Spatie\MarkdownResponse\Middleware\ProvideMarkdownResponse;
 
 Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])->group(function (): void {
@@ -45,3 +46,5 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
     Route::get('/alternatives/{competitor}', [AlternativesController::class, 'show'])->name('alternatives.show');
     Route::get('/contact', [ContactController::class, 'show'])->name('contact');
 });
+
+Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1,contact-form', ProtectAgainstSpam::class])->name('contact.store');

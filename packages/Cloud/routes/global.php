@@ -9,10 +9,8 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Docs\Http\Controllers\HelpController;
-use Relaticle\Cloud\Marketing\Http\Controllers\ContactController;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
-use Spatie\Honeypot\ProtectAgainstSpam;
 
 Route::get('/sitemap.xml', function (): Response {
     $sitemap = Storage::disk('public')->get('sitemap.xml');
@@ -26,8 +24,6 @@ Route::get('/sitemap.xml', function (): Response {
 })->name('sitemap');
 
 Route::get('/discord', fn (): RedirectResponse => redirect()->away(config('services.discord.invite_url')))->name('discord');
-
-Route::post('/contact', [ContactController::class, 'store'])->middleware(['throttle:5,1,contact-form', ProtectAgainstSpam::class])->name('contact.store');
 
 if (Feature::for(null)->active(Documentation::class)) {
     Route::get('/llms.txt', [HelpController::class, 'llmsTxt'])->name('llms-txt');
