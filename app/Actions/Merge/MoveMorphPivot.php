@@ -13,17 +13,15 @@ final readonly class MoveMorphPivot
 {
     public function execute(string $table, string $itemColumn, string $prefix, Company|People $merged, Company|People $original): void
     {
-        $morph = $merged->getMorphClass();
-
-        $this->linkedTo($table, $prefix, $morph, $original)
-            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $merged)->select($itemColumn))
+        $this->linkedTo($table, $prefix, $original)
+            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $merged)->select($itemColumn))
             ->delete();
 
-        $this->linkedTo($table, $prefix, $morph, $original)->update([$prefix.'_id' => $merged->getKey()]);
+        $this->linkedTo($table, $prefix, $original)->update([$prefix.'_id' => $merged->getKey()]);
     }
 
-    private function linkedTo(string $table, string $prefix, string $morph, Company|People $record): Builder
+    private function linkedTo(string $table, string $prefix, Company|People $record): Builder
     {
-        return DB::table($table)->where($prefix.'_type', $morph)->where($prefix.'_id', $record->getKey());
+        return DB::table($table)->where($prefix.'_type', $record->getMorphClass())->where($prefix.'_id', $record->getKey());
     }
 }

@@ -23,13 +23,11 @@ final readonly class MoveMergedRecordCommunication
 
     public function execute(Company|People $merged, Company|People $original): void
     {
-        $morph = $merged->getMorphClass();
-
         $this->metrics->combineMergedRecords(
             $merged,
             $original,
-            $this->sharedEmails($morph, $merged, $original),
-            $this->sharedMeetings($morph, $merged, $original),
+            $this->sharedEmails($merged, $original),
+            $this->sharedMeetings($merged, $original),
         );
 
         $this->keepManualLinks('emailables', 'email_id', 'emailable', $merged, $original);
@@ -47,47 +45,45 @@ final readonly class MoveMergedRecordCommunication
 
     private function keepManualLinks(string $table, string $itemColumn, string $prefix, Company|People $merged, Company|People $original): void
     {
-        $morph = $merged->getMorphClass();
-
-        $this->linkedTo($table, $prefix, $morph, $merged)
+        $this->linkedTo($table, $prefix, $merged)
             ->where('link_source', '!=', 'manual')
-            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $original)->where('link_source', 'manual')->select($itemColumn))
+            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $original)->where('link_source', 'manual')->select($itemColumn))
             ->update(['link_source' => 'manual']);
     }
 
     /**
      * @return Collection<int, Email>
      */
-    private function sharedEmails(string $morph, Company|People $merged, Company|People $original): Collection
+    private function sharedEmails(Company|People $merged, Company|People $original): Collection
     {
         return Email::query()
             ->withoutGlobalScopes()
             ->with('participants')
-            ->whereIn('id', $this->sharedIds('emailables', 'email_id', 'emailable', $morph, $merged, $original))
+            ->whereIn('id', $this->sharedIds('emailables', 'email_id', 'emailable', $merged, $original))
             ->get();
     }
 
     /**
      * @return Collection<int, Meeting>
      */
-    private function sharedMeetings(string $morph, Company|People $merged, Company|People $original): Collection
+    private function sharedMeetings(Company|People $merged, Company|People $original): Collection
     {
         return Meeting::query()
             ->withoutGlobalScopes()
             ->with(['attendees.contact', 'connectedAccount'])
-            ->whereIn('id', $this->sharedIds('meetingables', 'meeting_id', 'meetingable', $morph, $merged, $original))
+            ->whereIn('id', $this->sharedIds('meetingables', 'meeting_id', 'meetingable', $merged, $original))
             ->get();
     }
 
-    private function sharedIds(string $table, string $itemColumn, string $prefix, string $morph, Company|People $merged, Company|People $original): Builder
+    private function sharedIds(string $table, string $itemColumn, string $prefix, Company|People $merged, Company|People $original): Builder
     {
-        return $this->linkedTo($table, $prefix, $morph, $original)
-            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $morph, $merged)->select($itemColumn))
+        return $this->linkedTo($table, $prefix, $original)
+            ->whereIn($itemColumn, $this->linkedTo($table, $prefix, $merged)->select($itemColumn))
             ->select($itemColumn);
     }
 
-    private function linkedTo(string $table, string $prefix, string $morph, Company|People $record): Builder
+    private function linkedTo(string $table, string $prefix, Company|People $record): Builder
     {
-        return DB::table($table)->where($prefix.'_type', $morph)->where($prefix.'_id', $record->getKey());
+        return DB::table($table)->where($prefix.'_type', $record->getMorphClass())->where($prefix.'_id', $record->getKey());
     }
 }

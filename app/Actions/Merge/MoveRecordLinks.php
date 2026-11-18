@@ -18,29 +18,27 @@ final readonly class MoveRecordLinks
 
     public function execute(Company|People $merged, Company|People $original, MergedValues $mergedValues): void
     {
-        $morph = $merged->getMorphClass();
-
         $this->movePivot->execute('noteables', 'note_id', 'noteable', $merged, $original);
         $this->movePivot->execute('taskables', 'task_id', 'taskable', $merged, $original);
-        $this->moveAttachments($morph, $merged, $original, $mergedValues->attachmentUuids);
-        $this->repointRecordAttributes($morph, $merged, $original);
+        $this->moveAttachments($merged, $original, $mergedValues->attachmentUuids);
+        $this->repointRecordAttributes($merged, $original);
     }
 
     /**
      * @param  list<string>  $referencedUuids
      */
-    private function moveAttachments(string $morph, Company|People $merged, Company|People $original, array $referencedUuids): void
+    private function moveAttachments(Company|People $merged, Company|People $original, array $referencedUuids): void
     {
         DB::table('media')
             ->where('workspace_id', $merged->workspace_id)
-            ->where('model_type', $morph)
+            ->where('model_type', $merged->getMorphClass())
             ->where('model_id', $original->getKey())
             ->where('collection_name', MediaCollection::Attachments->value)
             ->whereIn('uuid', $referencedUuids)
             ->update(['model_id' => $merged->getKey()]);
     }
 
-    private function repointRecordAttributes(string $morph, Company|People $merged, Company|People $original): void
+    private function repointRecordAttributes(Company|People $merged, Company|People $original): void
     {
         DB::update(
             'update custom_field_values set json_value = ('
@@ -56,7 +54,7 @@ final readonly class MoveRecordLinks
             .') and exists (select 1 from '.CustomFieldValue::LIST_ELEMENTS.' as element where element = ?)',
             [
                 $original->getKey(), $merged->getKey(),
-                $merged->workspace_id, $merged->workspace_id, CustomFieldType::RECORD->value, $morph,
+                $merged->workspace_id, $merged->workspace_id, CustomFieldType::RECORD->value, $merged->getMorphClass(),
                 $original->getKey(),
             ],
         );
