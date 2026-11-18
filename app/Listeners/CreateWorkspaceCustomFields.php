@@ -40,7 +40,7 @@ final readonly class CreateWorkspaceCustomFields
 
     public function handle(WorkspaceCreated $event): void
     {
-        $owner = $event->workspace->owner;
+        $owner = $event->workspace->owner()->first();
         $locale = $owner instanceof User ? $owner->effectiveLocale() : (string) config('app.default_locale');
 
         Locales::within($locale, fn () => $this->seedDefaultFields($event->workspace));
