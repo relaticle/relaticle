@@ -1,0 +1,8 @@
+title: Clearbit-Integrationsvorschlag prüfen
+assigned_people:
+  - alex
+custom_fields:
+  description: Prüfen Sie den Vorschlag von Clearbit zur Datenanreicherung und bereiten Sie Feedback für den nächsten Abstimmungstermin vor.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

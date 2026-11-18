@@ -1,0 +1,8 @@
+title: Portfolio von Marcus prüfen
+assigned_people:
+  - marcus
+custom_fields:
+  description: Sehen Sie sich das Design-Portfolio und die Fallstudien von Marcus Rivera an. Bewerten Sie sein Produktdenken und sein visuelles Design anhand der Maßstäbe des Design-Teams von Linear.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium

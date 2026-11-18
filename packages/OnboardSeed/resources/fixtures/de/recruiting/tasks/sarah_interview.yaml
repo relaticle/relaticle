@@ -1,0 +1,8 @@
+title: Technisches Interview mit Sarah vereinbaren
+assigned_people:
+  - sarah
+custom_fields:
+  description: Stimmen Sie sich mit dem Engineering-Team von Stripe ab, um ein technisches Interview für Sarah Chen anzusetzen. Planen Sie eine Runde zu Systemdesign und eine Live-Coding-Session ein.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

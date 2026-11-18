@@ -1,0 +1,9 @@
+title: Nachfassen bei Dylan
+# Add people assignment directly in the YAML
+assigned_people:
+  - dylan
+custom_fields:
+  description: Besprechen Sie das Angebot für den Figma-Enterprise-Tarif und klären Sie seine offenen Fragen.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High
