@@ -923,7 +923,7 @@ it('falls back to text when the Add column menu sends a type that cannot be crea
     livewire(ListCompanies::class)
         ->mountAction('createTableAttribute', ['type' => $type])
         ->assertActionDataSet(['type' => 'text']);
-})->with(['unknown' => 'nope', 'empty' => '', 'not a string' => [['select']]]);
+})->with(['unknown' => 'nope', 'empty' => '', 'not a string' => [['select']], 'retired' => 'file-upload']);
 
 it('puts the Add column button in the actions column header and its menu beside the table', function (): void {
     Filament::bootCurrentPanel();
