@@ -17,6 +17,7 @@ use App\Models\Workspace;
 use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
+use App\Support\Locales;
 use App\Support\Mail\MailPreview;
 use Carbon\CarbonImmutable;
 use Filament\Auth\Events\Registered;
@@ -117,6 +118,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerDocsRoutes();
 
         Blade::componentNamespace('Relaticle\\Cloud\\Marketing\\View\\Components', 'cloud');
+        $this->speakTheLanguageOfALocalizedNotFound();
 
         Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
@@ -188,6 +190,17 @@ final class CloudServiceProvider extends ServiceProvider
                 'feed' => 'cloud::blog.feed',
             ],
         ]);
+    }
+
+    private function speakTheLanguageOfALocalizedNotFound(): void
+    {
+        View::composer('errors::404', static function (): void {
+            $locale = LocalizedUrl::localeOfPath(request()->path());
+
+            if ($locale !== null) {
+                Locales::apply($locale);
+            }
+        });
     }
 
     private function registerMarketingRoutes(): void

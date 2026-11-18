@@ -132,15 +132,16 @@ final readonly class MarketingNavigation
     // A near spelling wins; otherwise the section index, so a removed post suggests `/blog`.
     public function closestTo(string $path): ?NavItem
     {
+        $home = rtrim((string) parse_url(LocalizedUrl::route('home'), PHP_URL_PATH), '/');
         $path = '/'.mb_strtolower(trim($path, '/'));
-        $section = '/'.strtok($path, '/');
+        $section = $home.'/'.strtok(substr($path, strlen($home)), '/');
         $closest = null;
         $closestDistance = PHP_INT_MAX;
 
         foreach ([...array_merge(...array_map(fn (NavItem $column): array => $column->children, $this->footer())), ...$this->legal()] as $item) {
-            $candidate = parse_url((string) $item->url, PHP_URL_PATH) ?: '/';
+            $candidate = rtrim((string) parse_url((string) $item->url, PHP_URL_PATH), '/');
 
-            if ($item->external || $candidate === '/' || $candidate === $path) {
+            if ($item->external || $candidate === $home || $candidate === $path) {
                 continue;
             }
 
