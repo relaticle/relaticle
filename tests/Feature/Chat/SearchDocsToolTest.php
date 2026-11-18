@@ -244,11 +244,15 @@ it('adds no English results when the language index fills the limit', function (
 });
 
 it('falls back to English search results for Rela when a language has no docs yet', function (): void {
-    $english = searchDocs('how do I export my data')['results'];
+    $root = storage_path('framework/testing/search-docs-'.Str::random(8));
+    writeLocalizedDocs($root);
+    $english = searchDocs('gadget')['results'];
 
     app()->setLocale('fr');
 
-    $french = searchDocs('how do I export my data')['results'];
+    $french = searchDocs('gadget')['results'];
+
+    File::deleteDirectory($root);
 
     expect($english)->not->toBeEmpty()
         ->and($french)->toBe($english);
