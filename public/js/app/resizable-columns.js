@@ -1075,16 +1075,20 @@
                     }))
                 },
 
+                // Opens on the side with room for it, or the roomier side, and stops 16px short of the window edge.
                 place() {
                     const rect = this.trigger.getBoundingClientRect()
                     const viewportWidth = document.documentElement.clientWidth
-                    const viewportHeight = document.documentElement.clientHeight
-                    const below = rect.bottom + 4
-                    const above = rect.top - 4 - panel.offsetHeight
+                    const roomBelow = document.documentElement.clientHeight - rect.bottom - 20
+                    const roomAbove = rect.top - 20
+
+                    panel.style.removeProperty('--menu-room')
+                    const opensBelow = panel.offsetHeight <= roomBelow || roomBelow >= roomAbove
+                    panel.style.setProperty('--menu-room', `${opensBelow ? roomBelow : roomAbove}px`)
 
                     // The Add column header is the last column, so the menu opens leftwards from its button, clear of the window edge.
                     this.left = Math.max(8, Math.min(rect.right - panel.offsetWidth, viewportWidth - panel.offsetWidth - 8))
-                    this.top = below + panel.offsetHeight <= viewportHeight - 8 || above < 8 ? Math.min(below, Math.max(8, viewportHeight - panel.offsetHeight - 8)) : above
+                    this.top = opensBelow ? rect.bottom + 4 : rect.top - 4 - panel.offsetHeight
                 },
 
                 close(returnFocus) {
