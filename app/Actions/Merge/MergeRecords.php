@@ -147,11 +147,11 @@ final readonly class MergeRecords
             return;
         }
 
-        throw ValidationException::withMessages(['duplicate_id' => $message]);
+        throw ValidationException::withMessages(['picked_id' => $message]);
     }
 
     private function unavailable(): ValidationException
     {
-        return ValidationException::withMessages(['duplicate_id' => __('filament/record-page.merge.unavailable')]);
+        return ValidationException::withMessages(['picked_id' => __('filament/record-page.merge.unavailable')]);
     }
 }
