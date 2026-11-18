@@ -1,5 +1,5 @@
 <span class="fi-ta-add-column">
-    <x-filament::dropdown :menu="false" placement="bottom-end" width="xs" shift teleport size class="fi-ta-add-column-dropdown">
+    <x-filament::dropdown :menu="false" placement="bottom-end" width="xs" :offset="2" shift teleport size class="fi-ta-add-column-dropdown">
         <x-slot name="trigger">
             <button type="button" class="fi-ta-add-column-trigger" data-add-column-trigger>
                 <x-filament::icon icon="lucide-plus" />
