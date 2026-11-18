@@ -1296,3 +1296,36 @@ it('shows a member the managed plan without billing controls', function (): void
         ->assertDontSee('Renews')
         ->assertDontSee(__('cloud::billing.managed.overdue_title', ['plan' => 'Enterprise']));
 });
+
+it('links the paused screen to the public pages in the owner language', function (): void {
+    withHostedBilling();
+
+    config()->set('app.url', 'https://marketing.test');
+    [$owner, $workspace] = billingPageOwner();
+    $owner->forceFill(['locale' => 'de'])->save();
+    $workspace->forceFill([
+        'hosted_free_grandfathered_at' => null,
+        'plan' => Plan::Pro,
+        'pro_trial_used_at' => now()->subDays(14),
+        'trial_ends_at' => now()->subHour(),
+    ])->save();
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
+        ->assertOk()
+        ->assertSee('href="https://marketing.test/de/contact"', false)
+        ->assertSee('href="https://marketing.test/de/privacy-policy"', false)
+        ->assertDontSee('href="https://marketing.test/contact"', false);
+});
+
+it('links the enterprise contact button to the contact page in the owner language', function (): void {
+    withHostedBilling();
+
+    config()->set('app.url', 'https://marketing.test');
+    [$owner, $workspace] = billingPageOwner();
+    $owner->forceFill(['locale' => 'fr'])->save();
+    $workspace->forceFill(['plan' => Plan::Enterprise])->save();
+
+    $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
+        ->assertOk()
+        ->assertSee('href="https://marketing.test/fr/contact"', false);
+});

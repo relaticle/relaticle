@@ -41,9 +41,9 @@ final readonly class BuildSearchIndex
         }
 
         $signature = $this->signature($pages);
+        $cacheKey = self::CACHE_KEY.str_replace('/', '.', DocUrl::localePrefix());
 
         /** @var array{signature: string, records: list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>}|null $cached */
-        $cacheKey = self::CACHE_KEY.str_replace('/', '.', DocUrl::localePrefix());
         $cached = Cache::get($cacheKey);
 
         if (is_array($cached) && $cached['signature'] === $signature) {

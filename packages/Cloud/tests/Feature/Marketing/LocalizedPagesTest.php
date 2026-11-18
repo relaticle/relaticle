@@ -8,11 +8,14 @@ use App\Support\Locales;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Middleware\SetPublicLocale;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
+use Relaticle\Ink\Models\Post;
+use Spatie\Honeypot\EncryptedTime;
 use Symfony\Component\DomCrawler\Crawler;
 
 mutates(SetPublicLocale::class, LocalizedUrl::class);
@@ -238,4 +241,116 @@ it('renders the language switcher in the docs shell', function (): void {
     $html = (string) $this->get('/help')->assertOk()->getContent();
 
     expect((new Crawler($html))->filter('footer [data-language-switcher]'))->toHaveCount(1);
+});
+
+it('does not suggest the localized home page on a German 404', function (): void {
+    $html = $this->withUnencryptedCookie(Locales::COOKIE, 'de')
+        ->get('/de/help/import/missing', ['Accept' => 'text/html'])
+        ->assertNotFound()
+        ->getContent();
+
+    expect($html)->not->toContain('You were probably looking for Features');
+});
+
+it('renders a mistyped German URL as a German 404', function (): void {
+    app('translator')->addLines(['*.Page not found' => 'Seite nicht gefunden'], 'de');
+
+    $english = (string) $this->get('/pricng', ['Accept' => 'text/html'])->assertNotFound()->getContent();
+    $german = (string) $this->get('/de/pricng', ['Accept' => 'text/html'])->assertNotFound()->getContent();
+
+    expect($german)->toContain('<html lang="de"')->toContain('Seite nicht gefunden')
+        ->and($german)->toContain('You were probably looking for Pricing')
+        ->and($english)->toContain('<html lang="en"')->not->toContain('Seite nicht gefunden');
+});
+
+it('keeps an unprefixed path that starts like a language English on a 404', function (): void {
+    $this->get('/developers/zz-missing', ['Accept' => 'text/html'])
+        ->assertNotFound()
+        ->assertSee('<html lang="en"', false);
+});
+
+function contactSubmission(array $overrides = []): array
+{
+    config(['honeypot.enabled' => true]);
+
+    return [
+        'my_name' => '',
+        'valid_from' => (string) EncryptedTime::create(now()->subMinute()),
+        'name' => 'Jane Doe',
+        'email' => 'jane@gmail.com',
+        'company' => 'Acme Inc',
+        'message' => 'I would like to learn more about your enterprise plan and integrations.',
+        ...$overrides,
+    ];
+}
+
+it('posts the contact form under its own language and redirects back to it', function (): void {
+    Mail::fake();
+    $user = User::factory()->withPersonalWorkspace()->create(['locale' => 'en']);
+
+    $this->actingAs($user)
+        ->post('/de/contact', contactSubmission())
+        ->assertRedirect('/de/contact')
+        ->assertSessionHas('success');
+
+    $this->actingAs($user)
+        ->post('/contact', contactSubmission())
+        ->assertRedirect('/contact');
+});
+
+it('validates the German contact form in German whatever the profile language is', function (): void {
+    Mail::fake();
+    $user = User::factory()->withPersonalWorkspace()->create(['locale' => 'en']);
+
+    $this->actingAs($user)
+        ->from('/de/contact')
+        ->post('/de/contact', contactSubmission(['email' => 'not-an-email']))
+        ->assertRedirect('/de/contact')
+        ->assertSessionHasErrors(['email' => 'E-Mail-Adresse muss eine gültige E-Mail-Adresse sein.']);
+
+    $form = (string) $this->get('/de/contact')->getContent();
+
+    expect((new Crawler($form))->filter('form[method="POST"]')->attr('action'))->toBe(url('/de/contact'))
+        ->and((string) (new Crawler((string) $this->get('/contact')->getContent()))->filter('form[method="POST"]')->attr('action'))->toBe(url('/contact'));
+});
+
+it('keeps the page number in the alternates of a paginated page', function (): void {
+    Post::factory()->published()->count(40)->create();
+
+    $html = (string) $this->get('/blog?page=2')->assertOk()->getContent();
+    $page = (new Crawler($html))->filter('link[rel="canonical"]')->attr('href');
+
+    expect($page)->toContain('page=2')
+        ->and(hreflangLinks($html)['x-default'])->toBe($page)
+        ->and(hreflangLinks($html)['en'])->toBe($page);
+
+    $first = (string) $this->get('/blog')->assertOk()->getContent();
+
+    expect(hreflangLinks($first)['x-default'])->toBe(url('/blog'));
+});
+
+it('keeps the query string on the language switcher links but not on hreflang', function (): void {
+    $html = (string) $this->get('/de/contact?plan=enterprise')->assertOk()->getContent();
+    $links = (new Crawler($html))->filter('[data-language-switcher] a[hreflang]');
+
+    expect($links->eq(3)->attr('href'))->toBe(url('/fr/contact').'?plan=enterprise')
+        ->and($links->eq(0)->attr('href'))->toBe(url('/contact').'?plan=enterprise')
+        ->and(hreflangLinks($html)['fr'])->toBe(url('/fr/contact'));
+});
+
+it('renders the language switcher as an accessible disclosure', function (): void {
+    $html = (string) $this->get('/de/pricing')->assertOk()->getContent();
+    $switcher = (new Crawler($html))->filter('footer [data-language-switcher]');
+    $button = $switcher->filter('button');
+    $list = $switcher->filter('nav');
+
+    expect($button->attr('aria-label'))->toBeNull()
+        ->and($button->attr('aria-haspopup'))->toBeNull()
+        ->and($button->attr('aria-controls'))->toBe($list->attr('id'))
+        ->and($button->attr('x-bind:aria-expanded'))->toBe('open')
+        ->and($list->attr('aria-label'))->not->toBeNull()
+        ->and($switcher->attr('x-on:focusout'))->toContain('relatedTarget')
+        ->and($switcher->filter('a[lang]'))->toHaveCount(0)
+        ->and($switcher->filter('a span[lang]'))->toHaveCount(4)
+        ->and($button->filter('span')->text())->toBe('Deutsch');
 });
