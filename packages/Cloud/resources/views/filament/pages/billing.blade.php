@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-filament-panels::page>
     @php
         $purchased = (int) ($balance?->purchased_credits ?? 0);
@@ -215,7 +216,7 @@
                     <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ $renewalLabel }}</p>
                 @endif
                 <div class="mt-5 flex flex-wrap gap-3">
-                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', absolute: false))">{{ __('cloud::billing.enterprise.manage') }}</x-filament::button>
+                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(LocalizedUrl::route('contact', absolute: false))">{{ __('cloud::billing.enterprise.manage') }}</x-filament::button>
                     @if($managedSubscription || ($canManageSubscription && ! $pastDue))
                         <x-filament::button color="gray" wire:click="managePortal">{{ __('cloud::billing.manage.button') }}</x-filament::button>
                     @endif
@@ -327,7 +328,7 @@
                         <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.enterprise') }}</h3>
                         <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]) }}</p>
                     </div>
-                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', ['plan' => 'enterprise'], absolute: false))">{{ __('cloud::billing.enterprise.contact') }}</x-filament::button>
+                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(LocalizedUrl::route('contact', ['plan' => 'enterprise'], absolute: false))">{{ __('cloud::billing.enterprise.contact') }}</x-filament::button>
                 </div>
                 <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.tagline') }} {{ __('cloud::billing.enterprise.terms') }}</p>
             </section>
