@@ -386,7 +386,7 @@ it('drops the kept company\'s owner who left the workspace and takes the duplica
     expect(mergedRecord()->account_owner_id)->toBe($duplicateHasOwner ? $this->user->getKey() : null);
 })->with([true, false]);
 
-it('rolls back the new company, every moved link and the carried merge entries when the final write fails validation', function (): void {
+it('rolls back the new company and every moved link when the final write fails validation', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['account_owner_id' => $member->getKey()]);
@@ -665,6 +665,21 @@ it('shows only the merge on the new company\'s timeline', function (): void {
 
     livewire(ActivityLogLivewire::class, ['subjectClass' => Company::class, 'subjectKey' => $merged->getKey()])
         ->assertDontSeeHtml('data-event="created"');
+});
+
+it('rolls back the carried merge entries when logging the merge fails', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire PLC']);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Abshire']);
+    activity()->performedOn($kept)->event('record_merged')->withProperties(['merged_name' => 'Abshire Group'])->log('record_merged');
+    Activity::created(function (Activity $activity): void {
+        throw_if($activity->properties->has('merged_into_name'), RuntimeException::class, 'logging failed');
+    });
+
+    expect(fn (): mixed => mergeWith($kept, $duplicate))->toThrow(RuntimeException::class, 'logging failed');
+
+    expect(Company::withTrashed()->count())->toBe(2)
+        ->and(Company::query()->whereKey([$kept->getKey(), $duplicate->getKey()])->count())->toBe(2)
+        ->and(Activity::query()->where('event', 'record_merged')->pluck('subject_id')->all())->toBe([$kept->getKey()]);
 });
 
 it('keeps listing what was merged into a company when it is merged again from its own page', function (): void {

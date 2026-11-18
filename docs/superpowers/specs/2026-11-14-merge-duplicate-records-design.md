@@ -242,7 +242,9 @@ an original into the record it already went into.
   its own change.
 - **Sort by created date.** The new record's `created_at` is the merge time, so it sorts as the
   newest record, and the duplicate prompt, which lists oldest first, lists it last.
-- **Restoring an original** brings back its values and history, but none of its links: they moved. Its emails or
+- **Restoring an original** brings back its values and history, but none of its links: they moved.
+  A restored priority record also comes back without its own "merged <name> into this record"
+  entries, because the new record took them over. Its emails or
   domains now belong to the new record, so restore hits the existing `RestoreConflictMessage`, which
   is the right outcome.
 - **Force-deleting an original later** is safe. `people.company_id` and `opportunities.company_id`

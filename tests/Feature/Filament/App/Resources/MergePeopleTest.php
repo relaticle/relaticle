@@ -71,7 +71,7 @@ function mergePeopleWith(People $current, People $picked, bool $keepPicked = fal
         ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
 }
 
-it('rolls back the new person, every moved link and the carried merge entries when the final write fails validation', function (): void {
+it('rolls back the new person and every moved link when the final write fails validation', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $kept = mergePersonRecord($this->workspace, $this->user, ['company_id' => null]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['company_id' => $company->getKey()]);
