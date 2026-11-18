@@ -32,7 +32,7 @@ final readonly class MergeRecords
 
     public function execute(User $user, Company|People $priority, Company|People $other): Company|People
     {
-        abort_unless($user->can('create', $priority::class) && $user->can('delete', $priority) && $user->can('delete', $other), 403);
+        abort_unless($user->can('create', $priority::class) && $user->can('update', $priority) && $user->can('delete', $priority) && $user->can('delete', $other), 403);
 
         if ($priority::class !== $other::class || $priority->is($other) || $priority->workspace_id !== $other->workspace_id) {
             throw $this->unavailable();

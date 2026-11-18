@@ -221,11 +221,12 @@ per original, carrying the new record and that original. The package's listener,
 
 ## Authorization
 
-The member needs `create` on the entity and `delete` on both originals (`CompanyPolicy`,
-`PeoplePolicy`). Both originals must be in the same workspace, different from each other, and live.
+The member needs `create` on the entity, `update` on the priority record and `delete` on both
+originals (`CompanyPolicy`, `PeoplePolicy`). `update` is checked up front because the values are
+written through `UpdateCompany` or `UpdatePeople`, which require it. Both originals must be in the same workspace, different from each other, and live.
 The action checks all of this itself, as every action does. `MergeRecordAction::canMerge()` hides
-the menu item and the duplicate prompt from a member who lacks `create` on the entity or `delete` on
-the current record, and on a deleted record's page, where the prompt would otherwise offer to merge
+the menu item and the duplicate prompt from a member who lacks `create` on the entity, or `update` or
+`delete` on the current record, and on a deleted record's page, where the prompt would otherwise offer to merge
 an original into the record it already went into.
 
 ## Known effects

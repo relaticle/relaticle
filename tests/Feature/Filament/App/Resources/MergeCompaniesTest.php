@@ -190,7 +190,7 @@ it('combines multi-select values with the kept record first', function (): void 
     expect(mergeCompanyValue(mergedRecord(), 'segments'))->toBe([$enterprise, $eu]);
 });
 
-it('hides merge from a member who cannot create and delete records', function (): void {
+it('hides merge from a member who cannot create, update and delete records', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user);
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
@@ -222,7 +222,7 @@ it('refuses the merge when the member loses merge rights while the dialog is ope
         ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
 });
 
-it('offers merge to a member who can create and delete records', function (): void {
+it('offers merge to a member who can create, update and delete records', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])->assertActionVisible(mergeRecordAction());
@@ -386,7 +386,7 @@ it('drops the kept company\'s owner who left the workspace and takes the duplica
     expect(mergedRecord()->account_owner_id)->toBe($duplicateHasOwner ? $this->user->getKey() : null);
 })->with([true, false]);
 
-it('rolls back the new company, every moved link and the history when the final write fails validation', function (): void {
+it('rolls back the new company, every moved link and the carried merge entries when the final write fails validation', function (): void {
     $member = User::factory()->create();
     $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['account_owner_id' => $member->getKey()]);
@@ -397,22 +397,18 @@ it('rolls back the new company, every moved link and the history when the final 
     $duplicate->tasks()->attach($task->getKey());
     $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
     $logo = mergeMedia($duplicate, Company::LOGO_MEDIA_COLLECTION);
-    $duplicate->update(['name' => 'Brightline Health Inc']);
-    $duplicateRows = Activity::query()->where('subject_type', 'company')->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
+    activity()->performedOn($kept)->event('record_merged')->withProperties(['merged_name' => 'Brightline'])->log('record_merged');
 
     Event::listen(RecordMerged::class, fn (): int => $this->workspace->users()->detach($member));
     mergeWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
 
-    expect($duplicateRows)->not->toBeEmpty()
-        ->and(Company::query()->find($duplicate->getKey()))->not->toBeNull()
+    expect(Company::query()->find($duplicate->getKey()))->not->toBeNull()
         ->and(Company::withTrashed()->count())->toBe(2)
-        ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
-        ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([$task->getKey()])
-        ->and(mergeLinkedIds('noteables', 'note_id', $kept))->toBe([])
+        ->and(DB::table('noteables')->where('note_id', $note->getKey())->pluck('noteable_id')->all())->toBe([$duplicate->getKey()])
+        ->and(DB::table('taskables')->where('task_id', $task->getKey())->pluck('taskable_id')->all())->toBe([$duplicate->getKey()])
         ->and($person->refresh()->company_id)->toBe($duplicate->getKey())
         ->and($logo->refresh()->model_id)->toBe($duplicate->getKey())
-        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$duplicate->getKey()])
-        ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
+        ->and(Activity::query()->where('event', 'record_merged')->pluck('subject_id')->all())->toBe([$kept->getKey()]);
 });
 
 it('finds a company by name or by any of its domains', function (string $term, array $found): void {

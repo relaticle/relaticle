@@ -38,6 +38,7 @@ final class MergeRecordAction extends Action
         return ($record instanceof Company || $record instanceof People)
             && ! $record->trashed()
             && Gate::allows('create', $record::class)
+            && Gate::allows('update', $record)
             && Gate::allows('delete', $record);
     }
 

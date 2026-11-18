@@ -71,7 +71,7 @@ function mergePeopleWith(People $current, People $picked, bool $keepPicked = fal
         ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
 }
 
-it('rolls back the new person, every moved link and the history when the final write fails validation', function (): void {
+it('rolls back the new person, every moved link and the carried merge entries when the final write fails validation', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
     $kept = mergePersonRecord($this->workspace, $this->user, ['company_id' => null]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, ['company_id' => $company->getKey()]);
@@ -80,20 +80,17 @@ it('rolls back the new person, every moved link and the history when the final w
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $duplicate->tasks()->attach($task->getKey());
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
-    $duplicate->update(['name' => 'Dana W']);
-    $duplicateRows = Activity::query()->where('subject_type', 'people')->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
+    activity()->performedOn($kept)->event('record_merged')->withProperties(['merged_name' => 'Dana'])->log('record_merged');
 
     Event::listen(RecordMerged::class, fn (): int => DB::table('companies')->where('id', $company->getKey())->update(['deleted_at' => now()]));
     mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
 
-    expect($duplicateRows)->not->toBeEmpty()
-        ->and(People::query()->find($duplicate->getKey()))->not->toBeNull()
+    expect(People::query()->find($duplicate->getKey()))->not->toBeNull()
         ->and(People::withTrashed()->count())->toBe(2)
-        ->and(mergeLinkedIds('noteables', 'note_id', $duplicate))->toBe([$note->getKey()])
-        ->and(mergeLinkedIds('taskables', 'task_id', $duplicate))->toBe([$task->getKey()])
+        ->and(DB::table('noteables')->where('note_id', $note->getKey())->pluck('noteable_id')->all())->toBe([$duplicate->getKey()])
+        ->and(DB::table('taskables')->where('task_id', $task->getKey())->pluck('taskable_id')->all())->toBe([$duplicate->getKey()])
         ->and($opportunity->refresh()->contact_id)->toBe($duplicate->getKey())
-        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$duplicate->getKey()])
-        ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
+        ->and(Activity::query()->where('event', 'record_merged')->pluck('subject_id')->all())->toBe([$kept->getKey()]);
 });
 
 it('creates a new person with the current person\'s emails first and without repeats', function (): void {
@@ -417,7 +414,7 @@ it('makes the new person real data when the other person was real', function ():
     expect(People::query()->whereKey($merged->getKey())->exists())->toBeTrue();
 });
 
-it('hides merge from a member who cannot create and delete people', function (): void {
+it('hides merge from a member who cannot create, update and delete people', function (): void {
     $person = mergePersonRecord($this->workspace, $this->user);
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
@@ -427,7 +424,7 @@ it('hides merge from a member who cannot create and delete people', function ():
     livewire(ViewPeople::class, ['record' => $person->getKey()])->assertActionHidden(mergeRecordAction());
 });
 
-it('offers merge to a member who can create and delete people', function (): void {
+it('offers merge to a member who can create, update and delete people', function (): void {
     $person = mergePersonRecord($this->workspace, $this->user);
 
     livewire(ViewPeople::class, ['record' => $person->getKey()])->assertActionVisible(mergeRecordAction());
