@@ -27,7 +27,7 @@
 
 /* Placed under its trigger by the script, outside the table's scroll box. */
 .fi-dropdown-panel.fi-ta-add-column-menu {
-    @apply fixed z-60 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] w-md max-w-[calc(100vw-1rem)] flex-col transition-none;
+    @apply fixed z-60 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] w-xs max-w-[calc(100vw-1rem)] flex-col transition-none;
 
     /* View settings opens its search row with a back button. This one has none, so the text lines up with the row icons. */
     & .fi-view-settings-search > input {
