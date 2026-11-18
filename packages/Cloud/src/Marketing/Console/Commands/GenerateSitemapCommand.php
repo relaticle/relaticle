@@ -133,7 +133,7 @@ final class GenerateSitemapCommand extends Command
 
         $docsRepository->categories($locale)
             ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
-            ->each(fn (DocCategory $category) => $this->ensureUrl($sitemap, DocUrl::category($category)));
+            ->each(fn (DocCategory $category): Url => $this->ensureUrl($sitemap, DocUrl::category($category)));
 
         $docsRepository->pages($locale)->each(function (DocPage $page) use ($sitemap): void {
             $this->ensureUrl($sitemap, DocUrl::page($page), $page->updated);
