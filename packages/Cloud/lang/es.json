@@ -40,7 +40,7 @@
     ":multiplierx for :models": ":multiplierx para :models",
     ":name AI assistant": "Asistente de IA :name",
     ":name Alternative": "Alternativa a :name",
-    ":name alternative": "alternativa a :name",
+    ":name alternative": "Alternativa a :name",
     ":name answers from the records in your workspace, Relaticle's product documentation and, when you allow it, the web. It links the records it names, so you can open the source. Like any AI model, it can misread a record. Check an answer that matters, and read each proposal before you approve it.": ":name responde a partir de los registros de su espacio de trabajo, la documentación del producto de Relaticle y, cuando usted lo permite, la web. Enlaza los registros que nombra, para que pueda abrir la fuente. Como cualquier modelo de IA, puede interpretar mal un registro. Verifique una respuesta que importe y lea cada propuesta antes de aprobarla.",
     ":name asks before every change": ":name pregunta antes de cada cambio",
     ":name asks first": ":name pregunta primero",
