@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\ToggleFavoriteAction;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Infolists\RecordDetails;
 use App\Filament\Components\Infolists\RecordOverview;
@@ -308,6 +309,7 @@ trait HasRecordPageLayout
     private function recordActions(): Actions
     {
         return Actions::make([
+            ToggleFavoriteAction::make()->record($this->crmRecord()),
             EditAction::make()
                 ->icon('lucide-square-pen')
                 ->color('gray')
