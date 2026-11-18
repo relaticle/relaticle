@@ -3,7 +3,19 @@
 @endphp
 
 <li
-    x-data="{ label: @js($groupLabel) }"
+    x-data="{
+        label: @js($groupLabel),
+        keys(list) {
+            return [...list.children].filter((item) => item.dataset.favoriteKey).map((item) => item.dataset.favoriteKey)
+        },
+        arrange() {
+            const folders = {}
+            this.$refs.favorites.querySelectorAll('[data-favorite-folder]').forEach((list) => {
+                folders[list.dataset.favoriteFolder] = this.keys(list).map((key) => key.replace(/^record:/, ''))
+            })
+            this.$wire.arrange({ top: this.keys(this.$refs.favorites), folders })
+        },
+    }"
     data-group-label="{{ $groupLabel }}"
     x-bind:class="{ 'fi-collapsed': $store.sidebar.groupIsCollapsed(label) }"
     {{-- -ml-2 offsets this hook, a sibling of Filament's .fi-sidebar-nav-groups list (margin-left: -8px). --}}
@@ -44,6 +56,10 @@
     <ul
         x-show="$store.sidebar.isOpen ? ! $store.sidebar.groupIsCollapsed(label) : true"
         x-collapse.duration.200ms
+        x-ref="favorites"
+        x-sort="arrange"
+        x-sort:group="favorites"
+        x-sort:config="{ delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }"
         class="fi-sidebar-group-items"
     >
         @forelse ($items as $item)

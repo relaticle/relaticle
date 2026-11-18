@@ -5,6 +5,8 @@
 
 <li
     wire:key="favorite-folder-{{ $folder->getKey() }}"
+    x-sort:item="@js('folder:'.$folder->getKey())"
+    data-favorite-key="folder:{{ $folder->getKey() }}"
     class="fi-sidebar-favorites-folder"
 >
     <div
@@ -53,6 +55,10 @@
     <ul
         x-show="! $store.sidebar.isOpen || ! $store.sidebar.groupIsCollapsed(@js($folderKey))"
         x-collapse.duration.200ms
+        x-sort="arrange"
+        {{-- A folder may not hold a folder, so this list only accepts favorites. --}}
+        x-sort:config="{ group: { name: 'favorites', put: (to, from, item) => item.dataset.favoriteKey?.startsWith('record:') ?? false }, delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }"
+        data-favorite-folder="{{ $folder->getKey() }}"
         x-bind:class="{ 'ps-5': $store.sidebar.isOpen }"
         class="fi-sidebar-favorites-folder-items"
     >

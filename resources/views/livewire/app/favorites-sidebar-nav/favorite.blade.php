@@ -6,6 +6,8 @@
 
 <li
     wire:key="favorite-record-{{ $favorite->getKey() }}"
+    x-sort:item="@js('record:'.$favorite->getKey())"
+    data-favorite-key="record:{{ $favorite->getKey() }}"
     @class([
         'fi-sidebar-item group/favorite-item relative',
         'fi-active' => $url !== null && request()->url() === $url,

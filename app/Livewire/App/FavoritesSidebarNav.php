@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Livewire\App;
 
+use App\Actions\Favorites\ArrangeFavorites;
 use App\Actions\Favorites\CreateFavoriteFolder;
 use App\Actions\Favorites\DeleteFavoriteFolder;
 use App\Actions\Favorites\RemoveFavoriteRecord;
@@ -49,6 +50,19 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
         }
 
         $removeFavoriteRecord->execute($user, $record);
+
+        $this->dispatch('refresh-sidebar');
+    }
+
+    /**
+     * @param  array<mixed>  $tree
+     */
+    public function arrange(array $tree, ArrangeFavorites $arrangeFavorites): void
+    {
+        $workspace = Filament::getTenant();
+        abort_unless($workspace instanceof Workspace, 403);
+
+        $arrangeFavorites->execute($this->authUser(), $workspace, $tree);
 
         $this->dispatch('refresh-sidebar');
     }
