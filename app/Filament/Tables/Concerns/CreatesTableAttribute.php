@@ -61,7 +61,6 @@ trait CreatesTableAttribute
             && $user->hasWorkspaceCapability($user->currentWorkspace?->getKey(), WorkspaceCapability::FieldsManage);
     }
 
-    // The table's Add column menu opens the form on the type the member picked, and the type stays changeable.
     /**
      * @param  array<string, mixed>  $arguments
      */
