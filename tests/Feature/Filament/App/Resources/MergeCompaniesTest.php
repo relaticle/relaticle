@@ -301,6 +301,7 @@ it('leaves another workspace\'s rows alone even when they point at an original',
     $foreignOwner = User::factory()->withWorkspace()->create();
     $foreignPerson = People::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create();
     $foreignOpportunity = Opportunity::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create();
+    expect([$foreignPerson->workspace_id, $foreignOpportunity->workspace_id])->each->not->toBe($this->workspace->getKey());
     DB::table('people')->where('id', $foreignPerson->getKey())->update(['company_id' => $duplicate->getKey()]);
     DB::table('opportunities')->where('id', $foreignOpportunity->getKey())->update(['company_id' => $duplicate->getKey()]);
 
