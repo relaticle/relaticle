@@ -43,10 +43,10 @@ final readonly class ImportFileLoader
             $rowCount++;
         }
 
-        throw_if($rowCount === 0, ImportFileException::class, 'CSV file has no data rows');
+        throw_if($rowCount === 0, ImportFileException::class, __('CSV file has no data rows'));
 
         if ($rowCount > $this->maxRows()) {
-            throw new ImportFileException("Maximum {$this->maxRows()} rows allowed.");
+            throw new ImportFileException(__('Maximum :count rows allowed.', ['count' => $this->maxRows()]));
         }
 
         return ['headers' => $headers, 'row_count' => $rowCount];
@@ -90,7 +90,7 @@ final readonly class ImportFileLoader
                 ->chunk($this->chunkSize())
                 ->each(fn (LazyCollection $chunk) => $store->query()->insert($chunk->all()));
 
-            throw_if($rowCount === 0, ImportFileException::class, 'Could not read file. Please re-upload.');
+            throw_if($rowCount === 0, ImportFileException::class, __('Could not read file. Please re-upload.'));
 
             $store->persist();
         } catch (Throwable $e) {
@@ -154,7 +154,7 @@ final readonly class ImportFileLoader
             ->map(fn (string $h, int $i): string => filled($h) ? $h : 'Column_'.($i + 1))
             ->all();
 
-        throw_if(count($headers) !== count(array_unique($headers)), ImportFileException::class, 'Duplicate column names found.');
+        throw_if(count($headers) !== count(array_unique($headers)), ImportFileException::class, __('Duplicate column names found.'));
 
         return $headers;
     }

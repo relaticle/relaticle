@@ -14,10 +14,10 @@
                 {{-- Header --}}
                 <div
                     class="hidden md:flex items-center px-3 py-2 text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 rounded-t-xl shrink-0">
-                    <div class="flex-1">File column</div>
+                    <div class="flex-1">{{ __('File column') }}</div>
                     <div class="w-6"></div>
                     <div class="flex-1 flex justify-end">
-                        <div class="w-52">Map to</div>
+                        <div class="w-52">{{ __('Map to') }}</div>
                     </div>
                 </div>
 
@@ -75,7 +75,7 @@
                 class="hidden md:flex w-56 shrink-0 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden flex-col bg-white dark:bg-gray-900">
                 <div class="px-3 py-2 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
                     <div class="flex items-center justify-between gap-2">
-                        <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">Preview</span>
+                        <span class="text-[11px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('Preview') }}</span>
                         <x-filament::icon icon="lucide-eye" class="w-3.5 h-3.5 text-gray-400"/>
                     </div>
                 </div>
@@ -97,7 +97,7 @@
                     @endforeach
                 </div>
                 <div class="px-3 py-1.5 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                    <p class="text-[10px] text-gray-500 dark:text-gray-400">Showing sample values</p>
+                    <p class="text-[10px] text-gray-500 dark:text-gray-400">{{ __('Showing sample values') }}</p>
                 </div>
             </div>
         </div>
@@ -111,7 +111,7 @@
                 class="flex items-center gap-2 px-3 py-2 rounded-xl bg-warning-50 dark:bg-warning-950/50 border border-warning-200 dark:border-warning-800">
                 <x-filament::icon icon="lucide-triangle-exclamation-point" class="w-4 h-4 text-warning-500 shrink-0"/>
                 <p class="text-xs text-warning-700 dark:text-warning-300">
-                    <span class="font-medium text-warning-800 dark:text-warning-200">Required:</span>
+                    <span class="font-medium text-warning-800 dark:text-warning-200">{{ __('Required:') }}</span>
                     {{ $unmappedLabels->join(', ') }}
                 </p>
             </div>
@@ -126,7 +126,7 @@
             wire:click="$parent.mountAction('startOver')"
             color="gray"
         >
-            Start over
+            {{ __('Start over') }}
         </x-filament::button>
         {{ $this->continueAction }}
     </div>

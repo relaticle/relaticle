@@ -16,6 +16,7 @@ use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\Steps\MappingStep;
+use Relaticle\ImportWizard\Livewire\Steps\UploadStep;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Tests\Helpers\ImportExecutionFixture;
@@ -90,6 +91,24 @@ it('renders with correct headers from store', function (): void {
     $component = mountMappingStep($this);
 
     $component->assertOk();
+});
+
+it('renders the upload and mapping steps in the user locale', function (): void {
+    app()->setLocale('de');
+    createStoreWithHeaders($this, ['Name', 'Phone']);
+
+    Livewire::test(UploadStep::class, ['entityType' => ImportEntityType::People, 'storeId' => null])
+        ->assertSee('CSV-Datei auswählen')
+        ->assertDontSee('Choose a .CSV file')
+        ->assertDontSee('Drop your .CSV file');
+
+    mountMappingStep($this)
+        ->assertSee('Zuordnen zu')
+        ->assertSee('Neu beginnen')
+        ->assertSee('Beispielwerte werden angezeigt')
+        ->assertDontSee('Map to')
+        ->assertDontSee('Start over')
+        ->assertDontSee('Showing sample values');
 });
 
 it('auto-maps Name header to name field on mount', function (): void {

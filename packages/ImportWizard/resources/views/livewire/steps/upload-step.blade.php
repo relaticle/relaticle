@@ -17,7 +17,7 @@
                 <div class="flex items-start justify-between">
                     <div>
                         <p class="text-sm font-medium text-gray-950 dark:text-white">{{ $fileName }}</p>
-                        <p class="text-xs text-gray-500 dark:text-gray-400">.{{ $fileExtension }} file - {{ $fileSizeFormatted }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ __('.:extension file - :size', ['extension' => $fileExtension, 'size' => $fileSizeFormatted]) }}</p>
                     </div>
                     <button
                         type="button"
@@ -36,14 +36,14 @@
                     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                             <x-filament::icon icon="lucide-columns-3" class="h-3.5 w-3.5" />
-                            <span>Columns found</span>
+                            <span>{{ __('Columns found') }}</span>
                         </div>
                         <p class="text-xl font-semibold text-gray-950 dark:text-white mt-1">{{ count($headers) }}</p>
                     </div>
                     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
                         <div class="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
                             <x-filament::icon icon="lucide-list-ordered" class="h-3.5 w-3.5" />
-                            <span>Rows found</span>
+                            <span>{{ __('Rows found') }}</span>
                         </div>
                         <p class="text-xl font-semibold text-gray-950 dark:text-white mt-1">{{ number_format($rowCount) }}</p>
                     </div>
@@ -52,7 +52,7 @@
                 {{-- Column Preview --}}
                 @if (count($headers) > 0)
                     <div class="mt-4 pt-4 border-t border-dashed border-gray-200 dark:border-gray-700">
-                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Column preview</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ __('Column preview') }}</p>
                         <div class="flex flex-wrap gap-1.5">
                             @foreach (array_slice($headers, 0, 5) as $header)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
@@ -61,7 +61,7 @@
                             @endforeach
                             @if (count($headers) > 5)
                                 <span class="inline-flex items-center px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-500">
-                                    +{{ count($headers) - 5 }} more
+                                    {{ __('+:count more', ['count' => count($headers) - 5]) }}
                                 </span>
                             @endif
                         </div>
@@ -94,7 +94,7 @@
                 wire:model="uploadedFile"
                 accept=".csv"
                 class="hidden"
-                aria-label="Choose CSV file to upload"
+                aria-label="{{ __('Choose CSV file to upload') }}"
             >
 
             {{-- Content (hidden during loading) --}}
@@ -104,14 +104,14 @@
                     class="h-12 w-12 text-gray-400 dark:text-gray-600 mx-auto"
                 />
                 <p class="mt-6 text-sm text-gray-700 dark:text-gray-400">
-                    Drop your .CSV file onto this area to upload
+                    {{ __('Drop your .CSV file onto this area to upload') }}
                 </p>
                 <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                    Max 10,000 rows • Max 10MB
+                    {{ __('Max 10,000 rows • Max 10MB') }}
                 </p>
                 <div class="flex items-center gap-4 mt-6 w-full max-w-xs">
                     <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>
-                    <span class="text-sm text-gray-500 dark:text-gray-500">or</span>
+                    <span class="text-sm text-gray-500 dark:text-gray-500">{{ __('or') }}</span>
                     <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>
                 </div>
                 <x-filament::button
@@ -119,7 +119,7 @@
                     class="mt-6"
                     x-on:click.prevent="$refs.fileInput.click()"
                 >
-                    Choose a .CSV file
+                    {{ __('Choose a .CSV file') }}
                 </x-filament::button>
 
                 {{-- Validation Error --}}
@@ -132,8 +132,8 @@
             <div wire:loading.flex wire:target="uploadedFile" class="absolute inset-0 items-center justify-center">
                 <div class="flex flex-col items-center text-center">
                     <x-filament::loading-indicator class="h-10 w-10 text-primary-500" />
-                    <p class="mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">Analyzing your file...</p>
-                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Detecting columns and counting rows</p>
+                    <p class="mt-4 text-sm font-medium text-gray-700 dark:text-gray-300">{{ __('Analyzing your file...') }}</p>
+                    <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('Detecting columns and counting rows') }}</p>
                 </div>
             </div>
 
@@ -149,7 +149,7 @@
             class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-primary-600 dark:text-gray-400 dark:hover:text-primary-400 transition-colors"
         >
             <x-filament::icon icon="lucide-book-open" class="w-4 h-4" />
-            <span>Import Guide</span>
+            <span>{{ __('Import Guide') }}</span>
             <x-filament::icon icon="lucide-external-link" class="w-3 h-3" />
         </a>
         <x-filament::button
@@ -157,8 +157,8 @@
             :disabled="!$isParsed"
             wire:loading.attr="disabled"
         >
-            <span wire:loading.remove wire:target="continueToMapping">Continue</span>
-            <span wire:loading wire:target="continueToMapping">Processing...</span>
+            <span wire:loading.remove wire:target="continueToMapping">{{ __('Continue') }}</span>
+            <span wire:loading wire:target="continueToMapping">{{ __('Processing...') }}</span>
         </x-filament::button>
     </div>
 </div>
