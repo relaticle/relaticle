@@ -101,11 +101,13 @@ trait CreatesTableAttribute
                 continue;
             }
 
-            match (true) {
-                $component instanceof TypeField => $component->disabled(),
-                $component instanceof Toggle && $component->getName() === 'settings.encrypted' => $component->hidden(),
-                default => $this->lockAttributeType((array) $component->getDefaultChildComponents()),
-            };
+            if ($component instanceof TypeField) {
+                $component->disabled();
+            } elseif ($component instanceof Toggle && $component->getName() === 'settings.encrypted') {
+                $component->hidden();
+            } else {
+                $this->lockAttributeType((array) $component->getDefaultChildComponents());
+            }
         }
     }
 

@@ -82,14 +82,13 @@
     </div>
 
     @if ($types !== [])
-        <div class="fi-view-settings-view" x-show="creating" x-cloak data-add-column-types>
+        <div class="fi-view-settings-view" x-show="creating" x-cloak>
             <div class="fi-view-settings-search">
                 <x-filament::icon-button
                     icon="lucide-chevron-left"
                     color="gray"
                     size="sm"
                     :label="__('filament/panel.tables.views.back')"
-                    data-add-column-back
                     x-on:click="closeCreate()"
                 />
                 <span class="fi-view-settings-label">{{ __('filament/panel.tables.views.create_attribute') }}</span>

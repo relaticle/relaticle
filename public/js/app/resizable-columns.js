@@ -1032,7 +1032,6 @@
                     root: () => panel,
                     items: '[data-add-column-item]',
                     key: 'attribute',
-                    back: '[data-add-column-search]',
                     pick: 'show',
                     search: '[data-add-column-search]',
                     create: '[data-add-column-create]',
