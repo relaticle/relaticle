@@ -105,7 +105,7 @@
     $title = $titles[$competitorSlug];
     $metaTitle = $metaTitles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
-    $factsVerifiedAt = \Carbon\CarbonImmutable::parse($relaticle['verified'])->format('F j, Y');
+    $factsVerifiedAt = \Carbon\CarbonImmutable::parse($relaticle['verified'])->isoFormat('LL');
     $assistantName = (string) config('chat.assistant_name');
     $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 

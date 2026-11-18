@@ -293,7 +293,7 @@
         $schema = (new \Spatie\SchemaOrg\Graph())
             ->product(fn ($product) => $product
                 ->name('Relaticle')
-                ->description('Open-source CRM with unlimited users and unlimited records on every plan. Self-host free forever under the AGPL-3.0 license, or use the Relaticle-managed hosted plan.')
+                ->description(__('Open-source CRM with unlimited users and unlimited records on every plan. Self-host free forever under the AGPL-3.0 license, or use the Relaticle-managed hosted plan.'))
                 ->url(LocalizedUrl::route('pricing'))
                 ->image([
                     asset('images/product-preview-16x9.jpg'),
@@ -304,12 +304,12 @@
                 ->offers($billingActive
                     ? [
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Self-hosted')
+                            ->name(__('Self-hosted'))
                             ->price('0')
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(LocalizedUrl::route('pricing'))
-                            ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
+                            ->description(__('Free forever, AGPL-3.0 open source, unlimited users and records.')),
                         ...collect([$proPlan, $scalePlan])->map(fn (\App\Enums\Plan $plan): \Spatie\SchemaOrg\Offer => \Spatie\SchemaOrg\Schema::offer()
                             ->name($plan->marketingLabel())
                             ->price((string) $plan->yearlyPricePerMonth())
@@ -322,7 +322,7 @@
                                 'monthly' => $plan->monthlyPrice(),
                             ])))->all(),
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Enterprise')
+                            ->name(__('Enterprise'))
                             ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()
                                 ->minPrice(config('relaticle.enterprise.starting_price_yearly'))
                                 ->priceCurrency('USD')
@@ -332,19 +332,19 @@
                     ]
                     : [
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Self-hosted')
+                            ->name(__('Self-hosted'))
                             ->price('0')
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(LocalizedUrl::route('pricing'))
-                            ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
+                            ->description(__('Free forever, AGPL-3.0 open source, unlimited users and records.')),
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Cloud')
+                            ->name(__('Cloud'))
                             ->price('0')
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(LocalizedUrl::route('pricing'))
-                            ->description('Free hosted plan, managed by Relaticle.'),
+                            ->description(__('Free hosted plan, managed by Relaticle.')),
                     ]
                 )
             );

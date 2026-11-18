@@ -16,7 +16,7 @@
     <div class="border-rail mx-auto max-w-6xl sm:border-x">
         <div class="grid gap-12 px-6 py-14 md:grid-cols-12 md:px-10 md:py-20">
             <div class="md:col-span-4">
-                <a href="{{ LocalizedUrl::route('home') }}" class="inline-flex w-fit" aria-label="Relaticle Home">
+                <a href="{{ LocalizedUrl::route('home') }}" class="inline-flex w-fit" aria-label="{{ __('Relaticle Home') }}">
                     <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                 </a>
                 <p class="mt-5 max-w-xs text-sm leading-relaxed text-gray-500 dark:text-gray-400">

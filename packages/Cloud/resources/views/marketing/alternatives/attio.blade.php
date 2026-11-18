@@ -5,7 +5,7 @@
     $title = __('An open-source Attio alternative.');
     $metaTitle = __('Open Source Attio Alternative, Self-Hosted | Relaticle');
     $description = __('Compare Relaticle and Attio on hosting, pricing, AI and migration. Get an open-source CRM with unlimited users, or self-host it on your own infrastructure.');
-    $verifiedAt = \Illuminate\Support\Facades\Date::parse($competitor['verified'])->format('F j, Y');
+    $verifiedAt = \Illuminate\Support\Facades\Date::parse($competitor['verified'])->isoFormat('LL');
     $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 
     $rows = [

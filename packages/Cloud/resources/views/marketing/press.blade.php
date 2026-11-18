@@ -3,8 +3,8 @@
     $facts = \Relaticle\Cloud\Marketing\Support\CompetitorFacts::all()['relaticle'];
     $starsLabel = $githubStars > 0
         ? __(':stars stars', ['stars' => number_format($githubStars)])
-        : __(':stars stars as of :date', ['stars' => number_format($facts['stars']), 'date' => \Illuminate\Support\Facades\Date::parse($facts['stars_verified'])->format('F j, Y')]);
-    $factsVerifiedAt = \Illuminate\Support\Facades\Date::parse($facts['verified'])->format('F j, Y');
+        : __(':stars stars as of :date', ['stars' => number_format($facts['stars']), 'date' => \Illuminate\Support\Facades\Date::parse($facts['stars_verified'])->isoFormat('LL')]);
+    $factsVerifiedAt = \Illuminate\Support\Facades\Date::parse($facts['verified'])->isoFormat('LL');
     $brand = json_decode(file_get_contents(public_path('brand/kit/manifest.json')), true, flags: JSON_THROW_ON_ERROR);
     $avatarLabels = ['light' => __('Light'), 'purple' => __('Purple'), 'dark' => __('Dark')];
     $screenshots = [

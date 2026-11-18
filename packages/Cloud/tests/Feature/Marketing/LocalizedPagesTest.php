@@ -368,3 +368,62 @@ it('renders the language switcher as an accessible disclosure', function (): voi
         ->and($switcher->filter('a span[lang]'))->toHaveCount(4)
         ->and($button->filter('span')->text())->toBe('Deutsch');
 });
+
+dataset('marketing paths', [
+    '/', '/pricing', '/press', '/ai', '/ai-native-crm', '/self-hosted', '/crm-for-claude', '/crm-for-chatgpt', '/security',
+    '/email-and-calendar', '/contact', '/compare/relaticle-vs-twenty', '/compare/relaticle-vs-espocrm',
+    '/alternatives/attio', '/alternatives/hubspot',
+]);
+
+function translatedCataloguePatterns(string $locale): array
+{
+    $english = json_decode((string) file_get_contents(dirname(__DIR__, 3).'/lang/en.json'), true, flags: JSON_THROW_ON_ERROR);
+    $translated = json_decode((string) file_get_contents(dirname(__DIR__, 3)."/lang/{$locale}.json"), true, flags: JSON_THROW_ON_ERROR);
+    $patterns = [];
+
+    foreach (array_keys($english) as $key) {
+        if (($translated[$key] ?? $key) !== $key && preg_match('/[A-Za-z]{3}/', (string) preg_replace('/:\w+/', '', $key)) === 1) {
+            $patterns[$key] = '/^'.preg_replace('/\\:\w+/', '.+', preg_quote(Str::squish($key), '/')).'$/su';
+        }
+    }
+
+    return $patterns;
+}
+
+function renderedTexts(string $html): array
+{
+    $crawler = new Crawler($html);
+    $texts = $crawler->filterXPath('//body//text()[not(ancestor::script) and not(ancestor::style)]')->each(fn (Crawler $node): string => $node->text());
+    $attributes = $crawler->filterXPath('//*[@aria-label or @placeholder or @title or @alt or @content]')->each(
+        fn (Crawler $node): array => array_filter([$node->attr('aria-label'), $node->attr('placeholder'), $node->attr('title'), $node->attr('alt'), $node->attr('content')]),
+    );
+
+    return array_values(array_unique(array_filter(array_map(Str::squish(...), [...$texts, ...array_merge(...$attributes)]))));
+}
+
+it('renders no catalogue English on a German page', function (string $path): void {
+    $this->travelTo('2026-11-13 10:00:00');
+
+    $texts = renderedTexts((string) $this->get(publicPageUrl('de', $path))->assertOk()->getContent());
+    $leaks = [];
+
+    foreach (translatedCataloguePatterns('de') as $key => $pattern) {
+        foreach ($texts as $text) {
+            if (preg_match($pattern, $text) === 1) {
+                $leaks[] = $key;
+            }
+        }
+    }
+
+    expect(array_values(array_unique($leaks)))->toBe([]);
+})->with('marketing paths');
+
+it('shows the English-governs notice on translated legal pages', function (string $path): void {
+    $notice = fn (string $url): int => (new Crawler((string) $this->get($url)->assertOk()->getContent()))->filter('[data-legal-notice]')->count();
+
+    expect($notice($path))->toBe(0);
+
+    foreach (['de', 'es', 'fr'] as $locale) {
+        expect($notice(publicPageUrl($locale, $path)))->toBe(1);
+    }
+})->with(['/privacy-policy', '/terms-of-service']);

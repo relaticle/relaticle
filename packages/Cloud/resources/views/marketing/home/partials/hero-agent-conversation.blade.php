@@ -24,6 +24,8 @@
         'people' => 'M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z',
         'company' => 'M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21',
     ];
+
+    $heroChip = static fn (string $type, string $label): string => '<span class="chat-chip" data-record-type="'.$type.'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="'.$heroChipIcons[$type].'"/></svg><span class="chat-chip-label">'.e($label).'</span></span>';
 @endphp
 
 {{-- ── Exchange 1: read overdue tasks ── --}}
@@ -33,7 +35,7 @@
      wall of tinted bubbles would compete with the one thing asking to be read. --}}
 <div class="mcp-el mcp-user mcp-user-1 flex justify-end">
     <div class="max-w-[85%] [overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100">
-        What's overdue this week?
+        {{ __("What's overdue this week?") }}
     </div>
 </div>
 
@@ -41,18 +43,18 @@
      ring or shadow; the result block is a sibling below it. --}}
 <div class="flex w-full flex-col items-start gap-3">
     <div class="mcp-el mcp-avatar mcp-avatar-1 w-full min-w-0">
-        <span class="sr-only">Assistant</span>
+        <span class="sr-only">{{ __('Assistant') }}</span>
 
         {{-- The transcript shows its tool status row only while the tool runs, so the reply
              takes over the same cell as it streams. --}}
         <div class="grid">
             <div class="mcp-el mcp-tool mcp-tool-1 col-start-1 row-start-1 flex items-center gap-2 self-start px-1 py-1 text-xs">
                 <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
-                <span class="text-gray-600 dark:text-gray-300">Searching tasks…</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ __('Searching tasks…') }}</span>
             </div>
 
             <div class="mcp-el mcp-text mcp-text-1 col-start-1 row-start-1 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
-                You have 3 overdue tasks, all past due this week.
+                {{ __('You have :count overdue tasks, all past due this week.', ['count' => 3]) }}
             </div>
         </div>
     </div>
@@ -67,7 +69,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
                     </svg>
                 </span>
-                <span class="truncate text-sm font-semibold text-gray-900 dark:text-white">Tasks</span>
+                <span class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ __('Tasks') }}</span>
             </span>
         </div>
 
@@ -75,7 +77,7 @@
             <table class="w-full text-sm">
                 <thead>
                     <tr>
-                        @foreach (['Title', 'Due date', 'Company'] as $heroColumn)
+                        @foreach ([__('Title'), __('Due date'), __('Company')] as $heroColumn)
                             <th scope="col" class="whitespace-nowrap px-4 py-2 text-start text-micro font-medium uppercase tracking-wider text-gray-400 dark:text-gray-500">
                                 {{ $heroColumn }}
                             </th>
@@ -84,9 +86,9 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-white/5">
                     @foreach ([
-                        ['row' => 'mcp-task-1', 'title' => 'Call Sarah Chen', 'due' => 'Aug 24, 2026', 'company' => 'Kovra Systems'],
-                        ['row' => 'mcp-task-2', 'title' => 'Send proposal to Trellis Labs', 'due' => 'Aug 23, 2026', 'company' => 'Trellis Labs'],
-                        ['row' => 'mcp-task-3', 'title' => 'Schedule demo with Kovra Systems', 'due' => 'Aug 22, 2026', 'company' => 'Kovra Systems'],
+                        ['row' => 'mcp-task-1', 'title' => __('Call Sarah Chen'), 'due' => 'Aug 24, 2026', 'company' => 'Kovra Systems'],
+                        ['row' => 'mcp-task-2', 'title' => __('Send proposal to Trellis Labs'), 'due' => 'Aug 23, 2026', 'company' => 'Trellis Labs'],
+                        ['row' => 'mcp-task-3', 'title' => __('Schedule demo with Kovra Systems'), 'due' => 'Aug 22, 2026', 'company' => 'Kovra Systems'],
                     ] as $heroTaskRow)
                         <tr class="mcp-el mcp-task-card {{ $heroTaskRow['row'] }}">
                             <td class="max-w-48 px-4 py-2.5 align-top text-sm text-gray-700 dark:text-gray-300">
@@ -122,22 +124,22 @@
      the agent's own reply lands under it. --}}
 <div class="mcp-el mcp-user mcp-user-2 flex justify-end">
     <div class="max-w-[85%] [overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100">
-        Mark the Kovra demo as done.
+        {{ __('Mark the :company demo as done.', ['company' => 'Kovra']) }}
     </div>
 </div>
 
 <div class="flex w-full flex-col items-start gap-3">
     <div class="mcp-el mcp-avatar mcp-avatar-2 w-full min-w-0">
-        <span class="sr-only">Assistant</span>
+        <span class="sr-only">{{ __('Assistant') }}</span>
 
         <div class="grid">
             <div class="mcp-el mcp-tool mcp-tool-2 col-start-1 row-start-1 flex items-center gap-2 self-start px-1 py-1 text-xs">
                 <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
-                <span class="text-gray-600 dark:text-gray-300">Preparing task changes…</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ __('Preparing task changes…') }}</span>
             </div>
 
             <div class="mcp-el mcp-text mcp-text-2 col-start-1 row-start-1 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
-                I'll mark it done.
+                {{ __("I'll mark it done.") }}
             </div>
         </div>
     </div>
@@ -145,19 +147,15 @@
     {{-- Decided proposal: the receipt head and one check line with the record chip,
          as _proposal-receipt.blade.php renders it. --}}
     <div class="mcp-el mcp-audit-card my-2 w-full" aria-hidden="true">
-        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">Applied 1 change &middot; just now</p>
-        <x-cloud::marketing.rela-receipt-line class="mt-1" verb="Updated" type="task" name="Schedule demo with Kovra Systems" meta="Status"/>
+        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 1 change · just now') }}</p>
+        <x-cloud::marketing.rela-receipt-line class="mt-1" :verb="__('Updated')" type="task" :name="__('Schedule demo with Kovra Systems')" :meta="__('Status')"/>
     </div>
 
     {{-- Deciding a proposal resumes the turn (TurnContinuationService), so what
          lands under the decided row is the agent's OWN reply: flat prose like
          any other, with the record it touched rendered as a chip. --}}
     <div class="mcp-el mcp-approve-done w-full min-w-0 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100" aria-hidden="true">
-        <span class="chat-chip" data-record-type="task">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['task'] }}"/>
-            </svg>
-            <span class="chat-chip-label">Schedule demo with Kovra Systems</span></span> has been marked done.
+        {!! __(':record has been marked done.', ['record' => $heroChip('task', __('Schedule demo with Kovra Systems'))]) !!}
     </div>
 </div>
 
@@ -167,42 +165,33 @@
      resolves into the same decided row + record card the real transcript renders. --}}
 <div class="mcp-el mcp-user mcp-user-3 flex justify-end">
     <div class="max-w-[85%] [overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">
-        Add Sarah Chen at <span class="chat-chip" data-record-type="company"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['company'] }}"/></svg><span class="chat-chip-label">Kovra Systems</span></span>. She's VP of Engineering.
+        {!! __('Add :person at :company. She\'s VP of Engineering.', ['person' => 'Sarah Chen', 'company' => $heroChip('company', 'Kovra Systems')]) !!}
     </div>
 </div>
 
 <div class="flex w-full flex-col items-start gap-3">
     <div class="mcp-el mcp-avatar mcp-avatar-3 w-full min-w-0">
-        <span class="sr-only">Assistant</span>
+        <span class="sr-only">{{ __('Assistant') }}</span>
 
         <div class="grid">
             <div class="mcp-el mcp-tool mcp-tool-3 col-start-1 row-start-1 flex items-center gap-2 self-start px-1 py-1 text-xs">
                 <span class="h-1.5 w-1.5 rounded-full bg-gray-400 motion-safe:animate-pulse dark:bg-gray-500" aria-hidden="true"></span>
-                <span class="text-gray-600 dark:text-gray-300">Drafting a person…</span>
+                <span class="text-gray-600 dark:text-gray-300">{{ __('Drafting a person…') }}</span>
             </div>
 
             <div class="mcp-el mcp-text mcp-text-3 col-start-1 row-start-1 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">
-                I'll add her to Kovra Systems as VP of Engineering.
+                {{ __("I'll add her to :company as VP of Engineering.", ['company' => 'Kovra Systems']) }}
             </div>
         </div>
     </div>
 
     <div class="mcp-el mcp-create-card my-2 w-full" aria-hidden="true">
-        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">Applied 1 change &middot; just now</p>
-        <x-cloud::marketing.rela-receipt-line class="mt-1" verb="Created" type="people" name="Sarah Chen"/>
+        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 1 change · just now') }}</p>
+        <x-cloud::marketing.rela-receipt-line class="mt-1" :verb="__('Created')" type="people" name="Sarah Chen"/>
     </div>
 
     <div class="mcp-el mcp-create-done w-full min-w-0 px-1 py-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100" aria-hidden="true">
-        <span class="chat-chip" data-record-type="people">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['people'] }}"/>
-            </svg>
-            <span class="chat-chip-label">Sarah Chen</span></span> has been created and linked to
-        <span class="chat-chip" data-record-type="company">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                <path stroke-linecap="round" stroke-linejoin="round" d="{{ $heroChipIcons['company'] }}"/>
-            </svg>
-            <span class="chat-chip-label">Kovra Systems</span></span>.
+        {!! __(':person has been created and linked to :company.', ['person' => $heroChip('people', 'Sarah Chen'), 'company' => $heroChip('company', 'Kovra Systems')]) !!}
     </div>
 
     {{-- record_card block: header chip, then label/value field rows. No avatar
@@ -219,8 +208,8 @@
 
         <div class="divide-y divide-gray-100 dark:divide-white/5">
             @foreach ([
-                ['label' => 'Job title', 'value' => 'VP of Engineering'],
-                ['label' => 'Company', 'value' => 'Kovra Systems'],
+                ['label' => __('Job title'), 'value' => __('VP of Engineering')],
+                ['label' => __('Company'), 'value' => 'Kovra Systems'],
             ] as $heroField)
                 <div class="flex items-start gap-3 px-4 py-2.5">
                     <span class="w-32 shrink-0 truncate text-sm leading-5 text-gray-700 sm:w-40 dark:text-gray-300">{{ $heroField['label'] }}</span>
@@ -236,9 +225,9 @@
          the last beat of the demo, once every write has been decided. --}}
     <div class="mcp-el mcp-next-steps flex w-full flex-col items-start gap-0.5 pt-5" aria-hidden="true">
         @foreach ([
-            'Link Sarah to an opportunity',
-            'Create a task for Sarah',
-            'Add a note about Sarah',
+            __('Link :person to an opportunity', ['person' => 'Sarah']),
+            __('Create a task for :person', ['person' => 'Sarah']),
+            __('Add a note about :person', ['person' => 'Sarah']),
         ] as $heroNextStep)
             <span class="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm text-gray-500 dark:text-gray-400">
                 <x-lucide-corner-down-right class="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"/>

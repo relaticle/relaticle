@@ -28,7 +28,7 @@
                         'twentyStars' => number_format($competitor['stars']),
                         'twentyContributors' => $competitor['contributors'],
                         'relaticleStars' => number_format($relaticle['stars']),
-                        'relaticleContributors' => $relaticle['contributors'].' contributors',
+                        'relaticleContributors' => __(':count contributors', ['count' => $relaticle['contributors']]),
                         'twentyExtensibility' => $competitor['extensibility'],
                         'relaticleExtensibility' => $relaticle['extensibility'],
                     ]),
@@ -57,7 +57,7 @@
                         'espocrmStars' => number_format($competitor['stars']),
                         'espocrmContributors' => $competitor['contributors'],
                         'relaticleStars' => number_format($relaticle['stars']),
-                        'relaticleContributors' => $relaticle['contributors'].' contributors',
+                        'relaticleContributors' => __(':count contributors', ['count' => $relaticle['contributors']]),
                         'espocrmExtensibility' => $competitor['extensibility'],
                         'relaticleExtensibility' => $relaticle['extensibility'],
                     ]),
@@ -98,7 +98,7 @@
     $metaTitle = $metaTitles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
     $factsVerifiedDate = \Carbon\CarbonImmutable::parse($relaticle['verified']);
-    $factsVerifiedAt = $factsVerifiedDate->format('F j, Y');
+    $factsVerifiedAt = $factsVerifiedDate->isoFormat('LL');
 
     $assistantName = (string) config('chat.assistant_name');
     $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';

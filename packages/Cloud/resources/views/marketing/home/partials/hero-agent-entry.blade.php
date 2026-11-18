@@ -10,12 +10,12 @@
         {{-- Greeting --}}
         <div class="text-center">
             <h2 class="mcp-entry mcp-entry-greeting text-2xl sm:text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">
-                Good morning, Marcus.
+                {{ __('Good morning, :name.', ['name' => 'Marcus']) }}
             </h2>
 
             <div class="mcp-entry mcp-entry-recent mt-2 inline-flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 dark:text-zinc-400">
                 <x-lucide-message-square class="h-3.5 w-3.5"/>
-                <span>Recent chat · This week's pipeline review</span>
+                <span>{{ __('Recent chat · :title', ['title' => __("This week's pipeline review")]) }}</span>
             </div>
         </div>
 
@@ -24,7 +24,7 @@
         <div class="mcp-entry mcp-entry-composer mt-8 sm:mt-10">
             <div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-gray-900 dark:focus-within:border-primary-500/60">
                 <div class="px-4 pt-3.5 pb-1.5 min-h-[60px] text-sm leading-snug">
-                    <span id="hero-entry-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-gray-500">Ask anything...</span>
+                    <span id="hero-entry-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-gray-500">{{ __('Ask anything...') }}</span>
                     <span id="hero-entry-typed" class="hero-composer-typed text-gray-900 dark:text-gray-100"></span>
                     <span class="hero-composer-cursor inline-block w-px h-4 align-middle bg-primary/60 dark:bg-primary/80 ml-px" aria-hidden="true"></span>
                 </div>
@@ -32,7 +32,7 @@
                 <div class="flex items-center gap-2 px-3 pb-2">
                     <div class="ms-auto flex items-center gap-1.5">
                         <span class="inline-flex h-7 items-center gap-1 rounded-md border border-transparent px-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-                            <span>Auto</span>
+                            <span>{{ __('Auto') }}</span>
                             <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true"/>
                         </span>
                         <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400">
@@ -54,20 +54,20 @@
         <div class="mcp-entry mcp-entry-tasks mt-10 text-start">
             <div class="mb-3 flex items-center justify-between">
                 <h3 class="flex items-baseline gap-2 text-xs font-medium uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                    <span>Tasks</span>
+                    <span>{{ __('Tasks') }}</span>
                     <span class="text-gray-400 dark:text-gray-500">3</span>
                 </h3>
                 <div class="flex items-center gap-3">
-                    <span class="text-xs text-gray-500 dark:text-gray-400">View all</span>
+                    <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('View all') }}</span>
                     <x-lucide-plus class="h-4 w-4 text-gray-400 dark:text-gray-500"/>
                 </div>
             </div>
 
             <ul class="divide-y divide-[var(--surface-block-border)] overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
                 @foreach ([
-                    ['title' => 'Call Sarah Chen', 'due' => 'Aug 24, 2026', 'overdue' => true],
-                    ['title' => 'Send proposal to Trellis Labs', 'due' => 'Aug 23, 2026', 'overdue' => true],
-                    ['title' => 'Renewal prep for Daniel Okafor', 'due' => 'Sep 2, 2026', 'overdue' => false],
+                    ['title' => __('Call Sarah Chen'), 'due' => 'Aug 24, 2026', 'overdue' => true],
+                    ['title' => __('Send proposal to Trellis Labs'), 'due' => 'Aug 23, 2026', 'overdue' => true],
+                    ['title' => __('Renewal prep for :person', ['person' => 'Daniel Okafor']), 'due' => 'Sep 2, 2026', 'overdue' => false],
                 ] as $heroTask)
                     <li class="flex items-center gap-3 pl-4">
                         {{-- 1px ring, matching the real checkbox: a 2px border

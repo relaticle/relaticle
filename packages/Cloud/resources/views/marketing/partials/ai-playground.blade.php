@@ -26,13 +26,13 @@
 
     $opportunityRows = [
         ['deal' => 0],
-        ['name' => 'Trellis Labs pilot', 'company' => 'Trellis Labs', 'stage' => __('Negotiation/Review'), 'amount' => '$12,000'],
+        ['name' => __('Trellis Labs pilot'), 'company' => 'Trellis Labs', 'stage' => __('Negotiation/Review'), 'amount' => '$12,000'],
         ['deal' => 1],
-        ['name' => 'Lumen Health onboarding', 'company' => 'Lumen Health', 'stage' => __('Proposal/Price Quote'), 'amount' => '$18,000'],
+        ['name' => __('Lumen Health onboarding'), 'company' => 'Lumen Health', 'stage' => __('Proposal/Price Quote'), 'amount' => '$18,000'],
         ['deal' => 2],
-        ['name' => 'Northwind renewal', 'company' => 'Northwind', 'stage' => __('Closed Won'), 'amount' => '$48,000'],
-        ['name' => 'Halcyon Freight rollout', 'company' => 'Halcyon Freight', 'stage' => __('Qualification'), 'amount' => '$31,000'],
-        ['name' => 'Brightline analytics seats', 'company' => 'Brightline', 'stage' => __('Proposal/Price Quote'), 'amount' => '$9,600'],
+        ['name' => __('Northwind renewal'), 'company' => 'Northwind', 'stage' => __('Closed Won'), 'amount' => '$48,000'],
+        ['name' => __('Halcyon Freight rollout'), 'company' => 'Halcyon Freight', 'stage' => __('Qualification'), 'amount' => '$31,000'],
+        ['name' => __('Brightline analytics seats'), 'company' => 'Brightline', 'stage' => __('Proposal/Price Quote'), 'amount' => '$9,600'],
     ];
 
     $people = [
