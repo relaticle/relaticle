@@ -272,7 +272,7 @@
                                     @foreach($tasks as $index => [$taskTitle, $due, $company])
                                         <div class="{{ $row }} {{ $index >= 4 ? 'max-sm:hidden' : '' }} grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)]">
                                             <span class="truncate font-medium text-gray-900 dark:text-white">{{ $taskTitle }}</span>
-                                            <span @class(['truncate tabular-nums', 'text-red-600 dark:text-red-400' => $due->isPast(), 'text-gray-600 dark:text-gray-300' => ! $due->isPast()])>{{ $due->isoFormat('MMM D, YYYY') }}</span>
+                                            <span @class(['truncate tabular-nums', 'text-red-600 dark:text-red-400' => $due->isPast(), 'text-gray-600 dark:text-gray-300' => ! $due->isPast()])>{{ $due->isoFormat('ll') }}</span>
                                             <span class="hidden truncate text-gray-600 sm:block dark:text-gray-300">{{ $company }}</span>
                                         </div>
                                     @endforeach
@@ -491,7 +491,7 @@
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
                                                 <span class="chat-chip-label">{{ $taskTitle }}</span>
                                             </span>
-                                            <span class="ms-auto text-xs tabular-nums text-red-600 dark:text-red-400">{{ $due->isoFormat('MMM D') }}</span>
+                                            <span class="ms-auto text-xs tabular-nums text-red-600 dark:text-red-400">{{ $due->isoFormat(__('formats.date_without_year')) }}</span>
                                         </li>
                                     @endforeach
                                 </ul>

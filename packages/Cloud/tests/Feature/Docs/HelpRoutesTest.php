@@ -221,3 +221,12 @@ it('keeps llms.txt in English', function (): void {
     expect($body)->toContain('[Widgets]')
         ->and($body)->not->toContain('Widgets deutsch');
 });
+
+it('writes the updated date of a help page in its language', function (): void {
+    $updated = app(DocsRepository::class)->find('help/import/prepare-your-csv', 'es')->updated;
+
+    $this->get('/es/help/import/prepare-your-csv')
+        ->assertOk()
+        ->assertSee($updated->locale('es')->isoFormat('LL'))
+        ->assertDontSee($updated->locale('es')->isoFormat('MMMM D, YYYY'));
+});

@@ -104,7 +104,7 @@
 
         @if($page->updated)
             <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                {{ __('Updated :date', ['date' => $page->updated->isoFormat('MMMM D, YYYY')]) }}
+                {{ __('Updated :date', ['date' => $page->updated->isoFormat('LL')]) }}
             </p>
         @endif
 

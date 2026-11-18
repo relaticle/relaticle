@@ -35,7 +35,7 @@
                 <span aria-hidden="true">&middot;</span>
             @endif
             @if($post->published_at)
-                <time datetime="{{ $post->published_at->toIso8601String() }}">{{ $post->published_at->format('F j, Y') }}</time>
+                <time datetime="{{ $post->published_at->toIso8601String() }}">{{ $post->published_at->isoFormat('LL') }}</time>
             @else
                 <span>{{ __('Draft') }}</span>
             @endif
