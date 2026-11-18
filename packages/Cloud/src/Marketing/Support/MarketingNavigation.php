@@ -117,7 +117,7 @@ final readonly class MarketingNavigation
         return Arr::join(array_map(fn (EmailProvider $provider): string => match ($provider) {
             EmailProvider::GMAIL => 'Gmail',
             EmailProvider::AZURE => 'Outlook',
-        }, $configured === [] ? [EmailProvider::GMAIL] : $configured), ', ', ' and ');
+        }, $configured === [] ? [EmailProvider::GMAIL] : $configured), ', ', ' '.__('and').' ');
     }
 
     /** @return list<NavItem> */

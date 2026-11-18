@@ -301,3 +301,16 @@ it('hides the blog link on a language with no published post', function (): void
 
     $this->get('/de')->assertOk()->assertSee('href="'.url('/de/blog').'"', false);
 });
+
+it('joins the mail provider names in the page language', function (): void {
+    config()->set('services.gmail.client_id', 'gmail-id');
+    config()->set('services.azure.client_id', 'azure-id');
+    app()->setLocale('de');
+
+    $descriptions = collect(app(MarketingNavigation::class)->header())
+        ->flatMap(fn (NavItem $item): array => [$item, ...$item->children])
+        ->map(fn (NavItem $item): ?string => $item->description)
+        ->filter();
+
+    expect($descriptions)->toContain('Gmail und Outlook an jedem Eintrag');
+});
