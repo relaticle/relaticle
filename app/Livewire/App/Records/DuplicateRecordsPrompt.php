@@ -17,7 +17,7 @@ use Livewire\Attributes\Locked;
 
 final class DuplicateRecordsPrompt extends BaseLivewireComponent
 {
-    public const int SHOWN = 10;
+    private const int SHOWN = 10;
 
     #[Locked]
     public Company|People $record;
