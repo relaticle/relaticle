@@ -796,6 +796,7 @@ it('keeps the retired editor role key out of everything but its historic migrati
         'database/migrations/2026_08_18_100000_',
         'database/migrations/2026_09_01_203744_',
         'database/migrations/2026_09_18_000000_',
+        'lang/vendor/filament-forms/',
     ];
 
     $directories = [

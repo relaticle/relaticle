@@ -29,11 +29,26 @@ function translationRoots(): array
         }
     }
 
-    foreach (glob($base.'/lang/vendor/*', GLOB_ONLYDIR) ?: [] as $directory) {
-        $roots[] = str_replace($base.'/', '', $directory);
+    $vendorNamespaces = array_map(basename(...), glob($base.'/lang/vendor/*', GLOB_ONLYDIR) ?: []);
+
+    foreach (glob($base.'/vendor/filament/*/resources/lang', GLOB_ONLYDIR) ?: [] as $directory) {
+        $vendorNamespaces[] = filamentNamespace(basename(dirname($directory, 2)));
+    }
+
+    foreach (array_unique($vendorNamespaces) as $namespace) {
+        $roots[] = "lang/vendor/{$namespace}";
     }
 
     return $roots;
+}
+
+function filamentNamespace(string $package): string
+{
+    return match ($package) {
+        'support' => 'filament',
+        'filament' => 'filament-panels',
+        default => "filament-{$package}",
+    };
 }
 
 /** @return list<string> */
@@ -117,6 +132,7 @@ it('translates every English key of a root into a locale', function (string $loc
     $isVendor = str_starts_with($root, 'lang/vendor/');
 
     if ($isVendor) {
+        expect(app('translator')->getLoader()->namespaces())->toHaveKey(basename($root));
         $path = mergedVendorLangPath(basename($root), $path, $locale);
     }
 

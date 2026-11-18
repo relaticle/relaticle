@@ -209,6 +209,7 @@ Work in a checkout of `github.com/relaticle/ink`, branch `feat/post-locales` fro
 - [ ] **Step 1: Write the glossary.** The "Never use" column is checked by the second translation pass, not by a test (call: the words differ per language and a list test would only catch exact strings). Pick each word against Filament's own `de`, `es`, `fr` lang files so the two vocabularies agree (for example Filament's word for "record").
 - [ ] **Step 2: Generate framework strings once**: `composer require --dev laravel-lang/common && php artisan lang:add de es fr` (or `lang:update`), copy only the four files per locale, then `composer remove --dev laravel-lang/common` and confirm `git diff composer.json composer.lock` is empty. Edit `validation.php` attribute names that name our records against the glossary.
 - [ ] **Step 3: Publish and translate** the vendor files listed.
+  Every `filament` and `filament-*` namespace the translator registers is also a gated root (`lang/vendor/<namespace>`), found through `vendor/filament/*/resources/lang`, with or without an override directory. Its English baseline is the package's own `en` merged with our override. A key Filament lacks in `de` or `fr` is added to `lang/vendor/<namespace>/<locale>/` in the same change.
 - [ ] **Step 4: Run** `php artisan test --compact tests/Arch/TranslationsTest.php tests/Arch/ConventionsTest.php`. Expect the vendor roots to pass for every locale. Rows for `lang` still fail until Tasks 10-12.
 - [ ] **Step 5: Commit** `feat(i18n): add the glossary, framework strings and vendor translations`.
 
