@@ -27,7 +27,6 @@
     ":record: :message": ":record: :message",
     ":resolved of :total resolved. Review the rest below.": ":resolved sur :total traités. Passez en revue le reste ci-dessous.",
     ":step could not be completed: :message": "Impossible de terminer :step : :message",
-    ":verb :count :entities": ":verb : :count :entities",
     ":who changed :field at :time, after :assistant proposed this.": ":who a modifié :field à :time, après la proposition de :assistant.",
     ":who changed :fields at :time, after :assistant proposed this.": ":who a modifié :fields à :time, après la proposition de :assistant.",
     ":who cleared :field at :time, after :assistant proposed this.": ":who a effacé :field à :time, après la proposition de :assistant.",

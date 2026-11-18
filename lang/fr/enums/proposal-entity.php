@@ -164,4 +164,28 @@ return [
         'task' => 'Supprimer la tâche « :name »',
         'note' => 'Supprimer la note « :name »',
     ],
+    'receipt_batch' => [
+        'create' => [
+            'company' => ':count entreprise créée|:count entreprises créées',
+            'people' => ':count personne créée|:count personnes créées',
+            'opportunity' => ':count opportunité créée|:count opportunités créées',
+            'task' => ':count tâche créée|:count tâches créées',
+            'note' => ':count note créée|:count notes créées',
+            'email_drafts' => ':count brouillon d\'e-mail créé|:count brouillons d\'e-mail créés',
+        ],
+        'update' => [
+            'company' => ':count entreprise mise à jour|:count entreprises mises à jour',
+            'people' => ':count personne mise à jour|:count personnes mises à jour',
+            'opportunity' => ':count opportunité mise à jour|:count opportunités mises à jour',
+            'task' => ':count tâche mise à jour|:count tâches mises à jour',
+            'note' => ':count note mise à jour|:count notes mises à jour',
+        ],
+        'delete' => [
+            'company' => ':count entreprise supprimée|:count entreprises supprimées',
+            'people' => ':count personne supprimée|:count personnes supprimées',
+            'opportunity' => ':count opportunité supprimée|:count opportunités supprimées',
+            'task' => ':count tâche supprimée|:count tâches supprimées',
+            'note' => ':count note supprimée|:count notes supprimées',
+        ],
+    ],
 ];

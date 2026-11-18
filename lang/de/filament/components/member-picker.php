@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'search' => 'Mitglieder suchen',
-    'searching' => 'Suche läuft...',
+    'searching' => 'Suche läuft…',
     'failed' => 'Die Suche ist fehlgeschlagen. Versuchen Sie es erneut.',
     'none' => 'Es gibt keine Mitglieder zum Zuweisen.',
     'empty' => 'Kein Mitglied entspricht Ihrer Suche.',

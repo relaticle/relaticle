@@ -20,7 +20,7 @@ return [
         'name' => 'Tokenname',
         'workspace' => 'Arbeitsbereich',
         'expiration' => 'Ablauf',
-        'expiration_placeholder' => 'Ablauf auswählen ...',
+        'expiration_placeholder' => 'Ablauf auswählen…',
         'permissions' => 'Berechtigungen',
         'token' => 'Token',
     ],

@@ -122,7 +122,7 @@ return [
             'method_hint' => 'Sie bestätigen mit Face ID, Touch ID oder Ihrem Passkey.',
             'confirmed' => 'Bestätigt',
             'register' => 'Passkey registrieren',
-            'registering' => 'Registrierung läuft ...',
+            'registering' => 'Registrierung läuft…',
             'waiting' => 'Warten auf Passkey …',
             'cancel' => 'Abbrechen',
             'remove' => 'Entfernen',

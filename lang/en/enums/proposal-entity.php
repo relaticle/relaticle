@@ -164,4 +164,28 @@ return [
         'task' => 'Delete Task ":name"',
         'note' => 'Delete Note ":name"',
     ],
+    'receipt_batch' => [
+        'create' => [
+            'company' => 'Created :count company|Created :count companies',
+            'people' => 'Created :count person|Created :count people',
+            'opportunity' => 'Created :count opportunity|Created :count opportunities',
+            'task' => 'Created :count task|Created :count tasks',
+            'note' => 'Created :count note|Created :count notes',
+            'email_drafts' => 'Created :count email draft|Created :count email drafts',
+        ],
+        'update' => [
+            'company' => 'Updated :count company|Updated :count companies',
+            'people' => 'Updated :count person|Updated :count people',
+            'opportunity' => 'Updated :count opportunity|Updated :count opportunities',
+            'task' => 'Updated :count task|Updated :count tasks',
+            'note' => 'Updated :count note|Updated :count notes',
+        ],
+        'delete' => [
+            'company' => 'Deleted :count company|Deleted :count companies',
+            'people' => 'Deleted :count person|Deleted :count people',
+            'opportunity' => 'Deleted :count opportunity|Deleted :count opportunities',
+            'task' => 'Deleted :count task|Deleted :count tasks',
+            'note' => 'Deleted :count note|Deleted :count notes',
+        ],
+    ],
 ];

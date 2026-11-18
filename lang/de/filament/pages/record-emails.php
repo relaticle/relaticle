@@ -53,11 +53,11 @@ return [
     ],
     'protected' => [
         'heading' => 'Hier gibt es nichts anzuzeigen',
-        'description' => 'Dieser Eintrag ist geschützt. Seine E-Mails und Termine bleiben hier ausgeblendet.',
+        'description' => 'Dieser Eintrag ist geschützt. Seine E-Mails und Meetings bleiben hier ausgeblendet.',
     ],
     'blocked' => [
         'heading' => 'Hier gibt es nichts anzuzeigen',
-        'description' => 'Dieser Eintrag ist gesperrt. Seine E-Mails und Termine bleiben hier ausgeblendet.',
+        'description' => 'Dieser Eintrag ist gesperrt. Seine E-Mails und Meetings bleiben hier ausgeblendet.',
     ],
 
     'notifications' => [

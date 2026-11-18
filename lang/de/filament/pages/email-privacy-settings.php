@@ -33,11 +33,11 @@ return [
         'enforcement' => [
             'protected' => [
                 'label' => 'Geschützt',
-                'description' => 'Nur ausgeblendet, wenn jede Adresse der E-Mail oder des Termins geschützt oder gesperrt ist.',
+                'description' => 'Nur ausgeblendet, wenn jede Adresse der E-Mail oder des Meetings geschützt oder gesperrt ist.',
             ],
             'blocked' => [
                 'label' => 'Gesperrt',
-                'description' => 'Immer ausgeblendet, wenn diese Adresse in der E-Mail oder im Termin vorkommt.',
+                'description' => 'Immer ausgeblendet, wenn diese Adresse in der E-Mail oder im Meeting vorkommt.',
             ],
         ],
         'notifications' => [
@@ -83,7 +83,7 @@ return [
     ],
     'record_creation' => [
         'heading' => 'Automatische Erstellung von Einträgen',
-        'description' => 'Gilt für jedes verbundene Postfach und jeden Kalender im Arbeitsbereich. Adressen aus den E-Mail-Domains Ihrer Mitglieder erstellen nie Einträge. Eine Änderung wirkt sich nur auf neu synchronisierte E-Mails und Termine aus.',
+        'description' => 'Gilt für jedes verbundene Postfach und jeden Kalender im Arbeitsbereich. Adressen aus den E-Mail-Domains Ihrer Mitglieder erstellen nie Einträge. Eine Änderung wirkt sich nur auf neu synchronisierte E-Mails und Meetings aus.',
         'recommended' => 'Empfohlen',
         'modes' => [
             'all' => [

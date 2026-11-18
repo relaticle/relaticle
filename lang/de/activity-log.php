@@ -19,10 +19,10 @@ return [
             'label' => 'Aufgabe',
         ],
         'meeting.created' => [
-            'label' => 'Termin angesetzt',
+            'label' => 'Meeting angesetzt',
         ],
         'meeting.cancelled' => [
-            'label' => 'Termin abgesagt',
+            'label' => 'Meeting abgesagt',
         ],
     ],
 ];

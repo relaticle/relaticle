@@ -33,7 +33,7 @@ return [
     'request' => [
         'requested_incoming' => 'hat Zugriff angefragt',
         'requested_outgoing' => 'Sie haben Zugriff angefragt',
-        'unknown_user' => 'Unbekannter Nutzer',
+        'unknown_user' => 'Unbekannte Person',
         'email_unavailable' => 'Die zugehörige E-Mail ist nicht mehr verfügbar.',
     ],
     'empty' => [
@@ -65,7 +65,7 @@ return [
             'modal_description' => 'Ihre Anfrage für den Zugriff auf die E-Mail von :name zurückziehen?',
             'modal_submit_label' => 'Anfrage abbrechen',
         ],
-        'fallback_user' => 'diesem Nutzer',
+        'fallback_user' => 'dieser Person',
     ],
     'notifications' => [
         'approved' => 'Zugriffsanfrage genehmigt.',

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Enums;
 
 use App\Enums\CrmEntity;
+use Illuminate\Support\Facades\Lang;
 
 enum ProposalEntity: string
 {
@@ -309,18 +310,17 @@ enum ProposalEntity: string
         };
     }
 
-    private function receiptBatch(PendingActionOperation $operation, int $count): string
+    private function receiptBatch(PendingActionOperation $operation, int $count): ?string
     {
-        return match ($this) {
-            self::WorkspaceInvitation => $count === 1
+        if ($this === self::WorkspaceInvitation) {
+            return $count === 1
                 ? __('Sent :count invitation', ['count' => ':count'])
-                : __('Sent :count invitations', ['count' => ':count']),
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => __(':verb :count :entities', [
-                'verb' => $operation->done(),
-                'count' => ':count',
-                'entities' => $this->plural($count),
-            ]),
-        };
+                : __('Sent :count invitations', ['count' => ':count']);
+        }
+
+        $key = "enums/proposal-entity.receipt_batch.{$operation->value}.{$this->value}";
+
+        return Lang::has($key) ? trans_choice($key, $count, ['count' => ':count']) : null;
     }
 
     private function receiptMoved(int $count): string
@@ -358,6 +358,7 @@ enum ProposalEntity: string
                         'one' => $entity->receiptBatch($operation, 1),
                         'other' => $entity->receiptBatch($operation, 2),
                     ]])
+                    ->filter(fn (array $forms): bool => $forms['one'] !== null)
                     ->all(),
                 'moved' => [
                     'one' => $entity->receiptMoved(1),

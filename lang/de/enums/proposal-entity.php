@@ -164,4 +164,28 @@ return [
         'task' => 'Aufgabe „:name“ löschen',
         'note' => 'Notiz „:name“ löschen',
     ],
+    'receipt_batch' => [
+        'create' => [
+            'company' => ':count Unternehmen erstellt|:count Unternehmen erstellt',
+            'people' => ':count Person erstellt|:count Personen erstellt',
+            'opportunity' => ':count Verkaufschance erstellt|:count Verkaufschancen erstellt',
+            'task' => ':count Aufgabe erstellt|:count Aufgaben erstellt',
+            'note' => ':count Notiz erstellt|:count Notizen erstellt',
+            'email_drafts' => ':count E-Mail-Entwurf erstellt|:count E-Mail-Entwürfe erstellt',
+        ],
+        'update' => [
+            'company' => ':count Unternehmen aktualisiert|:count Unternehmen aktualisiert',
+            'people' => ':count Person aktualisiert|:count Personen aktualisiert',
+            'opportunity' => ':count Verkaufschance aktualisiert|:count Verkaufschancen aktualisiert',
+            'task' => ':count Aufgabe aktualisiert|:count Aufgaben aktualisiert',
+            'note' => ':count Notiz aktualisiert|:count Notizen aktualisiert',
+        ],
+        'delete' => [
+            'company' => ':count Unternehmen gelöscht|:count Unternehmen gelöscht',
+            'people' => ':count Person gelöscht|:count Personen gelöscht',
+            'opportunity' => ':count Verkaufschance gelöscht|:count Verkaufschancen gelöscht',
+            'task' => ':count Aufgabe gelöscht|:count Aufgaben gelöscht',
+            'note' => ':count Notiz gelöscht|:count Notizen gelöscht',
+        ],
+    ],
 ];

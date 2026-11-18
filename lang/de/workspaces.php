@@ -13,7 +13,7 @@ return [
         ],
         'emails' => [
             'label' => 'E-Mail-Adressen',
-            'placeholder' => 'name@firma.de, kollege@firma.de',
+            'placeholder' => 'name@beispiel.de, kollege@beispiel.de',
             'helper' => 'Trennen Sie mehrere Adressen durch Komma, Leerzeichen oder Zeilenumbruch.',
         ],
         'invite_as' => [
@@ -140,7 +140,7 @@ return [
         'slug_too_short' => ':attribute muss mindestens 3 Zeichen lang sein.',
         'slug_format' => ':attribute darf nur Kleinbuchstaben, Zahlen und Bindestriche enthalten.',
         'slug_reserved' => ':attribute ist reserviert und kann nicht verwendet werden.',
-        'email_already_invited' => 'Dieses Mitglied wurde bereits in den Arbeitsbereich eingeladen.',
+        'email_already_invited' => 'Diese Person wurde bereits in den Arbeitsbereich eingeladen.',
         'email_already_member' => 'Dieses Mitglied gehört bereits zum Arbeitsbereich.',
         'only_owner_promotes_admins' => 'Nur der Inhaber des Arbeitsbereichs kann die Administratorrolle erteilen.',
         'invite_link_role_cannot_be_admin' => 'Der Link zum Arbeitsbereich kann die Administratorrolle nicht erteilen. Laden Sie Administratoren stattdessen per E-Mail ein.',
@@ -347,8 +347,8 @@ return [
         'search_placeholder' => 'Nach Name oder E-Mail-Adresse suchen',
         'invite_pending' => 'Einladung ausstehend',
         'invite_expired' => 'Einladung abgelaufen',
-        'expires_in' => 'Läuft ab in :time',
-        'expired_ago' => 'Abgelaufen vor :time',
+        'expires_in' => 'Läuft noch :time',
+        'expired_ago' => 'Abgelaufen (:time her)',
         'expired' => 'Abgelaufen',
         'no_results' => [
             'heading' => 'Niemand entspricht dieser Suche',
@@ -369,7 +369,7 @@ return [
         'default_role' => 'Beitritt als',
         'default_role_helper' => 'Wird gespeichert, sobald Sie die Rolle wählen. Administratoren laden Sie stattdessen per E-Mail ein.',
         'lapsed' => [
-            'title' => 'Dieser Link ist vor :time abgelaufen',
+            'title' => 'Dieser Link ist abgelaufen (:time her)',
             'notice' => 'Damit kann niemand beitreten. Erzeugen Sie einen neuen Link, um weiter Mitglieder einzuladen.',
         ],
         'disabled' => [

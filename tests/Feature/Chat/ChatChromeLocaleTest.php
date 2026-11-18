@@ -13,6 +13,7 @@ use Laravel\Ai\Tools\Request;
 use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
@@ -134,4 +135,12 @@ it('stores the approval error in English and shows it in the user language', fun
     expect($component->errors()->first('resolve'))->toContain(Lang::get('Action class not allowlisted', [], 'fr'))
         ->and($action->fresh()->result_data['last_error'])->toContain('Action class not allowlisted')
         ->and($action->fresh()->result_data['last_error'])->not->toContain('Action non');
+});
+
+it('builds batch receipts as whole phrases in the user language', function (): void {
+    $receipts = Locales::within('de', fn (): array => ProposalEntity::receipts());
+
+    expect($receipts['task']['batch']['create'])->toBe(['one' => ':count Aufgabe erstellt', 'other' => ':count Aufgaben erstellt'])
+        ->and($receipts['opportunity']['batch']['delete'])->toBe(['one' => ':count Verkaufschance gelöscht', 'other' => ':count Verkaufschancen gelöscht'])
+        ->and($receipts['email_drafts']['batch'])->toHaveKey('create')->not->toHaveKey('delete');
 });

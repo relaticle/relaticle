@@ -8,10 +8,10 @@ return [
     'recruiting' => 'Recruiting',
     'marketing' => 'Marketing',
     'fundraising' => 'Fundraising',
-    'investing' => 'Investieren',
+    'investing' => 'Investments',
     'other' => 'Sonstiges',
     'descriptions' => [
-        'sales' => 'Verkaufschancen verfolgen, Pipeline-Phasen steuern und Umsatz abschließen',
+        'sales' => 'Verkaufschancen verfolgen, Pipeline-Phasen steuern und Abschlüsse erzielen',
         'customer_success' => 'Verlängerungen, Health Scores und Kundenbeziehungen verwalten',
         'recruiting' => 'Kandidaten, Vorstellungsgespräche und Einstellungsprozesse verwalten',
         'marketing' => 'Kampagnen, Leads und Marketingleistung verfolgen',

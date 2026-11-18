@@ -18,7 +18,7 @@ return [
 
     'collaboration' => [
         'heading' => 'Benachrichtigungen zur Zusammenarbeit',
-        'notify_me_about' => 'Benachrichtigen Sie mich über',
+        'notify_me_about' => 'Mich benachrichtigen über',
     ],
 
     'channels' => [
@@ -29,19 +29,19 @@ return [
     'types' => [
         'task_assigned' => [
             'label' => 'Aufgabenzuweisungen',
-            'description' => 'Benachrichtigen Sie mich, wenn mir eine Aufgabe zugewiesen wird.',
+            'description' => 'Mich benachrichtigen, wenn mir eine Aufgabe zugewiesen wird.',
         ],
         'email_access' => [
             'label' => 'E-Mail-Zugriff',
-            'description' => 'Senden Sie mir eine E-Mail, wenn jemand den Zugriff auf eine meiner E-Mails anfragt. Benachrichtigen Sie mich, wenn meine eigene Anfrage genehmigt, abgelehnt wird oder abläuft.',
+            'description' => 'Mir eine E-Mail senden, wenn jemand den Zugriff auf eine meiner E-Mails anfragt. Mich benachrichtigen, wenn meine eigene Anfrage genehmigt, abgelehnt wird oder abläuft.',
         ],
         'email_shared' => [
             'label' => 'Geteilte E-Mails',
-            'description' => 'Benachrichtigen Sie mich, wenn jemand eine E-Mail mit mir teilt.',
+            'description' => 'Mich benachrichtigen, wenn jemand eine E-Mail mit mir teilt.',
         ],
         'task_digest' => [
             'label' => 'Tägliche Zusammenfassung',
-            'description' => 'Benachrichtigen Sie mich jeden Morgen über überfällige und heute fällige Aufgaben.',
+            'description' => 'Mich benachrichtigen jeden Morgen über überfällige und heute fällige Aufgaben.',
         ],
     ],
 
@@ -91,7 +91,7 @@ return [
             'approved' => 'Genehmigt',
             'denied' => 'Abgelehnt',
             'already_decided' => 'Über diese Anfrage wurde bereits entschieden.',
-            'expires' => 'Läuft ab :when',
+            'expires' => 'Läuft :when ab',
         ],
         'empty' => [
             'notifications' => [

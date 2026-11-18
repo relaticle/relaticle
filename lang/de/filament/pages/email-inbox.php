@@ -67,7 +67,7 @@ return [
     ],
     'pending_access' => [
         'heading' => '{1}1 ausstehende Zugriffsanfrage|[2,*]:count ausstehende Zugriffsanfragen',
-        'unknown_user' => 'Unbekannter Nutzer',
+        'unknown_user' => 'Unbekannte Person',
         'approve' => 'Genehmigen',
         'deny' => 'Ablehnen',
     ],

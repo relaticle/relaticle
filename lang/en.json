@@ -27,7 +27,6 @@
     ":record: :message": ":record: :message",
     ":resolved of :total resolved. Review the rest below.": ":resolved of :total resolved. Review the rest below.",
     ":step could not be completed: :message": ":step could not be completed: :message",
-    ":verb :count :entities": ":verb :count :entities",
     ":who changed :field at :time, after :assistant proposed this.": ":who changed :field at :time, after :assistant proposed this.",
     ":who changed :fields at :time, after :assistant proposed this.": ":who changed :fields at :time, after :assistant proposed this.",
     ":who cleared :field at :time, after :assistant proposed this.": ":who cleared :field at :time, after :assistant proposed this.",

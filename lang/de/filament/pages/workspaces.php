@@ -93,7 +93,7 @@ return [
         ],
         'invite' => [
             'heading' => 'Laden Sie Ihr Team ein',
-            'description' => 'Fügen Sie die Menschen hinzu, mit denen Sie arbeiten. Sie erhalten eine E-Mail mit einem Link zum Beitreten.',
+            'description' => 'Fügen Sie die Menschen hinzu, mit denen Sie arbeiten. Jede eingeladene Person erhält eine E-Mail mit einem Link zum Beitreten.',
             'emails_label' => 'E-Mail-Adressen',
             'emails_placeholder' => 'maya@acme.com, leo@acme.com',
             'helper' => 'Fügen Sie mehrere auf einmal ein. Alle erhalten dieselbe Rolle.',

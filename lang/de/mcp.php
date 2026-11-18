@@ -45,7 +45,7 @@ return [
         'actions' => [
             'cancel' => 'Abbrechen',
             'authorize' => 'Autorisieren',
-            'authorizing' => 'Autorisierung läuft ...',
+            'authorizing' => 'Autorisierung läuft…',
         ],
 
         'revoke_hint' => 'Sie können diesen Konnektor jederzeit auf der Seite „Zugriffstoken“ widerrufen.',

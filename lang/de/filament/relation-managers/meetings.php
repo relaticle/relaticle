@@ -26,10 +26,10 @@ return [
 
     'notifications' => [
         'linked' => [
-            'title' => 'Termin erfolgreich verknüpft.',
+            'title' => 'Meeting erfolgreich verknüpft.',
         ],
         'unlinked' => [
-            'title' => 'Termin erfolgreich gelöst.',
+            'title' => 'Meeting erfolgreich gelöst.',
         ],
     ],
 ];

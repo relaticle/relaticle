@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     'synced' => 'Synchronisiert',
     'draft' => 'Entwurf',
-    'queued' => 'In Warteschlange',
+    'queued' => 'Eingeplant',
     'sending' => 'Wird gesendet',
     'sent' => 'Gesendet',
     'failed' => 'Fehlgeschlagen',

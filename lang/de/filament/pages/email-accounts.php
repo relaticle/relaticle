@@ -27,7 +27,7 @@ return [
         'reimport_history' => [
             'label' => 'Verlauf erneut importieren',
             'heading' => 'Postfachverlauf erneut importieren?',
-            'description' => 'Bereits synchronisierte E-Mails und Termine bleiben in Relaticle. Wir legen fehlende Personen und Unternehmen gemäß der Einstellung Ihres Arbeitsbereichs zur Erstellung von Einträgen an und importieren alle noch nicht gespeicherten Nachrichten. Bei einem großen Postfach kann das dauern.',
+            'description' => 'Bereits synchronisierte E-Mails und Meetings bleiben in Relaticle. Wir legen fehlende Personen und Unternehmen gemäß der Einstellung Ihres Arbeitsbereichs zur Erstellung von Einträgen an und importieren alle noch nicht gespeicherten Nachrichten. Bei einem großen Postfach kann das dauern.',
         ],
         'retry_failed_import' => [
             'label' => 'Erneut versuchen',
@@ -58,7 +58,7 @@ return [
     'notifications' => [
         'connected' => [
             'title' => 'Postfach verbunden.',
-            'body' => 'E-Mails und Termine erscheinen, während der Import läuft.',
+            'body' => 'E-Mails und Meetings erscheinen, während der Import läuft.',
         ],
         'cancelled' => [
             'title' => 'Es wurde nichts verbunden. Sie können jederzeit ein Postfach verbinden.',
@@ -70,7 +70,7 @@ return [
         ],
         'calendar_sync_queued' => [
             'title' => 'Kalendersynchronisierung gestartet.',
-            'body' => 'Ihre Termine werden auf dieser Seite aktualisiert, sobald die Synchronisierung abgeschlossen ist.',
+            'body' => 'Ihre Meetings werden auf dieser Seite aktualisiert, sobald die Synchronisierung abgeschlossen ist.',
         ],
         'disconnected' => [
             'title' => 'Postfach getrennt.',
@@ -101,7 +101,7 @@ return [
     'synced_at' => 'Synchronisiert :time',
     'in_sync' => 'Synchron',
     'sync_error' => [
-        'badge' => 'Synchronisierungsproblem',
+        'badge' => 'Sync-Problem',
         'heading' => 'Einige Elemente konnten nicht synchronisiert werden',
         'reasons' => [
             'google_mail_disabled' => 'Gmail ist für dieses Google-Workspace-Konto nicht aktiviert. Bitten Sie Ihren Google-Administrator, es zu aktivieren, und verbinden Sie das Postfach dann neu.',
@@ -112,7 +112,7 @@ return [
     'importing_count' => '{1}:count E-Mail|[2,*]:count E-Mails',
     'statuses' => [
         'active' => 'Aktiv',
-        'error' => 'Synchronisierungsproblem',
+        'error' => 'Sync-Problem',
         'disconnected' => 'Getrennt',
         'reauth_required' => 'Neu verbinden erforderlich',
     ],
@@ -137,8 +137,8 @@ return [
             'description' => 'Verbinden Sie Ihr Postfach, um jede Unterhaltung mit diesem Eintrag zu sehen und mit einem Klick zu antworten.',
         ],
         'meetings' => [
-            'heading' => 'Ihre Termine in Relaticle sehen',
-            'description' => 'Verbinden Sie Ihr Postfach, um Termine neben Ihren CRM-Einträgen zu verfolgen.',
+            'heading' => 'Ihre Meetings in Relaticle sehen',
+            'description' => 'Verbinden Sie Ihr Postfach, um Meetings neben Ihren CRM-Einträgen zu verfolgen.',
         ],
     ],
 ];

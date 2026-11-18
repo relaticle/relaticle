@@ -6,7 +6,7 @@ return [
     'label' => 'Verknüpfungen',
     'placeholder' => 'Unternehmen, Person oder Verkaufschance verknüpfen',
     'search' => 'Unternehmen, Personen und Verkaufschancen suchen',
-    'searching' => 'Suche läuft...',
+    'searching' => 'Suche läuft…',
     'failed' => 'Die Suche ist fehlgeschlagen. Versuchen Sie es erneut.',
     'none' => 'Es gibt noch nichts zu verknüpfen.',
     'empty' => 'Kein Eintrag entspricht Ihrer Suche.',
