@@ -14,4 +14,13 @@ return [
     'ai' => 'AI',
     'podcast' => 'Podcast',
     'other' => 'Other',
+    'sub_options' => [
+        'ai' => [
+            'chatgpt' => 'ChatGPT',
+            'claude' => 'Claude',
+            'gemini' => 'Gemini',
+            'perplexity' => 'Perplexity',
+            'other' => 'Another assistant',
+        ],
+    ],
 ];

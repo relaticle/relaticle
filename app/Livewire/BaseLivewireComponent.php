@@ -49,11 +49,11 @@ abstract class BaseLivewireComponent extends Component implements HasActions, Ha
             ->send();
     }
 
-    protected function sendNotification(string $title = 'Saved', ?string $message = null, string $type = 'success'): void
+    protected function sendNotification(?string $title = null, ?string $message = null, string $type = 'success'): void
     {
         Notification::make()
-            ->title(__($title))
-            ->body(__($message))
+            ->title($title ?? __('Saved'))
+            ->body($message)
             ->{$type}()
             ->send();
     }

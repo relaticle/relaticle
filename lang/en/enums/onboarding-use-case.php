@@ -19,4 +19,36 @@ return [
         'investing' => 'Track deal flow, portfolio companies, and investment pipeline',
         'other' => 'Organize people, companies, and tasks your way',
     ],
+    'sub_options' => [
+        'sales' => [
+            'outbound' => 'Outbound',
+            'inbound' => 'Inbound',
+            'product_led' => 'Product-led',
+            'partner_led' => 'Partner-led',
+        ],
+        'customer_success' => [
+            'high_touch' => 'High-touch',
+            'low_touch' => 'Low-touch',
+        ],
+        'recruiting' => [
+            'applications' => 'Applications',
+            'sourcing' => 'Sourcing',
+        ],
+        'marketing' => [
+            'content' => 'Content',
+            'demand_gen' => 'Demand gen',
+            'events' => 'Events',
+            'partnerships' => 'Partnerships',
+        ],
+        'fundraising' => [
+            'early_stage' => 'Early-stage',
+            'growth_stage' => 'Growth-stage',
+            'late_stage' => 'Late-stage',
+        ],
+        'investing' => [
+            'early_stage' => 'Early-stage',
+            'growth_stage' => 'Growth-stage',
+            'late_stage' => 'Late-stage',
+        ],
+    ],
 ];

@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\OnboardingReferralSource;
+use App\Enums\OnboardingUseCase;
 use App\Models\User;
 use App\Support\Locales;
 use Filament\Facades\Filament;
@@ -11,6 +13,7 @@ use Livewire\Livewire;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
+use Relaticle\EmailIntegration\Enums\EmailDirection;
 
 mutates(ChatInterface::class, ProposalEntity::class);
 
@@ -72,4 +75,21 @@ it('keeps the sentences sent to the model in English', function (): void {
             ->and(ProposalEntity::Company->verb(PendingActionOperation::Create))->toBe('create')
             ->and(ProposalEntity::Email->notDone(PendingActionOperation::Create))->toBe('NOT sent');
     });
+});
+
+it('keeps machine labels in English for a user who reads another language', function (): void {
+    Lang::addLines([
+        'enums/onboarding-use-case.sales' => 'Ventes',
+        'enums/onboarding-referral-source.ai' => 'IA',
+        'enums/onboarding-referral-source.sub_options.ai.other' => 'Un autre assistant',
+        'enums/email-direction.inbound' => 'Recu',
+    ], 'fr');
+    Locales::apply('fr');
+
+    expect(OnboardingUseCase::Sales->getLabel())->toBe('Ventes')
+        ->and(OnboardingUseCase::Sales->getLabel('en'))->toBe('Sales')
+        ->and(OnboardingReferralSource::AI->getLabel('en'))->toBe('AI')
+        ->and(OnboardingReferralSource::AI->getSubOptions('en')['other'])->toBe('Another assistant')
+        ->and(OnboardingReferralSource::AI->getSubOptions()['other'])->toBe('Un autre assistant')
+        ->and(EmailDirection::INBOUND->getLabel('en'))->toBe('Received');
 });

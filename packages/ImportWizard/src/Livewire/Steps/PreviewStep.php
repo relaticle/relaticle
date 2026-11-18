@@ -346,7 +346,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
             }
 
             fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, [...$headers, 'Import Error'], escape: '\\');
+            fputcsv($handle, [...$headers, __('import-wizard-new::failed_rows.error_header')], escape: '\\');
 
             $import->failedRows()
                 ->lazyById(100)

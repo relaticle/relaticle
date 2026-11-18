@@ -622,7 +622,7 @@ final class ProposalCard extends BaseLivewireComponent
             'items' => $this->batchItemViews($step),
             'excludableCodes' => $this->excludableCodesOf($step),
             'titleKey' => $entity->titleKey(),
-            'titleLabel' => $entity->titleLabel(),
+            'titleLabels' => $entity->titleLabels(),
             'entityNoun' => Str::lower($entity->singularName()),
             'deletes' => $entity->deletes($step->operation),
             'followUpLabel' => $entity->followUpLabel(),
@@ -784,7 +784,7 @@ final class ProposalCard extends BaseLivewireComponent
             }
 
             $isTitleRow = ($row['code'] ?? null) === null
-                ? ($row['label'] ?? null) === $entity->titleLabel()
+                ? in_array($row['label'] ?? null, $entity->titleLabels(), true)
                 : $row['code'] === $entity->titleKey();
             $value = $row['value'] ?? null;
 

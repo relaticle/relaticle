@@ -359,9 +359,9 @@ final class MappingStep extends Component implements HasActions, HasForms
             ->all();
 
         $entityLabel = $this->entityType->label();
-        $fieldList = implode(' or ', $fieldLabels);
+        $fieldList = implode(__('import-wizard-new::actions.continue.or'), $fieldLabels);
 
-        return "To avoid creating duplicate records, make sure you map a column that uniquely identifies each record.\n\nFor {$entityLabel}, map a {$fieldList} column.";
+        return __('import-wizard-new::actions.continue.warning', ['entity' => $entityLabel, 'fields' => $fieldList]);
     }
 
     private function saveMappings(): void

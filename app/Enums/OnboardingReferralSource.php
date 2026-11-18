@@ -20,36 +20,32 @@ enum OnboardingReferralSource: string implements HasLabel
     case Podcast = 'podcast';
     case Other = 'other';
 
-    public function getLabel(): string
+    public function getLabel(?string $locale = null): string
     {
         return match ($this) {
-            self::Google => __('enums/onboarding-referral-source.google'),
-            self::GitHub => __('enums/onboarding-referral-source.github'),
-            self::LinkedIn => __('enums/onboarding-referral-source.linkedin'),
-            self::X => __('enums/onboarding-referral-source.x'),
-            self::Reddit => __('enums/onboarding-referral-source.reddit'),
-            self::YouTube => __('enums/onboarding-referral-source.youtube'),
-            self::FriendsCoworker => __('enums/onboarding-referral-source.friends_coworker'),
-            self::Newsletter => __('enums/onboarding-referral-source.newsletter'),
-            self::AI => __('enums/onboarding-referral-source.ai'),
-            self::Podcast => __('enums/onboarding-referral-source.podcast'),
-            self::Other => __('enums/onboarding-referral-source.other'),
+            self::Google => __('enums/onboarding-referral-source.google', [], $locale),
+            self::GitHub => __('enums/onboarding-referral-source.github', [], $locale),
+            self::LinkedIn => __('enums/onboarding-referral-source.linkedin', [], $locale),
+            self::X => __('enums/onboarding-referral-source.x', [], $locale),
+            self::Reddit => __('enums/onboarding-referral-source.reddit', [], $locale),
+            self::YouTube => __('enums/onboarding-referral-source.youtube', [], $locale),
+            self::FriendsCoworker => __('enums/onboarding-referral-source.friends_coworker', [], $locale),
+            self::Newsletter => __('enums/onboarding-referral-source.newsletter', [], $locale),
+            self::AI => __('enums/onboarding-referral-source.ai', [], $locale),
+            self::Podcast => __('enums/onboarding-referral-source.podcast', [], $locale),
+            self::Other => __('enums/onboarding-referral-source.other', [], $locale),
         };
     }
 
     /**
      * @return array<string, string>
      */
-    public function getSubOptions(): array
+    public function getSubOptions(?string $locale = null): array
     {
         return match ($this) {
-            self::AI => [
-                'chatgpt' => 'ChatGPT',
-                'claude' => 'Claude',
-                'gemini' => 'Gemini',
-                'perplexity' => 'Perplexity',
-                'other' => 'Another assistant',
-            ],
+            self::AI => collect(['chatgpt', 'claude', 'gemini', 'perplexity', 'other'])
+                ->mapWithKeys(fn (string $key): array => [$key => __("enums/onboarding-referral-source.sub_options.ai.{$key}", [], $locale)])
+                ->all(),
             default => [],
         };
     }

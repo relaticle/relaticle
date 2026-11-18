@@ -52,12 +52,26 @@ enum ProposalEntity: string
 
     public function titleLabel(): string
     {
+        return __("enums/proposal-entity.title_label.{$this->titleLabelKey()}");
+    }
+
+    /** @return list<string> */
+    public function titleLabels(): array
+    {
+        return array_values(array_unique([
+            $this->titleLabel(),
+            __("enums/proposal-entity.title_label.{$this->titleLabelKey()}", [], 'en'),
+        ]));
+    }
+
+    private function titleLabelKey(): string
+    {
         return match ($this) {
-            self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => __('enums/proposal-entity.title_label.name'),
-            self::Task, self::Note => __('enums/proposal-entity.title_label.title'),
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => __('enums/proposal-entity.title_label.subject'),
-            self::WorkspaceInvitation => __('enums/proposal-entity.title_label.email'),
-            self::WebAccess => __('enums/proposal-entity.title_label.search'),
+            self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => 'name',
+            self::Task, self::Note => 'title',
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'subject',
+            self::WorkspaceInvitation => 'email',
+            self::WebAccess => 'search',
         };
     }
 
@@ -300,6 +314,8 @@ enum ProposalEntity: string
      *     moved: array{one: string, other: string},
      *     target: ?string,
      *     title: string,
+     *     titleKey: string,
+     *     titleLabels: list<string>,
      *     declined: string
      * }>
      */
@@ -324,6 +340,8 @@ enum ProposalEntity: string
                 ],
                 'target' => $entity->receiptTarget(),
                 'title' => $entity->titleLabel(),
+                'titleKey' => $entity->titleKey(),
+                'titleLabels' => $entity->titleLabels(),
                 'declined' => $entity->declinedOutcome()->value,
             ];
         }

@@ -1470,8 +1470,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return this.proposalTexts.outcomes[key]?.label ?? '';
     },
 
-    fieldValue(fields, label) {
-        const field = (Array.isArray(fields) ? fields : []).find((f) => f.label === label);
+    fieldValue(fields, label, code = null) {
+        const labels = Array.isArray(label) ? label : [label];
+        const field = (Array.isArray(fields) ? fields : []).find((f) => (code && f.code === code) || labels.includes(f.label));
         return field ? String(field.new ?? field.value ?? '') : '';
     },
 
@@ -1636,7 +1637,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     offLine(key, outcome, label, action) {
         const leads = !!this.proposalTexts.outcomes[outcome]?.leads;
         const receipt = this.proposalTexts.receipts[action?.entity_type] ?? {};
-        const text = leads && action ? (this.fieldValue(action.display?.fields, receipt.title) || label) : label;
+        const text = leads && action ? (this.fieldValue(action.display?.fields, receipt.titleLabels, receipt.titleKey) || label) : label;
 
         return {
             key,
@@ -1655,12 +1656,12 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const fields = action.display?.fields;
         const record = action.record?.url ? action.record : null;
         const target = receipt.target ? this.fieldValue(fields, receipt.target) : '';
-        const label = target || record?.label || this.proposalRecordLabel(action) || this.fieldValue(fields, receipt.title) || action.display?.summary || '';
+        const label = target || record?.label || this.proposalRecordLabel(action) || this.fieldValue(fields, receipt.titleLabels, receipt.titleKey) || action.display?.summary || '';
         const showChip = !!record && !!label && !!window.ChatModules.recordChipIcon(action.entity_type);
         const kept = (Array.isArray(fields) ? fields : []).filter((f) => !this.isExcluded(action.excluded, f));
         const meta = [
             receipt.target
-                ? this.fieldValue(fields, receipt.title)
+                ? this.fieldValue(fields, receipt.titleLabels, receipt.titleKey)
                 : (action.operation === 'update' ? kept.map((f) => f.label).join(', ') : ''),
             this.leftOutNote(action.excluded, fields),
         ].filter(Boolean).join(' ');

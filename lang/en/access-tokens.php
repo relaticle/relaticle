@@ -71,7 +71,19 @@ return [
         ],
     ],
 
+    'expirations' => [
+        '1' => '1 Day',
+        '7' => '7 Days',
+        '30' => '30 Days',
+        '60' => '60 Days',
+        '90' => '90 Days',
+        '180' => '180 Days',
+        '365' => '1 Year',
+        '0' => 'No Expiration',
+    ],
+
     'notifications' => [
+        'workspace_not_member' => 'You do not belong to this workspace.',
         'permissions_updated' => 'Access token permissions updated.',
         'deleted' => 'Access token deleted.',
     ],

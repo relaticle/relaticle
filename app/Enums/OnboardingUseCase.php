@@ -17,16 +17,25 @@ enum OnboardingUseCase: string implements HasLabel
     case Investing = 'investing';
     case Other = 'other';
 
-    public function getLabel(): string
+    private const array SUB_OPTION_KEYS = [
+        'sales' => ['outbound', 'inbound', 'product_led', 'partner_led'],
+        'customer_success' => ['high_touch', 'low_touch'],
+        'recruiting' => ['applications', 'sourcing'],
+        'marketing' => ['content', 'demand_gen', 'events', 'partnerships'],
+        'fundraising' => ['early_stage', 'growth_stage', 'late_stage'],
+        'investing' => ['early_stage', 'growth_stage', 'late_stage'],
+    ];
+
+    public function getLabel(?string $locale = null): string
     {
         return match ($this) {
-            self::Sales => __('enums/onboarding-use-case.sales'),
-            self::CustomerSuccess => __('enums/onboarding-use-case.customer_success'),
-            self::Recruiting => __('enums/onboarding-use-case.recruiting'),
-            self::Marketing => __('enums/onboarding-use-case.marketing'),
-            self::Fundraising => __('enums/onboarding-use-case.fundraising'),
-            self::Investing => __('enums/onboarding-use-case.investing'),
-            self::Other => __('enums/onboarding-use-case.other'),
+            self::Sales => __('enums/onboarding-use-case.sales', [], $locale),
+            self::CustomerSuccess => __('enums/onboarding-use-case.customer_success', [], $locale),
+            self::Recruiting => __('enums/onboarding-use-case.recruiting', [], $locale),
+            self::Marketing => __('enums/onboarding-use-case.marketing', [], $locale),
+            self::Fundraising => __('enums/onboarding-use-case.fundraising', [], $locale),
+            self::Investing => __('enums/onboarding-use-case.investing', [], $locale),
+            self::Other => __('enums/onboarding-use-case.other', [], $locale),
         };
     }
 
@@ -123,35 +132,13 @@ enum OnboardingUseCase: string implements HasLabel
     /**
      * @return array<string, string>
      */
-    public function getSubOptions(): array
+    public function getSubOptions(?string $locale = null): array
     {
         return match ($this) {
-            self::Sales => [
-                'outbound' => 'Outbound',
-                'inbound' => 'Inbound',
-                'product_led' => 'Product-led',
-                'partner_led' => 'Partner-led',
-            ],
-            self::CustomerSuccess => [
-                'high_touch' => 'High-touch',
-                'low_touch' => 'Low-touch',
-            ],
-            self::Recruiting => [
-                'applications' => 'Applications',
-                'sourcing' => 'Sourcing',
-            ],
-            self::Marketing => [
-                'content' => 'Content',
-                'demand_gen' => 'Demand gen',
-                'events' => 'Events',
-                'partnerships' => 'Partnerships',
-            ],
-            self::Fundraising, self::Investing => [
-                'early_stage' => 'Early-stage',
-                'growth_stage' => 'Growth-stage',
-                'late_stage' => 'Late-stage',
-            ],
             self::Other => [],
+            default => collect(self::SUB_OPTION_KEYS[$this->value])
+                ->mapWithKeys(fn (string $key): array => [$key => __("enums/onboarding-use-case.sub_options.{$this->value}.{$key}", [], $locale)])
+                ->all(),
         };
     }
 }

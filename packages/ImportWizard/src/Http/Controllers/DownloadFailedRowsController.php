@@ -21,7 +21,7 @@ final class DownloadFailedRowsController
         abort_unless($user->hasWorkspaceCapability((string) $import->workspace_id, WorkspaceCapability::DataImport), 403);
 
         $columnHeaders = $import->headers;
-        $csvHeaders = [...$columnHeaders, 'Import Error'];
+        $csvHeaders = [...$columnHeaders, __('import-wizard-new::failed_rows.error_header')];
 
         return response()->streamDownload(function () use ($import, $columnHeaders, $csvHeaders): void {
             $handle = fopen('php://output', 'w');
@@ -38,7 +38,7 @@ final class DownloadFailedRowsController
                 ->each(function (FailedImportRow $row) use ($handle, $columnHeaders): void {
                     $data = $row->data;
                     $values = array_map(fn (string $header): string => $data[$header] ?? '', $columnHeaders);
-                    $values[] = $row->validation_error ?? 'System error';
+                    $values[] = $row->validation_error ?? __('import-wizard-new::failed_rows.system_error');
                     fputcsv($handle, $values, escape: '\\');
                 });
 

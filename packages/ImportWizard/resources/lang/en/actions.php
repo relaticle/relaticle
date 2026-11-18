@@ -14,6 +14,8 @@ return [
         'heading' => 'Avoid creating duplicate records',
         'submit' => 'Continue without mapping',
         'back' => 'Go Back',
+        'or' => ' or ',
+        'warning' => "To avoid creating duplicate records, make sure you map a column that uniquely identifies each record.\n\nFor :entity, map a :fields column.",
     ],
     'start_import' => [
         'heading' => 'Start import',

@@ -282,7 +282,7 @@ final readonly class ChatController
 
         return response()->json([
             'error' => 'credits_exhausted',
-            'message' => "You have used all {$allowance} credits for this {$workspace->plan->getLabel()} plan period.",
+            'message' => __('You have used all :allowance credits for this :plan plan period.', ['allowance' => $allowance, 'plan' => $workspace->plan->getLabel()]),
             'plan' => $workspace->plan->value,
             'allowance' => $allowance,
             'reset_on' => $balance?->period_ends_at?->toFormattedDateString(),

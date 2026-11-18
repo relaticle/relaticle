@@ -139,6 +139,7 @@ return [
     ],
 
     'notifications' => [
+        'account_deletion_cancelled' => 'Account deletion cancelled',
         'save' => [
             'success' => 'Saved.',
         ],

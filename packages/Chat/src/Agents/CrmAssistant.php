@@ -637,7 +637,7 @@ PROMPT;
         $lines = [];
 
         if ($useCase instanceof OnboardingUseCase) {
-            $lines[] = "use_case: {$useCase->getLabel()}";
+            $lines[] = "use_case: {$useCase->getLabel('en')}";
 
             if ($this->setupMode) {
                 array_push($lines, ...$this->setupPipelineLines($this->workspace, $useCase));
@@ -658,7 +658,7 @@ PROMPT;
             $referral = $this->workspace->onboarding_referral_source;
 
             if ($referral instanceof OnboardingReferralSource) {
-                $lines[] = "referral: {$referral->getLabel()}";
+                $lines[] = "referral: {$referral->getLabel('en')}";
             }
 
             array_push($lines, ...$this->setupDataLines($this->workspace));
@@ -716,7 +716,7 @@ PROMPT;
     private function setupPipelineLines(Workspace $workspace, OnboardingUseCase $useCase): array
     {
         $lines = [];
-        $subOptions = $useCase->getSubOptions();
+        $subOptions = $useCase->getSubOptions('en');
         $contextLabels = collect($workspace->onboarding_context ?? [])
             ->map(fn (string $value): ?string => $subOptions[$value] ?? null)
             ->filter()

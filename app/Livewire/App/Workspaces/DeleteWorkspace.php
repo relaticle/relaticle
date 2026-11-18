@@ -78,7 +78,7 @@ final class DeleteWorkspace extends BaseLivewireComponent
         try {
             resolve(ScheduleWorkspaceDeletion::class)->schedule($this->authUser(), $workspace);
 
-            $this->sendNotification("Workspace scheduled for deletion on {$workspace->refresh()->scheduled_deletion_at->format('F j, Y')}");
+            $this->sendNotification(__('workspaces.notifications.workspace_deletion_scheduled.success', ['date' => $workspace->refresh()->scheduled_deletion_at->isoFormat('LL')]));
             $this->reloadPage();
         } catch (AuthorizationException) {
             $this->sendNotification(

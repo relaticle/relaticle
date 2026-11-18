@@ -85,6 +85,12 @@ return [
     ],
 
     'notifications' => [
+        'workspace_deletion_cancelled' => [
+            'success' => 'Workspace deletion cancelled',
+        ],
+        'workspace_deletion_scheduled' => [
+            'success' => 'Workspace scheduled for deletion on :date',
+        ],
         'workspace_invitation_sent' => [
             'success' => 'Invitation sent.',
             'success_many' => ':count invitations sent.',
@@ -263,6 +269,7 @@ return [
     ],
 
     'roles' => [
+        'unknown' => 'Unknown',
         'owner' => [
             'label' => 'Owner',
         ],
