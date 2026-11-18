@@ -1,7 +1,4 @@
-<ul @class([
-    'flex flex-col gap-2.5',
-    'rounded-xl p-4 ring-1 ring-gray-950/5 dark:ring-white/10' => $boxed ?? false,
-])>
+<ul class="flex flex-col gap-2.5">
     @foreach ([
         'lucide-user-plus' => 'benefit_records',
         'lucide-mail' => 'benefit_timeline',

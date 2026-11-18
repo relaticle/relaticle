@@ -3,8 +3,12 @@
 declare(strict_types=1);
 
 use Pest\Evals\Scorers\Scorer;
+use Tests\Evals\Scorers\AnsweredTurn;
 use Tests\Evals\Scorers\CalledAnyOf;
+use Tests\Evals\Scorers\CalledOrHandsOff;
+use Tests\Evals\Scorers\EveryRecordCarries;
 use Tests\Evals\Scorers\FirstToolCalled;
+use Tests\Evals\Scorers\NoCodeFence;
 use Tests\Evals\Scorers\NoContactWord;
 use Tests\Evals\Scorers\NoDuplicateRowSet;
 use Tests\Evals\Scorers\NoEmDash;
@@ -12,10 +16,13 @@ use Tests\Evals\Scorers\NoHeadingLine;
 use Tests\Evals\Scorers\NoMarkdownTable;
 use Tests\Evals\Scorers\NoNarration;
 use Tests\Evals\Scorers\NoRawUlid;
+use Tests\Evals\Scorers\NotCalledOrReplyMatches;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\RendersTable;
 use Tests\Evals\Scorers\ReplayedBytesUnder;
 use Tests\Evals\Scorers\TextMatches;
+use Tests\Evals\Scorers\ToolArgumentEquals;
+use Tests\Evals\Scorers\ToolCalledAtLeast;
 use Tests\Evals\Scorers\UsesLookupBeforeWrite;
 use Tests\Evals\Support\Scripts;
 
@@ -243,4 +250,80 @@ it('fails every scorer on a failed turn', function (Scorer $scorer): void {
     'TextMatches' => fn (): Scorer => new TextMatches('/x/'),
     'CalledAnyOf' => fn (): Scorer => new CalledAnyOf(['ListTasksTool']),
     'FirstToolCalled' => fn (): Scorer => new FirstToolCalled('ListTasksTool'),
+    'ToolCalledAtLeast' => fn (): Scorer => new ToolCalledAtLeast(['SearchCrmTool'], 2),
+    'ToolArgumentEquals' => fn (): Scorer => new ToolArgumentEquals('CreateTaskTool', 'records.*.title', 'x'),
+    'EveryRecordCarries' => fn (): Scorer => new EveryRecordCarries('CreateTaskTool', 'opportunity_ids'),
+    'NoCodeFence' => fn (): Scorer => new NoCodeFence,
+    'AnsweredTurn' => fn (): Scorer => new AnsweredTurn,
+    'CalledOrHandsOff' => fn (): Scorer => new CalledOrHandsOff(['UpdatePersonTool']),
+    'NotCalledOrReplyMatches' => fn (): Scorer => new NotCalledOrReplyMatches(['CreateTaskTool'], '/already/i'),
 ]);
+
+it('counts the calls of the named tools against a minimum', function (): void {
+    $search = ['name' => 'SearchCrmTool', 'arguments' => []];
+    $scorer = new ToolCalledAtLeast(['SearchCrmTool', 'ListCompaniesTool'], 2);
+
+    expect($scorer->score('', scorerEnvelope('x', [$search, ['name' => 'ListCompaniesTool', 'arguments' => []]]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('x', [$search, ['name' => 'ListTasksTool', 'arguments' => []]]))->score)->toBe(0.0);
+});
+
+it('reads a tool argument by a path with a record wildcard', function (): void {
+    $call = ['name' => 'CreateOpportunityTool', 'arguments' => ['records' => [
+        ['name' => 'A', 'custom_fields' => ['close_date' => '2026-09-15']],
+        ['name' => 'B', 'custom_fields' => ['close_date' => '2026-09-16 09:00']],
+    ]]];
+
+    expect((new ToolArgumentEquals('CreateOpportunityTool', 'records.*.custom_fields.close_date', '2026-09-15'))->score('', scorerEnvelope('x', [$call]))->score)->toBe(1.0)
+        ->and((new ToolArgumentEquals('CreateOpportunityTool', 'records.*.custom_fields.close_date', '2026-09-16', prefix: true))->score('', scorerEnvelope('x', [$call]))->score)->toBe(1.0)
+        ->and((new ToolArgumentEquals('CreateOpportunityTool', 'records.*.custom_fields.close_date', '2026-09-16'))->score('', scorerEnvelope('x', [$call]))->score)->toBe(0.0)
+        ->and((new ToolArgumentEquals('CreateOpportunityTool', 'records.*.company_id', 'x'))->score('', scorerEnvelope('x', [$call]))->score)->toBe(0.0)
+        ->and((new ToolArgumentEquals('CreateTaskTool', 'records.*.title', 'x'))->score('', scorerEnvelope('x', [$call]))->score)->toBe(0.0);
+});
+
+it('fails when one record lacks the link or fewer records were proposed', function (): void {
+    $linked = ['title' => 'A', 'opportunity_ids' => ['$ref:abc']];
+    $bare = ['title' => 'B'];
+    $call = fn (array ...$records): string => scorerEnvelope('x', [['name' => 'CreateTaskTool', 'arguments' => ['records' => $records]]]);
+
+    expect((new EveryRecordCarries('CreateTaskTool', 'opportunity_ids', records: 2))->score('', $call($linked, $linked))->score)->toBe(1.0)
+        ->and((new EveryRecordCarries('CreateTaskTool', 'opportunity_ids'))->score('', $call($linked, $bare))->score)->toBe(0.0)
+        ->and((new EveryRecordCarries('CreateTaskTool', 'opportunity_ids', records: 2))->score('', $call($linked))->score)->toBe(0.0)
+        ->and((new EveryRecordCarries('CreateTaskTool', 'title', '/^A$/'))->score('', $call($linked, $bare))->score)->toBe(0.0);
+});
+
+it('fails a reply that holds a code fence, also in an earlier step', function (): void {
+    expect((new NoCodeFence)->score('', scorerEnvelope('No code here.'))->score)->toBe(1.0)
+        ->and((new NoCodeFence)->score('', scorerEnvelope("Here:\n```php\necho 1;\n```"))->score)->toBe(0.0)
+        ->and((new NoCodeFence)->score('', scorerEnvelope('Done.', stepsText: ["```py\nx\n```"]))->score)->toBe(0.0);
+});
+
+it('accepts the write tool or a link to a new chat, never a record link or a dead end', function (): void {
+    $scorer = new CalledOrHandsOff(['UpdatePersonTool']);
+
+    expect($scorer->score('', scorerEnvelope('Drafted.', [['name' => 'UpdatePersonTool', 'arguments' => []]]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Continue in a [new chat](https://x.test/app/acme/chats?prompt=Link%20Priya).'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Continue in a [new chat](/app/acme/chats).'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Open [People](/app/people) and edit it.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Open [Priya Raman](/app/acme/people/01abc) and set the company.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Open [Settings](/app/acme/settings) to add it.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('See [the chat](/app/acme/chats/01abc).'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Open the record page and edit it.'))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('Open the record page, or a [new chat](/app/acme/chats).'))->score)->toBe(0.0);
+});
+
+it('fails a turn that ended with no reply and no tool call', function (): void {
+    $scorer = new AnsweredTurn;
+
+    expect($scorer->score('', scorerEnvelope('Here you go.'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('', [['name' => 'ListTasksTool', 'arguments' => []]]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('  '))->score)->toBe(0.0);
+});
+
+it('passes when the write was never called or the reply says it exists', function (): void {
+    $scorer = new NotCalledOrReplyMatches(['CreateTaskTool'], '/already/i');
+    $create = [['name' => 'CreateTaskTool', 'arguments' => []]];
+
+    expect($scorer->score('', scorerEnvelope('Done.'))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('That task already exists.', $create))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('Drafted it.', $create))->score)->toBe(0.0);
+});

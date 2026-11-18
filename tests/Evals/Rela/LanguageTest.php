@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Tests\Evals\Scorers\NoEmDash;
+use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\RelaTurn;
 use Tests\Evals\Support\Scripts;
@@ -17,7 +18,7 @@ it('answers a Persian message in Persian script', function (): void {
         ->toPassScorer(new NoEmDash);
 
     expect(Scripts::isLatin($turn->envelope()->text))->toBeFalse();
-});
+})->group('train');
 
 it('answers a Spanish message in Spanish', function (): void {
     $w = EvalWorkspace::seed();
@@ -26,4 +27,14 @@ it('answers a Spanish message in Spanish', function (): void {
         ->prompt('Muestrame mis empresas')
         ->toHaveToolCalls(['ListCompaniesTool' => []])
         ->toPassJudge('The reply is written in Spanish, not English.');
-});
+})->group('test');
+
+it('answers in English when an English request quotes Spanish names', function (): void {
+    $w = EvalWorkspace::seed();
+    $w->withSpanishNames();
+
+    expect((new RelaTurn($w))(...))
+        ->prompt('Create a task to call Señora Álvarez at Panadería La Espiga tomorrow')
+        ->toPassScorer(new TextMatches('/\b(the|task|review|proposal)\b/i'))
+        ->toPassScorer(new TextMatches('/\b(tarea|propuesta|revisa)\b/i', negate: true));
+})->group('train');

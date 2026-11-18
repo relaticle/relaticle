@@ -15,7 +15,7 @@ it('proposes the task unassigned and offers the invitation for an unknown assign
         ->repeat(3)
         ->toHaveToolCalls(['CreateTaskTool' => []])
         ->toPassJudge('The reply proposes the task unassigned, says Ahmed is not a member or a person here, and offers to invite him in the same reply.');
-});
+})->group('train');
 
 it('points at mass send instead of sending one email per person', function (): void {
     $w = EvalWorkspace::seed();
@@ -26,7 +26,7 @@ it('points at mass send instead of sending one email per person', function (): v
         ->not->toMatch('/"name":"SendEmailTool"/')
         ->toPassScorer(new OneClosingQuestionAtMost)
         ->toPassJudge('The reply points the user at selecting people in their table and the Send Email bulk action (mass send in the composer) instead of sending from chat, and sends nothing.');
-});
+})->group('guard');
 
 it('offers to create a note when the list comes back empty', function (): void {
     $w = EvalWorkspace::seed();
@@ -34,7 +34,7 @@ it('offers to create a note when the list comes back empty', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt('Show me the notes about Company 05')
         ->toPassJudge('The reply says no notes were found and offers one create action.');
-});
+})->group('test');
 
 it('offers nothing to create when the email list comes back empty', function (): void {
     $w = EvalWorkspace::seed();
@@ -43,7 +43,7 @@ it('offers nothing to create when the email list comes back empty', function ():
         ->prompt('Show me emails from Company 05')
         ->toHaveToolCalls(['ListEmailsTool' => []])
         ->toPassJudge('The reply says no emails were found. It never offers to create, log or draft an email record.');
-});
+})->group('train');
 
 it('tells a viewer that an owner or admin can do it and links no page', function (): void {
     $viewer = Prior::viewer(EvalWorkspace::seed());
@@ -51,4 +51,4 @@ it('tells a viewer that an owner or admin can do it and links no page', function
     expect((new RelaTurn($viewer))(...))
         ->prompt('Invite sam@example.com to the workspace')
         ->toPassJudge('The reply says a workspace owner or admin can do it and links no page.');
-});
+})->group('guard');
