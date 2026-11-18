@@ -35,6 +35,7 @@
             <div class="fi-dropdown-list">
                 @foreach ($hidden as $column)
                     <x-filament::dropdown.list.item
+                        :wire:key="'add-column.'.$column['name']"
                         role="button"
                         tabindex="0"
                         :aria-label="__('filament/panel.tables.views.add_column_attribute', ['column' => $column['text']])"
