@@ -219,7 +219,7 @@ final class SystemAdminPanelProvider extends PanelProvider
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
                 'auth.context',
-                'auth.lifetime',
+                'auth.lifetime:system-admin.session,idle',
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,

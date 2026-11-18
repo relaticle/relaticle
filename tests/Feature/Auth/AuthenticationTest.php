@@ -32,6 +32,7 @@ use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Events\PasskeyVerified;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
@@ -241,10 +242,10 @@ it('ends a customer session 90 days after sign-in despite activity', function ()
 
     $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
 
-    $this->travelTo(now()->addDays(89));
+    $this->travelTo(now()->addDays(90)->subMinute());
     $this->get($dashboard)->assertOk();
 
-    $this->travelTo(now()->addDay()->addMinute());
+    $this->travelTo(now()->addMinutes(2));
     $this->get($dashboard)->assertRedirect(Filament::getPanel('app')->getLoginUrl());
 
     $this->assertGuest('web');
@@ -276,6 +277,31 @@ it('answers a Livewire update from a capped session as an expired session', func
         'updates' => [],
         'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
     ]]])->assertStatus(419);
+
+    $this->assertGuest('web');
+    expect(session()->has('auth.started_at'))->toBeFalse();
+});
+
+it('keeps the sign-in time when a session is re-challenged after the second factor changes', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one']);
+    $signedInAt = now()->getTimestamp();
+    expect(session('auth.started_at'))->toBe($signedInAt);
+
+    $this->travelTo(now()->addDays(80));
+    $user->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt('JBSWY3DPEHPK3PXQ')])->save();
+    Auth::forgetGuards();
+    $this->get($dashboard)->assertRedirect(route('two-factor.login'));
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-two']);
+
+    $this->assertAuthenticated('web');
+    expect(session('auth.started_at'))->toBe($signedInAt);
+
+    $this->travelTo(now()->addDays(10)->addMinute());
+    $this->get($dashboard)->assertRedirect(Filament::getPanel('app')->getLoginUrl());
 
     $this->assertGuest('web');
 });

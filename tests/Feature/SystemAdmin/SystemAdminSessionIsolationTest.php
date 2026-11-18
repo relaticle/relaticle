@@ -692,7 +692,10 @@ it('ends a staff session 24 hours after sign-in despite activity', function (): 
         isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
     }
 
-    $this->travelTo(now()->addMinutes(31));
+    $this->travelTo(now()->addMinutes(29));
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
+
+    $this->travelTo(now()->addMinutes(2));
 
     isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertStatus(419);
     isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertUnauthorized();

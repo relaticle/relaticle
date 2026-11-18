@@ -13,7 +13,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 final readonly class EnforceAbsoluteSessionLifetime
 {
-    public function handle(Request $request, Closure $next): Response
+    public function handle(Request $request, Closure $next, string $config = 'session', ?string $idle = null): Response
     {
         $panel = Filament::getCurrentPanel();
         $guard = Auth::guard($panel?->getAuthGuard());
@@ -22,15 +22,22 @@ final readonly class EnforceAbsoluteSessionLifetime
             return $next($request);
         }
 
+        $now = now()->getTimestamp();
         $startedAt = AuthenticationSession::startedAt();
+        $lastSeenAt = $idle === null ? null : AuthenticationSession::lastSeenAt();
 
-        if ($startedAt === null) {
-            AuthenticationSession::markStarted();
+        $ended = ($startedAt !== null && $now - $startedAt > (int) config("{$config}.absolute_lifetime") * 60)
+            || ($lastSeenAt !== null && $now - $lastSeenAt > (int) config("{$config}.lifetime") * 60);
 
-            return $next($request);
-        }
+        if (! $ended) {
+            if ($startedAt === null) {
+                AuthenticationSession::markStarted();
+            }
 
-        if (now()->getTimestamp() - $startedAt <= (int) config('session.absolute_lifetime') * 60) {
+            if ($idle !== null) {
+                AuthenticationSession::markActive();
+            }
+
             return $next($request);
         }
 

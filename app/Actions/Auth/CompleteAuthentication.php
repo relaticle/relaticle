@@ -43,6 +43,7 @@ final readonly class CompleteAuthentication
             throw $this->expired();
         }
 
+        $startedAt = $pending['method'] === AuthMethod::REMEMBERED->value ? AuthenticationSession::startedAt() : null;
         $session = resolve(Session::class);
         $intended = $session->get('url.intended');
         $preserved = $this->capturePreservedSessionValues($session);
@@ -54,7 +55,7 @@ final readonly class CompleteAuthentication
         $session->regenerateToken();
 
         AuthenticationSession::markComplete($user);
-        AuthenticationSession::markStarted();
+        AuthenticationSession::markStarted($startedAt);
 
         if ($pending['method'] !== AuthMethod::REMEMBERED->value) {
             $session->put('fathom.track_login_completed', (string) Str::uuid());
