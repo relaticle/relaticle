@@ -55,7 +55,7 @@ final class ProcessTrialsCommand extends Command
                         return;
                     }
 
-                    Mail::to($owner->email)->queue(new ProTrialEndingSoonMail($workspace, $endsAt));
+                    Mail::to($owner)->queue(new ProTrialEndingSoonMail($workspace, $endsAt));
                     $workspace->forceFill(['trial_reminded_for' => $endsAt])->save();
                     $count++;
                 });
@@ -94,7 +94,7 @@ final class ProcessTrialsCommand extends Command
                     });
 
                     if ($workspace->owner instanceof User && ! $workspace->isScheduledForDeletion()) {
-                        Mail::to($workspace->owner->email)->queue(ProEndedMail::afterTrial($workspace));
+                        Mail::to($workspace->owner)->queue(ProEndedMail::afterTrial($workspace));
                     }
 
                     $this->info("Trial expired, paused hosted access: {$workspace->name}");

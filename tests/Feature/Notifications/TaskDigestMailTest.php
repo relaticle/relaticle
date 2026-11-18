@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -244,10 +245,11 @@ it('writes the digest dates in the language of the recipient', function (): void
         upcoming: [],
     );
 
-    $mail = new TaskDigestMail($user, digestWorkspace($user), $digest);
+    Mail::to($user)->send(new TaskDigestMail($user, digestWorkspace($user), $digest));
 
-    app()->setLocale('de');
+    $sent = Mail::mailer('array')->getSymfonyTransport()->messages()->sole()->getOriginalMessage();
 
-    $mail->assertHasSubject('[Acme] 1 überfällige Aufgabe, 18. Nov');
-    $mail->assertSeeInText("Call client: https://app.test/tasks?a\n17. Nov 2026 (überfällig)");
+    expect(app()->getLocale())->toBe('en')
+        ->and($sent->getSubject())->toBe('[Acme] 1 überfällige Aufgabe, 18. Nov')
+        ->and($sent->getTextBody())->toContain('17. Nov 2026 (überfällig)');
 });

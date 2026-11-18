@@ -83,6 +83,7 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -90,6 +91,7 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
@@ -109,20 +111,13 @@ final class AppPanelProvider extends PanelProvider
     public const string SIDEBAR_FOOTER_ACTIONS = 'app::sidebar.footer.actions';
 
     /**
-     * Datetime format for this panel, and the only place it is decided. Columns and
-     * entries call `->dateTime()` with no argument so they resolve to this; a resource
-     * that passes its own literal instead is drift, not a local preference.
+     * The datetime format of this panel is the `formats.date_time` lang key, the only place
+     * it is decided. Columns and entries call `->dateTime()` with no argument so they
+     * resolve to it; a resource that passes its own literal instead is drift.
      *
-     * No seconds. Nobody reading a CRM list cares which second a note was written, and
-     * DateTimePicker offers minutes anyway, so keeping them made every value read back
-     * one field longer than it was entered. Sysadmin keeps its seconds on purpose: that
-     * panel exists to line rows up against Horizon and server logs.
-     *
-     * No zone suffix either, unlike sysadmin: every timestamp here is already in the
-     * reader's own zone, so there is nothing for them to correlate against.
+     * No seconds and no zone suffix: every timestamp here is already in the reader's own
+     * zone. Sysadmin keeps its seconds on purpose, to line rows up against server logs.
      */
-    private const string DATE_TIME_FORMAT = 'M j, Y H:i';
-
     private const int DEFAULT_PAGINATION_PAGE_OPTION = 25;
 
     /**
@@ -192,7 +187,7 @@ final class AppPanelProvider extends PanelProvider
     {
         Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
             ? $table
-                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->defaultDateTimeDisplayFormat(fn (): string => __('formats.date_time'))
                 ->reorderableColumns()
                 ->stackedOnMobile()
                 ->columnManager(! $table->getLivewire() instanceof RelationManager)
@@ -205,10 +200,11 @@ final class AppPanelProvider extends PanelProvider
     private function formatDateTimesInSchemas(): void
     {
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
-            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            ? $schema->defaultDateTimeDisplayFormat(fn (): string => __('formats.date_time'))
             : $schema);
 
-        CustomFieldsConfig::useDateTimeDisplayFormat(self::DATE_TIME_FORMAT);
+        CustomFieldsConfig::useDateTimeDisplayFormat(__('formats.date_time'));
+        Event::listen(LocaleUpdated::class, fn (LocaleUpdated $event): CustomFieldsConfig => CustomFieldsConfig::useDateTimeDisplayFormat(trans('formats.date_time', [], $event->locale)));
     }
 
     /**

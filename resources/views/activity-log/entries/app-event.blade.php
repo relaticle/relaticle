@@ -44,7 +44,7 @@
         <time
             class="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums"
             datetime="{{ $entry->occurredAt->toIso8601String() }}"
-            title="{{ $entry->occurredAt->toDayDateTimeString() }}"
+            title="{{ $entry->occurredAt->isoFormat('lll') }}"
         >
             {{ $entry->occurredAt->diffForHumans(syntax: null, short: true) }}
         </time>

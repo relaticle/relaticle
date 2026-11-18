@@ -393,7 +393,7 @@ trait HasBoardCards
                 ->badge()
                 ->color('gray')
                 ->icon($key === 'created_at' ? 'lucide-calendar' : 'lucide-clock')
-                ->dateTime('M j, Y', FilamentTimezone::get())
+                ->isoDateTime('ll', FilamentTimezone::get())
                 ->grow(false)
                 ->visible(fn (mixed $state): bool => filled($state)),
             default => null,

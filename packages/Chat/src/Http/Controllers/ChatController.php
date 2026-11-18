@@ -285,7 +285,7 @@ final readonly class ChatController
             'message' => __('You have used all :allowance credits for this :plan plan period.', ['allowance' => $allowance, 'plan' => $workspace->plan->getLabel()]),
             'plan' => $workspace->plan->value,
             'allowance' => $allowance,
-            'reset_on' => $balance?->period_ends_at?->toFormattedDateString(),
+            'reset_on' => $balance?->period_ends_at?->isoFormat('ll'),
             'upgrade_available' => $isFree,
             'upgrade_url' => $isFree ? $billingUrl : null,
             // A top-up is only offered when a pack can actually be bought;

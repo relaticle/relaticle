@@ -119,7 +119,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
             return null;
         }
 
-        return $this->keptUntil->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
+        return $this->keptUntil->setTimezone($this->workspace->ownerTimezone())->settings(['locale' => app()->getLocale()])->isoFormat('ll');
     }
 
     private function isGrandfathered(): bool

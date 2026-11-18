@@ -112,7 +112,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
                 ->native(false)
                 ->live()
                 ->closeOnDateSelection()
-                ->displayFormat('M j')
+                ->displayFormat(fn (): string => __('formats.short_date'))
                 ->extraTriggerAttributes(['class' => 'fi-meetings-date-trigger'])
                 ->label(fn (): string => __('filament/pages/dashboard.meetings.pick_date', [
                     'date' => $this->dateLabel(),

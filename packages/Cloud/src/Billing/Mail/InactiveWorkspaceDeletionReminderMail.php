@@ -50,6 +50,6 @@ final class InactiveWorkspaceDeletionReminderMail extends Mailable implements Sh
 
     private function deletionDate(): string
     {
-        return $this->deletesAt->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
+        return $this->deletesAt->setTimezone($this->workspace->ownerTimezone())->settings(['locale' => app()->getLocale()])->isoFormat('ll');
     }
 }

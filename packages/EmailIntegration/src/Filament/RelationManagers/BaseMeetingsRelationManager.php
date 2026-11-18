@@ -73,7 +73,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                     ->limit(60),
                 TextColumn::make('starts_at')
                     ->label(__('filament/relation-managers/meetings.columns.starts_at.label'))
-                    ->dateTime('M j, Y · g:i a')
+                    ->isoDateTime('ll · LT')
                     ->sortable(),
                 ViewColumn::make('attendees')
                     ->label(__('filament/relation-managers/meetings.columns.attendees_count.label'))

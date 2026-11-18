@@ -403,7 +403,7 @@ final class EmailVisibilityService
                     'source' => $creator->name ?? (string) __('filament/pages/email-privacy-settings.visibility.table.unknown_user'),
                     'is_system' => false,
                     'entry_id' => $entry->getKey(),
-                    'updated_at' => $entry->updated_at?->toFormattedDateString(),
+                    'updated_at' => $entry->updated_at?->isoFormat('ll'),
                 ];
             })
             ->all();
