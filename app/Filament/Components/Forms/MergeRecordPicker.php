@@ -36,9 +36,6 @@ final class MergeRecordPicker extends Field
 {
     protected string $view = 'filament.app.merge-record';
 
-    /** @var array<string, Pairing|null> */
-    private array $pairings = [];
-
     private Company|People|null $currentWithCounts = null;
 
     protected function setUp(): void
@@ -172,13 +169,7 @@ final class MergeRecordPicker extends Field
 
         $keepsPicked = $this->keepPickedFlag();
 
-        $key = "{$pickedId}|{$keepsPicked}";
-
-        if (! array_key_exists($key, $this->pairings)) {
-            $this->pairings[$key] = $this->buildPairing($pickedId, $keepsPicked);
-        }
-
-        return $this->pairings[$key];
+        return once(fn (): ?array => $this->buildPairing($pickedId, $keepsPicked));
     }
 
     /**
