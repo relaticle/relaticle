@@ -41,7 +41,7 @@ return [
         ],
         'task_digest' => [
             'label' => 'Tägliche Zusammenfassung',
-            'description' => 'Mich benachrichtigen jeden Morgen über überfällige und heute fällige Aufgaben.',
+            'description' => 'Mich jeden Morgen über überfällige und heute fällige Aufgaben benachrichtigen.',
         ],
     ],
 

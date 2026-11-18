@@ -5,9 +5,9 @@ declare(strict_types=1);
 return [
     'finished' => [
         'title' => [
-            'completed' => 'Import de :entity terminé',
-            'completed_with_failures' => 'Import de :entity terminé avec des lignes en échec',
-            'failed' => 'Échec de l\'import de :entity',
+            'completed' => 'Import terminé : :entity',
+            'completed_with_failures' => 'Import terminé avec des lignes en échec : :entity',
+            'failed' => 'Échec de l\'import : :entity',
         ],
         'counts' => [
             'created' => ':count créés',

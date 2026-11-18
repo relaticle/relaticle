@@ -6,7 +6,7 @@ return [
     'title' => 'Boîte d\'envoi',
     'columns' => [
         'recipients' => 'Destinataires',
-        'scheduled_for' => 'Planifié pour',
+        'scheduled_for' => 'Programmé pour',
         'type' => 'Type',
     ],
     'priorities' => [
@@ -14,7 +14,7 @@ return [
         'bulk' => 'Envoi en masse',
     ],
     'batch_statuses' => [
-        'queued' => 'En attente',
+        'queued' => 'En file d\'attente',
         'sending' => 'Envoi en cours',
         'completed' => 'Terminé',
         'partial_failure' => 'Échec partiel',
@@ -24,8 +24,8 @@ return [
         'status_indicator' => 'Statut : :status',
     ],
     'tabs' => [
-        'queued' => 'En attente',
-        'scheduled' => 'Planifiés',
+        'queued' => 'En file d\'attente',
+        'scheduled' => 'Programmés',
         'sending' => 'Envoi en cours',
         'failed' => 'Échoués',
         'sent' => 'Envoyés ces dernières 24 heures',
@@ -36,8 +36,8 @@ return [
     ],
     'notifications' => [
         'cancelled' => 'Annulé',
-        'rescheduled' => 'Replanifié',
-        'retry_queued' => 'Nouvelle tentative en attente',
+        'rescheduled' => 'Reprogrammé',
+        'retry_queued' => 'Nouvelle tentative en file d\'attente',
         'bulk_cancelled' => '{1}1 e-mail annulé|[2,*]:count e-mails annulés',
         'bulk_cancelled_with_skipped' => ':cancelled annulés, :skipped ignorés car déjà en cours d\'envoi',
     ],

@@ -416,6 +416,30 @@ it('writes the relative period of a date rule in words', function (): void {
     expect(array_column($shown, 'display'))->toBe(['30 days', 'month', 'today']);
 });
 
+it('composes a this-period chip that reads right in each language', function (string $locale, array $expected): void {
+    app()->setLocale($locale);
+    filterBarField($this->user, 'opportunity', 'closes', 'date');
+
+    $data = livewire(ListOpportunities::class)
+        ->call('setFilterRules', array_map(
+            fn (string $unit): array => ['field' => 'custom_fields.closes', 'condition' => 'this', 'value' => ['unit' => $unit]],
+            ['days', 'weeks', 'months', 'quarters', 'years'],
+        ))
+        ->instance()->getFilterBarData();
+
+    $chips = array_map(
+        fn (array $rule): string => __('filament/panel.tables.filters.conditions.this').' '.$rule['display'],
+        $data['rules'],
+    );
+
+    expect($chips)->toBe($expected)
+        ->and(collect($data['periodUnits'])->firstWhere('value', 'days')['singular'])->toBe($locale === 'en' ? 'day' : ['de' => 'Tag', 'fr' => 'jour'][$locale]);
+})->with([
+    'en' => ['en', ['this day', 'this week', 'this month', 'this quarter', 'this year']],
+    'de' => ['de', ['ist heute', 'ist in dieser Woche', 'ist in diesem Monat', 'ist in diesem Quartal', 'ist in diesem Jahr']],
+    'fr' => ['fr', ['est aujourd\'hui', 'est cette semaine', 'est ce mois-ci', 'est ce trimestre', 'est cette année']],
+]);
+
 it('tells the empty list which rules hide its records and clears them from a button', function (string $page, string $model, string $records): void {
     $model::factory()->recycle([$this->user, $this->workspace])->create();
     $column = $model === Task::class || $model === Note::class ? 'title' : 'name';

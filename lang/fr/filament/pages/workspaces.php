@@ -94,7 +94,7 @@ return [
         ],
         'invite' => [
             'heading' => 'Invitez votre équipe',
-            'description' => 'Ajoutez les personnes avec qui vous travaillez. Elles reçoivent un e-mail avec un lien pour rejoindre.',
+            'description' => 'Ajoutez les membres avec qui vous travaillez. Ils reçoivent un e-mail avec un lien pour rejoindre.',
             'emails_label' => 'Adresses e-mail',
             'emails_placeholder' => 'maya@acme.com, leo@acme.com',
             'helper' => 'Collez-en plusieurs à la fois. Tous reçoivent le même rôle.',
@@ -105,7 +105,7 @@ return [
             'send_and_start' => 'Envoyer les invitations et commencer',
             'not_sent' => [
                 'title' => 'Certaines invitations n\'ont pas été envoyées',
-                'body' => 'Votre espace de travail est prêt. Consultez Membres dans les paramètres et invitez les personnes manquantes.',
+                'body' => 'Votre espace de travail est prêt. Consultez Membres dans les paramètres et invitez les membres manquants.',
             ],
         ],
         'preview' => [

@@ -9,8 +9,8 @@ return [
     'limit_reached' => 'Ce champ est plein. Supprimez du contenu pour continuer à écrire.',
 
     'checklist' => [
-        'item' => 'Élément de la liste de tâches : :item',
-        'empty_item' => 'Élément de liste de tâches vide',
+        'item' => 'Élément de la liste de contrôle : :item',
+        'empty_item' => 'Élément de liste de contrôle vide',
     ],
 
     'selection_toolbar' => [

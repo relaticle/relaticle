@@ -123,6 +123,13 @@ return [
                 'years' => 'Jahre',
             ],
             'this_unit' => [
+                'days' => 'Tag',
+                'weeks' => 'Woche',
+                'months' => 'Monat',
+                'quarters' => 'Quartal',
+                'years' => 'Jahr',
+            ],
+            'this_period' => [
                 'days' => 'heute',
                 'weeks' => 'in dieser Woche',
                 'months' => 'in diesem Monat',

@@ -171,6 +171,7 @@ return [
             'opportunity' => ':count opportunité créée|:count opportunités créées',
             'task' => ':count tâche créée|:count tâches créées',
             'note' => ':count note créée|:count notes créées',
+            'custom_field' => ':count attribut personnalisé créé|:count attributs personnalisés créés',
             'email_drafts' => ':count brouillon d\'e-mail créé|:count brouillons d\'e-mail créés',
         ],
         'update' => [
@@ -179,6 +180,7 @@ return [
             'opportunity' => ':count opportunité mise à jour|:count opportunités mises à jour',
             'task' => ':count tâche mise à jour|:count tâches mises à jour',
             'note' => ':count note mise à jour|:count notes mises à jour',
+            'custom_field' => ':count attribut personnalisé mis à jour|:count attributs personnalisés mis à jour',
         ],
         'delete' => [
             'company' => ':count entreprise supprimée|:count entreprises supprimées',
@@ -186,6 +188,7 @@ return [
             'opportunity' => ':count opportunité supprimée|:count opportunités supprimées',
             'task' => ':count tâche supprimée|:count tâches supprimées',
             'note' => ':count note supprimée|:count notes supprimées',
+            'custom_field' => ':count attribut personnalisé supprimé|:count attributs personnalisés supprimés',
         ],
     ],
 ];

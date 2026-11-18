@@ -6,8 +6,8 @@ return [
     'title' => '{1}E-mail non envoyé|[2,*]:count e-mails non envoyés',
     'partial_title' => ':sent envoyés, :failed non envoyés',
     'retry' => [
-        'body_one' => '« :subject » n\'a pas été envoyé. Consultez-le dans la boîte d\'envoi sous Échecs et réessayez.',
-        'body_many' => 'Consultez-les dans la boîte d\'envoi sous Échecs et réessayez.',
+        'body_one' => '« :subject » n\'a pas été envoyé. Consultez-le dans la boîte d\'envoi sous Échoués et réessayez.',
+        'body_many' => 'Consultez-les dans la boîte d\'envoi sous Échoués et réessayez.',
         'action' => 'Voir les e-mails en échec',
     ],
     'reconnect' => [

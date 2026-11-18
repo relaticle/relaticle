@@ -48,12 +48,12 @@ return [
             'description' => 'Chaque personne reçoit un e-mail avec un lien pour rejoindre :workspace.',
         ],
         'add_workspace_member' => [
-            'title' => 'Inviter des personnes',
+            'title' => 'Inviter des membres',
             'description' => 'Envoyez une invitation par e-mail, ou partagez un lien qui permet de rejoindre l\'espace de travail soi-même.',
         ],
         'workspace_members' => [
             'title' => 'Membres',
-            'description' => 'Toutes les personnes ayant accès à cet espace de travail, y compris celles qui n\'ont pas encore accepté.',
+            'description' => 'Tous les membres ayant accès à cet espace de travail, y compris ceux qui n\'ont pas encore accepté.',
         ],
         'delete_workspace' => [
             'title' => 'Supprimer l\'espace de travail',
@@ -145,11 +145,11 @@ return [
         'only_owner_promotes_admins' => 'Seul le propriétaire de l\'espace de travail peut accorder le rôle administrateur.',
         'invite_link_role_cannot_be_admin' => 'Le lien de l\'espace de travail ne peut pas accorder le rôle administrateur. Invitez plutôt les administrateurs par e-mail.',
         'no_valid_emails' => 'Saisissez au moins une adresse e-mail.',
-        'too_many_invites' => 'Vous pouvez inviter jusqu\'à :max personnes à la fois.',
+        'too_many_invites' => 'Vous pouvez inviter jusqu\'à :max membres à la fois.',
         'managed_plan_before_deleting' => 'Cet espace de travail est sur une offre facturée par Relaticle. Contactez-nous pour mettre fin à l\'offre avant de supprimer l\'espace de travail.',
         'managed_plan_before_deleting_account' => 'Ces espaces de travail sont sur une offre facturée par Relaticle : :workspaces. Contactez-nous pour mettre fin à l\'offre avant de supprimer votre compte.',
         'remove_members_before_deleting' => 'Retirez tous les membres de ces espaces de travail, ou supprimez-les, avant de supprimer votre compte : :workspaces',
-        'workspace_scheduled_for_deletion' => 'La suppression de cet espace de travail est programmée. Annulez-la pour inviter des personnes.',
+        'workspace_scheduled_for_deletion' => 'La suppression de cet espace de travail est programmée. Annulez-la pour inviter des membres.',
     ],
 
     'modals' => [
@@ -357,7 +357,7 @@ return [
     ],
 
     'invitation' => [
-        'members' => '{1} 1 personne est déjà dans cet espace de travail|[2,*] :count personnes sont déjà dans cet espace de travail',
+        'members' => '{1} 1 membre est déjà dans cet espace de travail|[2,*] :count membres sont déjà dans cet espace de travail',
     ],
 
     'invite_link' => [
@@ -366,11 +366,11 @@ return [
         'url' => 'Lien de l\'espace de travail',
         'copied' => 'Lien copié.',
         'expires_in' => 'Cesse de fonctionner dans :time. Générer un nouveau lien remet le compteur à zéro.',
-        'default_role' => 'Les personnes rejoignent en tant que',
+        'default_role' => 'Les membres rejoignent en tant que',
         'default_role_helper' => 'Enregistré dès que vous le choisissez. Les administrateurs sont invités par e-mail.',
         'lapsed' => [
             'title' => 'Ce lien a expiré il y a :time',
-            'notice' => 'Personne ne peut rejoindre avec lui. Générez un nouveau lien pour continuer à inviter des personnes.',
+            'notice' => 'Personne ne peut rejoindre avec lui. Générez un nouveau lien pour continuer à inviter des membres.',
         ],
         'disabled' => [
             'title' => 'Le lien de l\'espace de travail est désactivé',

@@ -28,7 +28,7 @@ return [
         'include_subdomains_hint' => 'Masque aussi les e-mails d\'adresses comme user@mail.example.com quand vous bloquez example.com.',
         'include_subdomains_column' => 'Sous-domaines',
         'include_subdomains_short' => 'Inclure les sous-domaines',
-        'hint' => 'Masqué pour cette boîte mail uniquement. Les autres boîtes mail connectées ne sont pas concernés.',
+        'hint' => 'Masqué pour cette boîte mail uniquement. Les autres boîtes mail connectées ne sont pas concernées.',
         'add' => 'Ajouter à la liste de blocage',
         'empty_heading' => 'Aucune adresse ni aucun domaine pour le moment',
         'empty_description' => 'Les e-mails des domaines et adresses bloqués n\'apparaîtront pas dans cette boîte mail.',

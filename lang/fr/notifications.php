@@ -28,8 +28,8 @@ return [
 
     'types' => [
         'task_assigned' => [
-            'label' => 'Attributions de tâches',
-            'description' => 'Me notifier quand une tâche m\'est attribuée.',
+            'label' => 'Assignations de tâches',
+            'description' => 'Me notifier quand une tâche m\'est assignée.',
         ],
         'email_access' => [
             'label' => 'Accès aux e-mails',
@@ -47,7 +47,7 @@ return [
 
     'events' => [
         'task_assigned' => [
-            'title' => ':actor vous a attribué une tâche',
+            'title' => ':actor vous a assigné une tâche',
             'title_without_actor' => 'Vous avez une nouvelle tâche',
             'action' => 'Voir la tâche',
         ],
@@ -96,7 +96,7 @@ return [
         'empty' => [
             'notifications' => [
                 'heading' => 'Vous êtes à jour',
-                'description' => 'Les attributions de tâches, les imports et exports, et les autres mises à jour de cet espace de travail arrivent ici.',
+                'description' => 'Les assignations de tâches, les imports et exports, et les autres mises à jour de cet espace de travail arrivent ici.',
             ],
             'requests' => [
                 'heading' => 'Aucune demande en attente',

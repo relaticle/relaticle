@@ -5,18 +5,21 @@ declare(strict_types=1);
 use App\Models\Task;
 use App\Models\User;
 use App\Support\Locales;
+use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Lang;
 use Laravel\Ai\Tools\Request;
 use Livewire\Livewire;
+use Relaticle\Chat\Data\ProposalConflict;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
+use Relaticle\Chat\Support\ProposalConflictNotice;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 
@@ -144,3 +147,31 @@ it('builds batch receipts as whole phrases in the user language', function (): v
         ->and($receipts['opportunity']['batch']['delete'])->toBe(['one' => ':count Verkaufschance gelöscht', 'other' => ':count Verkaufschancen gelöscht'])
         ->and($receipts['email_drafts']['batch'])->toHaveKey('create')->not->toHaveKey('delete');
 });
+
+it('words a custom attribute batch receipt in every language', function (string $locale, string $operation, string $one): void {
+    Locales::apply($locale);
+
+    $batch = ProposalEntity::receipts()['custom_field']['batch'][$operation];
+
+    expect($batch['one'])->toBe($one)
+        ->and($batch['other'])->toContain(':count')->not->toBe($batch['one']);
+})->with([
+    'en create' => ['en', 'create', 'Created :count custom attribute'],
+    'en delete' => ['en', 'delete', 'Deleted :count custom attribute'],
+    'de update' => ['de', 'update', ':count benutzerdefiniertes Attribut aktualisiert'],
+]);
+
+it('words a proposal conflict in the viewer language with the viewer as subject', function (string $locale, string $causer, string $today, string $earlier): void {
+    Locales::apply($locale);
+    $this->travelTo('2026-11-18 14:40:00');
+    $viewer = User::factory()->create(['timezone' => 'UTC']);
+    $conflict = fn (string $at): ProposalConflict => new ProposalConflict('a1', 'amount', 'Amount', '20', $causer === 'you' ? (string) $viewer->getKey() : 'other', 'Maya Chen', CarbonImmutable::parse($at));
+
+    expect(ProposalConflictNotice::for([$conflict('2026-11-18 14:32:00')], $viewer))->toContain($today)
+        ->and(ProposalConflictNotice::for([$conflict('2026-11-12 09:05:00')], $viewer))->toContain($earlier);
+})->with([
+    'fr you' => ['fr', 'you', 'Vous avez défini Amount sur 20 à 14:32', 'Vous avez défini Amount sur 20 le 12 nov. 2026 09:05'],
+    'fr other' => ['fr', 'other', 'Maya Chen a défini Amount sur 20 à 14:32', 'Maya Chen a défini Amount sur 20 le 12 nov. 2026 09:05'],
+    'de you' => ['de', 'you', 'Sie haben Amount auf 20 gesetzt (um 14:32)', 'Sie haben Amount auf 20 gesetzt (am 12. Nov 2026 09:05)'],
+    'en other' => ['en', 'other', 'Maya Chen set Amount to 20 at 14:32', 'Maya Chen set Amount to 20 on Nov 12, 2026 9:05 AM'],
+]);

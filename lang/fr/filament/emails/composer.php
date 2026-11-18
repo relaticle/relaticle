@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => 'Nouvel e-mail',
-    'title_mass_send' => 'Nouvel e-mail groupé',
+    'title_mass_send' => 'Nouvel e-mail en masse',
     'opening' => 'Ouverture de l\'éditeur…',
     'draft' => 'Brouillon',
     'quoted' => [
@@ -35,7 +35,7 @@ return [
 
     'mass_send' => [
         'summary' => '{0}Aucun destinataire pour le moment|{1}Envoi à 1 destinataire|[2,*]Envoi d\'un e-mail distinct à chacun des :count destinataires',
-        'toggle' => 'Envoi groupé',
+        'toggle' => 'Envoi en masse',
         'send_button' => 'Envoyer les e-mails (:count)',
         'add_recipients' => 'Ajouter des destinataires',
         'outbox_hint' => 'Le délai de livraison dépend des éléments de votre boîte d\'envoi.',
@@ -71,7 +71,7 @@ return [
     ],
     'notifications' => [
         'mass_queued' => [
-            'title' => 'E-mail groupé en file d\'attente',
+            'title' => 'E-mail en masse en file d\'attente',
             'body' => '{1}Envoi à 1 destinataire.|[2,*]Envoi à :count destinataires.',
         ],
         'queued' => ['title' => 'E-mail en file d\'attente pour envoi'],

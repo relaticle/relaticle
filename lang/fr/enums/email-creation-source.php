@@ -8,7 +8,7 @@ return [
     'forward' => 'Transfert',
     'bcc_inbound' => 'Cci entrant',
     'reply' => 'Réponse',
-    'reply_all' => 'Répondre à tous',
+    'reply_all' => 'Réponse à tous',
     'mass_send' => 'Envoi en masse',
     'mcp' => 'MCP',
 ];

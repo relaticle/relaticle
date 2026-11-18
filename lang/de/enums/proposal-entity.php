@@ -171,6 +171,7 @@ return [
             'opportunity' => ':count Verkaufschance erstellt|:count Verkaufschancen erstellt',
             'task' => ':count Aufgabe erstellt|:count Aufgaben erstellt',
             'note' => ':count Notiz erstellt|:count Notizen erstellt',
+            'custom_field' => ':count benutzerdefiniertes Attribut erstellt|:count benutzerdefinierte Attribute erstellt',
             'email_drafts' => ':count E-Mail-Entwurf erstellt|:count E-Mail-Entwürfe erstellt',
         ],
         'update' => [
@@ -179,6 +180,7 @@ return [
             'opportunity' => ':count Verkaufschance aktualisiert|:count Verkaufschancen aktualisiert',
             'task' => ':count Aufgabe aktualisiert|:count Aufgaben aktualisiert',
             'note' => ':count Notiz aktualisiert|:count Notizen aktualisiert',
+            'custom_field' => ':count benutzerdefiniertes Attribut aktualisiert|:count benutzerdefinierte Attribute aktualisiert',
         ],
         'delete' => [
             'company' => ':count Unternehmen gelöscht|:count Unternehmen gelöscht',
@@ -186,6 +188,7 @@ return [
             'opportunity' => ':count Verkaufschance gelöscht|:count Verkaufschancen gelöscht',
             'task' => ':count Aufgabe gelöscht|:count Aufgaben gelöscht',
             'note' => ':count Notiz gelöscht|:count Notizen gelöscht',
+            'custom_field' => ':count benutzerdefiniertes Attribut gelöscht|:count benutzerdefinierte Attribute gelöscht',
         ],
     ],
 ];

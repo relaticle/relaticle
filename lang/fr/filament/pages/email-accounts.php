@@ -74,7 +74,7 @@ return [
         ],
         'disconnected' => [
             'title' => 'Boîte mail déconnectée.',
-            'body' => 'La boîte mail et ses signatures ont été supprimés.',
+            'body' => 'La boîte mail et ses signatures ont été supprimées.',
         ],
         'default_set' => [
             'title' => 'Boîte mail par défaut mise à jour.',

@@ -34,7 +34,7 @@ return [
     'outbox' => [
         'empty' => [
             'heading' => 'Aucun e-mail dans la boîte d\'envoi',
-            'description' => 'Les e-mails en attente et planifiés apparaissent ici jusqu\'à leur envoi.',
+            'description' => 'Les e-mails en file d\'attente et programmés apparaissent ici jusqu\'à leur envoi.',
         ],
     ],
     'search' => [
@@ -75,7 +75,7 @@ return [
         'label' => 'Rédiger',
         'notifications' => [
             'queued' => [
-                'title' => 'E-mail en attente d\'envoi',
+                'title' => 'E-mail en file d\'attente pour envoi',
                 'body' => 'Votre e-mail est en cours d\'envoi.',
             ],
         ],
@@ -130,7 +130,7 @@ return [
         ],
         'notifications' => [
             'queued' => [
-                'title' => 'E-mail en attente d\'envoi',
+                'title' => 'E-mail en file d\'attente pour envoi',
             ],
         ],
     ],

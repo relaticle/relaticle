@@ -25,12 +25,13 @@ final readonly class ProposalConflictNotice
         );
 
         $replacements = [
-            'who' => self::who($latest, $viewer),
-            'time' => self::time($latest->at, $viewer),
+            'who' => $latest->causerName,
+            'when' => self::when($latest->at, $viewer),
             'assistant' => config('chat.assistant_name'),
         ];
 
-        $what = self::what($conflicts, $replacements);
+        $byViewer = self::byViewer($latest, $viewer);
+        $what = self::what($conflicts, $replacements, $byViewer);
         $consequence = trans_choice('Approving replaces that change.|Approving replaces those changes.', count($conflicts));
 
         return "{$what} {$consequence}";
@@ -38,43 +39,48 @@ final readonly class ProposalConflictNotice
 
     /**
      * @param  non-empty-list<ProposalConflict>  $conflicts
-     * @param  array{who: string, time: string, assistant: mixed}  $replacements
+     * @param  array{who: string, when: string, assistant: mixed}  $replacements
      */
-    private static function what(array $conflicts, array $replacements): string
+    private static function what(array $conflicts, array $replacements, bool $byViewer): string
     {
         if (count($conflicts) === 1) {
             $conflict = $conflicts[0];
             $replacements['field'] = $conflict->field;
 
             return match (true) {
-                str_ends_with($conflict->key, '_ids') => __(':who changed :field at :time, after :assistant proposed this.', $replacements),
-                $conflict->value === null => __(':who cleared :field at :time, after :assistant proposed this.', $replacements),
-                default => __(':who set :field to :value at :time, after :assistant proposed this.', [...$replacements, 'value' => $conflict->value]),
+                str_ends_with($conflict->key, '_ids') => $byViewer
+                    ? __('You changed :field :when, after :assistant proposed this.', $replacements)
+                    : __(':who changed :field :when, after :assistant proposed this.', $replacements),
+                $conflict->value === null => $byViewer
+                    ? __('You cleared :field :when, after :assistant proposed this.', $replacements)
+                    : __(':who cleared :field :when, after :assistant proposed this.', $replacements),
+                default => $byViewer
+                    ? __('You set :field to :value :when, after :assistant proposed this.', [...$replacements, 'value' => $conflict->value])
+                    : __(':who set :field to :value :when, after :assistant proposed this.', [...$replacements, 'value' => $conflict->value]),
             };
         }
 
         $replacements['fields'] = Arr::join(array_map(static fn (ProposalConflict $conflict): string => $conflict->field, $conflicts), ', ', ' '.__('and').' ');
         $causers = array_unique(array_map(static fn (ProposalConflict $conflict): string => $conflict->causerId ?? $conflict->causerName, $conflicts));
 
-        return count($causers) === 1
-            ? __(':who changed :fields at :time, after :assistant proposed this.', $replacements)
-            : __(':fields changed, last at :time, after :assistant proposed this.', $replacements);
+        return match (true) {
+            count($causers) !== 1 => __(':fields changed, last :when, after :assistant proposed this.', $replacements),
+            $byViewer => __('You changed :fields :when, after :assistant proposed this.', $replacements),
+            default => __(':who changed :fields :when, after :assistant proposed this.', $replacements),
+        };
     }
 
-    private static function who(ProposalConflict $conflict, User $viewer): string
+    private static function byViewer(ProposalConflict $conflict, User $viewer): bool
     {
-        return $conflict->causerId !== null && $conflict->causerId === (string) $viewer->getKey()
-            ? __('You')
-            : $conflict->causerName;
+        return $conflict->causerId !== null && $conflict->causerId === (string) $viewer->getKey();
     }
 
-    private static function time(CarbonImmutable $at, User $viewer): string
+    private static function when(CarbonImmutable $at, User $viewer): string
     {
-        $timezone = $viewer->effectiveTimezone();
-        $local = $at->setTimezone($timezone);
+        $local = $at->setTimezone($viewer->effectiveTimezone());
 
         return $local->isToday()
-            ? $local->isoFormat('HH:mm')
-            : $local->isoFormat('MMM D, HH:mm');
+            ? __('at :time', ['time' => $local->isoFormat('HH:mm')])
+            : __('on :time', ['time' => $local->isoFormat('lll')]);
     }
 }

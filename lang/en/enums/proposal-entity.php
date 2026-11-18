@@ -171,6 +171,7 @@ return [
             'opportunity' => 'Created :count opportunity|Created :count opportunities',
             'task' => 'Created :count task|Created :count tasks',
             'note' => 'Created :count note|Created :count notes',
+            'custom_field' => 'Created :count custom attribute|Created :count custom attributes',
             'email_drafts' => 'Created :count email draft|Created :count email drafts',
         ],
         'update' => [
@@ -179,6 +180,7 @@ return [
             'opportunity' => 'Updated :count opportunity|Updated :count opportunities',
             'task' => 'Updated :count task|Updated :count tasks',
             'note' => 'Updated :count note|Updated :count notes',
+            'custom_field' => 'Updated :count custom attribute|Updated :count custom attributes',
         ],
         'delete' => [
             'company' => 'Deleted :count company|Deleted :count companies',
@@ -186,6 +188,7 @@ return [
             'opportunity' => 'Deleted :count opportunity|Deleted :count opportunities',
             'task' => 'Deleted :count task|Deleted :count tasks',
             'note' => 'Deleted :count note|Deleted :count notes',
+            'custom_field' => 'Deleted :count custom attribute|Deleted :count custom attributes',
         ],
     ],
 ];

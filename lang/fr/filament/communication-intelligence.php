@@ -18,7 +18,7 @@ return [
         ],
         'strongest_connection' => [
             'label' => 'Collègue le plus proche',
-            'placeholder' => 'Personne',
+            'placeholder' => 'Aucun',
         ],
         'first_email' => [
             'label' => 'Premier e-mail',
