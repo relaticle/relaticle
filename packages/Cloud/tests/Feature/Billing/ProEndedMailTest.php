@@ -192,6 +192,12 @@ it('offers to restart the managed plan that ended instead of selling Pro', funct
     'grandfathered enterprise' => [Plan::Enterprise, 'Enterprise', ['hosted_free_grandfathered_at' => now()->subYear()]],
 ]);
 
+it('links the managed plan mail to the contact page in the owner language', function (): void {
+    $mail = ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Enterprise)->locale('de');
+
+    $mail->assertSeeInHtml(url('/de/contact').'?plan='.Plan::Enterprise->value);
+});
+
 it('keeps the pause notice in the managed plan mail', function (): void {
     $mail = ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Enterprise);
 

@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Docs\Http\Controllers\HelpController;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
 
@@ -41,7 +42,7 @@ if (Feature::for(null)->active(Documentation::class)) {
             return redirect($map[$slug], 301);
         }
 
-        $isKnownTarget = $repository->find("docs/guides/{$slug}") instanceof DocPage
+        $isKnownTarget = $repository->find("docs/guides/{$slug}", LocalizedUrl::DEFAULT_LOCALE) instanceof DocPage
             || "/developers/{$slug}" === config('documentation.api_reference.url');
 
         return $isKnownTarget

@@ -20,6 +20,7 @@ use Illuminate\Support\Str;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 
 #[Tries(3)]
 #[Backoff(60, 300)]
@@ -130,7 +131,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
     private function ctaUrl(): string
     {
         return $this->plan instanceof Plan
-            ? route('contact', ['plan' => $this->plan->value])
+            ? LocalizedUrl::route('contact', ['plan' => $this->plan->value])
             : Billing::getUrl(panel: 'app', tenant: $this->workspace);
     }
 

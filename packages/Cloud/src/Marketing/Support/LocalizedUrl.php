@@ -15,6 +15,9 @@ final readonly class LocalizedUrl
 {
     public const string DEFAULT_LOCALE = 'en';
 
+    // The listings whose canonical keeps `?page` (blog/index.blade.php).
+    private const array PAGINATED_ROUTES = ['blog.index', 'blog.category', 'blog.tag'];
+
     /**
      * @param  array<string, mixed>  $parameters
      */
@@ -87,8 +90,10 @@ final readonly class LocalizedUrl
     private static function pageQuery(): array
     {
         $page = request()->query('page');
+        $name = Route::current()?->getName();
+        $paginates = $name !== null && in_array(self::baseName($name), self::PAGINATED_ROUTES, true);
 
-        return is_numeric($page) && (int) $page > 1 ? ['page' => (int) $page] : [];
+        return $paginates && is_numeric($page) && (int) $page > 1 ? ['page' => (int) $page] : [];
     }
 
     /** @param  array<string, mixed>  $query */
@@ -100,7 +105,7 @@ final readonly class LocalizedUrl
 
         return $route === null || $localizedName === null
             ? null
-            : route($localizedName, [...Arr::only($route->parameters(), $route->parameterNames()), ...$query]);
+            : route($localizedName, [...$query, ...Arr::only($route->parameters(), $route->parameterNames())]);
     }
 
     /** @return array<string, array{native: string, english: string}> */

@@ -329,6 +329,20 @@ it('keeps the page number in the alternates of a paginated page', function (): v
     expect(hreflangLinks($first)['x-default'])->toBe(url('/blog'));
 });
 
+it('keeps a page number out of the alternates of a page that does not paginate', function (): void {
+    $html = (string) $this->get('/de/pricing?page=2')->assertOk()->getContent();
+
+    expect(hreflangLinks($html)['de'])->toBe(url('/de/pricing'))
+        ->and(hreflangLinks($html)['x-default'])->toBe(url('/pricing'));
+});
+
+it('lets the route parameters win over a query key of the same name on the switcher', function (): void {
+    $html = (string) $this->get('/de/compare/relaticle-vs-twenty?competitor=hubspot')->assertOk()->getContent();
+    $links = (new Crawler($html))->filter('[data-language-switcher] a[hreflang]');
+
+    expect($links->eq(0)->attr('href'))->toStartWith(url('/compare/relaticle-vs-twenty'));
+});
+
 it('keeps the query string on the language switcher links but not on hreflang', function (): void {
     $html = (string) $this->get('/de/contact?plan=enterprise')->assertOk()->getContent();
     $links = (new Crawler($html))->filter('[data-language-switcher] a[hreflang]');
