@@ -54,6 +54,19 @@ it('says the picked record is unavailable when it is deleted while the dialog is
     expect(mergeDialogHtml($dialog->call('$refresh')))->toContain($message);
 });
 
+it('says the picked record is unavailable once when a merge is submitted after it was deleted', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline']);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics']);
+
+    $dialog = livewire(ViewCompany::class, ['record' => $kept->getKey()])
+        ->mountAction(mergeRecordAction())
+        ->setActionData(['picked_id' => $duplicate->getKey(), 'keep_picked' => false]);
+    $duplicate->delete();
+    $dialog->callMountedAction();
+
+    expect(substr_count(mergeDialogHtml($dialog), e(__('filament/record-page.merge.unavailable'))))->toBe(1);
+});
+
 it('says nothing is unavailable before a record is picked', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline']);
 

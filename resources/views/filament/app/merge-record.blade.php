@@ -73,11 +73,11 @@
 
     @if ($isUnavailable())
         <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="__('filament/record-page.merge.unavailable')" role="alert" data-merge-error />
+    @else
+        @error($getStatePath())
+            <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="$message" role="alert" data-merge-error />
+        @enderror
     @endif
-
-    @error($getStatePath())
-        <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="$message" role="alert" data-merge-error />
-    @enderror
 
     @foreach ($getOverLimitMessages() as $overLimitMessage)
         <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="$overLimitMessage" role="alert" data-merge-over-limit />
