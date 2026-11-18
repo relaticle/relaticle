@@ -49,7 +49,7 @@ final class ConversationTitler implements Agent, HasStructuredOutput
         Set has_topic to true when a subject, record, or task is named, however briefly, and write the title:
         - 3 to 6 words, never more than 60 characters.
         - Name what the user wants, not what an assistant would answer.
-        - Write in the same language the message is written in. When the message carries no language of its own, write in {$language}.
+        - Write in the same language the message is written in. When the message carries no language of its own, write in the language of the <reply>, or in {$language} when there is no <reply>.
         - Keep record names (people, companies, deals) spelled exactly as the user wrote them.
         - Use Title Case for English titles.
         - No quotes, no trailing punctuation, no emoji, and no prefixes such as "Title:", "Chat about", or "Request to".

@@ -576,7 +576,7 @@ PROMPT;
 
     private function languageBlock(): string
     {
-        if ($this->language === null) {
+        if ($this->language === null || $this->origin->isTyped()) {
             return '';
         }
 
