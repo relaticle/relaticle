@@ -56,7 +56,7 @@ return [
         'record_id' => ':name: :value no es un ID de registro.',
         'too_many_values' => ':name admite como máximo :max valores.',
         'members_ids_only' => ':name admite $in, $not_in o $is_empty.',
-        'stale_days' => 'stale_days admite {"$gte": <whole days from 1 to :max>}.',
+        'stale_days' => 'stale_days admite {"$gte": <días enteros de 1 a :max>}.',
         'assigned_to_me' => 'assigned_to_me admite {"$eq": true}.',
         'relation_operator' => ':name no admite :operator. Use $in, $not_in, $is_empty o condiciones sobre el registro relacionado.',
         'node_object' => 'Cada condición debe ser un objeto de condiciones de campo.',

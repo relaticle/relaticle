@@ -57,7 +57,7 @@ return [
     ],
     'notifications' => [
         'connected' => [
-            'title' => 'Cuenta conectada.',
+            'title' => 'Buzón conectado.',
             'body' => 'Los correos y las reuniones aparecerán a medida que avance la importación.',
         ],
         'cancelled' => [
@@ -65,7 +65,7 @@ return [
         ],
         'limit_reached' => [
             'title' => '{1}Se alcanzó el límite de buzones. Este espacio de trabajo puede conectar 1 buzón. Mejore su plan para conectar más.|[2,*]Se alcanzó el límite de buzones. Este espacio de trabajo puede conectar :count buzones. Mejore su plan para conectar más.',
-            'trial' => 'Se alcanzó el límite de cuentas de la prueba gratuita. Mejore su plan ahora para sincronizar más buzones.',
+            'trial' => 'Se alcanzó el límite de buzones de la prueba gratuita. Mejore su plan ahora para sincronizar más buzones.',
             'upgrade' => 'Mejorar plan',
         ],
         'calendar_sync_queued' => [
@@ -138,7 +138,7 @@ return [
         ],
         'meetings' => [
             'heading' => 'Vea sus reuniones en Relaticle',
-            'description' => 'Conecte su cuenta para seguir las reuniones junto a sus registros del CRM.',
+            'description' => 'Conecte su buzón para seguir las reuniones junto a sus registros del CRM.',
         ],
     ],
 ];

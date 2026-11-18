@@ -5,15 +5,15 @@ declare(strict_types=1);
 return [
     'finished' => [
         'title' => [
-            'completed' => 'Importación de :entity completada',
+            'completed' => 'Importación completada: :entity',
             'completed_with_failures' => 'Importación de :entity completada con filas fallidas',
             'failed' => 'Falló la importación de :entity',
         ],
         'counts' => [
-            'created' => ':count creados',
-            'updated' => ':count actualizados',
-            'skipped' => ':count omitidos',
-            'failed' => ':count fallidos',
+            'created' => 'Creados: :count',
+            'updated' => 'Actualizados: :count',
+            'skipped' => 'Omitidos: :count',
+            'failed' => 'Fallidos: :count',
         ],
         'actions' => [
             'view' => 'Ver importaciones',

@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     'title' => 'Título',
     'name' => 'Nombre',
-    'assignee' => 'Persona asignada',
+    'assignee' => 'Asignado',
     'account_owner' => 'Responsable',
     'point_of_contact' => 'Persona de contacto',
     'record_id' => 'ID del registro',

@@ -123,7 +123,7 @@ return [
             'overdue' => ':date (vencida)',
         ],
         'groupings' => [
-            'assignee' => 'Persona asignada',
+            'assignee' => 'Asignado',
             'unassigned' => 'Sin asignar',
         ],
         'checklist_progress' => 'Progreso de la lista de verificación',

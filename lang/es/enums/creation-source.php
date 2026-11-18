@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'web' => 'Interfaz web',
-    'sample' => 'Datos de muestra',
+    'sample' => 'Datos de ejemplo',
     'import' => 'Importación de datos',
     'api' => 'API',
     'mcp' => 'Agente MCP',

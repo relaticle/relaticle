@@ -251,10 +251,10 @@ return [
             'import' => 'Importación',
         ],
         'import_counts' => [
-            'created' => ':count creados',
-            'updated' => ':count actualizados',
-            'skipped' => ':count omitidos',
-            'failed' => ':count fallidos',
+            'created' => 'Creados: :count',
+            'updated' => 'Actualizados: :count',
+            'skipped' => 'Omitidos: :count',
+            'failed' => 'Fallidos: :count',
         ],
         'via_import' => 'Mediante la importación :file',
         'via_source' => 'Mediante :source',
@@ -316,16 +316,16 @@ return [
             'promote_admin' => ['label' => 'Ascender a alguien a administrador'],
         ],
         'fields' => [
-            'manage' => ['label' => 'Gestionar atributos personalizados'],
+            'manage' => ['label' => 'Administrar atributos personalizados'],
         ],
         'billing' => [
-            'manage' => ['label' => 'Gestionar la facturación'],
+            'manage' => ['label' => 'Administrar la facturación'],
         ],
         'workspace' => [
             'manage' => ['label' => 'Cambiar el nombre o eliminar el espacio de trabajo'],
         ],
         'email' => [
-            'manage' => ['label' => 'Gestionar los ajustes de correo electrónico del espacio de trabajo'],
+            'manage' => ['label' => 'Administrar los ajustes de correo electrónico del espacio de trabajo'],
             'agent_send' => ['label' => 'Enviar correo electrónico mediante un asistente de IA'],
         ],
         'activity' => [

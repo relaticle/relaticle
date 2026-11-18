@@ -5,7 +5,7 @@ declare(strict_types=1);
 return [
     'heading' => [
         'title' => 'Atributos personalizados',
-        'description' => 'Cree y gestione atributos personalizados para capturar datos adicionales de sus registros.',
+        'description' => 'Cree y administre atributos personalizados para capturar datos adicionales de sus registros.',
     ],
     'nav' => [
         'label' => 'Atributos personalizados',
@@ -19,7 +19,7 @@ return [
             'type' => 'Tipo',
             'width' => 'Ancho',
             'description' => 'Descripción',
-            'add_section' => 'Añadir sección',
+            'add_section' => 'Agregar sección',
             'system_defined_cannot_delete' => 'Las secciones definidas por el sistema no se pueden eliminar.',
             'contains_system_fields_cannot_delete' => 'Las secciones que contienen atributos definidos por el sistema no se pueden eliminar.',
         ],
@@ -75,9 +75,9 @@ return [
             ],
             'options' => [
                 'label' => 'Opciones',
-                'add' => 'Añadir opción',
+                'add' => 'Agregar opción',
             ],
-            'add_field' => 'Añadir atributo',
+            'add_field' => 'Agregar atributo',
             'search_placeholder' => 'Buscar atributos...',
             'type_search_prompt' => 'Buscar tipos de atributo...',
             'type_no_results' => 'No se encontraron tipos de atributo',
@@ -94,11 +94,11 @@ return [
                 'rules' => 'Reglas de validación',
                 'rule' => 'Regla',
                 'description' => 'Descripción',
-                'rules_hint' => 'Para añadir reglas de validación, seleccione un tipo de atributo personalizado.',
-                'add_rule' => 'Añadir regla',
+                'rules_hint' => 'Para agregar reglas de validación, seleccione un tipo de atributo personalizado.',
+                'add_rule' => 'Agregar regla',
                 'parameters' => 'Parámetros',
                 'parameters_value' => 'Valor del parámetro',
-                'add_parameter' => 'Añadir parámetro',
+                'add_parameter' => 'Agregar parámetro',
                 'select_rule_placeholder' => 'Seleccione una regla de validación',
             ],
             'conditional_visibility' => [
@@ -375,12 +375,12 @@ return [
         ],
         'fields' => [
             'heading' => 'Esta sección está vacía',
-            'description' => 'Arrastre y suelta atributos aquí o haga clic en el botón de abajo para añadir su primer atributo.',
+            'description' => 'Arrastre y suelte atributos aquí o haga clic en el botón de abajo para agregar su primer atributo.',
             'icon' => 'heroicon-o-squares-plus',
         ],
         'fields_no_sections' => [
             'heading' => 'Aún no hay atributos personalizados',
-            'description' => 'Haga clic en el botón de abajo para añadir su primer atributo personalizado.',
+            'description' => 'Haga clic en el botón de abajo para agregar su primer atributo personalizado.',
             'icon' => 'heroicon-o-squares-plus',
         ],
         'search_no_results' => [
@@ -400,19 +400,19 @@ return [
         'required' => 'Obligatorio',
         'system' => 'Sistema',
         'archived' => 'Archivado',
-        'add' => 'Añadir',
-        'click_to_add' => 'Haga clic para añadir',
+        'add' => 'Agregar',
+        'click_to_add' => 'Haga clic para agregar',
         'searching' => 'Buscando...',
     ],
     'email' => [
-        'add_email_placeholder' => 'Añadir dirección de correo electrónico...',
+        'add_email_placeholder' => 'Agregar dirección de correo electrónico...',
     ],
     'link' => [
-        'add_link_placeholder' => 'Añadir URL...',
+        'add_link_placeholder' => 'Agregar URL...',
     ],
     'phone' => [
-        'add_phone_placeholder' => 'Añadir número de teléfono...',
-        'add_label' => 'Añadir número de teléfono',
+        'add_phone_placeholder' => 'Agregar número de teléfono...',
+        'add_label' => 'Agregar número de teléfono',
         'empty_state_label' => 'Ingrese un número de teléfono',
         'search_country' => 'Buscar país...',
         'no_results' => 'No se encontraron países',
@@ -421,7 +421,7 @@ return [
         'country_list' => 'Lista de países',
         'change_country' => 'Cambiar país',
         'phone_number' => 'Número de teléfono',
-        'manage_phone_numbers' => 'Gestionar números de teléfono',
+        'manage_phone_numbers' => 'Administrar números de teléfono',
         'edit_phone_numbers' => 'Editar números de teléfono',
         'phone_numbers_list' => 'Lista de números de teléfono',
         'remove_phone_number' => 'Quitar número de teléfono',
@@ -429,7 +429,7 @@ return [
     ],
     'record' => [
         'search_placeholder' => 'Buscar registros...',
-        'add_record_placeholder' => 'Añadir registro...',
+        'add_record_placeholder' => 'Agregar registro...',
         'empty_state_label' => 'Seleccionar registro...',
     ],
     'enums' => [
@@ -480,12 +480,12 @@ return [
             'labels' => [
                 'custom_fields' => 'Atributos personalizados',
                 'lookup_source' => 'Origen de búsqueda',
-                'scoped_management' => 'Gestión por ámbito',
+                'scoped_management' => 'Administración por ámbito',
             ],
             'descriptions' => [
                 'custom_fields' => 'El tipo de registro puede tener atributos personalizados',
                 'lookup_source' => 'El tipo de registro se puede usar como origen de búsqueda para atributos de elección',
-                'scoped_management' => 'Los atributos personalizados del tipo de registro se gestionan por registro principal, no en la página de gestión global',
+                'scoped_management' => 'Los atributos personalizados del tipo de registro se administran por registro principal, no en la página de administración global',
             ],
         ],
         'visibility_logic' => [

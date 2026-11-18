@@ -9,7 +9,7 @@ return [
 
     'fields' => [
         'assignees' => [
-            'label' => 'Personas asignadas',
+            'label' => 'Asignados',
             'placeholder' => 'Asignar a un miembro',
         ],
         'companies' => [

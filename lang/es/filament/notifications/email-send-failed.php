@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => '{1}Correo no enviado|[2,*]:count correos no enviados',
-    'partial_title' => ':sent enviados, :failed no enviados',
+    'partial_title' => 'Enviados: :sent. No enviados: :failed',
     'retry' => [
         'body_one' => '":subject" no se envió. Revíselo en la bandeja de salida, en Fallidos, e inténtelo de nuevo.',
         'body_many' => 'Revíselos en la bandeja de salida, en Fallidos, e inténtelo de nuevo.',

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 return [
     'title' => '{1}E-mail non envoyé|[2,*]:count e-mails non envoyés',
-    'partial_title' => ':sent envoyés, :failed non envoyés',
+    'partial_title' => 'Envoyés : :sent. Non envoyés : :failed',
     'retry' => [
         'body_one' => '« :subject » n\'a pas été envoyé. Consultez-le dans la boîte d\'envoi sous Échoués et réessayez.',
         'body_many' => 'Consultez-les dans la boîte d\'envoi sous Échoués et réessayez.',

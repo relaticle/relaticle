@@ -42,7 +42,7 @@ return [
         'hint' => 'Se usan al redactar desde este buzón.',
         'add' => 'Agregar firma',
         'empty_heading' => 'Aún no hay firmas',
-        'empty_description' => 'Cree una firma para añadirla a los correos que envíe desde este buzón.',
+        'empty_description' => 'Cree una firma para agregarla a los correos que envíe desde este buzón.',
     ],
     'actions' => [
         'save' => 'Guardar cambios',

@@ -6,7 +6,7 @@ return [
     'active' => 'Activa',
     'trialing' => 'En prueba',
     'past_due' => 'Pago vencido',
-    'unpaid' => 'Impaga',
+    'unpaid' => 'Sin pagar',
     'canceled' => 'Cancelada',
     'incomplete' => 'Incompleta',
     'incomplete_expired' => 'Incompleta vencida',

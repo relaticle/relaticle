@@ -51,7 +51,7 @@ return [
                 'label' => 'Aceptar',
             ],
             'tentative' => [
-                'label' => 'Quizás',
+                'label' => 'Tal vez',
             ],
             'declined' => [
                 'label' => 'Rechazar',

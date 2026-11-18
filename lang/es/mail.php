@@ -50,7 +50,7 @@ return [
 
     'trial_usage' => [
         'so_far' => 'Hasta ahora su equipo ha :parts.',
-        'during' => 'Durante la prueba su equipo :parts.',
+        'during' => 'Durante la prueba su equipo ha :parts.',
         'records' => 'agregado :count registro|agregado :count registros',
         'questions' => 'hecho :count pregunta a Rela|hecho :count preguntas a Rela',
         'both' => ':records y :questions',

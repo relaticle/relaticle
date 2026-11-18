@@ -10,10 +10,10 @@ return [
             'failed' => 'Échec de l\'import : :entity',
         ],
         'counts' => [
-            'created' => ':count créés',
-            'updated' => ':count mis à jour',
-            'skipped' => ':count ignorés',
-            'failed' => ':count échoués',
+            'created' => 'Créés : :count',
+            'updated' => 'Mis à jour : :count',
+            'skipped' => 'Ignorés : :count',
+            'failed' => 'Échoués : :count',
         ],
         'actions' => [
             'view' => 'Voir les imports',

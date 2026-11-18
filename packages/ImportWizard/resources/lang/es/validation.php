@@ -7,7 +7,7 @@ return [
     'invalid_choice' => '":value" no es una opción válida.',
     'invalid_number' => 'No se puede interpretar como número con el separador decimal :format.',
     'invalid_item_format' => "Formato no válido: ':item'",
-    'no_match' => "No se encontró ninguna :entity que coincida con ':value' en :field",
+    'no_match' => "Sin coincidencias en :entity para ':value' (buscado por :field)",
     'expected_date_format' => 'Formato de fecha no válido. Se esperaba: :format',
     'expected_number_format' => 'Formato de número no válido. Se esperaba: :format',
     'not_a_valid_option' => 'No es una opción válida',

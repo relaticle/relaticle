@@ -15,7 +15,7 @@ return [
         'linkedin' => ['name' => 'LinkedIn'],
     ],
     'opportunity' => [
-        'amount' => ['name' => 'Importe'],
+        'amount' => ['name' => 'Monto'],
         'close_date' => ['name' => 'Fecha de cierre'],
         'stage' => [
             'name' => 'Etapa',

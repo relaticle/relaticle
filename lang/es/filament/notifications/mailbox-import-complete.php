@@ -38,8 +38,8 @@ return [
         'subject_with_issues' => 'La importación de su buzón finalizó con problemas',
         'retry_subject' => 'El reintento de importación de su buzón fue exitoso',
         'greeting' => 'Hola, :name:',
-        'line' => 'Importación completada: :imported importados desde :email. El correo nuevo seguirá sincronizándose automáticamente.',
-        'line_with_issues' => 'Importación finalizada con problemas: :imported importados desde :email. :failures',
+        'line' => 'Importación completada desde :email: :imported. El correo nuevo seguirá sincronizándose automáticamente.',
+        'line_with_issues' => 'Importación finalizada con problemas desde :email: :imported. :failures',
         'retry_line' => 'Importamos los mensajes que faltaban de :email. Ahora hay :imported en Relaticle.',
     ],
 ];

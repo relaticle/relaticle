@@ -38,8 +38,8 @@ return [
         'subject_with_issues' => 'L\'import de votre boîte mail est terminé avec des problèmes',
         'retry_subject' => 'La nouvelle tentative d\'import de votre boîte mail a réussi',
         'greeting' => 'Bonjour :name,',
-        'line' => 'Import terminé : :imported importés depuis :email. Les nouveaux e-mails continueront de se synchroniser automatiquement.',
-        'line_with_issues' => 'Import terminé avec des problèmes : :imported importés depuis :email. :failures',
+        'line' => 'Import terminé depuis :email : :imported. Les nouveaux e-mails continueront de se synchroniser automatiquement.',
+        'line_with_issues' => 'Import terminé avec des problèmes depuis :email : :imported. :failures',
         'retry_line' => 'Nous avons importé les messages manquants de :email. :imported sont maintenant dans Relaticle.',
     ],
 ];
