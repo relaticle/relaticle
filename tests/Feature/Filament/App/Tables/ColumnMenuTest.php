@@ -933,14 +933,12 @@ it('puts the Add column button in the actions column header and its menu beside 
     $hidden = collect($component->get('tableColumns'))->firstWhere(fn (array $item): bool => ! $item['isToggled'] && $item['isToggleable']);
     $page = new Crawler($component->html());
 
-    expect($page->filter('thead th > .fi-ta-add-column [data-add-column-trigger]')->count())->toBe(1)
+    expect($hidden)->not->toBeNull()
+        ->and($page->filter('thead th > .fi-ta-add-column [data-add-column-trigger]')->count())->toBe(1)
         ->and($page->filter('table [data-add-column]')->count())->toBe(0)
         ->and($page->filter('[data-add-column] [data-add-column-create]')->count())->toBe(1)
-        ->and($page->filter('[data-add-column] [data-add-column-type]')->count())->toBeGreaterThan(0);
-
-    if ($hidden !== null) {
-        expect($page->filter("[data-add-column] [data-attribute=\"{$hidden['name']}\"]")->count())->toBe(1);
-    }
+        ->and($page->filter('[data-add-column] [data-add-column-type]')->count())->toBeGreaterThan(0)
+        ->and($page->filter("[data-add-column] [data-attribute=\"{$hidden['name']}\"]")->count())->toBe(1);
 });
 
 it('offers no Add column button to a member when every attribute is already shown', function (): void {
