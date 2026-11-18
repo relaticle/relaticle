@@ -7,6 +7,7 @@ namespace Relaticle\OnboardSeed\Support;
 use App\Enums\CreationSource;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\OnboardingUseCase;
 use App\Models\CustomField;
 use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -124,8 +125,15 @@ abstract class BaseModelSeeder implements ModelSeederInterface
             return null;
         }
 
-        $option = $field->options->firstWhere('name', $optionLabel)
-            ?? $field->options->firstWhere('name', $this->localizedOptionLabel($fieldCode, $optionLabel));
+        $option = null;
+
+        foreach ($this->optionLabelCandidates($fieldCode, $optionLabel) as $candidate) {
+            $option = $field->options->firstWhere('name', $candidate);
+
+            if ($option !== null) {
+                break;
+            }
+        }
 
         if (! $option) {
             Log::warning("Option '{$optionLabel}' not found for field '{$fieldCode}'");
@@ -136,11 +144,17 @@ abstract class BaseModelSeeder implements ModelSeederInterface
         return $option->id;
     }
 
-    private function localizedOptionLabel(string $fieldCode, string $optionLabel): string
+    /**
+     * @return list<string>
+     */
+    private function optionLabelCandidates(string $fieldCode, string $optionLabel): array
     {
-        $field = TaskField::tryFrom($fieldCode) ?? OpportunityField::tryFrom($fieldCode);
+        $enumField = TaskField::tryFrom($fieldCode) ?? OpportunityField::tryFrom($fieldCode);
+        $labels = $enumField?->optionLabelsFor($optionLabel) ?? [$optionLabel];
 
-        return $field?->localizeOption($optionLabel) ?? $optionLabel;
+        return $fieldCode === OpportunityField::STAGE->value
+            ? array_values(array_unique([...$labels, ...OnboardingUseCase::stageLabelsFor($optionLabel)]))
+            : $labels;
     }
 
     /** @return array<string, mixed> */

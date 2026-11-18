@@ -130,7 +130,7 @@ final readonly class CrmSummaryQuery
             ->selectRaw(implode(', ', [
                 'MAX(CASE WHEN field.code = ? THEN field.id END) AS due_field_id',
                 'MAX(CASE WHEN field.code = ? THEN field.id END) AS status_field_id',
-                'MAX(CASE WHEN field.code = ? THEN option.id END) AS done_option_id',
+                'MIN(CASE WHEN field.code = ? THEN option.id END) AS done_option_id',
             ]), [TaskField::DUE_DATE->value, TaskField::STATUS->value, TaskField::STATUS->value])
             ->first();
 

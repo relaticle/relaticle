@@ -51,4 +51,32 @@ return [
             'late_stage' => 'Late-stage',
         ],
     ],
+    'stages' => [
+        'customer_success' => [
+            'onboarding' => 'Onboarding',
+            'active' => 'Active',
+            'renewal_due' => 'Renewal due',
+            'at_risk' => 'At risk',
+            'renewed' => 'Renewed',
+            'churned' => 'Churned',
+        ],
+        'recruiting' => [
+            'sourced' => 'Sourced',
+            'applied' => 'Applied',
+            'screen' => 'Screen',
+            'interview' => 'Interview',
+            'offer' => 'Offer',
+            'hired' => 'Hired',
+            'declined' => 'Declined',
+        ],
+        'fundraising' => [
+            'target' => 'Target',
+            'intro' => 'Intro',
+            'first_meeting' => 'First meeting',
+            'partner_meeting' => 'Partner meeting',
+            'term_sheet' => 'Term sheet',
+            'closed' => 'Closed',
+            'passed' => 'Passed',
+        ],
+    ],
 ];

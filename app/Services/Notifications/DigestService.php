@@ -178,7 +178,7 @@ final readonly class DigestService
             ->selectRaw(implode(', ', [
                 "MAX(CASE WHEN cf.code = 'due_date' THEN cf.id END) AS due_field_id",
                 "MAX(CASE WHEN cf.code = 'status' THEN cf.id END) AS status_field_id",
-                "MAX(CASE WHEN cf.code = 'status' THEN opt.id END) AS done_option_id",
+                "MIN(CASE WHEN cf.code = 'status' THEN opt.id END) AS done_option_id",
                 "MAX(CASE WHEN cf.code = 'priority' THEN cf.id END) AS priority_field_id",
                 "BOOL_OR(cf.code = 'priority' AND (cf.settings->>'enable_option_colors')::boolean) AS priority_colors",
             ]))

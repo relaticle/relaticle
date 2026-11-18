@@ -221,7 +221,7 @@ final readonly class CustomFieldOptionPlan
         $errors = [...$errors, ...array_filter([self::moveCapError($moves, $cleared)])];
 
         if (self::isTaskStatus($field) && ! self::keepsDone($current, $targets)) {
-            $errors[] = __('The task Status option "Done" marks a task complete, so it cannot be renamed or removed.');
+            $errors[] = __('The task Status option ":name" marks a task complete, so it cannot be renamed or removed.', ['name' => TaskField::doneOption($current)?->name]);
         }
 
         if ($removals === [] && self::sameList($field, $current, $targets)) {
@@ -547,9 +547,9 @@ final readonly class CustomFieldOptionPlan
         return null;
     }
 
-    public static function locksOption(CustomField $field, string $name): bool
+    public static function locksOption(CustomField $field, string $optionId): bool
     {
-        return self::isTaskStatus($field) && TaskField::isDone($name);
+        return self::isTaskStatus($field) && TaskField::doneOption($field->options)?->getKey() === $optionId;
     }
 
     private static function isTaskStatus(CustomField $field): bool
@@ -568,7 +568,7 @@ final readonly class CustomFieldOptionPlan
      */
     private static function keepsDone(Collection $current, array $targets): bool
     {
-        $done = $current->first(fn (CustomFieldOption $option): bool => TaskField::isDone($option->name));
+        $done = TaskField::doneOption($current);
 
         if (! $done instanceof CustomFieldOption) {
             return true;

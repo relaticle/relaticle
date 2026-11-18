@@ -326,7 +326,7 @@ trait HasBoardStageOrder
 
     private function locksStage(mixed $optionId): bool
     {
-        return CustomFieldOptionPlan::locksOption($this->boardColumnField(), $this->stageNameFor($optionId));
+        return CustomFieldOptionPlan::locksOption($this->boardColumnField(), (string) $optionId);
     }
 
     private function stageNameFor(mixed $optionId): string

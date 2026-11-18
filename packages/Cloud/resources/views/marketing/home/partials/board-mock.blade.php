@@ -1,19 +1,19 @@
 @php
-    $stageColors = \App\Enums\CustomFields\OpportunityField::STAGE->getOptionColors() ?? [];
+    $stageColors = \App\Enums\CustomFields\OpportunityField::STAGE->optionKeyColors() ?? [];
 
     $columns = [
-        ['stage' => 'Prospecting', 'label' => __('Prospecting'), 'count' => [2, 1], 'cards' => [
+        ['stage' => 'enums/custom-fields.opportunity.stage.options.prospecting', 'label' => __('Prospecting'), 'count' => [2, 1], 'cards' => [
             ['title' => __('Notion API Integration'), 'company' => 'Notion', 'icon' => 'ri-notion-fill', 'amount' => '$18,000.00', 'date' => __('Oct 25')],
             ['title' => __('Figma Design System Rollout'), 'company' => 'Figma', 'icon' => 'ri-figma-fill', 'amount' => '$12,500.00', 'date' => __('Nov 6'), 'dragged' => true],
         ]],
-        ['stage' => 'Qualification', 'label' => __('Qualification'), 'count' => [1, 2], 'cards' => [
+        ['stage' => 'enums/custom-fields.opportunity.stage.options.qualification', 'label' => __('Qualification'), 'count' => [1, 2], 'cards' => [
             ['title' => __('Dropbox SSO Upgrade'), 'company' => 'Dropbox', 'icon' => 'ri-dropbox-fill', 'amount' => '$9,800.00', 'date' => __('Nov 1')],
         ], 'slot' => true],
-        ['stage' => 'Needs Analysis', 'label' => __('Needs Analysis'), 'count' => [2, 2], 'cards' => [
+        ['stage' => 'enums/custom-fields.opportunity.stage.options.needs_analysis', 'label' => __('Needs Analysis'), 'count' => [2, 2], 'cards' => [
             ['title' => __('Apple Developer Partnership'), 'company' => 'Apple', 'icon' => 'ri-apple-fill', 'amount' => '$25,000.00', 'date' => __('Nov 4')],
             ['title' => __('Vercel Partner Program'), 'company' => 'Vercel', 'icon' => 'ri-vercel-fill', 'amount' => '$30,000.00', 'date' => __('Oct 18')],
         ]],
-        ['stage' => 'Value Proposition', 'label' => __('Value Proposition'), 'count' => [2, 2], 'cards' => [
+        ['stage' => 'enums/custom-fields.opportunity.stage.options.value_proposition', 'label' => __('Value Proposition'), 'count' => [2, 2], 'cards' => [
             ['title' => __('GitHub Enterprise Migration'), 'company' => 'GitHub', 'icon' => 'ri-github-fill', 'amount' => '$48,000.00', 'date' => __('Oct 23')],
             ['title' => __('Spotify Ads Pilot'), 'company' => 'Spotify', 'icon' => 'ri-spotify-fill', 'amount' => '$24,000.00', 'date' => __('Oct 14')],
         ]],

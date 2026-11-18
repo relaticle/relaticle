@@ -18,7 +18,7 @@ enum OpportunityField: string
     /**
      * @return array<string, string>|null
      */
-    protected function optionKeyColors(): ?array
+    public function optionKeyColors(): ?array
     {
         return match ($this) {
             self::STAGE => [

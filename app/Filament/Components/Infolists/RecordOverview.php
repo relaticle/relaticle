@@ -313,7 +313,7 @@ final readonly class RecordOverview
 
         $dueField = $fields->get(TaskField::DUE_DATE->value);
         $statusField = $fields->get(TaskField::STATUS->value);
-        $doneOptionId = $statusField?->options->first(fn (CustomFieldOption $option): bool => TaskField::isDone($option->name))?->getKey();
+        $doneOptionId = $statusField instanceof CustomField ? TaskField::doneOption($statusField->options)?->getKey() : null;
 
         return $record->tasks()
             ->with(['customFieldValues.customField', 'assignees'])

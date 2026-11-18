@@ -6,7 +6,9 @@ namespace App\Enums\CustomFields;
 
 use App\Enums\CustomFieldType;
 use App\Enums\OptionColor;
+use App\Models\CustomFieldOption;
 use App\Support\ChecklistHtml;
+use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
 
 enum TaskField: string
@@ -110,7 +112,7 @@ enum TaskField: string
     /**
      * @return array<string, string>|null
      */
-    protected function optionKeyColors(): ?array
+    public function optionKeyColors(): ?array
     {
         return match ($this) {
             self::STATUS => [
@@ -136,6 +138,21 @@ enum TaskField: string
             fn (string $locale): string => __(self::DONE_LABEL_KEY, [], $locale),
             config('app.available_locales'),
         )));
+    }
+
+    /**
+     * The done option of a status field is the earliest-created one named like a done label.
+     *
+     * @template TKey of array-key
+     *
+     * @param  Collection<TKey, CustomFieldOption>  $options
+     */
+    public static function doneOption(Collection $options): ?CustomFieldOption
+    {
+        return $options
+            ->filter(fn (CustomFieldOption $option): bool => self::isDone($option->name))
+            ->sortBy(fn (CustomFieldOption $option): string => (string) $option->getKey())
+            ->first();
     }
 
     public static function isDone(string $name): bool

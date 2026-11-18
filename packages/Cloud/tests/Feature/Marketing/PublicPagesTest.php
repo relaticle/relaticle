@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\OptionColor;
 use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Support\DetectsPublicMarkdownRequest;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
@@ -606,4 +609,12 @@ it('renders the hero tabs in their first state before any script runs', function
     expect($classes->keys()->all())->toBe(['ai-agent', 'pipeline', 'companies', 'custom-fields'])
         ->and($classes['ai-agent'])->toContain('border-gray-200')
         ->and($classes->except('ai-agent')->all())->each->toContain('border-transparent');
+});
+
+it('colours the board mock stages by their stable key in every language', function (): void {
+    Lang::addLines(['enums/custom-fields.opportunity.stage.options.prospecting' => 'Akquise'], 'de');
+
+    $html = Locales::within('de', fn (): string => view('cloud::marketing.home.partials.board-mock')->render());
+
+    expect($html)->toContain('background-color: '.OptionColor::Purple->value);
 });

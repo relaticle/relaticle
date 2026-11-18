@@ -5,19 +5,26 @@ declare(strict_types=1);
 use App\Actions\Task\CompleteTask;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\CustomFields\TaskField;
+use App\Enums\OnboardingUseCase;
 use App\Enums\OptionColor;
+use App\Features\OnboardSeed;
 use App\Listeners\CreateWorkspaceCustomFields;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
+use App\Models\Note;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Crm\CrmSummaryQuery;
 use App\Services\Notifications\DigestService;
+use App\Support\CustomFieldOptionPlan;
+use App\Support\Locales;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
+use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\MyTasksService;
 use Relaticle\OnboardSeed\OnboardSeedManager;
 use Relaticle\OnboardSeed\Support\FixtureLoader;
@@ -133,6 +140,16 @@ custom_fields:
   status: To do
   priority: High
 YAML);
+    File::ensureDirectoryExists("{$this->fixtures}/sales/companies");
+    File::put("{$this->fixtures}/sales/companies/airbnb.yaml", "name: Airbnb\n");
+    File::ensureDirectoryExists("{$this->fixtures}/de/sales/notes");
+    File::put("{$this->fixtures}/de/sales/notes/note.yaml", <<<'YAML'
+title: Plattform fuer Gastgeber
+noteable_type: company
+noteable_key: airbnb
+custom_fields:
+  body: <p>Notiz</p>
+YAML);
     File::ensureDirectoryExists("{$this->fixtures}/sales/tasks");
     File::put("{$this->fixtures}/sales/tasks/call.yaml", <<<'YAML'
 title: Discovery call with Brian
@@ -146,7 +163,8 @@ YAML);
     $task = Task::query()->withoutGlobalScopes()->where('workspace_id', $workspace->id)->sole();
     $stored = DB::table('custom_field_values')->where('entity_id', $task->id)->pluck('string_value')->all();
 
-    expect($task->title)->toBe('Erstgespraech mit Brian')
+    expect(Note::query()->withoutGlobalScopes()->where('workspace_id', $workspace->id)->sole()->title)->toBe('Plattform fuer Gastgeber')
+        ->and($task->title)->toBe('Erstgespraech mit Brian')
         ->and($stored)->toContain(wlStatusOptionId($workspace, 'Zu erledigen'));
 });
 
@@ -201,4 +219,116 @@ it('counts German done tasks in the digest, My Tasks and the CRM summary', funct
         ->and(TaskField::isDone('Erledigt'))->toBeTrue()
         ->and(TaskField::isDone('Done'))->toBeTrue()
         ->and(TaskField::isDone('Fertig'))->toBeFalse();
+});
+
+function wlAddSecondDoneOption(Workspace $workspace): string
+{
+    $field = CustomField::withoutGlobalScopes()
+        ->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'status')->sole();
+    $id = Str::lower((string) Str::ulid());
+
+    DB::table('custom_field_options')->insert([
+        'id' => $id,
+        'custom_field_id' => $field->id,
+        'tenant_id' => $workspace->id,
+        'name' => 'Erledigt',
+        'sort_order' => 3,
+    ]);
+
+    return $id;
+}
+
+it('treats only the earliest done option as done when a field has two', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->personalWorkspace();
+    $doneId = wlStatusOptionId($workspace, 'Done');
+    $extraId = wlAddSecondDoneOption($workspace);
+    wlTaskWithStatus($user, $workspace, 'open', 'To do', now()->subDay());
+    wlTaskWithStatus($user, $workspace, 'finished', 'Done', now()->subDay());
+    $this->actingAs($user);
+
+    $digest = resolve(DigestService::class)->forWorkspace($user, $workspace);
+    $mine = resolve(MyTasksService::class)->forUser($user, $workspace);
+    $summary = resolve(CrmSummaryQuery::class)->get($user)['tasks'];
+
+    expect(collect($digest->overdue)->pluck('title')->all())->toBe(['open'])
+        ->and($mine->pluck('title')->all())->toBe(['open'])
+        ->and($summary['overdue'])->toBe(1);
+
+    $field = CustomField::withoutGlobalScopes()->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'status')->sole()->load('options');
+
+    expect(CustomFieldOptionPlan::locksOption($field, $doneId))->toBeTrue()
+        ->and(CustomFieldOptionPlan::locksOption($field, $extraId))->toBeFalse();
+});
+
+it('completes a task with the earliest done option when a field has two', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->personalWorkspace();
+    $doneId = wlStatusOptionId($workspace, 'Done');
+    wlAddSecondDoneOption($workspace);
+    $task = wlTaskWithStatus($user, $workspace, 'send', 'To do', now()->addDay());
+
+    $this->actingAs($user);
+    resolve(CompleteTask::class)->execute($user, $task);
+
+    expect(DB::table('custom_field_values')->where('entity_id', $task->id)->pluck('string_value')->all())->toContain($doneId);
+});
+
+it('names the workspace done option when it refuses to rename it', function (): void {
+    [, $workspace] = wlGermanWorkspace();
+    $field = CustomField::withoutGlobalScopes()->where('tenant_id', $workspace->id)->where('entity_type', 'task')->where('code', 'status')->sole()->load('options');
+
+    $options = $field->options->sortBy('sort_order')->map(fn (CustomFieldOption $option): array => [
+        'id' => $option->id,
+        'name' => $option->name === 'Erledigt' ? 'Fertig' : $option->name,
+        'was' => $option->name,
+    ])->values()->all();
+
+    expect(fn () => CustomFieldOptionPlan::validated($field, ['options' => $options, 'removed' => []]))
+        ->toThrow(ValidationException::class, '"Erledigt"');
+});
+
+it('gives a German creator the fundraising stages in German and seeds against them', function (): void {
+    Feature::define(OnboardSeed::class, true);
+    Lang::addLines([
+        'enums/onboarding-use-case.stages.fundraising.target' => 'Ziel',
+        'enums/onboarding-use-case.stages.fundraising.intro' => 'Kontakt',
+        'enums/onboarding-use-case.stages.fundraising.first_meeting' => 'Erstes Treffen',
+        'enums/onboarding-use-case.stages.fundraising.partner_meeting' => 'Partnertreffen',
+        'enums/onboarding-use-case.stages.fundraising.term_sheet' => 'Term Sheet',
+        'enums/onboarding-use-case.stages.fundraising.closed' => 'Abgeschlossen',
+        'enums/onboarding-use-case.stages.fundraising.passed' => 'Abgesagt',
+    ], 'de');
+    $user = User::factory()->create(['locale' => 'de']);
+
+    $workspace = onboardWorkspace($user, ['name' => 'Fonds'], ['onboarding_use_case' => OnboardingUseCase::Fundraising->value, 'onboarding_context' => ['early_stage']]);
+
+    $names = collect(wlOptionsOf($workspace, 'opportunity', 'stage'));
+    $partner = $names->sole(fn (CustomFieldOption $option): bool => $option->name === 'Partnertreffen');
+    $stored = DB::table('custom_field_values')->where('custom_field_id', $partner->custom_field_id)->pluck('string_value')->all();
+
+    expect($names->pluck('name')->first())->toBe('Ziel')
+        ->and($partner->settings->color)->toBe(OptionColor::Amber->value)
+        ->and($stored)->toContain($partner->id)
+        ->and(Locales::within('de', fn (): array => array_keys(OnboardingUseCase::Fundraising->pipelineStages())))->toContain('Partnertreffen');
+});
+
+it('seeds stages by the english label even when the language changed after the workspace was created', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create(['locale' => 'de']);
+    $workspace = $user->personalWorkspace();
+    $user->forceFill(['locale' => 'en'])->save();
+    File::ensureDirectoryExists("{$this->fixtures}/sales/tasks");
+    File::put("{$this->fixtures}/sales/tasks/call.yaml", <<<'YAML'
+title: Discovery call with Brian
+custom_fields:
+  status: To do
+YAML);
+    FixtureLoader::setBasePath($this->fixtures);
+
+    resolve(OnboardSeedManager::class)->generateFor($user->refresh(), $workspace);
+
+    $task = Task::query()->withoutGlobalScopes()->where('workspace_id', $workspace->id)->sole();
+
+    expect(DB::table('custom_field_values')->where('entity_id', $task->id)->pluck('string_value')->all())
+        ->toContain(wlStatusOptionId($workspace, 'Zu erledigen'));
 });

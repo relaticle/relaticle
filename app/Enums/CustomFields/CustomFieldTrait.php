@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums\CustomFields;
 
+use App\Onboarding\OptionLabels;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
 
@@ -30,23 +31,17 @@ trait CustomFieldTrait
      *
      * @return array<string, string>|null
      */
-    protected function optionKeyColors(): ?array
+    public function optionKeyColors(): ?array
     {
         return null;
     }
 
     /**
-     * Translate an English option label (as sample fixtures write it) into the current locale.
+     * @return list<string>
      */
-    public function localizeOption(string $english): string
+    public function optionLabelsFor(string $english): array
     {
-        foreach (array_keys($this->optionKeyColors() ?? []) as $key) {
-            if (__($key, [], 'en') === $english) {
-                return __($key);
-            }
-        }
-
-        return $english;
+        return OptionLabels::inEveryLocale(array_keys($this->optionKeyColors() ?? []), $english);
     }
 
     /**

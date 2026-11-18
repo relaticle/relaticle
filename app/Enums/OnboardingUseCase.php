@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Enums;
 
 use App\Enums\CustomFields\OpportunityField;
+use App\Onboarding\OptionLabels;
 use Filament\Support\Contracts\HasLabel;
 
 enum OnboardingUseCase: string implements HasLabel
@@ -59,35 +60,68 @@ enum OnboardingUseCase: string implements HasLabel
      */
     public function stagePreset(): ?array
     {
+        $keyColors = $this->stagePresetKeyColors();
+
+        if ($keyColors === null) {
+            return null;
+        }
+
+        $preset = [];
+
+        foreach ($keyColors as $key => $color) {
+            $preset[__($key)] = $color;
+        }
+
+        return $preset;
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    public function stagePresetKeyColors(): ?array
+    {
         return match ($this) {
             self::CustomerSuccess => [
-                'Onboarding' => OptionColor::Purple->value,
-                'Active' => OptionColor::Green->value,
-                'Renewal due' => OptionColor::Amber->value,
-                'At risk' => OptionColor::Orange->value,
-                'Renewed' => OptionColor::Cyan->value,
-                'Churned' => OptionColor::Gray->value,
+                'enums/onboarding-use-case.stages.customer_success.onboarding' => OptionColor::Purple->value,
+                'enums/onboarding-use-case.stages.customer_success.active' => OptionColor::Green->value,
+                'enums/onboarding-use-case.stages.customer_success.renewal_due' => OptionColor::Amber->value,
+                'enums/onboarding-use-case.stages.customer_success.at_risk' => OptionColor::Orange->value,
+                'enums/onboarding-use-case.stages.customer_success.renewed' => OptionColor::Cyan->value,
+                'enums/onboarding-use-case.stages.customer_success.churned' => OptionColor::Gray->value,
             ],
             self::Recruiting => [
-                'Sourced' => OptionColor::Purple->value,
-                'Applied' => OptionColor::Blue->value,
-                'Screen' => OptionColor::Cyan->value,
-                'Interview' => OptionColor::Amber->value,
-                'Offer' => OptionColor::Magenta->value,
-                'Hired' => OptionColor::Green->value,
-                'Declined' => OptionColor::Gray->value,
+                'enums/onboarding-use-case.stages.recruiting.sourced' => OptionColor::Purple->value,
+                'enums/onboarding-use-case.stages.recruiting.applied' => OptionColor::Blue->value,
+                'enums/onboarding-use-case.stages.recruiting.screen' => OptionColor::Cyan->value,
+                'enums/onboarding-use-case.stages.recruiting.interview' => OptionColor::Amber->value,
+                'enums/onboarding-use-case.stages.recruiting.offer' => OptionColor::Magenta->value,
+                'enums/onboarding-use-case.stages.recruiting.hired' => OptionColor::Green->value,
+                'enums/onboarding-use-case.stages.recruiting.declined' => OptionColor::Gray->value,
             ],
             self::Fundraising, self::Investing => [
-                'Target' => OptionColor::Purple->value,
-                'Intro' => OptionColor::Blue->value,
-                'First meeting' => OptionColor::Cyan->value,
-                'Partner meeting' => OptionColor::Amber->value,
-                'Term sheet' => OptionColor::Magenta->value,
-                'Closed' => OptionColor::Green->value,
-                'Passed' => OptionColor::Gray->value,
+                'enums/onboarding-use-case.stages.fundraising.target' => OptionColor::Purple->value,
+                'enums/onboarding-use-case.stages.fundraising.intro' => OptionColor::Blue->value,
+                'enums/onboarding-use-case.stages.fundraising.first_meeting' => OptionColor::Cyan->value,
+                'enums/onboarding-use-case.stages.fundraising.partner_meeting' => OptionColor::Amber->value,
+                'enums/onboarding-use-case.stages.fundraising.term_sheet' => OptionColor::Magenta->value,
+                'enums/onboarding-use-case.stages.fundraising.closed' => OptionColor::Green->value,
+                'enums/onboarding-use-case.stages.fundraising.passed' => OptionColor::Gray->value,
             ],
             self::Sales, self::Marketing, self::Other => null,
         };
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function stageLabelsFor(string $english): array
+    {
+        $keys = array_merge(...array_map(
+            fn (self $useCase): array => array_keys($useCase->stagePresetKeyColors() ?? []),
+            self::cases(),
+        ));
+
+        return OptionLabels::inEveryLocale($keys, $english);
     }
 
     /**
