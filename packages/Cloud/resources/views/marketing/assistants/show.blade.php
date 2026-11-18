@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
@@ -145,7 +146,7 @@
                 <a href="{{ route($sibling->routeName()) }}" class="{{ $linkClass }}">{{ __('Relaticle for :sibling', ['sibling' => $sibling->label()]) }}</a>
             </p>
             @if($docsActive)
-                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt']) }}" class="sm:ml-auto">
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ LocalizedUrl::route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt']) }}" class="sm:ml-auto">
                     {{ __('Read the setup guide') }}
                 </x-cloud::marketing.button>
             @endif
@@ -184,7 +185,7 @@
         <div class="bg-surface border-rail border-t px-6 py-5 md:px-8">
             <p class="type-prose text-gray-700 dark:text-gray-300">
                 {{ __('Prefer an assistant that asks first?') }}
-                <a href="{{ route('ai') }}" class="{{ $linkClass }}">{{ __('Meet :name, the built-in AI assistant', ['name' => $assistantName]) }}</a>
+                <a href="{{ LocalizedUrl::route('ai') }}" class="{{ $linkClass }}">{{ __('Meet :name, the built-in AI assistant', ['name' => $assistantName]) }}</a>
             </p>
         </div>
     </x-cloud::marketing.frame>
@@ -197,7 +198,7 @@
                     <h2 class="type-title text-gray-950 dark:text-white">{{ __('Questions about Relaticle and :name', ['name' => $name]) }}</h2>
                     <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                         {{ __('Something else on your mind?') }}
-                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                        <a href="{{ LocalizedUrl::route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
                     </p>
                 </div>
             </div>
@@ -212,7 +213,7 @@
         <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
             {{ __('Start for free') }}
         </x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
+        <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('pricing') }}">
             {{ __('See pricing') }}
         </x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
@@ -229,7 +230,7 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
                     \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Relaticle for :name', ['name' => $name]))->item($pageUrl),
                 ]));
     @endphp

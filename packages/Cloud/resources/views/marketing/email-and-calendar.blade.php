@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     use Illuminate\Support\Arr;
     use Illuminate\Support\Collection;
@@ -236,7 +237,7 @@
                 :label="__('02 · :name', ['name' => $assistantName])"
                 :lead="__(':name drafts. You send.', ['name' => $assistantName])"
                 :link-label="__('Meet :name', ['name' => $assistantName])"
-                :link-href="route('ai')"
+                :link-href="LocalizedUrl::route('ai')"
             >
                 {{ __(':name puts each email on its own card. Nothing leaves until you click Send.', ['name' => $assistantName]) }}
 
@@ -298,7 +299,7 @@
                     @if($documentationActive)
                         <p class="type-prose mt-4 text-gray-500 dark:text-gray-400">
                             {{ __('Step-by-step guides live in the') }}
-                            <a href="{{ route('help.category', ['category' => 'email-and-calendar']) }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('help center') }}</a>.
+                            <a href="{{ LocalizedUrl::route('help.category', ['category' => 'email-and-calendar']) }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('help center') }}</a>.
                         </p>
                     @endif
                 </div>
@@ -324,8 +325,8 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
-                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Email and calendar'))->item(route('emailAndCalendar')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Email and calendar'))->item(LocalizedUrl::route('emailAndCalendar')),
                 ]));
     @endphp
 

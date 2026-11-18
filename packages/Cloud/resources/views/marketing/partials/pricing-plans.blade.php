@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $planCell = 'bg-surface relative flex flex-col';
     $priceLabel = 'type-label text-gray-500 dark:text-gray-400';
@@ -75,7 +76,7 @@
                     <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.billing') }}</p>
                 </div>
 
-                <x-cloud::marketing.button variant="secondary" :href="route('contact', ['plan' => 'enterprise'])" class="mt-8 w-full">
+                <x-cloud::marketing.button variant="secondary" :href="LocalizedUrl::route('contact', ['plan' => 'enterprise'])" class="mt-8 w-full">
                     {{ __('cloud::billing.enterprise.contact') }}
                 </x-cloud::marketing.button>
                 <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">{{ __('No commitment until scope is agreed.') }}</p>
@@ -102,7 +103,7 @@
         <h2 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('Prefer to self-host? It’s free.') }}</h2>
         <p class="type-prose mt-1.5 text-gray-500 dark:text-gray-400">{{ __('AGPL-3.0 open source. Unlimited users and records on your own server, forever.') }}</p>
     </div>
-    <x-cloud::marketing.button variant="secondary" size="sm" :href="route('selfHosted')" iconTrailing="lucide-arrow-right" class="shrink-0 self-start sm:self-center">
+    <x-cloud::marketing.button variant="secondary" size="sm" :href="LocalizedUrl::route('selfHosted')" iconTrailing="lucide-arrow-right" class="shrink-0 self-start sm:self-center">
         {{ __('Explore self-hosting') }}
     </x-cloud::marketing.button>
 </div>

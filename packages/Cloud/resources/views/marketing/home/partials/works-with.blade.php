@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
@@ -8,20 +9,20 @@
             __(':name proposes a create, update or delete as a card. Nothing is saved until you approve it.', ['name' => $assistantName]),
             __('How approval works'),
             $documentationActive
-                ? route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes'])
-                : route('ai'),
+                ? LocalizedUrl::route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes'])
+                : LocalizedUrl::route('ai'),
         ],
         [
             __('Your data is yours'),
             __('Export every record type to CSV or Excel, or run Relaticle on your own server under the AGPL-3.0.'),
             __('Self-host Relaticle'),
-            route('selfHosted'),
+            LocalizedUrl::route('selfHosted'),
         ],
         [
             __('$:price a month, unlimited users', ['price' => \App\Enums\Plan::Pro->yearlyPricePerMonth()]),
             __('Priced per workspace, not per user, with unlimited users and records. Every workspace starts on a :days-day trial with no card.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]),
             __('See pricing'),
-            route('pricing'),
+            LocalizedUrl::route('pricing'),
         ],
     ];
 
@@ -55,7 +56,7 @@
             @endforeach
 
             @if($documentationActive)
-                <a href="{{ route('documentation.index') }}" class="group col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 px-3 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
+                <a href="{{ LocalizedUrl::route('documentation.index') }}" class="group col-span-2 md:col-span-1 flex items-center justify-center gap-1.5 px-3 py-5 md:py-6 whitespace-nowrap text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors">
                     {{ __('+ any MCP client') }}
                     <x-lucide-arrow-up-right class="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 group-hover:text-current transition-colors"/>
                 </a>

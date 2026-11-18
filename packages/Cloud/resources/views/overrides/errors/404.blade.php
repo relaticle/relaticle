@@ -1,16 +1,17 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $suggestion = app(\Relaticle\Cloud\Marketing\Support\MarketingNavigation::class)->closestTo(request()->path());
     $user = auth('web')->user();
     $home = $user || request()->is('app', 'app/*')
         ? ['label' => __('Go to your workspace'), 'url' => $user ? app(\App\Support\Auth\LoginDestination::class)->resolve($user, null) : route('login')]
-        : ['label' => __('Back to home'), 'url' => url('/')];
+        : ['label' => __('Back to home'), 'url' => LocalizedUrl::route('home')];
 
     $links = array_filter([
-        (string) config('chat.assistant_name') => route('ai'),
-        __('Pricing') => route('pricing'),
-        __('Help center') => Route::has('help.index') ? route('help.index') : null,
-        __('Developers') => Route::has('documentation.index') ? route('documentation.index') : null,
-        __('Contact us') => route('contact'),
+        (string) config('chat.assistant_name') => LocalizedUrl::route('ai'),
+        __('Pricing') => LocalizedUrl::route('pricing'),
+        __('Help center') => Route::has('help.index') ? LocalizedUrl::route('help.index') : null,
+        __('Developers') => Route::has('documentation.index') ? LocalizedUrl::route('documentation.index') : null,
+        __('Contact us') => LocalizedUrl::route('contact'),
     ], fn (?string $url): bool => $url !== null && $url !== $suggestion?->url);
 @endphp
 

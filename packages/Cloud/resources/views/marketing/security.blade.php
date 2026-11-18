@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $emailActive = \Relaticle\EmailIntegration\EmailIntegrationServiceProvider::enabled();
@@ -78,7 +79,7 @@
         ['lucide-git-fork', __('Open source'), __('AGPL-3.0. Read the code, or run it on your own server.'), '#data'],
     ];
 
-    $policyLink = [route('policy.show'), __('Read the privacy policy for sharing settings, deletion and the Google Limited Use commitment.')];
+    $policyLink = [LocalizedUrl::route('policy.show'), __('Read the privacy policy for sharing settings, deletion and the Google Limited Use commitment.')];
 
     $sections = array_filter([
         ['account', __('Your account'), __('How you sign in, and what protects the account.'), $account, null],
@@ -149,7 +150,7 @@
             </p>
 
             <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
-                <x-cloud::marketing.button href="{{ route('policy.show') }}">
+                <x-cloud::marketing.button href="{{ LocalizedUrl::route('policy.show') }}">
                     {{ __('Read the privacy policy') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" href="#report">
@@ -249,7 +250,7 @@
                     <h2 class="type-title text-gray-950 dark:text-white">{{ __('Security questions, answered') }}</h2>
                     <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                         {{ __('Something else on your mind?') }}
-                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                        <a href="{{ LocalizedUrl::route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
                     </p>
                 </div>
             </div>
@@ -264,7 +265,7 @@
         <x-cloud::marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
             {{ __('View on GitHub') }}
         </x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+        <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}">
             {{ __('Get in touch') }}
         </x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
@@ -274,15 +275,15 @@
             ->webPage(fn ($webPage) => $webPage
                 ->name($title)
                 ->description($description)
-                ->url(route('security')))
+                ->url(LocalizedUrl::route('security')))
             ->fAQPage(fn ($faqPage) => $faqPage
                 ->mainEntity(collect($faqs)->map(fn (array $faq) => \Spatie\SchemaOrg\Schema::question()
                     ->name($faq[0])
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
-                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Security'))->item(route('security')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Security'))->item(LocalizedUrl::route('security')),
                 ]));
     @endphp
 

@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @props([
     'post',
     'relatedPosts',
@@ -12,10 +13,10 @@
     <x-slot:eyebrow>
         <nav aria-label="{{ __('Breadcrumb') }}">
             <ol class="type-label flex flex-wrap items-center gap-2 text-gray-500 dark:text-gray-400">
-                <li><a href="{{ route('blog.index') }}" class="{{ $crumbClass }}">{{ __('Blog') }}</a></li>
+                <li><a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $crumbClass }}">{{ __('Blog') }}</a></li>
                 @if($post->category)
                     <li aria-hidden="true">/</li>
-                    <li><a href="{{ route('blog.category', $post->category->slug) }}" class="{{ $crumbClass }}">{{ $post->category->name }}</a></li>
+                    <li><a href="{{ LocalizedUrl::route('blog.category', ['slug' => $post->category->slug]) }}" class="{{ $crumbClass }}">{{ $post->category->name }}</a></li>
                 @endif
             </ol>
         </nav>
@@ -68,7 +69,7 @@
                 <div class="border-rail mt-12 flex flex-wrap items-center gap-2 border-t pt-8">
                     <span class="type-label mr-1 text-gray-500 dark:text-gray-400">{{ __('Tagged') }}</span>
                     @foreach($post->tags as $tag)
-                        <a href="{{ route('blog.tag', $tag->slug) }}"
+                        <a href="{{ LocalizedUrl::route('blog.tag', ['slug' => $tag->slug]) }}"
                            class="border-rail hover:bg-tint inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium text-gray-700 transition-colors dark:text-gray-200">
                             #{{ $tag->name }}
                         </a>

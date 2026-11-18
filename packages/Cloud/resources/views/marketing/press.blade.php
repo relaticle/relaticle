@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $facts = \Relaticle\Cloud\Marketing\Support\CompetitorFacts::all()['relaticle'];
     $starsLabel = $githubStars > 0
@@ -199,7 +200,7 @@
                         </li>
                     @endforeach
                 </ul>
-                <p class="border-rail border-t px-6 py-5 text-sm text-gray-500 md:px-8 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
+                <p class="border-rail border-t px-6 py-5 text-sm text-gray-500 md:px-8 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ LocalizedUrl::route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
             </div>
         </div>
     </x-cloud::marketing.frame>
@@ -212,7 +213,7 @@
                 <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Use these assets to identify or cover Relaticle. Do not imply a partnership or endorsement without our agreement.') }}</p>
             </div>
             <div class="bg-surface flex items-center p-6 md:p-10 lg:col-span-4">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}" iconTrailing="lucide-arrow-right">{{ __('Contact the team') }}</x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}" iconTrailing="lucide-arrow-right">{{ __('Contact the team') }}</x-cloud::marketing.button>
             </div>
         </div>
     </x-cloud::marketing.frame>

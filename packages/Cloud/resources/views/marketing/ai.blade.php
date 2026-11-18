@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
@@ -156,7 +157,7 @@
                 </p>
 
                 <div class="flex shrink-0 flex-wrap items-center gap-x-6 gap-y-3">
-                    <a href="{{ route('aiNativeCrm') }}" class="{{ $linkClass }} text-sm">{{ __('What makes a CRM AI-native?') }}</a>
+                    <a href="{{ LocalizedUrl::route('aiNativeCrm') }}" class="{{ $linkClass }} text-sm">{{ __('What makes a CRM AI-native?') }}</a>
                     <x-cloud::marketing.button variant="secondary" href="#demo" class="lg:hidden">
                         {{ __('See it work') }}
                     </x-cloud::marketing.button>
@@ -189,7 +190,7 @@
                     __('Every active custom attribute, with options shown as text'),
                 ]"
                 :link-label="__('How approvals work')"
-                :link-href="$documentationActive ? route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes']) : null"
+                :link-href="$documentationActive ? LocalizedUrl::route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes']) : null"
             >
                 {{ __('Linked in order and approved once.') }}
 
@@ -208,7 +209,7 @@
                     __('Points you to the page for what chat cannot do'),
                 ]"
                 :link-label="__('What :name can answer', ['name' => $assistantName])"
-                :link-href="$documentationActive ? route('help.show', ['category' => 'ai-assistant', 'slug' => 'ask-questions-about-your-data']) : null"
+                :link-href="$documentationActive ? LocalizedUrl::route('help.show', ['category' => 'ai-assistant', 'slug' => 'ask-questions-about-your-data']) : null"
             >
                 {{ __('With the source one click away.') }}
 
@@ -228,7 +229,7 @@
                         trans_choice('An Undo button stays up for :count second after Send|An Undo button stays up for :count seconds after Send', $undoSeconds, ['count' => $undoSeconds]),
                     ]"
                     :link-label="__('Use your email with an AI assistant')"
-                    :link-href="$documentationActive ? route('help.show', ['category' => 'email-and-calendar', 'slug' => 'use-your-email-with-an-ai-assistant']) : null"
+                    :link-href="$documentationActive ? LocalizedUrl::route('help.show', ['category' => 'email-and-calendar', 'slug' => 'use-your-email-with-an-ai-assistant']) : null"
                 >
                     {{ __('You press Send.') }}
 
@@ -290,7 +291,7 @@
                     __('Relaticle does not train AI models on your CRM data'),
                 ]))"
                 :link-label="__('Which providers handle a request')"
-                :link-href="route('security').'#ai'"
+                :link-href="LocalizedUrl::route('security').'#ai'"
             >
                 {{ __('Right from the message box.') }}
 
@@ -324,7 +325,7 @@
                         </x-cloud::marketing.button>
                     @endforeach
                     @feature(App\Features\Documentation::class)
-                        <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('documentation.index') }}">
+                        <x-cloud::marketing.button variant="secondary" size="sm" href="{{ LocalizedUrl::route('documentation.index') }}">
                             {{ __('Read the developer docs') }}
                         </x-cloud::marketing.button>
                     @endfeature
@@ -346,7 +347,7 @@
                     <p class="type-prose mt-2 text-gray-500 dark:text-gray-400">{{ __('Self-hosting Relaticle does not mean giving up the assistant. On your own server, bring your own API key for Claude or GPT, or point it at a local model with Ollama and keep every request on your own infrastructure.') }}</p>
                 </div>
                 <div class="mt-auto">
-                    <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('selfHosted') }}" iconTrailing="lucide-arrow-right">
+                    <x-cloud::marketing.button variant="secondary" size="sm" href="{{ LocalizedUrl::route('selfHosted') }}" iconTrailing="lucide-arrow-right">
                         {{ __('See self-hosting options') }}
                     </x-cloud::marketing.button>
                 </div>
@@ -362,7 +363,7 @@
                     <h2 class="type-title text-gray-950 dark:text-white">{{ __('Questions about :name, answered', ['name' => $assistantName]) }}</h2>
                     <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                         {{ __('Something else on your mind?') }}
-                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                        <a href="{{ LocalizedUrl::route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
                     </p>
                 </div>
             </div>
@@ -380,7 +381,7 @@
         <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
             {{ __('Start for free') }}
         </x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
+        <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('pricing') }}">
             {{ __('See pricing') }}
         </x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
@@ -397,8 +398,8 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
-                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name($assistantName)->item(route('ai')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name($assistantName)->item(LocalizedUrl::route('ai')),
                 ]));
     @endphp
 

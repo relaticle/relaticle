@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $quotes = collect(config('marketing.testimonials'))->keyBy(fn (array $t): string => $t['slot'] ?? '')->all();
@@ -16,7 +17,7 @@
             :lead="__('A pipeline you read at a glance.')"
             :facts="[__('Board or list, your pick'), __('Drag a card to the next stage'), __('Rename, recolor or reorder the stages')]"
             :link-label="__('Track a deal through the pipeline')"
-            :link-href="$documentationActive ? route('help.show', ['category' => 'getting-started', 'slug' => 'track-a-deal-through-the-pipeline']) : null"
+            :link-href="$documentationActive ? LocalizedUrl::route('help.show', ['category' => 'getting-started', 'slug' => 'track-a-deal-through-the-pipeline']) : null"
             :quote="$quotes['board'] ?? null"
         >
             {{ __('Company, amount and close date, in the stages you define.') }}
@@ -32,7 +33,7 @@
             :lead="__('Ask in plain words.')"
             :facts="[__('Type @ to point it at any record'), __('Every create, update and delete waits for your approval'), __('Fix a field on the card before you approve')]"
             :link-label="__('Meet :name', ['name' => $assistantName])"
-            :link-href="route('ai')"
+            :link-href="LocalizedUrl::route('ai')"
             :quote="$quotes['rela'] ?? null"
         >
             {{ __(':name drafts the change. You approve it before it is saved.', ['name' => $assistantName]) }}

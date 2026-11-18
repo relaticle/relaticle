@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-cloud::guest-layout
     title="Contact: Deployments and integrations - Relaticle"
     description="Get in touch with the Relaticle team. Questions about enterprise deployments, custom integrations, or partnerships."
@@ -18,7 +19,7 @@
                 {{ $inquiry ? __("cloud::billing.inquiry.{$inquiryKey}.body") : __('Questions about deployments, integrations, or partnerships? Get in touch with our team.') }}
             </p>
             @if($inquiry)
-                <a href="{{ route('pricing') }}" class="mt-5 inline-flex items-center gap-2 text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">
+                <a href="{{ LocalizedUrl::route('pricing') }}" class="mt-5 inline-flex items-center gap-2 text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">
                     <x-lucide-arrow-left class="size-4" />
                     {{ __('Back to pricing') }}
                 </a>
@@ -37,8 +38,8 @@
                     <x-cloud::marketing.eyebrow class="mb-4">{{ __('Other ways in') }}</x-cloud::marketing.eyebrow>
                     <ul class="divide-rail border-rail divide-y border-y">
                         @feature(App\Features\Documentation::class)
-                            <li><a href="{{ route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-life-buoy class="size-4 text-gray-400"/>Help center</a></li>
-                            <li><a href="{{ route('documentation.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-book-open class="size-4 text-gray-400"/>Developer Docs</a></li>
+                            <li><a href="{{ LocalizedUrl::route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-life-buoy class="size-4 text-gray-400"/>Help center</a></li>
+                            <li><a href="{{ LocalizedUrl::route('documentation.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-book-open class="size-4 text-gray-400"/>Developer Docs</a></li>
                         @endfeature
                         <li><a href="{{ route('discord') }}" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-discord-fill class="size-4 text-gray-400"/>Join Discord community</a></li>
                         <li><a href="https://github.com/relaticle/relaticle" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-github-fill class="size-4 text-gray-400"/>GitHub repository</a></li>
@@ -56,7 +57,7 @@
                         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ session('success') }}</p>
                     </div>
                 @else
-                    <form method="POST" action="{{ route('contact', $inquiry ? ['plan' => $inquiryKey] : []) }}" class="max-w-2xl space-y-6">
+                    <form method="POST" action="{{ route('contact.store', $inquiry ? ['plan' => $inquiryKey] : []) }}" class="max-w-2xl space-y-6">
                         @csrf
                         <x-honeypot />
 

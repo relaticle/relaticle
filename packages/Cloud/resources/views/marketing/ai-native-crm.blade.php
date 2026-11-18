@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
@@ -21,7 +22,7 @@
             ['credits' => $freeCredits]
         );
 
-    $mcpDocsUrl = route('documentation.show', ['type' => 'mcp']);
+    $mcpDocsUrl = LocalizedUrl::route('documentation.show', ['type' => 'mcp']);
 
     $checks = [
         [
@@ -43,21 +44,21 @@
             __('An assistant that can write to your pipeline needs a review step, or one bad prompt rewrites a quarter of deals.'),
             __(':name proposes every change as a card and waits. You approve or reject each record before anything is written.', ['name' => $assistantName]),
             __('How approvals work'),
-            $documentationActive ? route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes']) : route('ai'),
+            $documentationActive ? LocalizedUrl::route('help.show', ['category' => 'ai-assistant', 'slug' => 'approve-what-the-assistant-changes']) : LocalizedUrl::route('ai'),
         ],
         [
             __('Can it run where your data lives?'),
             __('If the only way to get the AI is the vendor cloud, the CRM is not yours in any way that matters.'),
             __('Self-host the whole thing with Docker Compose. Bring your own key for Claude or GPT, or point it at a local model with Ollama.'),
             __('Self-hosting'),
-            route('selfHosted'),
+            LocalizedUrl::route('selfHosted'),
         ],
         [
             __('Do you pay for AI per seat?'),
             __('Per-seat AI add-ons punish the teams that adopt it most.'),
             __('One flat price for unlimited users. AI is metered by what you use, in credits, not by how many people log in.'),
             __('Pricing'),
-            route('pricing'),
+            LocalizedUrl::route('pricing'),
         ],
     ];
 
@@ -81,22 +82,22 @@
             __('Connect what you already use'),
             __('Claude and ChatGPT reach your workspace through the built-in MCP server. The setup is a consent screen, with no code and no API keys.'),
             [
-                [__('Relaticle for Claude'), route('assistants.claude'), 'ri-claude-fill'],
-                [__('Relaticle for ChatGPT'), route('assistants.chatgpt'), 'ri-openai-fill'],
+                [__('Relaticle for Claude'), LocalizedUrl::route('assistants.claude'), 'ri-claude-fill'],
+                [__('Relaticle for ChatGPT'), LocalizedUrl::route('assistants.chatgpt'), 'ri-openai-fill'],
             ],
         ],
         [
             __('Meet the assistant inside'),
             __(':name opens beside every page, answers from your records, and proposes every change as a card you approve or reject.', ['name' => $assistantName]),
             [
-                [__('Meet :name', ['name' => $assistantName]), route('ai'), null],
+                [__('Meet :name', ['name' => $assistantName]), LocalizedUrl::route('ai'), null],
             ],
         ],
         [
             __('Run it where the data lives'),
             __('The self-hosted install runs the same open-source CRM as the cloud, with :name and the MCP server. Bring your own key, or run a local model with Ollama.', ['name' => $assistantName]),
             [
-                [__('See self-hosting options'), route('selfHosted'), null],
+                [__('See self-hosting options'), LocalizedUrl::route('selfHosted'), null],
                 [__('Read the MCP server docs'), $mcpDocsUrl, null],
             ],
         ],
@@ -150,7 +151,7 @@
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('selfHosted') }}">
+                <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('selfHosted') }}">
                     {{ __('Self-host it') }}
                 </x-cloud::marketing.button>
             </div>
@@ -289,7 +290,7 @@
                     <h2 class="type-title text-gray-950 dark:text-white">{{ __('Questions about AI-native CRMs, answered') }}</h2>
                     <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                         {{ __('Something else on your mind?') }}
-                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                        <a href="{{ LocalizedUrl::route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
                     </p>
                 </div>
             </div>
@@ -304,7 +305,7 @@
         <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
             {{ __('Start for free') }}
         </x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" href="{{ route('pricing') }}">
+        <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('pricing') }}">
             {{ __('See pricing') }}
         </x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
@@ -321,8 +322,8 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
-                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('AI-native CRM'))->item(route('aiNativeCrm')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('AI-native CRM'))->item(LocalizedUrl::route('aiNativeCrm')),
                 ]));
     @endphp
 

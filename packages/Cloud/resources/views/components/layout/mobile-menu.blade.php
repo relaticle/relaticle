@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <div x-show="mobileMenu" x-transition.opacity.duration.150ms @click="mobileMenu = false" class="fixed inset-0 z-[59] md:hidden" x-cloak aria-hidden="true"></div>
 
 <nav x-show="mobileMenu"
@@ -15,7 +16,7 @@
 
     {{-- Header --}}
     <div class="flex items-center justify-between h-16 shrink-0 px-6 sm:px-[25px]">
-        <a href="{{ url('/') }}" aria-label="Relaticle Home">
+        <a href="{{ LocalizedUrl::route('home') }}" aria-label="Relaticle Home">
             <x-brand.logo-lockup size="md" class="text-black dark:text-white"/>
         </a>
         {{-- Focus lands here when the overlay opens, so the trap has somewhere to

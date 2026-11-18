@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 {{-- The mobile overlay is `fixed inset-0`, which does not stop the page behind it
      from scrolling, and does not stop Tab from walking into the page behind it
      either. `bodyLock` handles the first, `trapTab` the second.
@@ -46,7 +47,7 @@
             <div class="flex h-16 items-center justify-between">
 
                 <div class="flex flex-1 items-center">
-                    <a href="{{ url('/') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="Relaticle Home">
+                    <a href="{{ LocalizedUrl::route('home') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="Relaticle Home">
                         <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                     </a>
                 </div>

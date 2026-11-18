@@ -25,6 +25,7 @@
 {{-- Defaults to the query-stripped URL, which is what consolidates the marketing
      pages. Pages that genuinely paginate pass their own page-aware canonical. --}}
 <link rel="canonical" href="{{ $canonical ?? url()->current() }}" />
+<x-cloud::layout.alternate-links />
 @if($robots)
     <meta name="robots" content="{{ $robots }}">
 @endif
@@ -46,7 +47,7 @@
 <meta property="og:url" content="{{ request()->getUri() }}"/>
 <meta property="og:type" content="{{ $ogType }}" />
 <meta property="og:site_name" content="{{ config('app.name', 'Relaticle') }}" />
-<meta property="og:locale" content="{{ str_replace('_', '-', app()->getLocale()) }}" />
+<meta property="og:locale" content="{{ \Relaticle\Cloud\Marketing\Support\LocalizedUrl::openGraphLocale(app()->getLocale()) }}" />
 
 <!-- Twitter Card Meta Tags -->
 <meta name="twitter:card" content="summary_large_image" />
