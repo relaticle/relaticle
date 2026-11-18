@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Auth\ConfirmMfaEnrollment;
+use App\Actions\Auth\VerifyTotpCode;
 use App\Enums\SocialiteProvider;
 use App\Livewire\App\Profile\ManageMfa;
 use App\Models\User;
@@ -15,7 +16,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
 use PragmaRX\Google2FA\Google2FA;
 
-mutates(ManageMfa::class, ConfirmMfaEnrollment::class);
+mutates(ManageMfa::class, ConfirmMfaEnrollment::class, VerifyTotpCode::class);
 
 test('the section renders and reports that MFA is off', function (): void {
     $this->actingAs(User::factory()->withWorkspace()->create());

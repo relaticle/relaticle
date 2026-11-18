@@ -3,16 +3,19 @@
 declare(strict_types=1);
 
 use App\Actions\Auth\CompleteAuthentication;
+use App\Actions\Auth\VerifyMfa;
+use App\Actions\Auth\VerifyTotpCode;
 use App\Enums\AuthMethod;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Testing\TestResponse;
 use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Fortify;
 use PragmaRX\Google2FA\Google2FA;
 
-mutates(CompleteAuthentication::class, AuthenticationSession::class);
+mutates(CompleteAuthentication::class, AuthenticationSession::class, VerifyMfa::class, VerifyTotpCode::class);
 
 test('completing authentication rotates the session id so a fixated session cannot be reused', function (): void {
     $user = User::factory()->withWorkspace()->create();
@@ -75,6 +78,7 @@ test('an authenticator code is refused the second time at the sign-in challenge'
 
     $this->post(route('logout'));
     $this->assertGuest();
+    Cache::flush();
 
     passMfaChallenge($user, $code)->assertSessionHasErrors('code');
     $this->assertGuest();

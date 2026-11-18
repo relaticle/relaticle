@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Auth\CancelIdentityConfirmation;
 use App\Actions\Auth\CompleteIdentityMfa;
+use App\Actions\Auth\VerifyTotpCode;
 use App\Enums\SocialiteProvider;
 use App\Filament\Pages\Security;
 use App\Http\Controllers\Auth\IdentityConfirmationController;
@@ -28,6 +29,7 @@ mutates(
     IdentityConfirmationRedirectController::class,
     CompleteIdentityMfa::class,
     IdentityConfirmation::class,
+    VerifyTotpCode::class,
 );
 
 test('the confirm-identity page renders for a user with a password', function () {
