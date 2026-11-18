@@ -14,7 +14,7 @@
 
 - Locales: `['en', 'de', 'es', 'fr']`, read only through `config('app.available_locales')`. English is the default and keeps every existing URL, and an unprefixed public URL always renders English.
 - The install's default language is `config('app.default_locale')` (env `APP_LOCALE`). Never read `config('app.locale')` as the default: `Application::setLocale()` overwrites it on every call.
-- Address: German "Sie", French "vous", Spanish neutral Latin American with "tú" (no "vosotros", no one-country words like "ordenador" or "computadora"). Locale code `es`.
+- Address: German "Sie", French "vous", Spanish neutral Latin American with "usted" (no "vosotros", no one-country words like "ordenador" or "computadora"). Locale code `es`. German writes "MCP-Server".
 - Every translation obeys the `docs/i18n.md` glossary (Task 9), and Rela is never translated.
 - No em-dash (U+2014) in any file. The `ConventionsTest` copy checks apply to every language file.
 - Core never names `Relaticle\Cloud`, `cloud::` or `packages/Cloud`. Marketing copy lives in `packages/Cloud/lang`.

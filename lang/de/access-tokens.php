@@ -123,7 +123,7 @@ return [
         'heading' => 'Nächste Schritte',
         'api_link' => 'REST API',
         'api_description' => 'CRM-Daten programmatisch verwalten.',
-        'mcp_link' => 'MCP server',
+        'mcp_link' => 'MCP-Server',
         'mcp_description' => 'KI-Assistenten wie Claude verbinden.',
         'forms_link' => 'Webformulare',
         'forms_description' => 'Formulareinsendungen mit Maxforms in Einträge verwandeln.',

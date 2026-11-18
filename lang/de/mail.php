@@ -87,7 +87,7 @@ return [
         'preheader_grandfathered' => 'Ihr Arbeitsbereich nutzt wieder seinen Cloud-Free-Tarif.',
         'paused' => 'Der Cloud-Zugriff auf :workspace ist jetzt pausiert. Ihre Einträge sind sicher, und nichts wurde gelöscht.',
         'mailbox_sync_paused' => 'Auch die E-Mail- und Kalendersynchronisierung ist pausiert. Sie wird fortgesetzt, sobald Sie ein Abonnement abschließen.',
-        'restore' => 'Schließen Sie einen Cloud-Tarif ab, um App, REST-API, MCP server und KI-Assistent genau dort wieder zu öffnen, wo Sie aufgehört haben.',
+        'restore' => 'Schließen Sie einen Cloud-Tarif ab, um App, REST-API, MCP-Server und KI-Assistent genau dort wieder zu öffnen, wo Sie aufgehört haben.',
         'grandfathered' => ':workspace nutzt wieder seinen bestehenden Cloud-Free-Tarif. Ihre Daten bleiben unberührt, und Sie können jederzeit wieder ein Abonnement abschließen.',
         'cta' => 'Tarif wählen',
         'cta_grandfathered' => 'Tarif wählen',

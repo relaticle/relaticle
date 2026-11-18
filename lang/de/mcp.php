@@ -15,7 +15,7 @@ return [
         ],
         'redirect' => 'Nach der Autorisierung gelangen Sie zurück zu :host. Fahren Sie nur fort, wenn Sie dieser Website vertrauen.',
         'signed_in_as' => 'Angemeldet als :email.',
-        'invalid_resource' => 'Diese Verbindung hat Zugriff auf einen anderen Server angefordert. Relaticle autorisiert nur Verbindungen zum eigenen MCP server.',
+        'invalid_resource' => 'Diese Verbindung hat Zugriff auf einen anderen Server angefordert. Relaticle autorisiert nur Verbindungen zum eigenen MCP-Server.',
 
         'workspace' => [
             'heading' => 'Welcher Arbeitsbereich?',

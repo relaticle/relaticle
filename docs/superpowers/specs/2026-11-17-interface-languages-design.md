@@ -287,12 +287,17 @@ that is fragile. A German workspace seeded with "Erledigt" would never count a t
 
 ### Form of address and Spanish variant
 
-Decided by Manuk on 2026-11-17 (option A of five): German uses "Sie", French uses "vous", Spanish
-is neutral Latin American with "tú". This matches Filament's own translations, which share every
-screen with ours ("Sind Sie sicher", "Êtes-vous sûr", "¿Estás seguro?"). Neutral Spanish uses no
-"vosotros" and no word only one country uses ("ordenador", "computadora"). 62% of Spanish visits
-came from Latin America (198 of 319, 2026-09-16 to 2026-11-17). The locale code stays `es`.
-srchema's Spain-Spanish fork is a starting point. Its "tú" carries over and its Spain-only words change.
+Decided by Manuk on 2026-11-17 and corrected on 2026-11-18: German uses "Sie", French uses "vous",
+Spanish is neutral Latin American with "usted". The first decision picked "tú" on the belief that
+Filament's Spanish uses it. It does not: Filament v5.11.2's Spanish mostly addresses the user as
+"usted" (75 forms against 22, the confirm modal reads "¿Está segura/o de hacer esto?"). "usted"
+matches most of what Filament shows and the formality of German and French, with no override
+files. Filament's own 22 "tú" lines stay as they are. Neutral Spanish uses no "vosotros" and no
+word only one country uses ("ordenador", "computadora"). 62% of Spanish visits came from Latin
+America (198 of 319, 2026-09-16 to 2026-11-17). The locale code stays `es`.
+
+German writes the MCP server as "MCP-Server" (decided 2026-11-18), as it already writes
+"API-Token". Spanish and French keep "MCP server" as the glossary says.
 
 ### Vocabulary
 
