@@ -1048,7 +1048,7 @@
 
                 // There is no back button here, so a touch screen focuses nothing rather than zoom into the search box.
                 focusAddStart() {
-                    if (!window.avoidsSearchFocus()) panel.querySelector('[data-add-column-search]')?.focus()
+                    if (!window.avoidsSearchFocus()) panel.querySelector('[data-add-column-search]')?.focus({ preventScroll: true })
                 },
 
                 open(trigger) {
@@ -1071,7 +1071,7 @@
 
                         this.place()
                         this.placed = true
-                        this.focusAddStart()
+                        this.$nextTick(() => this.focusAddStart())
                     }))
                 },
 
