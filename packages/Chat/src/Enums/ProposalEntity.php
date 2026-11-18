@@ -30,14 +30,19 @@ enum ProposalEntity: string
         return __("enums/proposal-entity.noun.{$this->value}");
     }
 
-    public function pluralTitle(int $count): string
-    {
-        return trans_choice("enums/proposal-entity.plural_title.{$this->value}", $count);
-    }
-
     public function createLabel(): string
     {
-        return __(':verb :entity', ['verb' => $this->createVerb(), 'entity' => $this->inlineName()]);
+        return __("enums/proposal-entity.create_label.{$this->value}");
+    }
+
+    public function deleteTitle(): string
+    {
+        return __("enums/proposal-entity.delete_title.{$this->value}");
+    }
+
+    public function deleteSummary(string $name): string
+    {
+        return __("enums/proposal-entity.delete_summary.{$this->value}", ['name' => $name]);
     }
 
     public function plural(int $count): string
@@ -131,27 +136,12 @@ enum ProposalEntity: string
 
     public function batchTitle(PendingActionOperation $operation, int $count): string
     {
-        return match ($operation) {
-            PendingActionOperation::Create => __(':verb :entities', ['verb' => $this->createVerb(), 'entities' => $this->pluralTitle($count)]),
-            PendingActionOperation::Update => __('Update :entities', ['entities' => $this->pluralTitle($count)]),
-            PendingActionOperation::Delete => __('Delete :count :entities', ['count' => $count, 'entities' => $this->pluralTitle($count)]),
-        };
+        return trans_choice("enums/proposal-entity.batch_title.{$operation->value}.{$this->value}", $count, ['count' => $count]);
     }
 
     public function batchSummary(PendingActionOperation $operation, int $count): string
     {
-        $verb = match ($operation) {
-            PendingActionOperation::Create => $this->createVerb(),
-            PendingActionOperation::Update => __('Update'),
-            PendingActionOperation::Delete => __('Delete'),
-        };
-
-        return __(':verb :count :entities', ['verb' => $verb, 'count' => $count, 'entities' => $this->plural($count)]);
-    }
-
-    private function createVerb(): string
-    {
-        return __("enums/proposal-entity.create_verb.{$this->value}");
+        return trans_choice("enums/proposal-entity.batch_summary.{$operation->value}.{$this->value}", $count, ['count' => $count]);
     }
 
     public function createSummary(string $title): string

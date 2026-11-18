@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Models\Task;
 use App\Models\User;
 use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Lang;
 use Laravel\Ai\Tools\Request;
 use Livewire\Livewire;
@@ -17,27 +17,20 @@ use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
+use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 
 mutates(ChatInterface::class, ProposalCard::class);
 
 beforeEach(function (): void {
-    $this->langPath = sys_get_temp_dir().'/chat-chrome-locale-'.bin2hex(random_bytes(4));
-    File::ensureDirectoryExists($this->langPath);
-    File::put($this->langPath.'/fr.json', json_encode([
-        'Ask anything...' => 'Demandez ce que vous voulez...',
-        'Action class not allowlisted' => 'Action non autorisee',
-        'Searching companies…' => 'Recherche des entreprises',
-        'Reading company details…' => 'Lecture de la fiche entreprise',
-        'New chat' => 'Nouvelle conversation',
-        'Your session expired. Please sign in again: your message is saved locally.' => 'Votre session a expire',
-    ], JSON_UNESCAPED_UNICODE));
-    Lang::addJsonPath($this->langPath);
     Lang::addLines([
         'enums/proposal-entity.create_title.task' => 'Creer une tache',
         'enums/proposal-entity.create_summary.task' => '« :title » a creer',
-        'enums/proposal-entity.create_verb.task' => 'Creer',
+        'enums/proposal-entity.create_label.task' => 'Tache a creer',
+        'enums/proposal-entity.batch_title.create.task' => 'Tache a creer|Taches a creer',
+        'enums/proposal-entity.batch_summary.create.task' => ':count tache a creer|:count taches a creer',
+        'enums/proposal-entity.delete_title.task' => 'Supprimer la tache',
+        'enums/proposal-entity.delete_summary.task' => 'Supprimer la tache « :name »',
         'enums/proposal-entity.plural.task' => 'tache|taches',
-        'enums/proposal-entity.plural_title.task' => 'Tache|Taches',
         'enums/proposal-entity.noun.task' => 'Tache',
     ], 'fr');
 
@@ -46,21 +39,18 @@ beforeEach(function (): void {
     Filament::setTenant($this->user->currentWorkspace);
 });
 
-afterEach(function (): void {
-    File::deleteDirectory($this->langPath);
-});
-
 it('renders the chat strings in the user language', function (): void {
     Locales::apply('fr');
 
-    $html = Livewire::test(ChatInterface::class)->html();
+    $html = preg_replace('/\\\\+u/', '\\u', html_entity_decode(Livewire::test(ChatInterface::class)->html()));
+    $inScript = fn (string $key): string => trim(json_encode(Lang::get($key, [], 'fr'), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT), '"');
 
     expect($html)
-        ->toContain('Demandez ce que vous voulez...')
-        ->toContain('Recherche des entreprises')
-        ->toContain('Lecture de la fiche entreprise')
-        ->toContain('Nouvelle conversation')
-        ->toContain('Votre session a expire');
+        ->toContain($inScript('Ask anything...'))
+        ->toContain($inScript('Searching companies…'))
+        ->toContain($inScript('Reading company details…'))
+        ->toContain($inScript('New chat'))
+        ->toContain($inScript('Your session expired. Please sign in again: your message is saved locally.'));
 });
 
 function proposeFrenchTasks(object $test, array $titles): PendingAction
@@ -100,10 +90,22 @@ it('builds batch titles, row names and nouns in the user language', function ():
 
     $view = Locales::within('fr', fn (): array => Livewire::test(ProposalCard::class, ['context' => 'conversation'])->dispatch('proposal:set-active', id: $pending->getKey(), context: 'conversation')->instance()->stepViews()[0]);
 
-    expect($pending->display_data['title'])->toBe('Creer Taches')
-        ->and($pending->display_data['summary'])->toBe('Creer 2 taches')
+    expect($pending->display_data['title'])->toBe('Taches a creer')
+        ->and($pending->display_data['summary'])->toBe('2 taches a creer')
         ->and(array_column($view['items'], 'label'))->toBe(['Appeler Priya', 'Envoyer le devis'])
-        ->and($view['entityNoun'])->toBe('Tache');
+        ->and($view['entityNoun'])->toBe('Tache')
+        ->and($view['createLabel'])->toBe('Tache a creer');
+});
+
+it('builds a single delete title and summary from full-phrase keys', function (): void {
+    $task = Task::factory()->for($this->user->currentWorkspace)->create(['title' => 'Appeler Priya']);
+
+    Locales::within('fr', fn (): string => resolve(DeleteTaskTool::class)->handle(new Request(['ids' => [$task->getKey()]])));
+
+    $pending = PendingAction::query()->where('user_id', $this->user->getKey())->firstOrFail();
+
+    expect($pending->display_data['title'])->toBe('Supprimer la tache')
+        ->and($pending->display_data['summary'])->toBe('Supprimer la tache « Appeler Priya »');
 });
 
 it('stores the approval error in English and shows it in the user language', function (): void {
@@ -129,7 +131,7 @@ it('stores the approval error in English and shows it in the user language', fun
         ->call('createCurrent')
         ->assertDispatched('proposal:resolve-failed');
 
-    expect($component->errors()->first('resolve'))->toContain('Action non autorisee')
+    expect($component->errors()->first('resolve'))->toContain(Lang::get('Action class not allowlisted', [], 'fr'))
         ->and($action->fresh()->result_data['last_error'])->toContain('Action class not allowlisted')
         ->and($action->fresh()->result_data['last_error'])->not->toContain('Action non');
 });

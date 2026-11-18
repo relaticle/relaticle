@@ -174,8 +174,8 @@ abstract class BaseWriteDeleteTool implements Tool
             $name = (string) $models->first()->{$this->nameAttribute()};
 
             return [
-                'title' => __('Delete :entity', ['entity' => $this->entityLabel()]),
-                'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                'title' => $this->proposalEntity()->deleteTitle(),
+                'summary' => $this->proposalEntity()->deleteSummary($name),
                 'name' => $name,
                 'fields' => [['label' => __('Name'), 'value' => $name]],
             ];
@@ -186,7 +186,7 @@ abstract class BaseWriteDeleteTool implements Tool
                 $name = (string) $model->{$this->nameAttribute()};
 
                 return [
-                    'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                    'summary' => $this->proposalEntity()->deleteSummary($name),
                     'name' => $name,
                     'fields' => [['label' => __('Name'), 'value' => $name]],
                 ];
