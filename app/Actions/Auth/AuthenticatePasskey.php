@@ -24,13 +24,13 @@ final readonly class AuthenticatePasskey
         $passkey = ($this->verifyPasskey)($credential, $options);
 
         if (! Passkeys::allowsLogin(request(), $passkey)) {
-            throw InvalidPasskeyException::make('Unable to sign in with this account.');
+            throw InvalidPasskeyException::make(__('Unable to sign in with this account.'));
         }
 
         $user = $passkey->user;
 
         if (! $user instanceof User) {
-            throw InvalidPasskeyException::make('Unable to sign in with this account.');
+            throw InvalidPasskeyException::make(__('Unable to sign in with this account.'));
         }
 
         return $this->beginAuthentication->execute($user, AuthMethod::PASSKEY, (string) $passkey->getKey(), $remember);

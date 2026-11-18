@@ -112,7 +112,17 @@ it('never lets a client cache the summary', function (): void {
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'resources/read',
-        'params' => ['uri' => 'relaticle://summary/crm'],
+        'params' => [
+            'uri' => 'relaticle://summary/crm',
+            '_meta' => [
+                'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                'io.modelcontextprotocol/clientCapabilities' => (object) [],
+            ],
+        ],
+    ], [
+        'MCP-Protocol-Version' => '2026-07-28',
+        'Mcp-Method' => 'resources/read',
+        'Mcp-Name' => 'relaticle://summary/crm',
     ])
         ->assertOk()
         ->assertJsonPath('result.ttlMs', 0);
