@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Support;
 
-use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\User;
@@ -66,7 +65,7 @@ final readonly class CustomFieldDefinitionValidator
             )],
             'code' => ['nullable', 'string', 'max:50', 'alpha_dash', self::uniqueDefinition('code', $tenantId, $entityType)],
             'lookup_type' => ['nullable', $requiresLookupType ? 'required' : 'prohibited', 'string', Rule::in($lookupTypes)],
-            'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
+            'options' => ['nullable', ...self::optionsPresence($type), 'array', "max:{$maxOptions}"],
             'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
             'options.*.settings.color' => ['nullable', 'hex_color'],
             'settings' => ['nullable', 'array'],
@@ -359,9 +358,19 @@ final readonly class CustomFieldDefinitionValidator
         return $data;
     }
 
-    private static function expectsOptions(string $type): bool
+    // The package's own form offers an options list for these types, and a tags input takes its options as suggestions.
+    /**
+     * @return list<string>
+     */
+    private static function optionsPresence(string $type): array
     {
-        return in_array($type, CreateCustomField::CHOICE_TYPES, true);
+        $fieldType = in_array($type, self::creatableTypes(), true) ? CustomFieldsType::getFieldType($type) : null;
+
+        return match (true) {
+            $fieldType === null, ! $fieldType->dataType->isChoiceField(), $fieldType->withoutUserOptions, $fieldType->requiresLookupType => ['prohibited'],
+            $fieldType->acceptsArbitraryValues => [],
+            default => ['required'],
+        };
     }
 
     public static function maxFields(): int

@@ -14,9 +14,9 @@ use App\Support\CustomFieldDefinitionValidator;
 use App\Support\CustomFieldSettingsSchema;
 use Closure;
 use Filament\Actions\Action;
+use Filament\Forms\Components\Toggle;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\Width;
 use Illuminate\Support\Arr;
@@ -54,7 +54,7 @@ trait CreatesTableAttribute
                 'type' => ($type ?? $this->presetAttributeType($arguments) ?? CustomFieldType::TEXT)->value,
             ]))
             ->schema(fn (): array => $this->tableAttributeFields($type))
-            ->action(fn (array $data, Schema $schema) => $created($this->createTableAttribute($type instanceof CustomFieldType ? [...$data, 'type' => $type->value] : $data, $schema)));
+            ->action(fn (array $data, Schema $schema) => $created($this->createTableAttribute($type instanceof CustomFieldType ? $this->lockedAttributeData($data, $type) : $data, $schema)));
     }
 
     protected function canCreateTableAttribute(): bool
@@ -90,18 +90,36 @@ trait CreatesTableAttribute
         return $fields;
     }
 
+    // A fixed type is the board's grouping field, and the board never groups by an encrypted one.
     /**
      * @param  array<int, mixed>  $components
      */
     private function lockAttributeType(array $components): void
     {
         foreach ($components as $component) {
+            if (! $component instanceof Component) {
+                continue;
+            }
+
             match (true) {
                 $component instanceof TypeField => $component->disabled(),
-                $component instanceof Grid => $this->lockAttributeType((array) $component->getDefaultChildComponents()),
-                default => null,
+                $component instanceof Toggle && $component->getName() === 'settings.encrypted' => $component->hidden(),
+                default => $this->lockAttributeType((array) $component->getDefaultChildComponents()),
             };
         }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function lockedAttributeData(array $data, CustomFieldType $type): array
+    {
+        return [
+            ...$data,
+            'type' => $type->value,
+            'settings' => Arr::except((array) ($data['settings'] ?? []), 'encrypted'),
+        ];
     }
 
     /**

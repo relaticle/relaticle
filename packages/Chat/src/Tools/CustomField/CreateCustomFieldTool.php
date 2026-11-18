@@ -66,12 +66,15 @@ final class CreateCustomFieldTool implements Tool
                     'options' => $schema->array()
                         ->items($schema->object([
                             'name' => $schema->string()->description('The option label.')->required(),
+                            'settings' => $schema->object([
+                                'color' => $schema->string()->description('Optional hex color such as "#f59e0b". Shown only when the field\'s enable_option_colors setting is on.'),
+                            ]),
                         ]))
-                        ->description('Required for choice types (select, multi-select, radio, checkbox-list, toggle-buttons). Must not be provided for other types.'),
+                        ->description('Required for choice types (select, multi-select, radio, checkbox-list, toggle-buttons). Optional suggestions for tags-input. Must not be provided for other types.'),
                     'lookup_type' => $schema->string()
                         ->description("Required for a record field, and only there: the record type it links to. One of: {$lookupTypes}."),
                     'settings' => $schema->object()
-                        ->description('Optional settings, with the names UpdateCustomFieldTool accepts. A currency field takes currency_code (ISO 4217, such as EUR), display_type (symbol or code) and decimal_places (0, 2, 3 or 4), for example {"currency_code": "EUR"}. Any field takes {"visible_in_list": false} to hide its column. Omit for the defaults: a currency field starts in USD.'),
+                        ->description('Optional settings, with the names UpdateCustomFieldTool accepts. A currency field takes currency_code (ISO 4217, such as EUR), display_type (symbol or code) and decimal_places (0, 2, 3 or 4), for example {"currency_code": "EUR"}. Any field takes {"visible_in_list": false} to hide its column. {"encrypted": true} encrypts the stored values: only at creation, only for types that support it, and it can never be turned off, filtered on or grouped by, so set it only when the user asks. Omit for the defaults: a currency field starts in USD.'),
                 ]))
                 ->required()
                 ->description(
@@ -230,7 +233,10 @@ final class CreateCustomFieldTool implements Tool
         $name = (string) $validated['name'];
         $type = (string) $validated['type'];
         $code = (string) ($validated['code'] ?? '');
-        $optionNames = array_column(is_array($validated['options'] ?? null) ? $validated['options'] : [], 'name');
+        $optionNames = array_map(
+            fn (array $option): string => isset($option['settings']['color']) ? "{$option['name']} ({$option['settings']['color']})" : $option['name'],
+            is_array($validated['options'] ?? null) ? $validated['options'] : [],
+        );
 
         $typeLabel = CustomFieldsType::getFieldType($type)->label ?? $type;
 

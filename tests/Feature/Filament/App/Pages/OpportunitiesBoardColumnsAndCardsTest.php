@@ -986,11 +986,28 @@ it('creates a select attribute from grouped by and groups the columns by it', fu
         ->and($state->noValueColumns)->toBe([$tier->code]);
 });
 
-it('creates nothing but a select attribute from grouped by, whatever type the form sends', function (): void {
+it('refuses a grouped by attribute whose locked type was changed to one without options', function (): void {
     livewire(OpportunitiesBoard::class)
-        ->callAction('createColumnAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'options' => [['name' => 'Hot']]]);
+        ->callAction('createColumnAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'options' => [['name' => 'Hot']]])
+        ->assertHasActionErrors(['options']);
 
-    expect(CustomField::query()->where('entity_type', 'opportunity')->where('name', 'Lead score')->where('type', '!=', 'select')->exists())->toBeFalse();
+    expect(CustomField::query()->where('name', 'Lead score')->exists())->toBeFalse()
+        ->and(TablePreference::query()->first()?->board_state->columnField)->toBeNull();
+});
+
+it('hides encryption from grouped by and groups by the new attribute even when the form sends it', function (): void {
+    livewire(OpportunitiesBoard::class)
+        ->mountAction('createColumnAttribute')
+        ->assertFormFieldHidden('settings.encrypted');
+
+    livewire(OpportunitiesBoard::class)
+        ->callAction('createColumnAttribute', data: ['name' => 'Tier', 'options' => [['name' => 'Gold']], 'settings' => ['encrypted' => true]])
+        ->assertHasNoActionErrors();
+
+    $tier = CustomField::query()->where('entity_type', 'opportunity')->where('name', 'Tier')->sole();
+
+    expect($tier->settings->encrypted)->toBeFalse()
+        ->and(TablePreference::query()->sole()->board_state->columnField)->toBe($tier->code);
 });
 
 it('refuses a grouped by attribute without options', function (): void {

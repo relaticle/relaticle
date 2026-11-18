@@ -951,6 +951,18 @@ it('stores the settings chosen on the list form', function (): void {
         ->and($settings->visible_in_list)->toBeTrue();
 });
 
+it('creates a tags input from the list form with suggested tags or none', function (): void {
+    $component = livewire(ListCompanies::class);
+
+    $component->callAction('createTableAttribute', data: ['name' => 'Labels', 'type' => 'tags-input', 'options' => [['name' => 'VIP']]])
+        ->assertHasNoActionErrors();
+    $component->callAction('createTableAttribute', data: ['name' => 'Topics', 'type' => 'tags-input'])
+        ->assertHasNoActionErrors();
+
+    expect(CustomField::query()->where('entity_type', 'company')->where('name', 'Labels')->sole()->options->pluck('name')->all())->toBe(['VIP'])
+        ->and(CustomField::query()->where('entity_type', 'company')->where('name', 'Topics')->sole()->options)->toHaveCount(0);
+});
+
 it('stores option colors and currency settings from the list form', function (): void {
     $component = livewire(ListCompanies::class);
 
