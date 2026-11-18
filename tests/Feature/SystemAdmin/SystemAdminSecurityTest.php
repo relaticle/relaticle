@@ -415,9 +415,16 @@ describe('Staff passkeys', function () {
             'credential' => $assertion['storedCredential'],
         ]);
 
-        $this->postJson('/sysadmin/passkeys/login', $assertion['payload'])->assertOk();
+        $response = $this->postJson('/sysadmin/passkeys/login', [...$assertion['payload'], 'remember' => true])->assertOk();
 
         $this->assertAuthenticatedAs($administrator, 'sysadmin');
+        $response->assertCookieMissing(auth('sysadmin')->getRecallerName());
+    });
+
+    it('serves the staff sign-in page without a remember-me label', function () {
+        $this->get('/sysadmin/login')
+            ->assertOk()
+            ->assertDontSee(__('filament-panels::auth/pages/login.form.remember.label'));
     });
 
     it('refuses a staff assertion minted on the customer panel origin', function () {

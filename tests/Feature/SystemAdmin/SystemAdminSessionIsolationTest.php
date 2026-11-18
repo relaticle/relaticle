@@ -10,6 +10,7 @@ use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentView;
 use Filament\Support\View\ViewManager;
 use Illuminate\Contracts\Routing\ResponseFactory;
+use Illuminate\Cookie\CookieValuePrefix;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -329,6 +330,19 @@ it('keeps the customer signed in through staff login and logout with identical a
 
     expect(DB::table('sessions')->where('user_id', $customer->id)->exists())->toBeTrue()
         ->and(DB::table('system_administrator_sessions')->where('user_id', $administrator->id)->exists())->toBeFalse();
+});
+
+it('restores no staff session from a matching remember cookie', function (): void {
+    $cookies = [];
+    $administrator = SystemAdministrator::factory()->create(['remember_token' => 'issued-before-the-change']);
+    $recaller = Auth::guard('sysadmin')->getRecallerName();
+    $hash = $administrator->password;
+    $cookies['staff.example.test'][$recaller] = encrypt(CookieValuePrefix::create($recaller, app('encrypter')->getKey())."{$administrator->getKey()}|issued-before-the-change|{$hash}", false);
+
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/')->assertUnauthorized();
+
+    $sessions = DB::table('system_administrator_sessions')->get();
+    expect($sessions->every(fn (object $row): bool => $row->user_id === null))->toBeTrue();
 });
 
 it('serves staff blog previews while still requiring a valid signature', function (): void {

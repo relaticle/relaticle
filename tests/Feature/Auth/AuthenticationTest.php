@@ -26,6 +26,7 @@ use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -225,12 +226,12 @@ it('sets no remember-me cookie on password sign-in', function (): void {
 });
 
 it('ignores an old remember-me cookie once the session is gone', function (): void {
-    $user = User::factory()->withWorkspace()->create(['remember_token' => null]);
+    $user = User::factory()->withWorkspace()->create(['remember_token' => 'issued-before-the-change']);
     $recaller = Auth::guard('web')->getRecallerName();
 
-    $this->withCookie($recaller, "{$user->getKey()}|old-remember-token|{$user->password}")
+    $this->withCookie($recaller, "{$user->getKey()}|issued-before-the-change|".$user->password)
         ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
-        ->assertRedirect();
+        ->assertRedirect(Filament::getPanel('app')->getLoginUrl());
 
     $this->assertGuest('web');
 });
@@ -457,11 +458,12 @@ test('a well-formed passkey assertion completes login through the installed veri
     $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
     storePasskeyAssertionFor($user, $assertion);
 
-    $this->postJson(route('passkey.login'), $assertion['payload'])
+    $response = $this->postJson(route('passkey.login'), [...$assertion['payload'], 'remember' => true])
         ->assertOk()
         ->assertJson(['redirect' => Dashboard::getUrl(['tenant' => $user->currentWorkspace])]);
 
     $this->assertAuthenticatedAs($user);
+    $response->assertCookieMissing(Auth::guard('web')->getRecallerName());
 });
 
 test('a verified passkey satisfies enrolled MFA at login', function (): void {
@@ -1083,6 +1085,8 @@ test('signup creates a user and sends a verification email', function (): void {
     Notification::assertSentTo($user, VerifyEmail::class);
 
     $this->assertAuthenticated();
+    expect($user->fresh()->remember_token)->toBeNull();
+    expect(collect(Cookie::getQueuedCookies())->map->getName())->not->toContain(Auth::guard('web')->getRecallerName());
 });
 
 test('signup with a matching invitation auto-verifies the email and fires Verified', function (): void {

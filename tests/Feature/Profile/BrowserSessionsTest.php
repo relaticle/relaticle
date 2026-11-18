@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use Filament\Facades\Filament;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
@@ -247,6 +248,18 @@ test('completes a sign-in that was pending with the old remember flag', function
     $response->assertRedirect();
     $this->assertAuthenticatedAs($user);
     $response->assertCookieMissing('remember_web_'.sha1(SessionGuard::class));
+});
+
+test('the recaller cookie of an incomplete session restores nothing', function (): void {
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create(['remember_token' => 'issued-before-the-change']);
+    $recaller = 'remember_web_'.sha1(SessionGuard::class);
+    $hash = $user->password;
+
+    $this->withCookie($recaller, "{$user->getKey()}|issued-before-the-change|{$hash}")
+        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
+        ->assertRedirect(Filament::getPanel('app')->getLoginUrl());
+
+    $this->assertGuest('web');
 });
 
 test('a restored session stays challenged across repeated requests until MFA completes', function (): void {
