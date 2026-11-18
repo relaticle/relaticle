@@ -46,6 +46,6 @@ final class Membership extends JetstreamMembership
      */
     protected function roleName(): Attribute
     {
-        return Attribute::get(fn (): string => WorkspaceRole::tryFrom($this->role)?->label() ?? __('workspaces.roles.unknown'));
+        return Attribute::get(fn (): string => WorkspaceRole::tryFrom((string) $this->role)?->label() ?? __('workspaces.roles.unknown'));
     }
 }
