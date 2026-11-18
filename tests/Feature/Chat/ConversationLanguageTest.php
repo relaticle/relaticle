@@ -5,8 +5,11 @@ declare(strict_types=1);
 use App\Contracts\Entitlements;
 use App\Models\User;
 use App\Support\Locales;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\ConversationTitler;
 use Relaticle\Chat\Agents\CrmAssistant;
@@ -14,6 +17,7 @@ use Relaticle\Chat\Agents\NextStepSuggester;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Events\ChatStreamFailed;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
+use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
 
 mutates(CrmAssistant::class, ProcessChatMessage::class);
@@ -96,11 +100,42 @@ it('hands the provider the chosen language on a system-opened turn', function ()
         ->toContain("## Chosen language\nThe user's chosen language is German.");
 });
 
-it('hands the provider the chosen language on a typed turn that carries only an attachment', function (): void {
+it('hands the provider the chosen language when the user sends only an attachment', function (): void {
+    Storage::fake('local');
+    Queue::fake();
     $user = User::factory()->withPersonalWorkspace()->create(['locale' => 'de']);
+    $this->actingAs($user);
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $user->currentWorkspace->getKey()], [
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'credits_remaining' => 100,
+        'credits_used' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => now()->endOfMonth(),
+    ]);
+    $conversationId = (string) Str::uuid7();
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $user->getKey(),
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'title' => 'Language',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $attachmentId = (string) $this->postJson(route('chat.attachments.store'), [
+        'file' => UploadedFile::fake()->createWithContent('leads.csv', "Name,Email\nAnna,anna@example.test\n"),
+        'conversation_id' => $conversationId,
+    ])->assertOk()->json('id');
 
-    expect(promptedInstructionsFor($user, MessageOrigin::Typed, '', ['id' => (string) Str::uuid7(), 'name' => 'leads.csv', 'kind' => 'rows', 'row_count' => 3]))
-        ->toContain("## Chosen language\nThe user's chosen language is German.");
+    $this->postJson(route('chat.send', ['conversation' => $conversationId]), [
+        'document' => ['type' => 'doc', 'content' => []],
+        'attachment_id' => $attachmentId,
+    ])->assertOk();
+
+    CrmAssistant::fake(['ok']);
+    Queue::pushed(ProcessChatMessage::class)->sole()->handle(resolve(CreditService::class));
+
+    CrmAssistant::assertPrompted(fn ($prompt): bool => str_contains((string) $prompt->agent->instructions(), "## Chosen language\nThe user's chosen language is German."));
 });
 
 it('hands the provider no chosen language on a typed turn', function (): void {

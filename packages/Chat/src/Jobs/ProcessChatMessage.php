@@ -228,7 +228,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withUserTimezone($this->user->timezone)->withLanguage($this->user->effectiveLocale());
             $agent->withWorkspace($this->workspace);
             $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation());
-            $agent->withTurnOrigin($this->origin)->withTypedText($this->message);
+            $agent->withTurnOrigin($this->origin)->withTypedText($this->typedText());
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
@@ -1129,6 +1129,14 @@ final class ProcessChatMessage implements ShouldQueue
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
                 'steps' => StoredSteps::text($acknowledgement),
             ]);
+    }
+
+    private function typedText(): string
+    {
+        // An attachment turn's message holds the file's contents, so only the document says what the user typed.
+        return $this->attachment === null
+            ? $this->message
+            : $this->getParser()->parse($this->document, $this->workspace)['text'];
     }
 
     private function getParser(): TipTapDocumentParser
