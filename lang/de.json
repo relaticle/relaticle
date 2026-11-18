@@ -480,6 +480,8 @@
     "Type": "Typ",
     "Type at least two characters to search this conversation.": "Geben Sie mindestens zwei Zeichen ein, um dieses Gespräch zu durchsuchen.",
     "Typed": "Eingegeben",
+    "Unable to sign in with this account.": "Die Anmeldung mit diesem Konto ist nicht möglich.",
+    "Unable to verify passkey. Please try again.": "Der Passkey konnte nicht bestätigt werden. Bitte versuchen Sie es erneut.",
     "Unknown": "Unbekannt",
     "Untitled chat": "Chat ohne Titel",
     "Update": "Aktualisieren",

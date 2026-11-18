@@ -185,7 +185,8 @@ final class LangExtractCommand extends Command
 
         foreach (glob(base_path('packages/*'), GLOB_ONLYDIR) ?: [] as $package) {
             if (basename($package) !== self::SKIPPED_PACKAGE) {
-                array_push($directories, $package.'/src', $package.'/resources');
+                $directories[] = $package.'/src';
+                $directories[] = $package.'/resources';
             }
         }
 

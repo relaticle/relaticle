@@ -480,6 +480,8 @@
     "Type": "Type",
     "Type at least two characters to search this conversation.": "Saisissez au moins deux caractères pour rechercher dans cette conversation.",
     "Typed": "Saisi",
+    "Unable to sign in with this account.": "Impossible de se connecter avec ce compte.",
+    "Unable to verify passkey. Please try again.": "Impossible de vérifier la clé d'accès. Veuillez réessayer.",
     "Unknown": "Inconnu",
     "Untitled chat": "Chat sans titre",
     "Update": "Mettre à jour",

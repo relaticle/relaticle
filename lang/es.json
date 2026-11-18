@@ -480,6 +480,8 @@
     "Type": "Tipo",
     "Type at least two characters to search this conversation.": "Escriba al menos dos caracteres para buscar en esta conversación.",
     "Typed": "Escrito",
+    "Unable to sign in with this account.": "No es posible iniciar sesión con esta cuenta.",
+    "Unable to verify passkey. Please try again.": "No se pudo verificar la llave de acceso. Inténtelo de nuevo.",
     "Unknown": "Desconocido",
     "Untitled chat": "Chat sin título",
     "Update": "Actualizar",

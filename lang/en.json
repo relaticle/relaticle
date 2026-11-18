@@ -480,6 +480,8 @@
     "Type": "Type",
     "Type at least two characters to search this conversation.": "Type at least two characters to search this conversation.",
     "Typed": "Typed",
+    "Unable to sign in with this account.": "Unable to sign in with this account.",
+    "Unable to verify passkey. Please try again.": "Unable to verify passkey. Please try again.",
     "Unknown": "Unknown",
     "Untitled chat": "Untitled chat",
     "Update": "Update",

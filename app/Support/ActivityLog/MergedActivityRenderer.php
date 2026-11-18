@@ -7,6 +7,7 @@ namespace App\Support\ActivityLog;
 use App\Enums\CreationSource;
 use App\Models\ActivityLog\Activity;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Relaticle\ActivityLog\Contracts\TimelineRenderer;
@@ -57,7 +58,7 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
             return $name;
         }
 
-        $noun = $subject === null ? null : 'workspaces.activity.subjects.'.Str::snake(class_basename($subject));
+        $noun = $subject instanceof Model ? 'workspaces.activity.subjects.'.Str::snake(class_basename($subject)) : null;
 
         return $noun !== null && Lang::has($noun) ? __($noun) : __('activity-log::messages.summary.this_record');
     }
