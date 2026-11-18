@@ -1,2 +1,7 @@
+# picomatch has no patched release, and only Vite build tooling pulls it in.
+# Drop this once a fixed version ships: GHSA-fc5q-39xc-vjpf.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-fc5q-39xc-vjpf
 overrides:
   '@tailwindcss/typography>postcss-selector-parser': ^7.1.6
