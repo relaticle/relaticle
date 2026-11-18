@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Tools\SearchDocsTool;
+use Relaticle\Documentation\Support\DocsRepository;
 
 mutates(SearchDocsTool::class);
 
@@ -197,4 +200,56 @@ it('asks the model for english keywords', function (): void {
 
     expect($schema['query']->toArray()['description'])
         ->toBe('What the user wants to know, as English keywords. Translate a question asked in another language.');
+});
+
+function writeLocalizedDocs(string $root): void
+{
+    File::ensureDirectoryExists("{$root}/help/guides");
+    File::ensureDirectoryExists("{$root}/de/help/guides");
+    File::put("{$root}/help/guides/_index.md", "---\ntitle: Guides\ndescription: English guides.\norder: 1\n---\n\nBody.\n");
+    File::put("{$root}/help/guides/widgets.md", "---\ntitle: Widgets\ndescription: English widgets.\norder: 1\n---\n\n## Widget setup\n\nEnglish widget text.\n");
+    File::put("{$root}/help/guides/gadgets.md", "---\ntitle: Gadgets\ndescription: English gadgets.\norder: 2\n---\n\n## Gadget setup\n\nA gadget works like a widget in English.\n");
+    File::put("{$root}/de/help/guides/_index.md", "---\ntitle: Anleitungen\ndescription: Deutsche Anleitungen.\norder: 1\n---\n\nInhalt.\n");
+    File::put("{$root}/de/help/guides/widgets.md", "---\ntitle: Widgets deutsch\ndescription: Deutsche Widgets.\norder: 1\n---\n\n## Widget einrichten\n\nDeutscher widget Text.\n");
+
+    config()->set('documentation.content_path', $root);
+    config()->set('documentation.cache.enabled', false);
+    app()->forgetInstance(DocsRepository::class);
+}
+
+it('searches the language index first and fills the rest from English', function (): void {
+    $root = storage_path('framework/testing/search-docs-'.Str::random(8));
+    writeLocalizedDocs($root);
+    app()->setLocale('de');
+
+    $results = searchDocs('widget', 3)['results'];
+
+    File::deleteDirectory($root);
+
+    expect(array_column($results, 'title'))->toBe(['Widgets deutsch', 'Gadgets'])
+        ->and($results[0]['url'])->toContain('/de/help/guides/widgets')
+        ->and($results[1]['url'])->not->toContain('/de/');
+});
+
+it('adds no English results when the language index fills the limit', function (): void {
+    $root = storage_path('framework/testing/search-docs-'.Str::random(8));
+    writeLocalizedDocs($root);
+    app()->setLocale('de');
+
+    $results = searchDocs('widget', 1)['results'];
+
+    File::deleteDirectory($root);
+
+    expect(array_column($results, 'title'))->toBe(['Widgets deutsch']);
+});
+
+it('falls back to English search results for Rela when a language has no docs yet', function (): void {
+    $english = searchDocs('how do I export my data')['results'];
+
+    app()->setLocale('fr');
+
+    $french = searchDocs('how do I export my data')['results'];
+
+    expect($english)->not->toBeEmpty()
+        ->and($french)->toBe($english);
 });

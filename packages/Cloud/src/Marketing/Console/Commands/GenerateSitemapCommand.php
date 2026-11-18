@@ -6,12 +6,14 @@ namespace Relaticle\Cloud\Marketing\Console\Commands;
 
 use App\Features\Blog;
 use App\Features\EmailIntegration;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
@@ -77,8 +79,6 @@ final class GenerateSitemapCommand extends Command
      */
     private function addDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
     {
-        $this->ensureUrl($sitemap, route('help.index'));
-        $this->ensureUrl($sitemap, route('documentation.index'));
         $this->ensureUrl($sitemap, route('aiNativeCrm'));
         $this->ensureUrl($sitemap, route('security'));
 
@@ -90,11 +90,21 @@ final class GenerateSitemapCommand extends Command
             $this->ensureUrl($sitemap, route($assistant->routeName()));
         }
 
-        $docsRepository->categories()
+        foreach (config('app.available_locales') as $locale) {
+            Locales::within($locale, fn () => $this->addLocalizedDocumentationUrls($sitemap, $docsRepository, $locale));
+        }
+    }
+
+    private function addLocalizedDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository, string $locale): void
+    {
+        $this->ensureUrl($sitemap, LocalizedUrl::route('help.index', locale: $locale));
+        $this->ensureUrl($sitemap, LocalizedUrl::route('documentation.index', locale: $locale));
+
+        $docsRepository->categories($locale)
             ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
             ->each(fn (DocCategory $category) => $this->ensureUrl($sitemap, DocUrl::category($category)));
 
-        $docsRepository->pages()->each(function (DocPage $page) use ($sitemap): void {
+        $docsRepository->pages($locale)->each(function (DocPage $page) use ($sitemap): void {
             $this->ensureUrl($sitemap, DocUrl::page($page), $page->updated);
         });
     }

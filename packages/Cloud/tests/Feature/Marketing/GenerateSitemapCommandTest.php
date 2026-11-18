@@ -136,6 +136,27 @@ it('omits lastmod for a help page with no updated front matter', function (): vo
         ->and($xml)->not->toMatch('#no-date/undated-page</loc>\s*<lastmod>#');
 });
 
+it('lists the help pages of each language under its own prefix', function (): void {
+    $fixturePath = storage_path('framework/testing/sitemap-help-'.Str::random(8));
+
+    File::ensureDirectoryExists("{$fixturePath}/de/help/guides");
+    File::put("{$fixturePath}/de/help/guides/_index.md", "---\ntitle: Anleitungen\ndescription: Deutsche Anleitungen.\norder: 1\n---\n\nInhalt.\n");
+    File::put("{$fixturePath}/de/help/guides/widgets.md", "---\ntitle: Widgets\ndescription: Deutsche Widgets.\norder: 1\nupdated: 2026-11-01\n---\n\nInhalt.\n");
+
+    Config::set('documentation.content_path', $fixturePath);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    File::deleteDirectory($fixturePath);
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+
+    expect($xml)->toContain('<loc>'.route('de.help.index').'</loc>')
+        ->and($xml)->toContain('<loc>'.route('de.help.category', ['category' => 'guides']).'</loc>')
+        ->and($xml)->toMatch('#/de/help/guides/widgets</loc>\s*<lastmod>2026-11-01#')
+        ->and($xml)->not->toContain('/es/help/');
+});
+
 it('excludes query string variants of a page already in the sitemap', function (): void {
     fakeSitemapCrawl([
         config('app.url') => '<html><body><a href="'.url('/contact').'">Contact</a>'

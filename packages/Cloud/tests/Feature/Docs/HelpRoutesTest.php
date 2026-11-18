@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 use App\Features\EmailIntegration;
+use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Docs\Support\DocsNavigation;
 use Relaticle\Documentation\Support\DocsRepository;
@@ -143,4 +146,78 @@ it('links to help and developers from the marketing header, mobile nav, and foot
     // passes an "assertSee" style check -- count the occurrences instead.
     expect(substr_count($html, route('help.index')))->toBeGreaterThanOrEqual(3)
         ->and(substr_count($html, route('documentation.index')))->toBeGreaterThanOrEqual(3);
+});
+
+function writeGermanHelp(string $root): void
+{
+    File::ensureDirectoryExists("{$root}/help/guides");
+    File::ensureDirectoryExists("{$root}/de/help/guides");
+    File::put("{$root}/help/guides/_index.md", "---\ntitle: Guides\ndescription: English guides.\norder: 1\n---\n\nBody.\n");
+    File::put("{$root}/help/guides/widgets.md", "---\ntitle: Widgets\ndescription: English widgets.\norder: 1\n---\n\nEnglish text.\n");
+    File::put("{$root}/help/guides/gadgets.md", "---\ntitle: Gadgets\ndescription: English gadgets.\norder: 2\n---\n\nEnglish text.\n");
+    File::put("{$root}/de/help/guides/_index.md", "---\ntitle: Anleitungen\ndescription: Deutsche Anleitungen.\norder: 1\n---\n\nInhalt.\n");
+    File::put("{$root}/de/help/guides/widgets.md", "---\ntitle: Widgets deutsch\ndescription: Deutsche Widgets.\norder: 1\n---\n\nSiehe [Gadgets](/de/help/guides/gadgets).\n");
+
+    Config::set('documentation.content_path', $root);
+    Config::set('documentation.cache.enabled', false);
+    app()->forgetInstance(DocsRepository::class);
+}
+
+it('serves a German help page from content/de and 404s one with no German file', function (): void {
+    $root = storage_path('framework/testing/help-routes-'.Str::random(8));
+    writeGermanHelp($root);
+
+    $this->get('/de/help/guides/widgets')->assertOk()->assertSee('Widgets deutsch', false);
+    $this->get('/de/help/guides/gadgets')->assertNotFound();
+    $this->get('/help/guides/gadgets')->assertOk()->assertSee('Gadgets', false);
+
+    File::deleteDirectory($root);
+});
+
+it('lists only the German pages on the German help hub and category', function (): void {
+    $root = storage_path('framework/testing/help-routes-'.Str::random(8));
+    writeGermanHelp($root);
+
+    $this->get('/de/help')->assertOk()->assertSee('Anleitungen', false)->assertDontSee('Gadgets', false);
+    $this->get('/de/help/guides')->assertOk()->assertSee('Widgets deutsch', false)->assertDontSee('Gadgets', false);
+
+    File::deleteDirectory($root);
+});
+
+it('serves the German search index with prefixed urls', function (): void {
+    $root = storage_path('framework/testing/help-routes-'.Str::random(8));
+    writeGermanHelp($root);
+
+    $records = $this->get('/de/help/search-index.json')->assertOk()->json('records');
+    $english = $this->get('/help/search-index.json')->assertOk()->json('records');
+
+    File::deleteDirectory($root);
+
+    expect(array_column($records, 'title'))->each->toBe('Widgets deutsch')
+        ->and(array_column($records, 'url'))->each->toContain('/de/help/guides/widgets')
+        ->and(array_column($english, 'title'))->toContain('Gadgets');
+});
+
+it('keeps the language prefix written in a German article body', function (): void {
+    $root = storage_path('framework/testing/help-routes-'.Str::random(8));
+    writeGermanHelp($root);
+
+    $html = $this->get('/de/help/guides/widgets')->assertOk()->getContent();
+
+    File::deleteDirectory($root);
+
+    expect($html)->toContain('href="/de/help/guides/gadgets"')
+        ->and($html)->not->toContain('/de/de/');
+});
+
+it('keeps llms.txt in English', function (): void {
+    $root = storage_path('framework/testing/help-routes-'.Str::random(8));
+    writeGermanHelp($root);
+
+    $body = $this->get('/llms.txt')->assertOk()->getContent();
+
+    File::deleteDirectory($root);
+
+    expect($body)->toContain('[Widgets]')
+        ->and($body)->not->toContain('Widgets deutsch');
 });
