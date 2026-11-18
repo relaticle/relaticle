@@ -726,6 +726,30 @@ it('hands one tool call to laravel ai and resumes the model with its result', fu
     $process->release();
 });
 
+it('reads a message with no content blocks as an empty reply from its model', function (): void {
+    fakeClaudeScenario([
+        ['do' => 'init'],
+        toolMessage('m1', [['toolu_1', 'ListCompaniesTool', ['limit' => 5]]]),
+        ['do' => 'connect', 'key' => 'k1', 'id' => 'toolu_1', 'name' => 'ListCompaniesTool', 'arguments' => ['limit' => 5]],
+        ['do' => 'await', 'keys' => ['k1']],
+        ['do' => 'user_ok', 'id' => 'toolu_1'],
+        ['do' => 'message', 'id' => 'm2', 'model' => 'claude-haiku-5-5', 'blocks' => []],
+        ['do' => 'result'],
+    ]);
+    $process = startFakeClaude('ListCompaniesTool');
+
+    $process->nextStep();
+    $process->deliver([new ToolResult('toolu_1', 'ListCompaniesTool', ['limit' => 5], '{"data":[]}')]);
+    $empty = $process->nextStep();
+
+    expect($empty->text)->toBe('')
+        ->and($empty->toolCalls)->toBe([])
+        ->and($empty->finishReason)->toBe(FinishReason::Stop)
+        ->and($empty->meta->model)->toBe('claude-haiku-5-5');
+
+    $process->release();
+});
+
 it('keeps parallel calls of one message in one step and matches each result by tool use id', function (): void {
     $scenario = fakeClaudeScenario([
         ['do' => 'init'],
