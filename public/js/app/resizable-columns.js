@@ -1127,6 +1127,7 @@
                     if (this.pending.includes(name)) return
 
                     this.pending.push(name)
+                    this.close(false)
 
                     try {
                         await this.$wire.toggleTableColumn(name)
@@ -1135,21 +1136,8 @@
                         this.revision++
                     }
 
-                    // The morph redraws the header, so the menu follows the new trigger or closes when none is left.
-                    const trigger = document.querySelector('[data-add-column-trigger]')
-
-                    if (!trigger || this.addItems().length === 0 && !panel.querySelector('[data-add-column-create]')) {
-                        this.trigger = null
-
-                        return
-                    }
-
-                    this.trigger = trigger
-                    trigger.setAttribute('aria-expanded', 'true')
-                    this.$nextTick(() => requestAnimationFrame(() => {
-                        this.place()
-                        this.focusAddStart()
-                    }))
+                    // The morph redraws the header, so focus goes to the new button, not the one that was replaced.
+                    document.querySelector('[data-add-column-trigger]')?.focus()
                 },
             }
         })
