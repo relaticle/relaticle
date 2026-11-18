@@ -210,6 +210,25 @@ it('zeroes both originals\' counters so a restore cannot double count', function
         ->and((int) DB::table($merged->getTable())->where('id', $merged->getKey())->value('email_count'))->toBe(5);
 })->with(['company', 'people']);
 
+it('counts shared emails once across more than one batch', function (): void {
+    $kept = communicationRecord('company', ['email_count' => 501, 'inbound_email_count' => 501]);
+    $duplicate = communicationRecord('company', ['email_count' => 502, 'inbound_email_count' => 502]);
+    $shared = Email::factory()->count(501)->inbound()->create([
+        'workspace_id' => $this->workspace->getKey(),
+        'user_id' => $this->user->getKey(),
+        'connected_account_id' => $this->account->getKey(),
+    ])->modelKeys();
+    $kept->emails()->attach($shared);
+    $duplicate->emails()->attach($shared);
+
+    mergeCommunication('company', $kept, $duplicate);
+    $merged = mergedRecord();
+
+    $row = DB::table($merged->getTable())->where('id', $merged->getKey())->first();
+
+    expect([$row->email_count, $row->inbound_email_count])->toBe([502, 502]);
+});
+
 it('never lets a combined counter go below zero', function (string $type): void {
     $kept = communicationRecord($type, ['email_count' => 0, 'inbound_email_count' => 0, 'meeting_count' => 0]);
     $duplicate = communicationRecord($type, ['email_count' => 0, 'inbound_email_count' => 0, 'meeting_count' => 0]);

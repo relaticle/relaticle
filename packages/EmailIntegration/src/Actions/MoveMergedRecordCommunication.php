@@ -7,15 +7,21 @@ namespace Relaticle\EmailIntegration\Actions;
 use App\Actions\Merge\MoveMorphPivot;
 use App\Models\Company;
 use App\Models\People;
+use Generator;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\LazyCollection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Services\RecordCommunicationMetrics;
 
 final readonly class MoveMergedRecordCommunication
 {
+    private const int CHUNK = 500;
+
     public function __construct(
         private RecordCommunicationMetrics $metrics,
         private MoveMorphPivot $movePivot,
@@ -52,27 +58,41 @@ final readonly class MoveMergedRecordCommunication
     }
 
     /**
-     * @return Collection<int, Email>
+     * @return LazyCollection<int, Email>
      */
-    private function sharedEmails(Company|People $merged, Company|People $original): Collection
+    private function sharedEmails(Company|People $merged, Company|People $original): LazyCollection
     {
-        return Email::query()
-            ->withoutGlobalScopes()
-            ->with('participants')
-            ->whereIn('id', $this->sharedIds('emailables', 'email_id', 'emailable', $merged, $original))
-            ->get();
+        return $this->inChunks(
+            $this->sharedIds('emailables', 'email_id', 'emailable', $merged, $original)->pluck('email_id'),
+            fn (array $ids): EloquentCollection => Email::query()->withoutGlobalScopes()->with('participants')->whereKey($ids)->get(),
+        );
     }
 
     /**
-     * @return Collection<int, Meeting>
+     * @return LazyCollection<int, Meeting>
      */
-    private function sharedMeetings(Company|People $merged, Company|People $original): Collection
+    private function sharedMeetings(Company|People $merged, Company|People $original): LazyCollection
     {
-        return Meeting::query()
-            ->withoutGlobalScopes()
-            ->with(['attendees.contact', 'connectedAccount'])
-            ->whereIn('id', $this->sharedIds('meetingables', 'meeting_id', 'meetingable', $merged, $original))
-            ->get();
+        return $this->inChunks(
+            $this->sharedIds('meetingables', 'meeting_id', 'meetingable', $merged, $original)->pluck('meeting_id'),
+            fn (array $ids): EloquentCollection => Meeting::query()->withoutGlobalScopes()->with(['attendees.contact', 'connectedAccount'])->whereKey($ids)->get(),
+        );
+    }
+
+    /**
+     * @template TModel of Model
+     *
+     * @param  Collection<int, mixed>  $ids
+     * @param  callable(list<mixed>): EloquentCollection<int, TModel>  $load
+     * @return LazyCollection<int, TModel>
+     */
+    private function inChunks(Collection $ids, callable $load): LazyCollection
+    {
+        return LazyCollection::make(function () use ($ids, $load): Generator {
+            foreach ($ids->chunk(self::CHUNK) as $chunk) {
+                yield from $load(array_values($chunk->all()))->all();
+            }
+        });
     }
 
     private function sharedIds(string $table, string $itemColumn, string $prefix, Company|People $merged, Company|People $original): Builder

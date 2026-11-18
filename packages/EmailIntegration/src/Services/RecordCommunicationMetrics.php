@@ -10,8 +10,8 @@ use App\Models\People;
 use Carbon\CarbonInterface;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Query\Builder as QueryBuilder;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\LazyCollection;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Models\Email;
 use Relaticle\EmailIntegration\Models\Meeting;
@@ -63,26 +63,27 @@ final readonly class RecordCommunicationMetrics
     }
 
     /**
-     * @param  Collection<int, Email>  $sharedEmails
-     * @param  Collection<int, Meeting>  $sharedMeetings
+     * @param  LazyCollection<int, Email>  $sharedEmails
+     * @param  LazyCollection<int, Meeting>  $sharedMeetings
      */
-    public function combineMergedRecords(Company|People $merged, Company|People $original, Collection $sharedEmails, Collection $sharedMeetings): void
+    public function combineMergedRecords(Company|People $merged, Company|People $original, LazyCollection $sharedEmails, LazyCollection $sharedMeetings): void
     {
         // The record takes one original at a time, so its counters already hold the first one's.
         $merged->refresh();
 
-        $sharedEmails = $sharedEmails->filter($this->visibility->countsTowardCommunicationIntelligence(...));
-        $sharedMeetings = $sharedMeetings->filter($this->visibility->meetingCountsTowardCommunicationIntelligence(...));
-        $sharedInbound = $sharedEmails->where('direction', EmailDirection::INBOUND)->count();
+        [$sharedEmailCount, $sharedInbound] = $sharedEmails
+            ->filter($this->visibility->countsTowardCommunicationIntelligence(...))
+            ->reduce(fn (array $counts, Email $email): array => [$counts[0] + 1, $counts[1] + (int) ($email->direction === EmailDirection::INBOUND)], [0, 0]);
+        $sharedMeetingCount = $sharedMeetings->filter($this->visibility->meetingCountsTowardCommunicationIntelligence(...))->count();
 
         $summed = fn (string $column, int $shared): int => max(0, (int) $merged->getAttribute($column) + (int) $original->getAttribute($column) - $shared);
         $latest = fn (string $column): ?CarbonInterface => collect([$merged->getAttribute($column), $original->getAttribute($column)])->filter()->max();
 
         DB::table($merged->getTable())->where('id', $merged->getKey())->update([
-            'email_count' => $summed('email_count', $sharedEmails->count()),
+            'email_count' => $summed('email_count', $sharedEmailCount),
             'inbound_email_count' => $summed('inbound_email_count', $sharedInbound),
-            'outbound_email_count' => $summed('outbound_email_count', $sharedEmails->count() - $sharedInbound),
-            'meeting_count' => $summed('meeting_count', $sharedMeetings->count()),
+            'outbound_email_count' => $summed('outbound_email_count', $sharedEmailCount - $sharedInbound),
+            'meeting_count' => $summed('meeting_count', $sharedMeetingCount),
             'last_email_at' => $latest('last_email_at'),
             'last_interaction_at' => $latest('last_interaction_at'),
             'last_meeting_at' => $latest('last_meeting_at'),
