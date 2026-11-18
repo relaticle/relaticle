@@ -75,6 +75,7 @@ use Laravel\Sanctum\HasApiTokens;
  * @property CarbonImmutable|null $scheduled_deletion_at
  * @property string|null $two_factor_recovery_codes
  * @property string|null $two_factor_secret
+ * @property int|null $two_factor_last_used_step
  * @property array<string, mixed>|null $ai_preferences
  * @property array<string, mixed>|null $notification_preferences
  * @property-read Workspace|null $currentWorkspace
@@ -140,6 +141,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
             'email_sign_in_enabled_at' => 'datetime',
             'last_login_at' => 'datetime',
             'email_bounced_at' => 'datetime',
+            'two_factor_last_used_step' => 'integer',
             'password' => 'hashed',
             'ai_preferences' => 'array',
             'notification_preferences' => 'array',
