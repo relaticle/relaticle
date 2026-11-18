@@ -107,6 +107,7 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cloud');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'cloud');
+        $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->configureAnalytics();
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');

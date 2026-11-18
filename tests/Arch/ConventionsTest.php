@@ -850,6 +850,7 @@ it('keeps the retired contact and deal words out of record copy', function (): v
     $labelPathsNamingSomethingElse = [
         'packages/Cloud/src/Marketing/Support/MarketingNavigation.php',
         'packages/Cloud/resources/views/marketing/alternatives/',
+        'packages/Cloud/lang/en.json',
     ];
 
     $emailParticipantPaths = [
