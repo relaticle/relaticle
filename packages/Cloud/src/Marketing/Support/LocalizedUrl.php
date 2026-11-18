@@ -9,6 +9,7 @@ use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Route;
 use Locale;
+use Relaticle\Ink\Models\Post;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final readonly class LocalizedUrl
@@ -25,7 +26,11 @@ final readonly class LocalizedUrl
     {
         $locale ??= app()->getLocale();
 
-        return route(self::nameIn($name, $locale) ?? $name, $parameters, $absolute);
+        if (self::baseName($name) === 'blog.show' && ! self::hasPost($locale, (string) Arr::first($parameters))) {
+            $locale = self::DEFAULT_LOCALE;
+        }
+
+        return route(self::nameIn($name, $locale) ?? self::baseName($name), $parameters, $absolute);
     }
 
     /** @return array<string, string> */
@@ -38,6 +43,27 @@ final readonly class LocalizedUrl
 
             if ($url !== null) {
                 $alternates[$locale] = $url;
+            }
+        }
+
+        return isset($alternates[self::DEFAULT_LOCALE])
+            ? [...$alternates, 'x-default' => $alternates[self::DEFAULT_LOCALE]]
+            : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $parameters
+     * @return array<string, string>
+     */
+    public static function alternatesOf(string $name, array $parameters = []): array
+    {
+        $alternates = [];
+
+        foreach (config('app.available_locales') as $locale) {
+            $localizedName = self::nameIn($name, $locale);
+
+            if ($localizedName !== null) {
+                $alternates[$locale] = route($localizedName, $parameters);
             }
         }
 
@@ -101,6 +127,10 @@ final readonly class LocalizedUrl
     {
         $route = Route::current();
         $name = $route instanceof RoutingRoute ? $route->getName() : null;
+
+        if ($name !== null && self::baseName($name) === 'blog.show') {
+            return self::currentPostUrls()[$locale] ?? null;
+        }
         $localizedName = $name === null ? null : self::nameIn($name, $locale);
 
         return $route === null || $localizedName === null
@@ -141,6 +171,10 @@ final readonly class LocalizedUrl
             return Route::has($baseName) ? $baseName : null;
         }
 
+        if (str_starts_with($baseName, 'blog.') && ! in_array($locale, self::blogLocales(), true)) {
+            return null;
+        }
+
         $candidates = [
             "{$locale}.{$baseName}",
             str_starts_with($baseName, 'blog.') ? 'blog.'.$locale.'.'.substr($baseName, 5) : null,
@@ -153,6 +187,60 @@ final readonly class LocalizedUrl
         }
 
         return null;
+    }
+
+    public static function hasBlogIn(string $locale): bool
+    {
+        return $locale === self::DEFAULT_LOCALE || in_array($locale, self::blogLocales(), true);
+    }
+
+    /** @return list<string> */
+    private static function blogLocales(): array
+    {
+        $attributes = request()->attributes;
+
+        if (! $attributes->has('blog.locales')) {
+            $attributes->set('blog.locales', Post::query()->published()->distinct()->pluck('locale')->all());
+        }
+
+        return $attributes->get('blog.locales');
+    }
+
+    private static function hasPost(string $locale, string $slug): bool
+    {
+        return $locale === self::DEFAULT_LOCALE
+            || Post::query()->published()->inLocale($locale)->where('slug', $slug)->exists();
+    }
+
+    /** @return array<string, string> */
+    private static function currentPostUrls(): array
+    {
+        $attributes = request()->attributes;
+
+        if (! $attributes->has('blog.post_urls')) {
+            $attributes->set('blog.post_urls', self::postUrls());
+        }
+
+        return $attributes->get('blog.post_urls');
+    }
+
+    /** @return array<string, string> */
+    private static function postUrls(): array
+    {
+        $post = Post::query()
+            ->published()
+            ->inLocale(app()->getLocale())
+            ->where('slug', Route::current()?->parameter('slug'))
+            ->first();
+
+        if (! $post instanceof Post) {
+            return [];
+        }
+
+        return [
+            (string) $post->getAttribute('locale') => $post->getUrl(),
+            ...$post->translations()->mapWithKeys(fn (Post $translation): array => [(string) $translation->getAttribute('locale') => $translation->getUrl()])->all(),
+        ];
     }
 
     private static function baseName(string $name): string

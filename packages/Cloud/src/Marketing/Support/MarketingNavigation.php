@@ -178,7 +178,7 @@ final readonly class MarketingNavigation
                 LocalizedUrl::route('documentation.index'),
                 ...$detail('developers', __('Self-hosting, MCP, and contributing')),
             ) : null,
-            Feature::active(Blog::class) ? new NavItem(
+            Feature::active(Blog::class) && LocalizedUrl::hasBlogIn(app()->getLocale()) ? new NavItem(
                 __('Blog'),
                 LocalizedUrl::route('blog.index'),
                 ...$detail('blog', __('How we build an open-source CRM')),

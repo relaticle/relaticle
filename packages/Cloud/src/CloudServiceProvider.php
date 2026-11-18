@@ -180,7 +180,9 @@ final class CloudServiceProvider extends ServiceProvider
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
             'ink.features.mcp' => true,
-            'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class, SetPublicLocale::class.':'.LocalizedUrl::DEFAULT_LOCALE])),
+            'ink.locales' => config('app.available_locales'),
+            'ink.default_locale' => LocalizedUrl::DEFAULT_LOCALE,
+            'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class, SetPublicLocale::class])),
             'ink.views' => [
                 'index' => 'cloud::blog.index',
                 'show' => 'cloud::blog.show',

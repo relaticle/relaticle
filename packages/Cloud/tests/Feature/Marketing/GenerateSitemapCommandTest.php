@@ -216,3 +216,36 @@ it('serves the generated sitemap from the public disk', function (): void {
 it('returns not found before the sitemap is generated', function (): void {
     $this->get('/sitemap.xml')->assertNotFound();
 });
+
+it('lists every public page in every language with xhtml:link alternates', function (): void {
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+
+    foreach (['/pricing', '/crm-for-claude', '/compare/relaticle-vs-twenty', '/alternatives/attio'] as $path) {
+        foreach (['', '/de', '/es', '/fr'] as $prefix) {
+            expect($xml)->toContain('<loc>'.url($prefix.$path).'</loc>');
+        }
+    }
+
+    preg_match('#<url>\s*<loc>'.preg_quote(url('/de/pricing'), '#').'</loc>.*?</url>#s', $xml, $entry);
+
+    foreach (['en' => '/pricing', 'de' => '/de/pricing', 'es' => '/es/pricing', 'fr' => '/fr/pricing', 'x-default' => '/pricing'] as $hreflang => $path) {
+        expect($entry[0])->toContain('hreflang="'.$hreflang.'" href="'.url($path).'"');
+    }
+});
+
+it('lists a translated post with its alternates and leaves out a language with no post', function (): void {
+    $group = (string) Str::uuid();
+    $english = Post::factory()->published()->create(['locale' => 'en', 'translation_group' => $group]);
+    $german = Post::factory()->published()->create(['locale' => 'de', 'translation_group' => $group]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+
+    expect($xml)->toContain('<loc>'.route('blog.de.show', $german->slug).'</loc>')
+        ->and($xml)->toContain('hreflang="en" href="'.route('blog.show', $english->slug).'"')
+        ->and($xml)->toContain('<loc>'.route('blog.de.index').'</loc>')
+        ->and($xml)->not->toContain('/es/blog');
+});

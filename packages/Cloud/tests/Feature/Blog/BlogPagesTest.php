@@ -5,7 +5,9 @@ declare(strict_types=1);
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Str;
 use Relaticle\Cloud\CloudServiceProvider;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\Ink\Models\Tag;
@@ -352,5 +354,82 @@ describe('Blog metadata', function () {
 
             expect(mb_strlen($titleText))->toBeGreaterThanOrEqual(30, "{$path} title: {$titleText}");
         }
+    });
+});
+
+describe('Blog languages', function () {
+    function translatedPosts(): array
+    {
+        $group = (string) Str::uuid();
+        $english = Post::factory()->published()->create(['locale' => 'en', 'translation_group' => $group, 'slug' => 'self-hosting-guide']);
+        $german = Post::factory()->published()->create(['locale' => 'de', 'translation_group' => $group, 'slug' => 'self-hosting-leitfaden']);
+
+        return [$english, $german];
+    }
+
+    function blogHreflangs(string $html): array
+    {
+        preg_match_all('/<link rel="alternate" hreflang="([^"]+)" href="([^"]+)"/', $html, $matches);
+
+        return array_combine($matches[1], $matches[2]);
+    }
+
+    it('shows a German post at /de/blog/{slug} with its English sibling as an alternate', function () {
+        [$english, $german] = translatedPosts();
+
+        $response = $this->get("/de/blog/{$german->slug}")
+            ->assertOk()
+            ->assertSee('lang="de"', false);
+
+        expect(blogHreflangs($response->getContent()))->toBe([
+            'en' => url("/blog/{$english->slug}"),
+            'de' => url("/de/blog/{$german->slug}"),
+            'x-default' => url("/blog/{$english->slug}"),
+        ]);
+    });
+
+    it('links a German page to the English post when no German version exists', function () {
+        [, $german] = translatedPosts();
+        $untranslated = Post::factory()->published()->create(['locale' => 'en', 'slug' => 'only-in-english']);
+
+        expect(LocalizedUrl::route('blog.show', ['slug' => $untranslated->slug], 'de'))->toBe(url('/blog/only-in-english'))
+            ->and(LocalizedUrl::route('blog.show', ['slug' => $german->slug], 'de'))->toBe(url("/de/blog/{$german->slug}"));
+
+        $this->get("/de/blog/{$german->slug}")->assertOk();
+        $this->get('/de/blog/only-in-english')->assertNotFound();
+    });
+
+    it('links the English blog index from a German page while no German post exists', function () {
+        Post::factory()->published()->create(['locale' => 'en']);
+
+        expect(LocalizedUrl::route('blog.index', locale: 'de'))->toBe(url('/blog'));
+    });
+
+    it('links the German blog index once a German post exists', function () {
+        translatedPosts();
+
+        expect(LocalizedUrl::route('blog.index', locale: 'de'))->toBe(url('/de/blog'));
+    });
+
+    it('lists only German posts on the German index and keeps the English index English', function () {
+        [$english, $german] = translatedPosts();
+
+        $this->get('/de/blog')->assertOk()->assertSee($german->title)->assertDontSee($english->title);
+        $this->get('/blog')->assertOk()->assertSee($english->title)->assertDontSee($german->title);
+    });
+
+    it('sends the language switcher on a post to its translation or to the home page', function () {
+        [$english, $german] = translatedPosts();
+
+        $html = $this->get("/blog/{$english->slug}")->assertOk()->getContent();
+
+        preg_match_all('/<a href="([^"]+)"\s+hreflang="([a-z]{2})"/', $html, $matches);
+
+        expect(array_combine($matches[2], $matches[1]))->toBe([
+            'en' => url("/blog/{$english->slug}"),
+            'de' => url("/de/blog/{$german->slug}"),
+            'es' => url('/es'),
+            'fr' => url('/fr'),
+        ]);
     });
 });

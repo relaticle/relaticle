@@ -10,6 +10,7 @@ use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Cloud\Marketing\Support\MarketingNavigation;
 use Relaticle\Cloud\Marketing\Support\NavItem;
+use Relaticle\Ink\Models\Post;
 
 mutates(MarketingNavigation::class);
 
@@ -287,3 +288,16 @@ it('suggests the page a missing url most likely meant on the 404 page', function
     'a sibling that is not a near spelling' => ['/compare/relaticle-vs-hubspot', null],
     'nothing alike' => ['/zz-qq-xx', null],
 ]);
+
+it('hides the blog link on a language with no published post', function (): void {
+    Post::factory()->published()->create(['locale' => 'en']);
+
+    $this->get('/de')->assertOk()
+        ->assertDontSee('href="'.url('/blog').'"', false)
+        ->assertDontSee('href="'.url('/de/blog').'"', false);
+    $this->get('/')->assertOk()->assertSee('href="'.url('/blog').'"', false);
+
+    Post::factory()->published()->create(['locale' => 'de']);
+
+    $this->get('/de')->assertOk()->assertSee('href="'.url('/de/blog').'"', false);
+});

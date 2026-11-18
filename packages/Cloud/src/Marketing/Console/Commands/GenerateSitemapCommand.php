@@ -34,6 +34,7 @@ final class GenerateSitemapCommand extends Command
     {
         $sitemap = $this->crawlMarketingSitemap();
 
+        $this->addMarketingUrls($sitemap);
         $this->addDocumentationUrls($sitemap, $docsRepository);
 
         if (Feature::active(Blog::class)) {
@@ -68,6 +69,47 @@ final class GenerateSitemapCommand extends Command
             ->getSitemap();
     }
 
+    private function addMarketingUrls(Sitemap $sitemap): void
+    {
+        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
+
+        foreach (ConnectableAssistant::cases() as $assistant) {
+            $names[] = $assistant->routeName();
+        }
+
+        if (Feature::active(EmailIntegration::class)) {
+            $names[] = 'emailAndCalendar';
+        }
+
+        $pages = array_map(fn (string $name): array => [$name, []], $names);
+
+        foreach (config('comparisons.compare', []) as $competitor) {
+            $pages[] = ['compare.show', ['competitor' => $competitor]];
+        }
+
+        foreach (config('comparisons.alternatives', []) as $competitor) {
+            $pages[] = ['alternatives.show', ['competitor' => $competitor]];
+        }
+
+        foreach ($pages as [$name, $parameters]) {
+            $this->addLocalizedPage($sitemap, $name, $parameters);
+        }
+    }
+
+    /** @param  array<string, string>  $parameters */
+    private function addLocalizedPage(Sitemap $sitemap, string $name, array $parameters): void
+    {
+        $alternates = LocalizedUrl::alternatesOf($name, $parameters);
+
+        foreach (array_diff_key($alternates, ['x-default' => true]) as $url) {
+            $tag = $this->ensureUrl($sitemap, $url);
+
+            foreach ($alternates as $hreflang => $href) {
+                $tag->addAlternate($href, $hreflang);
+            }
+        }
+    }
+
     /**
      * The crawler usually discovers the documentation pages itself (they're
      * linked from the marketing nav), but a crawl-found entry carries no
@@ -79,17 +121,6 @@ final class GenerateSitemapCommand extends Command
      */
     private function addDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
     {
-        $this->ensureUrl($sitemap, route('aiNativeCrm'));
-        $this->ensureUrl($sitemap, route('security'));
-
-        if (Feature::active(EmailIntegration::class)) {
-            $this->ensureUrl($sitemap, route('emailAndCalendar'));
-        }
-
-        foreach (ConnectableAssistant::cases() as $assistant) {
-            $this->ensureUrl($sitemap, route($assistant->routeName()));
-        }
-
         foreach (config('app.available_locales') as $locale) {
             Locales::within($locale, fn () => $this->addLocalizedDocumentationUrls($sitemap, $docsRepository, $locale));
         }
@@ -109,7 +140,7 @@ final class GenerateSitemapCommand extends Command
         });
     }
 
-    private function ensureUrl(Sitemap $sitemap, string $location, ?CarbonImmutable $lastModified = null): void
+    private function ensureUrl(Sitemap $sitemap, string $location, ?CarbonImmutable $lastModified = null): Url
     {
         $url = $sitemap->getUrl($location);
 
@@ -121,5 +152,7 @@ final class GenerateSitemapCommand extends Command
         if ($lastModified instanceof CarbonImmutable) {
             $url->setLastModificationDate($lastModified);
         }
+
+        return $url;
     }
 }
