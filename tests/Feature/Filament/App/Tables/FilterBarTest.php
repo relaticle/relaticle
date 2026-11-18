@@ -433,11 +433,12 @@ it('composes a this-period chip that reads right in each language', function (st
     );
 
     expect($chips)->toBe($expected)
-        ->and(collect($data['periodUnits'])->firstWhere('value', 'days')['singular'])->toBe($locale === 'en' ? 'day' : ['de' => 'Tag', 'fr' => 'jour'][$locale]);
+        ->and(collect($data['periodUnits'])->firstWhere('value', 'days')['singular'])->toBe($locale === 'en' ? 'day' : ['de' => 'Tag', 'es' => 'día', 'fr' => 'jour'][$locale]);
 })->with([
     'en' => ['en', ['this day', 'this week', 'this month', 'this quarter', 'this year']],
-    'de' => ['de', ['ist heute', 'ist in dieser Woche', 'ist in diesem Monat', 'ist in diesem Quartal', 'ist in diesem Jahr']],
-    'fr' => ['fr', ['est aujourd\'hui', 'est cette semaine', 'est ce mois-ci', 'est ce trimestre', 'est cette année']],
+    'de' => ['de', ['liegt heute', 'liegt in dieser Woche', 'liegt in diesem Monat', 'liegt in diesem Quartal', 'liegt in diesem Jahr']],
+    'es' => ['es', ['cae hoy', 'cae esta semana', 'cae este mes', 'cae este trimestre', 'cae este año']],
+    'fr' => ['fr', ['tombe aujourd\'hui', 'tombe cette semaine', 'tombe ce mois-ci', 'tombe ce trimestre', 'tombe cette année']],
 ]);
 
 it('tells the empty list which rules hide its records and clears them from a button', function (string $page, string $model, string $records): void {

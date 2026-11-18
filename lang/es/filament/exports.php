@@ -25,24 +25,24 @@ return [
     'notifications' => [
         'completed' => [
             'company' => [
-                'body' => 'Su exportación de empresas se completó y se exportaron :rows.',
-                'failed' => 'No se pudieron exportar :rows.',
+                'body' => 'La exportación de sus empresas se completó (:rows).',
+                'failed' => 'Sin exportar: :rows.',
             ],
             'note' => [
-                'body' => 'Su exportación de notas se completó y se exportaron :rows.',
-                'failed' => 'No se pudieron exportar :rows.',
+                'body' => 'La exportación de sus notas se completó (:rows).',
+                'failed' => 'Sin exportar: :rows.',
             ],
             'opportunity' => [
-                'body' => 'Su exportación de oportunidades se completó y se exportaron :rows.',
-                'failed' => 'No se pudieron exportar :rows.',
+                'body' => 'La exportación de sus oportunidades se completó (:rows).',
+                'failed' => 'Sin exportar: :rows.',
             ],
             'people' => [
-                'body' => 'Su exportación de personas se completó y se exportaron :rows.',
-                'failed' => 'No se pudieron exportar :rows.',
+                'body' => 'La exportación de sus personas se completó (:rows).',
+                'failed' => 'Sin exportar: :rows.',
             ],
             'task' => [
-                'body' => 'Su exportación de tareas se completó y se exportaron :rows.',
-                'failed' => 'No se pudieron exportar :rows.',
+                'body' => 'La exportación de sus tareas se completó (:rows).',
+                'failed' => 'Sin exportar: :rows.',
             ],
         ],
     ],

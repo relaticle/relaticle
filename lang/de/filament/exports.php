@@ -25,23 +25,23 @@ return [
         'completed' => [
             'company' => [
                 'body' => 'Der Export Ihrer Unternehmen ist abgeschlossen. :rows exportiert.',
-                'failed' => ':rows konnten nicht exportiert werden.',
+                'failed' => 'Nicht exportiert: :rows.',
             ],
             'note' => [
                 'body' => 'Der Export Ihrer Notizen ist abgeschlossen. :rows exportiert.',
-                'failed' => ':rows konnten nicht exportiert werden.',
+                'failed' => 'Nicht exportiert: :rows.',
             ],
             'opportunity' => [
                 'body' => 'Der Export Ihrer Verkaufschancen ist abgeschlossen. :rows exportiert.',
-                'failed' => ':rows konnten nicht exportiert werden.',
+                'failed' => 'Nicht exportiert: :rows.',
             ],
             'people' => [
                 'body' => 'Der Export Ihrer Personen ist abgeschlossen. :rows exportiert.',
-                'failed' => ':rows konnten nicht exportiert werden.',
+                'failed' => 'Nicht exportiert: :rows.',
             ],
             'task' => [
                 'body' => 'Der Export Ihrer Aufgaben ist abgeschlossen. :rows exportiert.',
-                'failed' => ':rows konnten nicht exportiert werden.',
+                'failed' => 'Nicht exportiert: :rows.',
             ],
         ],
     ],

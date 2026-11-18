@@ -179,7 +179,7 @@ return [
                 'at_or_after' => 'am oder nach',
                 'in_the_past' => 'in den letzten',
                 'in_the_next' => 'in den nächsten',
-                'this' => 'ist',
+                'this' => 'liegt',
                 'is_any_of' => 'ist eines von',
                 'is_none_of' => 'ist keines von',
                 'has_any_of' => 'hat eines von',

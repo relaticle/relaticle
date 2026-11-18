@@ -179,7 +179,7 @@ return [
                 'at_or_after' => 'en o después de',
                 'in_the_past' => 'en el pasado',
                 'in_the_next' => 'en los próximos',
-                'this' => 'este',
+                'this' => 'cae',
                 'is_any_of' => 'es cualquiera de',
                 'is_none_of' => 'no es ninguno de',
                 'has_any_of' => 'tiene cualquiera de',

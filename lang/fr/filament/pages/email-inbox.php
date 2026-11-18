@@ -67,7 +67,7 @@ return [
     ],
     'pending_access' => [
         'heading' => '{1}1 demande d\'accès en attente|[2,*]:count demandes d\'accès en attente',
-        'unknown_user' => 'Personne inconnue',
+        'unknown_user' => 'Membre inconnu',
         'approve' => 'Approuver',
         'deny' => 'Refuser',
     ],
