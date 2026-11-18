@@ -16,9 +16,9 @@ return [
     ],
 
     'expired' => [
-        'title' => 'La solicitud de acceso al correo expiró',
+        'title' => 'La solicitud de acceso al correo venció',
         'body' => ':owner no respondió a tiempo.',
-        'body_without_owner' => 'Su solicitud expiró sin respuesta.',
+        'body_without_owner' => 'Su solicitud venció sin respuesta.',
     ],
 
     'mail' => [

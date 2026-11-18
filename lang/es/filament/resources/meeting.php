@@ -119,7 +119,7 @@ return [
                 'title' => 'Invitación aceptada. Su calendario está actualizado.',
             ],
             'tentative' => [
-                'title' => 'Marcada como quizás. Su calendario está actualizado.',
+                'title' => 'Marcada como tal vez. Su calendario está actualizado.',
             ],
             'declined' => [
                 'title' => 'Invitación rechazada. Su calendario está actualizado.',

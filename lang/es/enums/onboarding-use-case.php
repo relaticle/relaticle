@@ -11,7 +11,7 @@ return [
     'investing' => 'Inversión',
     'other' => 'Otro',
     'descriptions' => [
-        'sales' => 'Dé seguimiento a las ventas, administre las etapas del pipeline y cierre sus ventas',
+        'sales' => 'Dé seguimiento a sus oportunidades, administre las etapas del pipeline y cierre ventas',
         'customer_success' => 'Administre renovaciones, indicadores de salud y relaciones con los clientes',
         'recruiting' => 'Administre candidatos, entrevistas y procesos de contratación',
         'marketing' => 'Dé seguimiento a campañas, leads y al rendimiento de marketing',

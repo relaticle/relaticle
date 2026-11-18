@@ -84,7 +84,7 @@ return [
             'deleted_remove' => 'Quitar registros eliminados',
             'today_shortcut' => 'Hoy',
             'stays_relative' => 'Se mantiene relativo al guardar esta vista.',
-            'amount' => 'Monto',
+            'amount' => 'Cantidad',
             'unit' => 'Unidad',
             'add' => 'Filtrar',
             'add_label' => 'Agregar filtro',

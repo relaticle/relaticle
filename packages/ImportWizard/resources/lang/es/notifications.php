@@ -6,8 +6,8 @@ return [
     'finished' => [
         'title' => [
             'completed' => 'Importación completada: :entity',
-            'completed_with_failures' => 'Importación de :entity completada con filas fallidas',
-            'failed' => 'Falló la importación de :entity',
+            'completed_with_failures' => 'Importación completada con filas fallidas: :entity',
+            'failed' => 'Falló la importación: :entity',
         ],
         'counts' => [
             'created' => 'Creados: :count',
