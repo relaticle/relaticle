@@ -43,7 +43,7 @@ final readonly class LogRecordMerge
             ->performedOn($record)
             ->causedBy($user)
             // A batch of its own, so record_merged never folds into the originals' `deleted` rows from this request.
-            ->tap(fn (Activity $activity) => $activity->setAttribute('batch_uuid', (string) Str::uuid()))
+            ->tap(fn (Activity $activity): Activity => $activity->setAttribute('batch_uuid', (string) Str::uuid()))
             ->event(AppEventPalette::RecordMerged->value)
             ->withProperties($properties)
             ->log(AppEventPalette::RecordMerged->value);
