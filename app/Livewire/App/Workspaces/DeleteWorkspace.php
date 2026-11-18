@@ -44,7 +44,7 @@ final class DeleteWorkspace extends BaseLivewireComponent
                         TextEntry::make('notice')
                             ->hiddenLabel()
                             ->state(fn (): string => $this->workspace->isScheduledForDeletion()
-                                ? __('workspaces.sections.delete_workspace.scheduled_notice', ['date' => $this->workspace->scheduled_deletion_at->format('F j, Y')])
+                                ? __('workspaces.sections.delete_workspace.scheduled_notice', ['date' => $this->workspace->scheduled_deletion_at->isoFormat('LL')])
                                 : __('workspaces.sections.delete_workspace.notice')),
                         Actions::make([
                             Action::make('scheduleWorkspaceDeletionAction')

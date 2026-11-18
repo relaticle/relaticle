@@ -45,6 +45,16 @@ it('renders the workspace deletion scheduled mail', function (): void {
         ->and($html)->not->toContain('mail.');
 });
 
+it('writes the deletion date of the workspace mails in the language of the recipient', function (): void {
+    app()->setLocale('de');
+
+    $scheduled = (string) (new WorkspaceDeletionScheduledNotification($this->workspace))->toMail($this->owner)->render();
+    $reminder = (string) (new WorkspaceDeletionReminderNotification($this->workspace))->toMail($this->owner)->render();
+
+    expect($scheduled)->toContain('6. Okt 2026')
+        ->and($reminder)->toContain('6. Okt 2026');
+});
+
 it('renders the workspace deletion reminder with a pluralised subject', function (): void {
     $message = (new WorkspaceDeletionReminderNotification($this->workspace))->toMail($this->owner);
 

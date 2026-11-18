@@ -13,6 +13,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 
@@ -232,4 +233,21 @@ it('links the digest to the task list narrowed to the tasks assigned to the memb
     Livewire::withQueryParams($query)->test(ManageTasks::class)
         ->assertCanSeeTableRecords([$mine])
         ->assertCanNotSeeTableRecords([$theirs]);
+});
+
+it('writes the digest dates in the language of the recipient', function (): void {
+    $this->travelTo(Date::parse('2026-11-18 08:00:00', 'UTC'));
+
+    $user = User::factory()->withPersonalWorkspace()->create(['timezone' => 'UTC', 'locale' => 'de']);
+    $digest = new TaskDigest(
+        overdue: [new DigestTaskItem('Call client', Date::parse('2026-11-17 09:00:00', 'UTC'), 'https://app.test/tasks?a')],
+        upcoming: [],
+    );
+
+    $mail = new TaskDigestMail($user, digestWorkspace($user), $digest);
+
+    app()->setLocale('de');
+
+    $mail->assertHasSubject('[Acme] 1 überfällige Aufgabe, 18. Nov');
+    $mail->assertSeeInText("Call client: https://app.test/tasks?a\n17. Nov 2026 (überfällig)");
 });

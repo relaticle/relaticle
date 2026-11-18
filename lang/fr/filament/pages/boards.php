@@ -99,6 +99,11 @@ return [
         'form' => [
             'name_placeholder' => 'Saisissez le titre de l\'opportunité',
         ],
+        'badges' => [
+            'today' => 'Clôture aujourd\'hui',
+            'tomorrow' => 'Clôture demain',
+            'overdue' => ':date (en retard)',
+        ],
         'groupings' => [
             'company' => 'Entreprise',
             'no_company' => 'Sans entreprise',
@@ -111,6 +116,11 @@ return [
             'add' => 'Ajouter une tâche',
             'edit' => 'Modifier',
             'delete' => 'Supprimer',
+        ],
+        'badges' => [
+            'today' => 'Échéance aujourd\'hui',
+            'tomorrow' => 'Échéance demain',
+            'overdue' => ':date (en retard)',
         ],
         'groupings' => [
             'assignee' => 'Assigné à',

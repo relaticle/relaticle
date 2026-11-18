@@ -56,7 +56,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
     {
         $overdue = $this->digest->overdueCount();
         $due = $this->digest->upcomingCount();
-        $replace = ['workspace' => $this->workspace->name, 'date' => now($this->user->effectiveTimezone())->format('M j')];
+        $replace = ['workspace' => $this->workspace->name, 'date' => now($this->user->effectiveTimezone())->settings(['locale' => app()->getLocale()])->isoFormat(__('formats.date_without_year'))];
 
         if ($overdue > 0 && $due > 0) {
             return __('mail.task_digest.subject_both', [...$replace, 'overdue' => $overdue, 'due' => $due]);
@@ -96,7 +96,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
                 'preheader' => $this->preheader(),
                 'summary' => $this->summary(),
                 'overdue' => $this->cards($this->digest->overdue, fn (DigestTaskItem $item): string => __('mail.task_digest.due_overdue', [
-                    'date' => $item->dueAt->setTimezone($timezone)->format('M j, Y'),
+                    'date' => $item->dueAt->setTimezone($timezone)->settings(['locale' => app()->getLocale()])->isoFormat('ll'),
                 ])),
                 'upcoming' => $this->cards($this->digest->upcoming, fn (): string => __('mail.task_digest.due_today_chip')),
                 'tasksUrl' => TaskResource::assignedToMeUrl($this->workspace),

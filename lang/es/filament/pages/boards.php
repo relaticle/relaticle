@@ -99,6 +99,11 @@ return [
         'form' => [
             'name_placeholder' => 'Ingrese el título de la oportunidad',
         ],
+        'badges' => [
+            'today' => 'Cierra hoy',
+            'tomorrow' => 'Cierra mañana',
+            'overdue' => ':date (vencida)',
+        ],
         'groupings' => [
             'company' => 'Empresa',
             'no_company' => 'Sin empresa',
@@ -111,6 +116,11 @@ return [
             'add' => 'Agregar tarea',
             'edit' => 'Editar',
             'delete' => 'Eliminar',
+        ],
+        'badges' => [
+            'today' => 'Vence hoy',
+            'tomorrow' => 'Vence mañana',
+            'overdue' => ':date (vencida)',
         ],
         'groupings' => [
             'assignee' => 'Persona asignada',

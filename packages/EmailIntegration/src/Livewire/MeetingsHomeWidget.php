@@ -282,7 +282,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             1 => __('filament/pages/dashboard.meetings.date.tomorrow'),
             -1 => __('filament/pages/dashboard.meetings.date.yesterday'),
             default => __('filament/pages/dashboard.meetings.date.other', [
-                'weekday' => $selected->format('D'),
+                'weekday' => $selected->isoFormat('ddd'),
             ]),
         };
     }
@@ -295,7 +295,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     {
         $selected = Date::parse($this->selectedDate, $this->viewerTimezone())->startOfDay();
 
-        return $this->datePrefix().' '.$selected->format('M j');
+        return $this->datePrefix().' '.$selected->isoFormat(__('formats.date_without_year'));
     }
 
     /**
@@ -367,8 +367,8 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         }
 
         $end = $meeting->ends_at->timezone($timezone);
-        $startLabel = $start->format('g:i A');
-        $endLabel = $end->equalTo($start) ? null : $end->format('g:i A');
+        $startLabel = $start->isoFormat('LT');
+        $endLabel = $end->equalTo($start) ? null : $end->isoFormat('LT');
 
         return [
             'start' => $startLabel,

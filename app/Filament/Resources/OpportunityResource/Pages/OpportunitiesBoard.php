@@ -295,15 +295,16 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         $date = Date::parse($state);
         $viewerToday = Date::now(FilamentTimezone::get())->startOfDay();
 
+        $shortDate = $date->isoFormat(__('formats.date_without_year'));
         $closesOn = $date->toDateString();
         $today = $viewerToday->toDateString();
         $tomorrow = $viewerToday->copy()->addDay()->toDateString();
 
         return match (true) {
-            $closesOn < $today => $date->format('M j').' (Overdue)',
-            $closesOn === $today => 'Closes Today',
-            $closesOn === $tomorrow => 'Closes Tomorrow',
-            default => $date->format('M j'),
+            $closesOn < $today => __('filament/pages/boards.opportunities.badges.overdue', ['date' => $shortDate]),
+            $closesOn === $today => __('filament/pages/boards.opportunities.badges.today'),
+            $closesOn === $tomorrow => __('filament/pages/boards.opportunities.badges.tomorrow'),
+            default => $shortDate,
         };
     }
 

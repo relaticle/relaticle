@@ -101,7 +101,7 @@
                                     datetime="{{ $task->dueAt->toDateString() }}"
                                     title="{{ $task->dueAt->isoFormat('LL') }}"
                                     class="shrink-0 whitespace-nowrap text-xs tabular-nums {{ $dateClass }}"
-                                >{{ $task->dueAt->isoFormat($task->dueAt->isSameYear(now($task->dueAt->timezone)) ? 'MMM D' : 'MMM D, YYYY') }}</time>
+                                >{{ $task->dueAt->isoFormat($task->dueAt->isSameYear(now($task->dueAt->timezone)) ? __('formats.date_without_year') : 'll') }}</time>
                             @endif
                         </a>
                     </div>

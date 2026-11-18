@@ -51,7 +51,7 @@
                     </p>
                     <p>
                         {{ __('profile.scheduled_deletion_interstitial.details.deletion_date') }}
-                        <strong class="text-gray-950 dark:text-white">{{ $deletionDate->format('F j, Y') }}</strong>
+                        <strong class="text-gray-950 dark:text-white">{{ $deletionDate->isoFormat('LL') }}</strong>
                     </p>
                     <p>
                         {{ trans_choice('profile.scheduled_deletion_interstitial.details.workspaces', $workspaceCount, ['count' => $workspaceCount]) }}

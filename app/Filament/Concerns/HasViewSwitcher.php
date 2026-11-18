@@ -374,7 +374,7 @@ trait HasViewSwitcher
         $zone = FilamentTimezone::get();
 
         foreach ($views as $view) {
-            $date = $view->created_at?->setTimezone($zone)->translatedFormat('M j, Y');
+            $date = $view->created_at?->setTimezone($zone)->isoFormat('ll');
 
             $isBoard = $view->type === SavedViewType::Board;
             $layout = $isBoard ? 'board' : 'list';

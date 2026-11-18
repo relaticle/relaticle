@@ -25,7 +25,7 @@
         $sentAt->isToday()        => $sentAt->isoFormat('LT'),
         $sentAt->isYesterday()    => __('filament/pages/email-inbox.list_row.timestamp_yesterday', ['time' => $sentAt->isoFormat('LT')]),
         $sentAt->diffInDays() < 7 => $sentAt->isoFormat('ddd'),
-        $sentAt->isCurrentYear()  => $sentAt->isoFormat('MMM D'),
+        $sentAt->isCurrentYear()  => $sentAt->isoFormat(__('formats.date_without_year')),
         default                   => $sentAt->isoFormat('ll'),
     };
 

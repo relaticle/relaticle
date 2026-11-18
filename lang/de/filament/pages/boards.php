@@ -90,6 +90,11 @@ return [
         'form' => [
             'name_placeholder' => 'Titel der Verkaufschance eingeben',
         ],
+        'badges' => [
+            'today' => 'Schließt heute',
+            'tomorrow' => 'Schließt morgen',
+            'overdue' => ':date (überfällig)',
+        ],
         'groupings' => [
             'company' => 'Unternehmen',
             'no_company' => 'Kein Unternehmen',
@@ -101,6 +106,11 @@ return [
             'add' => 'Aufgabe hinzufügen',
             'edit' => 'Bearbeiten',
             'delete' => 'Löschen',
+        ],
+        'badges' => [
+            'today' => 'Heute fällig',
+            'tomorrow' => 'Morgen fällig',
+            'overdue' => ':date (überfällig)',
         ],
         'groupings' => [
             'assignee' => 'Zuständig',
