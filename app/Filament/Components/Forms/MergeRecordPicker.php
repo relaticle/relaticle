@@ -30,7 +30,7 @@ use Livewire\Attributes\Renderless;
 
 /**
  * @phpstan-type Card array{name: string, logo: ?string, icon: string, detailIcon: string, details: list<array{label: string, href: string}>, emptyDetails: string, counts: list<array{key: string, icon: string, count: int}>}
- * @phpstan-type Pairing array{picked: Company|People, values: MergedValues}
+ * @phpstan-type Pairing array{picked: Company|People, priority: Company|People, other: Company|People, values: MergedValues}
  */
 final class MergeRecordPicker extends Field
 {
@@ -184,10 +184,9 @@ final class MergeRecordPicker extends Field
             return null;
         }
 
-        $values = resolve(CombineRecordValues::class)
-            ->execute(...$keepsPicked ? [$picked, $current] : [$current, $picked]);
+        [$priority, $other] = $keepsPicked ? [$picked, $current] : [$current, $picked];
 
-        return ['picked' => $picked, 'values' => $values];
+        return ['picked' => $picked, 'priority' => $priority, 'other' => $other, 'values' => resolve(CombineRecordValues::class)->execute($priority, $other)];
     }
 
     private function subject(): Company|People
@@ -252,11 +251,10 @@ final class MergeRecordPicker extends Field
         $values = $pairing['values'];
         $picked = $pairing['picked'];
         $current = $this->currentRecord();
-        [$priority, $other] = $this->keepPickedFlag() ? [$picked, $current] : [$current, $picked];
 
         return $this->cardData(
             (string) $values->attributes['name'],
-            $this->image($priority) ?? $this->image($other),
+            $this->image($pairing['priority']) ?? $this->image($pairing['other']),
             $this->links($values->customFields[$this->identity()->fieldCode()] ?? []),
             fn (string $key): int => (int) $picked->getAttribute("{$key}_count")
                 + (int) $current->getAttribute("{$key}_count")
