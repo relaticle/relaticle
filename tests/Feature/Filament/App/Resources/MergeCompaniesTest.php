@@ -461,6 +461,17 @@ it('finds a company by domain while the domains column is hidden from the list',
     expect(mergeSearchNames(ViewCompany::class, $kept, 'brightline.health'))->toBe(['Brightline Health']);
 });
 
+it('shows no domains in the search once the domains attribute is deactivated, like the duplicate prompt', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept']);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Brightline Health'], ['domains' => ['brightline.health']]);
+
+    expect(array_column(mergeSearch(ViewCompany::class, $kept, 'Bright')->effects['returns'][0], 'detail'))->toBe(['brightline.health']);
+
+    WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains')->update(['active' => false]);
+
+    expect(array_column(mergeSearch(ViewCompany::class, $kept, 'Bright')->effects['returns'][0], 'detail'))->toBe([null]);
+});
+
 it('searches for a duplicate without rendering the dialog again', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Kept']);
     mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Northwind']);

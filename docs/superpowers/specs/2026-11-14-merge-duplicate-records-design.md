@@ -247,6 +247,11 @@ an original into the record it already went into.
   entries, because the new record took them over. Its emails or
   domains now belong to the new record, so restore hits the existing `RestoreConflictMessage`, which
   is the right outcome.
+- **Inactive custom attributes** are not merged. A value an original holds in a deactivated field
+  stays on that original, so reactivating the field shows it there and not on the new record
+  (decided 2026-11-18).
+- **Shared emails and meetings** are counted in batches of 500, so a merge's memory stays flat
+  however many the two records share: about 3 MB at 3,000 shared emails, measured 2026-11-18.
 - **Force-deleting an original later** is safe. `people.company_id` and `opportunities.company_id`
   are set null on a hard delete (`ON DELETE SET NULL`), and nothing points at it any more anyway.
 - **Email relink.** Changing a record's emails or domains already queues `RelinkRecordHistoryJob`.
