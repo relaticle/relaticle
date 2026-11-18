@@ -6,6 +6,7 @@ namespace Relaticle\OnboardSeed;
 
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Locales;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
@@ -41,18 +42,21 @@ final class OnboardSeedManager
             $workspace = $user->personalWorkspace();
         }
 
+        $locale = $user instanceof User ? $user->effectiveLocale() : (string) config('app.default_locale');
+
         try {
             FixtureRegistry::clear();
             FixtureLoader::setFixtureSet($fixtureSet);
+            FixtureLoader::setLocale($locale);
             $this->initializeSeeders();
 
-            DB::transaction(function () use ($user, $workspace): void {
+            Locales::within($locale, fn () => DB::transaction(function () use ($user, $workspace): void {
                 Model::withoutEvents(function () use ($user, $workspace): void {
                     foreach ($this->seeders as $seeder) {
                         $seeder->seed($workspace, $user);
                     }
                 });
-            });
+            }));
 
             return true;
         } catch (Throwable $e) {

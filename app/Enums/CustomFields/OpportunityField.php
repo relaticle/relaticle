@@ -16,22 +16,22 @@ enum OpportunityField: string
     case STAGE = 'stage';
 
     /**
-     * @return string[]|null
+     * @return array<string, string>|null
      */
-    public function getOptions(): ?array
+    protected function optionKeyColors(): ?array
     {
         return match ($this) {
             self::STAGE => [
-                'Prospecting',
-                'Qualification',
-                'Needs Analysis',
-                'Value Proposition',
-                'Id. Decision Makers',
-                'Perception Analysis',
-                'Proposal/Price Quote',
-                'Negotiation/Review',
-                'Closed Won',
-                'Closed Lost',
+                'enums/custom-fields.opportunity.stage.options.prospecting' => OptionColor::Purple->value,
+                'enums/custom-fields.opportunity.stage.options.qualification' => OptionColor::Blue->value,
+                'enums/custom-fields.opportunity.stage.options.needs_analysis' => OptionColor::Cyan->value,
+                'enums/custom-fields.opportunity.stage.options.value_proposition' => OptionColor::Olive->value,
+                'enums/custom-fields.opportunity.stage.options.id_decision_makers' => OptionColor::Magenta->value,
+                'enums/custom-fields.opportunity.stage.options.perception_analysis' => OptionColor::Amber->value,
+                'enums/custom-fields.opportunity.stage.options.proposal_price_quote' => OptionColor::Pink->value,
+                'enums/custom-fields.opportunity.stage.options.negotiation_review' => OptionColor::Orange->value,
+                'enums/custom-fields.opportunity.stage.options.closed_won' => OptionColor::Green->value,
+                'enums/custom-fields.opportunity.stage.options.closed_lost' => OptionColor::Gray->value,
             ],
             default => null,
         };
@@ -49,36 +49,14 @@ enum OpportunityField: string
     public function getDisplayName(): string
     {
         return match ($this) {
-            self::AMOUNT => 'Amount',
-            self::CLOSE_DATE => 'Close Date',
-            self::STAGE => 'Stage',
+            self::AMOUNT => __('enums/custom-fields.opportunity.amount.name'),
+            self::CLOSE_DATE => __('enums/custom-fields.opportunity.close_date.name'),
+            self::STAGE => __('enums/custom-fields.opportunity.stage.name'),
         };
     }
 
     public function isListToggleableHidden(): bool
     {
         return false;
-    }
-
-    /**
-     * @return array<string, string>|null
-     */
-    public function getOptionColors(): ?array
-    {
-        return match ($this) {
-            self::STAGE => [
-                'Prospecting' => OptionColor::Purple->value,
-                'Qualification' => OptionColor::Blue->value,
-                'Needs Analysis' => OptionColor::Cyan->value,
-                'Value Proposition' => OptionColor::Olive->value,
-                'Id. Decision Makers' => OptionColor::Magenta->value,
-                'Perception Analysis' => OptionColor::Amber->value,
-                'Proposal/Price Quote' => OptionColor::Pink->value,
-                'Negotiation/Review' => OptionColor::Orange->value,
-                'Closed Won' => OptionColor::Green->value,
-                'Closed Lost' => OptionColor::Gray->value,
-            ],
-            default => null,
-        };
     }
 }

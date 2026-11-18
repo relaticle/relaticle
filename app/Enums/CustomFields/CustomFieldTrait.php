@@ -26,6 +26,30 @@ trait CustomFieldTrait
     }
 
     /**
+     * Option lang keys in sort order, each with its colour. The key is the stable identity of an option.
+     *
+     * @return array<string, string>|null
+     */
+    protected function optionKeyColors(): ?array
+    {
+        return null;
+    }
+
+    /**
+     * Translate an English option label (as sample fixtures write it) into the current locale.
+     */
+    public function localizeOption(string $english): string
+    {
+        foreach (array_keys($this->optionKeyColors() ?? []) as $key) {
+            if (__($key, [], 'en') === $english) {
+                return __($key);
+            }
+        }
+
+        return $english;
+    }
+
+    /**
      * Get the field type
      *
      * @return string The type of form field to use
@@ -73,7 +97,9 @@ trait CustomFieldTrait
      */
     public function getOptions(): ?array
     {
-        return null;
+        $keys = $this->optionKeyColors();
+
+        return $keys === null ? null : array_map(fn (string $key): string => __($key), array_keys($keys));
     }
 
     /**
@@ -93,7 +119,19 @@ trait CustomFieldTrait
      */
     public function getOptionColors(): ?array
     {
-        return null;
+        $keys = $this->optionKeyColors();
+
+        if ($keys === null) {
+            return null;
+        }
+
+        $colors = [];
+
+        foreach ($keys as $key => $color) {
+            $colors[__($key)] = $color;
+        }
+
+        return $colors;
     }
 
     /**

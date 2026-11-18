@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\OnboardSeed\Support;
 
 use App\Enums\CreationSource;
+use App\Enums\CustomFields\OpportunityField;
+use App\Enums\CustomFields\TaskField;
 use App\Models\CustomField;
 use App\Models\Workspace;
 use Illuminate\Contracts\Auth\Authenticatable;
@@ -122,7 +124,8 @@ abstract class BaseModelSeeder implements ModelSeederInterface
             return null;
         }
 
-        $option = $field->options->firstWhere('name', $optionLabel);
+        $option = $field->options->firstWhere('name', $optionLabel)
+            ?? $field->options->firstWhere('name', $this->localizedOptionLabel($fieldCode, $optionLabel));
 
         if (! $option) {
             Log::warning("Option '{$optionLabel}' not found for field '{$fieldCode}'");
@@ -131,6 +134,13 @@ abstract class BaseModelSeeder implements ModelSeederInterface
         }
 
         return $option->id;
+    }
+
+    private function localizedOptionLabel(string $fieldCode, string $optionLabel): string
+    {
+        $field = TaskField::tryFrom($fieldCode) ?? OpportunityField::tryFrom($fieldCode);
+
+        return $field?->localizeOption($optionLabel) ?? $optionLabel;
     }
 
     /** @return array<string, mixed> */

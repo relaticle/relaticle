@@ -25,7 +25,7 @@ enum NoteField: string
     public function getDisplayName(): string
     {
         return match ($this) {
-            self::BODY => 'Body',
+            self::BODY => __('enums/custom-fields.note.body.name'),
         };
     }
 

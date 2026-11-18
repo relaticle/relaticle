@@ -549,7 +549,7 @@ final readonly class CustomFieldOptionPlan
 
     public static function locksOption(CustomField $field, string $name): bool
     {
-        return self::isTaskStatus($field) && $name === TaskField::DONE_STATUS;
+        return self::isTaskStatus($field) && TaskField::isDone($name);
     }
 
     private static function isTaskStatus(CustomField $field): bool
@@ -568,7 +568,7 @@ final readonly class CustomFieldOptionPlan
      */
     private static function keepsDone(Collection $current, array $targets): bool
     {
-        $done = $current->first(fn (CustomFieldOption $option): bool => $option->name === TaskField::DONE_STATUS);
+        $done = $current->first(fn (CustomFieldOption $option): bool => TaskField::isDone($option->name));
 
         if (! $done instanceof CustomFieldOption) {
             return true;
@@ -576,7 +576,7 @@ final readonly class CustomFieldOptionPlan
 
         foreach ($targets as $target) {
             if ($target['option'] instanceof CustomFieldOption && $target['option']->is($done)) {
-                return $target['name'] === TaskField::DONE_STATUS;
+                return TaskField::isDone($target['name']);
             }
         }
 

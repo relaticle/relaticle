@@ -127,7 +127,7 @@ final readonly class MyTasksService
         $row = DB::table('custom_fields as cf')
             ->leftJoin('custom_field_options as opt', function (JoinClause $join): void {
                 $join->on('opt.custom_field_id', '=', 'cf.id')
-                    ->where('opt.name', '=', TaskField::DONE_STATUS);
+                    ->whereIn('opt.name', TaskField::doneNames());
             })
             ->where('cf.tenant_id', $workspace->getKey())
             ->where('cf.entity_type', 'task')

@@ -32,7 +32,7 @@ final readonly class CompleteTask
                 ->where('code', TaskField::STATUS)
                 ->first();
 
-            $done = $status?->options->firstWhere('name', TaskField::DONE_STATUS);
+            $done = $status?->options->first(fn (CustomFieldOption $option): bool => TaskField::isDone($option->name));
 
             abort_unless(
                 $status instanceof CustomField && $done instanceof CustomFieldOption,
