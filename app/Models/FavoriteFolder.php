@@ -26,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable(['workspace_id', 'user_id', 'name', 'position'])]
 final class FavoriteFolder extends Model
 {
+    public const int NAME_MAX_LENGTH = 60;
+
     /** @use HasFactory<FavoriteFolderFactory> */
     use HasFactory;
 

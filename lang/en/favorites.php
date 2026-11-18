@@ -10,6 +10,13 @@ return [
         'remove' => 'Remove from favorites',
         'new_folder' => 'New folder',
     ],
+    'folders' => [
+        'name' => 'Name',
+        'rename' => 'Rename',
+        'delete' => 'Delete folder',
+        'delete_body' => 'The favorites in this folder move to the top of the list.',
+        'menu' => 'Folder options',
+    ],
     'entities' => [
         'company' => 'Company',
         'people' => 'Person',

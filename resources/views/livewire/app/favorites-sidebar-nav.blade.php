@@ -27,6 +27,7 @@
             icon="lucide-folder-plus"
             :label="__('favorites.actions.new_folder')"
             x-on:click.stop
+            wire:click="mountAction('createFolder')"
             class="fi-sidebar-favorites-new-folder-btn"
         />
 
@@ -61,4 +62,6 @@
             </li>
         @endforelse
     </ul>
+
+    <x-filament-actions::modals />
 </li>

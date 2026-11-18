@@ -21,6 +21,33 @@
             <x-lucide-folder :x-show="$isClosed" x-cloak class="fi-icon fi-size-lg fi-sidebar-item-icon" />
             <span title="{{ $folder->name }}" class="fi-sidebar-item-label truncate">{{ $folder->name }}</span>
         </button>
+
+        <x-filament::dropdown placement="bottom-end" teleport class="absolute end-1 top-1/2 -translate-y-1/2">
+            <x-slot name="trigger">
+                <x-filament::icon-button
+                    color="gray"
+                    size="sm"
+                    icon="lucide-ellipsis"
+                    :label="__('favorites.folders.menu')"
+                />
+            </x-slot>
+
+            <x-filament::dropdown.list>
+                <x-filament::dropdown.list.item
+                    icon="lucide-pencil"
+                    wire:click="mountAction('renameFolder', { folder: @js($folder->getKey()) })"
+                >
+                    {{ __('favorites.folders.rename') }}
+                </x-filament::dropdown.list.item>
+                <x-filament::dropdown.list.item
+                    icon="lucide-trash-2"
+                    color="danger"
+                    wire:click="mountAction('deleteFolder', { folder: @js($folder->getKey()) })"
+                >
+                    {{ __('favorites.folders.delete') }}
+                </x-filament::dropdown.list.item>
+            </x-filament::dropdown.list>
+        </x-filament::dropdown>
     </div>
 
     <ul
