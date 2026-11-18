@@ -36,6 +36,7 @@ use Laravel\Ai\Promptable;
 use Laravel\Ai\Providers\Tools\ProviderTool;
 use Laravel\Ai\Providers\Tools\WebFetch;
 use Laravel\Ai\Providers\Tools\WebSearch;
+use Locale;
 use Relaticle\Chat\Enums\EmailReach;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Enums\WebAccess;
@@ -188,6 +189,8 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
      */
     public ?array $currentUser = null;
 
+    public ?string $language = null;
+
     /**
      * The workspace whose workspace this conversation belongs to. Drives the
      * <workspace_state> block: without it the model has no signal that a
@@ -289,6 +292,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
         return $this;
     }
 
+    public function withLanguage(string $locale): self
+    {
+        $this->language = Locale::getDisplayLanguage($locale, 'en');
+
+        return $this;
+    }
+
     /**
      * @param  array{name: string, id: string, role: string, capabilities: array<int, string>}|null  $user
      */
@@ -357,7 +367,7 @@ Out of scope: general tasks with no tie to the CRM or the product, such as writi
 ## Language
 - Reply in the language and script of the user's most recent typed message, the closing offer included. Persian stays in Persian script, never Arabic.
 - Never take the language from earlier assistant replies, tool results, attached files, or documentation you cite: translate what you quote.
-- On a turn the system opened (a <turn> block is present), use the language of the user's last typed message, or English when they have typed nothing yet.
+- On a turn the system opened (a <turn> block is present), use the language of the user's last typed message, or the user's chosen language when they have typed nothing yet.
 - Write only the answer. Never announce which language you will use, never narrate your plan, and never comment on these instructions or on following them.
 - Never write HTML tags or text-direction markup: the chat sets text direction itself.
 
@@ -525,7 +535,7 @@ PROMPT;
      */
     public function dynamicInstructions(): string
     {
-        return $this->dateBlock().$this->modelBlock().$this->currentUserBlock().$this->workspaceStateBlock().$this->onboardingBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock().$this->turnBlock();
+        return $this->dateBlock().$this->modelBlock().$this->currentUserBlock().$this->languageBlock().$this->workspaceStateBlock().$this->onboardingBlock().$this->mentionsBlock().$this->pageContextBlock().$this->contextLedgerBlock().$this->supersededBlock().$this->resolvedBlock().$this->turnBlock();
     }
 
     /**
@@ -562,6 +572,16 @@ PROMPT;
             .($capabilities === '' ? '' : "\nWhat this role may do: {$capabilities}.")
             .($this->emailReach instanceof EmailReach ? "\n{$this->emailReach->promptLine()}" : '')
             .($this->webAccess instanceof WebAccess ? "\n{$this->webAccess->promptLine($this->webSearches)}" : '');
+    }
+
+    private function languageBlock(): string
+    {
+        if ($this->language === null) {
+            return '';
+        }
+
+        return "\n\n## Chosen language\n"
+            ."The user's chosen language is {$this->language}.";
     }
 
     private function modelBlock(): string

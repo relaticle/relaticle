@@ -10,6 +10,7 @@ use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use App\Support\Locales;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -151,7 +152,7 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function handle(CreditService $creditService): void
     {
-        resolve(CurrentWorkspace::class)->within($this->workspace, fn () => $this->process($creditService));
+        Locales::within($this->user->effectiveLocale(), fn () => resolve(CurrentWorkspace::class)->within($this->workspace, fn () => $this->process($creditService)));
     }
 
     private function process(CreditService $creditService): void
@@ -224,7 +225,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withConversationId($this->conversationId);
             $agent->withTurnId($this->turnId);
             $agent->continue($this->conversationId, as: $this->user);
-            $agent->withUserTimezone($this->user->timezone);
+            $agent->withUserTimezone($this->user->timezone)->withLanguage($this->user->effectiveLocale());
             $agent->withWorkspace($this->workspace);
             $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation());
             $agent->withTurnOrigin($this->origin);
@@ -535,6 +536,11 @@ final class ProcessChatMessage implements ShouldQueue
     }
 
     public function failed(?Throwable $exception): void
+    {
+        Locales::within($this->user->effectiveLocale(), fn () => $this->settleFailedTurn($exception));
+    }
+
+    private function settleFailedTurn(?Throwable $exception): void
     {
         $this->reportTimeout($exception);
 
