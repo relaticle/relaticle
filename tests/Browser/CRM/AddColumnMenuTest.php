@@ -73,3 +73,15 @@ it('opens the Add column menu as wide as View settings', function (): void {
 
     expect($page->script('document.querySelector("#add-column-menu").getBoundingClientRect().width'))->toBe($viewSettingsWidth);
 });
+
+it('opens the create attribute form on the type picked from the Add column menu', function (): void {
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900);
+    $page->script('document.querySelector("[data-add-column-trigger]").click()');
+    waitUntil($page, 'document.querySelector("#add-column-menu").checkVisibility()');
+
+    $page->script('document.querySelector("[data-add-column-create]").click()');
+    waitUntil($page, 'document.querySelector("[data-add-column-type][data-type=\"number\"]").checkVisibility()');
+    $page->script('document.querySelector("[data-add-column-type][data-type=\"number\"]").click()');
+
+    waitUntil($page, '!document.querySelector("#add-column-menu").checkVisibility() && Livewire.all().find((component) => component.name.includes("ListCompanies")).$wire.mountedActions?.[0]?.data?.type === "number"');
+});
