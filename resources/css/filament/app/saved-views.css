@@ -71,7 +71,7 @@
 }
 
 /* Filament's size option caps the panel at the room below the trigger. The menu inside shrinks to it. */
-:is(.fi-view-switcher, .fi-view-settings) > .fi-dropdown-panel:not([x-cloak], [style*='display: none']) {
+:is(.fi-view-switcher, .fi-view-settings, .fi-ta-add-column-dropdown) > .fi-dropdown-panel:not([x-cloak], [style*='display: none']) {
     @apply flex! flex-col;
 }
 

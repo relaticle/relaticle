@@ -1,19 +1,10 @@
 <div
     id="add-column-menu"
     x-data="tableAddColumn"
-    x-on:add-column-open.window="open($event.detail.trigger)"
-    x-on:resize.window="close(false)"
-    x-on:scroll.window.capture="$event.target.closest?.('[data-add-column]') || close(false)"
-    x-on:livewire:navigating.window="close(false)"
-    x-on:keydown.escape.prevent.stop="creating ? closeCreate() : close(true)"
-    x-on:click.outside="$event.target.closest('[data-add-column-trigger]') || close(false)"
-    x-cloak
-    x-show="trigger !== null"
-    x-bind:class="{ 'invisible': ! placed }"
-    x-bind:style="{ top: `${top}px`, left: `${left}px` }"
+    x-on:dropdown-escape="creating && ($event.preventDefault(), closeCreate())"
     role="group"
     aria-label="{{ __('filament/panel.tables.views.add_column') }}"
-    class="fi-dropdown-panel fi-width-xs fi-ta-add-column-menu"
+    class="fi-ta-add-column-menu"
     data-add-column
 >
     <div class="fi-view-settings-view" x-show="! creating">
@@ -104,7 +95,7 @@
                             :aria-label="__('filament/panel.tables.views.create_attribute_type', ['type' => $option['label']])"
                             data-add-column-type
                             :data-type="$type"
-                            x-on:click="create($el.dataset.type); close(false)"
+                            x-on:click="create($el.dataset.type)"
                         >
                             {{ $option['label'] }}
                         </x-filament::dropdown.list.item>

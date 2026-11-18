@@ -93,15 +93,9 @@ trait HasCustomFieldColumns
     // The actions column takes the width the data columns leave, so its header carries the Add column button.
     private function addColumnHeader(): ?Htmlable
     {
-        return $this->addColumnMenu() === null ? null : new HtmlString(view('filament.app.tables.add-column')->render());
-    }
-
-    // Rendered beside the table, not in its header, because the table's sideways scroll would clip it.
-    public function getAddColumnMenu(): ?Htmlable
-    {
         $menu = $this->addColumnMenu();
 
-        return $menu === null ? null : new HtmlString(view('filament.app.tables.add-column-menu', $menu)->render());
+        return $menu === null ? null : new HtmlString(view('filament.app.tables.add-column', $menu)->render());
     }
 
     /**

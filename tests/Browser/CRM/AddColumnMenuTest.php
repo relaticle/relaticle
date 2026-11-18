@@ -20,7 +20,7 @@ beforeEach(function (): void {
 
 it('closes the Add column menu once a hidden attribute is picked, shows its column and focuses the button', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
-    $page->script('document.querySelector("[data-add-column-trigger]").click()');
+    $page->click('[data-add-column-trigger]');
     waitUntil($page, 'document.querySelector("#add-column-menu").checkVisibility()');
 
     $attribute = $page->script('document.querySelector("[data-add-column-item]").dataset.attribute');
@@ -35,8 +35,7 @@ it('closes the Add column menu once a hidden attribute is picked, shows its colu
 
 it('shows the attribute the member picks after an earlier pick drew the list again', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
-    $open = 'document.querySelector("[data-add-column-trigger]").click()';
-    $page->script($open);
+    $page->click('[data-add-column-trigger]');
     waitUntil($page, 'document.querySelector("#add-column-menu").checkVisibility()');
 
     [$first, $second] = $page->script('[...document.querySelectorAll("[data-add-column-item]")].slice(0, 2).map((item) => item.dataset.attribute)');
@@ -44,7 +43,7 @@ it('shows the attribute the member picks after an earlier pick drew the list aga
     waitUntil($page, sprintf('%s.includes("%s") && document.activeElement.matches("[data-add-column-trigger]")', headerOrder(), $first));
     $page->wait(0.3);
 
-    $page->script($open);
+    $page->click('[data-add-column-trigger]');
     waitUntil($page, 'document.querySelector("#add-column-menu").checkVisibility()');
     $page->script('[...document.querySelectorAll("[data-add-column-item]")].find((item) => item.checkVisibility()).click()');
 
@@ -53,7 +52,7 @@ it('shows the attribute the member picks after an earlier pick drew the list aga
 
 it('focuses the search box when the Add column menu opens, so Escape closes it from the keyboard', function (): void {
     $page = companiesTable($this->user, $this->workspace->slug);
-    $page->script('document.querySelector("[data-add-column-trigger]").click()');
+    $page->click('[data-add-column-trigger]');
 
     waitUntil($page, 'document.activeElement.matches("[data-add-column-search]")');
 
@@ -68,15 +67,15 @@ it('opens the Add column menu as wide as View settings', function (): void {
     $viewSettingsWidth = $page->script('document.querySelector(".fi-view-settings-panel").closest(".fi-dropdown-panel").getBoundingClientRect().width');
     $page->keys('.fi-view-settings-trigger', 'Escape');
 
-    $page->script('document.querySelector("[data-add-column-trigger]").click()');
+    $page->click('[data-add-column-trigger]');
     waitUntil($page, 'document.querySelector("#add-column-menu").checkVisibility()');
 
-    expect($page->script('document.querySelector("#add-column-menu").getBoundingClientRect().width'))->toBe($viewSettingsWidth);
+    expect($page->script('document.querySelector("#add-column-menu").closest(".fi-dropdown-panel").getBoundingClientRect().width'))->toBe($viewSettingsWidth);
 });
 
 it('opens the create attribute form on the type picked from the Add column menu', function (): void {
     $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900);
-    $page->script('document.querySelector("[data-add-column-trigger]").click()');
+    $page->click('[data-add-column-trigger]');
     waitUntil($page, 'document.querySelector("#add-column-menu").checkVisibility()');
 
     $page->script('document.querySelector("[data-add-column-create]").click()');

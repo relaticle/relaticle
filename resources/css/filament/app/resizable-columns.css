@@ -25,14 +25,9 @@
     @apply min-w-56 px-2 py-1.5 text-start;
 }
 
-/* Placed under its trigger by the script, outside the table's scroll box. */
-.fi-dropdown-panel.fi-ta-add-column-menu {
-    @apply fixed z-60 flex max-h-[min(var(--spacing-menu-max),var(--menu-room,100dvh))] w-xs flex-col transition-none;
-
-    /* View settings opens its search row with a back button. This one has none, so the text lines up with the row icons. */
-    & .fi-view-settings-search > input {
-        @apply ps-2;
-    }
+/* View settings opens its search row with a back button. This one has none, so the text lines up with the row icons. */
+.fi-ta-add-column-menu .fi-view-settings-search > input {
+    @apply ps-2;
 }
 
 .fi-ta-add-column-trigger {
