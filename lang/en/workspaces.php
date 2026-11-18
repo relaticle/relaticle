@@ -203,6 +203,18 @@ return [
         'record_destroyed' => 'This record has been permanently deleted.',
         'yes' => 'Yes',
         'no' => 'No',
+        'outcome' => [
+            'created' => 'created :subject',
+            'deleted' => 'deleted :subject',
+            'restored' => 'restored :subject',
+        ],
+        'subjects' => [
+            'company' => 'a company',
+            'people' => 'a person',
+            'opportunity' => 'an opportunity',
+            'task' => 'a task',
+            'note' => 'a note',
+        ],
         'columns' => [
             'created_at' => 'When',
             'causer' => 'Who',

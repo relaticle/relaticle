@@ -230,3 +230,17 @@ it('offers no full text toggle for a change that fits its row', function (): voi
 
     expect($html)->not->toContain(__('workspaces.activity.full_change.show'));
 })->mutates(MergedActivityRenderer::class);
+
+it('words a created, deleted or restored entry as a full sentence in the interface language', function (string $event, string $expected): void {
+    app()->setLocale('de');
+    seedActivityRow($this->company, $event, null);
+
+    $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->sole())->render();
+
+    expect($html)->toContain(str_replace(':subject', $this->company->name, $expected))
+        ->and($html)->not->toContain("{$event} {$this->company->name}");
+})->with([
+    'created' => ['created', 'hat :subject erstellt'],
+    'deleted' => ['deleted', 'hat :subject gelöscht'],
+    'restored' => ['restored', 'hat :subject wiederhergestellt'],
+])->mutates(MergedActivityRenderer::class);

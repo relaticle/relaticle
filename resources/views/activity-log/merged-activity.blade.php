@@ -4,6 +4,7 @@
     /** @var \Relaticle\ActivityLog\Timeline\TimelineEntry $entry */
     /** @var \Relaticle\ActivityLog\Support\ActivityLogSummary $summary */
     /** @var list<array{label: string, old: string, new: string, full: array{old: string, new: string}|null}> $rows */
+    /** @var string|null $outcome */
     /** @var string|null $importFile */
     /** @var string|null $viaSource */
 
@@ -52,7 +53,7 @@
                     <span class="font-medium text-gray-900 underline decoration-dotted decoration-gray-400 underline-offset-[3px] dark:text-gray-100">{{ __('activity-log::messages.entry.attributes', ['count' => $count]) }}</span>
                 @endif
             @else
-                {{ \Illuminate\Support\Str::of($summary->summarySentence)->after($summary->causerName)->trim() }}
+                {{ $outcome ?? \Illuminate\Support\Str::of($summary->summarySentence)->after($summary->causerName)->trim() }}
             @endif
         </p>
 

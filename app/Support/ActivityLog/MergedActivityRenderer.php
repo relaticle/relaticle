@@ -7,7 +7,10 @@ namespace App\Support\ActivityLog;
 use App\Enums\CreationSource;
 use App\Models\ActivityLog\Activity;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\Str;
 use Relaticle\ActivityLog\Contracts\TimelineRenderer;
+use Relaticle\ActivityLog\Support\ActivityLogOperation;
 use Relaticle\ActivityLog\Support\ActivityLogSummary;
 use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
@@ -29,10 +32,34 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
         return view('activity-log.merged-activity', [
             'entry' => $entry,
             'summary' => $summary,
+            'outcome' => $this->outcome($summary, $entry),
             'rows' => $this->rows($entry, $summary),
             'importFile' => is_string($importFile) ? $importFile : null,
             'viaSource' => $this->viaSource(Activity::sourceFrom($entry->properties)),
         ]);
+    }
+
+    private function outcome(ActivityLogSummary $summary, TimelineEntry $entry): ?string
+    {
+        if (! in_array($summary->operation, [ActivityLogOperation::Created, ActivityLogOperation::Deleted, ActivityLogOperation::Restored], true)) {
+            return null;
+        }
+
+        return __("workspaces.activity.outcome.{$summary->operation->value}", ['subject' => $this->subjectName($entry)]);
+    }
+
+    private function subjectName(TimelineEntry $entry): string
+    {
+        $subject = $entry->subject;
+        $name = $subject?->getAttribute('name');
+
+        if (is_string($name) && $name !== '') {
+            return $name;
+        }
+
+        $noun = $subject === null ? null : 'workspaces.activity.subjects.'.Str::snake(class_basename($subject));
+
+        return $noun !== null && Lang::has($noun) ? __($noun) : __('activity-log::messages.summary.this_record');
     }
 
     private function viaSource(?CreationSource $source): ?string

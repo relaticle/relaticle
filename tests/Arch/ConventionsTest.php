@@ -94,10 +94,15 @@ function declaresQueueAttribute(ReflectionClass $class, string $attribute): bool
 
 function isEnglishCopy(string $relativePath): bool
 {
-    $config = require dirname(__DIR__, 2).'/config/app.php';
-    $others = implode('|', array_diff($config['available_locales'], ['en']));
+    static $pattern = null;
 
-    return preg_match("#(^|/)({$others})(/|\\.json\$)#", $relativePath) !== 1;
+    if ($pattern === null) {
+        $config = require dirname(__DIR__, 2).'/config/app.php';
+        $others = implode('|', array_diff($config['available_locales'], ['en']));
+        $pattern = "#(^|/)({$others})(/|\\.json\$)#";
+    }
+
+    return preg_match($pattern, $relativePath) !== 1;
 }
 
 /**
