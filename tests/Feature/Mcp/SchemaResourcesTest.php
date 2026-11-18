@@ -120,7 +120,17 @@ it('lets a client cache an entity schema privately for as long as the server doe
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'resources/read',
-        'params' => ['uri' => $uri],
+        'params' => [
+            'uri' => $uri,
+            '_meta' => [
+                'io.modelcontextprotocol/protocolVersion' => '2026-07-28',
+                'io.modelcontextprotocol/clientCapabilities' => (object) [],
+            ],
+        ],
+    ], [
+        'MCP-Protocol-Version' => '2026-07-28',
+        'Mcp-Method' => 'resources/read',
+        'Mcp-Name' => $uri,
     ])
         ->assertOk()
         ->assertJsonPath('result.ttlMs', CustomFieldSchemaCache::TTL * 1000)
