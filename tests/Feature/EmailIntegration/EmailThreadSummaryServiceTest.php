@@ -7,9 +7,9 @@ use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
+use Laravel\Ai\Exceptions\InvalidApiKeyException;
 use Laravel\Ai\Exceptions\ProviderOverloadedException;
 use Laravel\Ai\Exceptions\RateLimitedException;
 use Laravel\Ai\Responses\Data\Meta;
@@ -328,6 +328,6 @@ it('shows a failure notice instead of erroring when the AI provider rejects the 
     expect($thread->aiSummary()->exists())->toBeFalse();
 })->with([
     'no credit or rate limited' => [429, RateLimitedException::class],
-    'invalid api key' => [401, RequestException::class],
+    'invalid api key' => [401, InvalidApiKeyException::class],
     'provider unavailable' => [503, ProviderOverloadedException::class],
 ]);
