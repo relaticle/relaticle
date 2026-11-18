@@ -935,7 +935,7 @@ it('puts the Add column button in the actions column header and its menu beside 
 
     expect($page->filter('thead th > .fi-ta-add-column [data-add-column-trigger]')->count())->toBe(1)
         ->and($page->filter('table [data-add-column]')->count())->toBe(0)
-        ->and($page->filter('[data-add-column] [data-view-settings-create]')->count())->toBe(1)
+        ->and($page->filter('[data-add-column] [data-add-column-create]')->count())->toBe(1)
         ->and($page->filter('[data-add-column] [data-add-column-type]')->count())->toBeGreaterThan(0);
 
     if ($hidden !== null) {

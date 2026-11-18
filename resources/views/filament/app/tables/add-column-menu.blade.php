@@ -24,7 +24,7 @@
                 autocomplete="off"
                 placeholder="{{ __('filament/panel.tables.views.search_attributes', ['entity' => $entityLabel]) }}"
                 aria-label="{{ __('filament/panel.tables.views.search_attributes', ['entity' => $entityLabel]) }}"
-                data-view-settings-search
+                data-add-column-search
                 x-on:keydown.enter.prevent="pickFirst()"
                 x-on:keydown.arrow-down.prevent="stepAdd(1)"
                 x-on:keydown.arrow-up.prevent="stepAdd(-1)"
@@ -37,8 +37,8 @@
                     <x-filament::dropdown.list.item
                         role="button"
                         tabindex="0"
-                        :aria-label="__('filament/panel.tables.views.show_column', ['column' => $column['text']])"
-                        data-view-settings-add-item
+                        :aria-label="__('filament/panel.tables.views.add_column_attribute', ['column' => $column['text']])"
+                        data-add-column-item
                         :data-attribute="$column['name']"
                         :data-text="$column['text']"
                         x-show="isCandidate($el)"
@@ -67,7 +67,7 @@
                     icon="lucide-plus"
                     role="button"
                     tabindex="0"
-                    data-view-settings-create
+                    data-add-column-create
                     x-bind:aria-expanded="creating.toString()"
                     x-on:click="openCreate()"
                 >
@@ -88,7 +88,7 @@
                     color="gray"
                     size="sm"
                     :label="__('filament/panel.tables.views.back')"
-                    data-view-settings-back
+                    data-add-column-back
                     x-on:click="closeCreate()"
                 />
                 <span class="fi-view-settings-label">{{ __('filament/panel.tables.views.create_attribute') }}</span>

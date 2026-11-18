@@ -35,7 +35,7 @@
     window.avoidsSearchFocus = () => window.matchMedia('(width < 40rem), (pointer: coarse)').matches
 
     // The add panel of View settings, for the table's list and the board's card attributes.
-    window.viewSettingsAddPanel = ({ root, items, key, back, pick }) => ({
+    window.viewSettingsAddPanel = ({ root, items, key, back, pick, search = '[data-view-settings-search]', create = '[data-view-settings-create]' }) => ({
         query: '',
         pending: [],
         revision: 0,
@@ -56,7 +56,7 @@
 
         stepAdd(delta) {
             const scope = root(this)
-            const rows = [...this.addItems(), ...scope.querySelectorAll('[data-view-settings-create]')]
+            const rows = [...this.addItems(), ...scope.querySelectorAll(create)]
 
             if (rows.length === 0) return
 
@@ -64,7 +64,7 @@
             const next = index === -1 ? (delta > 0 ? 0 : rows.length - 1) : index + delta
 
             if (next < 0) {
-                scope.querySelector('[data-view-settings-search]').focus()
+                scope.querySelector(search).focus()
             } else {
                 rows[Math.min(next, rows.length - 1)].focus()
             }
@@ -79,7 +79,7 @@
         },
 
         focusAddStart(scope = root(this)) {
-            scope.querySelector(window.avoidsSearchFocus() ? back : '[data-view-settings-search]').focus()
+            scope.querySelector(window.avoidsSearchFocus() ? back : search).focus()
         },
     })
 
@@ -1030,10 +1030,12 @@
             return {
                 ...window.viewSettingsAddPanel({
                     root: () => panel,
-                    items: '[data-view-settings-add-item]',
+                    items: '[data-add-column-item]',
                     key: 'attribute',
-                    back: '[data-view-settings-search]',
+                    back: '[data-add-column-search]',
                     pick: 'show',
+                    search: '[data-add-column-search]',
+                    create: '[data-add-column-create]',
                 }),
                 creating: false,
                 trigger: null,
@@ -1047,7 +1049,7 @@
 
                 // There is no back button here, so a touch screen focuses nothing rather than zoom into the search box.
                 focusAddStart() {
-                    if (!window.avoidsSearchFocus()) panel.querySelector('[data-view-settings-search]')?.focus()
+                    if (!window.avoidsSearchFocus()) panel.querySelector('[data-add-column-search]')?.focus()
                 },
 
                 open(trigger) {
@@ -1107,7 +1109,7 @@
                     this.creating = false
                     this.$nextTick(() => requestAnimationFrame(() => {
                         this.place()
-                        panel.querySelector('[data-view-settings-create]')?.focus()
+                        panel.querySelector('[data-add-column-create]')?.focus()
                     }))
                 },
 
@@ -1135,7 +1137,7 @@
                     // The morph redraws the header, so the menu follows the new trigger or closes when none is left.
                     const trigger = document.querySelector('[data-add-column-trigger]')
 
-                    if (!trigger || this.addItems().length === 0 && !panel.querySelector('[data-view-settings-create]')) {
+                    if (!trigger || this.addItems().length === 0 && !panel.querySelector('[data-add-column-create]')) {
                         this.trigger = null
 
                         return

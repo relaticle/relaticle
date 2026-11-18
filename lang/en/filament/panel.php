@@ -197,6 +197,7 @@ return [
             'settings' => 'View settings',
             'add_attribute' => 'Add attribute to view',
             'add_column' => 'Add column',
+            'add_column_attribute' => 'Add :column column',
             'create_attribute_type' => 'Create :type attribute',
             'search_attributes' => 'Search :entity attributes…',
             'all_attributes_in_view' => 'Every attribute is already in this view',
