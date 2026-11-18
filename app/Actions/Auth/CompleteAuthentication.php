@@ -50,7 +50,7 @@ final readonly class CompleteAuthentication
         $session->invalidate();
         $session->put($preserved);
 
-        Auth::guard('web')->login($user, $pending['remember']);
+        Auth::guard('web')->login($user);
         $session->regenerateToken();
 
         AuthenticationSession::markComplete($user);

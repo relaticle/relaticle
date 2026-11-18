@@ -18,7 +18,7 @@ test('completing authentication rotates the session id so a fixated session cann
     $user = User::factory()->withWorkspace()->create();
 
     session()->put('attacker.planted', 'pre-login value');
-    AuthenticationSession::begin($user, AuthMethod::PASSWORD, null, false);
+    AuthenticationSession::begin($user, AuthMethod::PASSWORD, null);
     $fixated = session()->getId();
 
     resolve(CompleteAuthentication::class)->execute();
@@ -31,7 +31,7 @@ test('completing authentication rotates the session id so a fixated session cann
 test('a pending authentication proof cannot be spent twice', function (): void {
     $user = User::factory()->withWorkspace()->create();
 
-    AuthenticationSession::begin($user, AuthMethod::PASSWORD, null, false);
+    AuthenticationSession::begin($user, AuthMethod::PASSWORD, null);
     $pending = AuthenticationSession::pending();
 
     expect(AuthenticationSession::consume($user))->not->toBe([]);

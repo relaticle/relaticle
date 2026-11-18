@@ -36,6 +36,7 @@ use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\SystemAdmin\Auth\RequiredAppAuthentication;
 use Relaticle\SystemAdmin\Filament\Pages\Auth\EditProfile;
+use Relaticle\SystemAdmin\Filament\Pages\Auth\Login;
 use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyLoginController;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyRegistrationController;
@@ -163,7 +164,7 @@ final class SystemAdminPanelProvider extends PanelProvider
         }
 
         return $panel
-            ->login()
+            ->login(Login::class)
             ->profile(EditProfile::class)
             ->emailVerification(isRequired: config('app.require_email_verification'))
             // A SuperAdministrator password reaches every customer's data and, through

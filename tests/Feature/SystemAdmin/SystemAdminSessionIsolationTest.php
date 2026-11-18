@@ -6,7 +6,6 @@ use App\Filament\Pages\Auth\Login;
 use App\Models\ActivityLog\Activity;
 use App\Models\ActivityLog\Scopes\WorkspaceScope;
 use App\Models\User;
-use Filament\Auth\Pages\Login as StaffLogin;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentView;
 use Filament\Support\View\ViewManager;
@@ -28,6 +27,7 @@ use Illuminate\Support\Str;
 use Illuminate\Testing\TestResponse;
 use PragmaRX\Google2FAQRCode\Google2FA;
 use Relaticle\Ink\Models\Post;
+use Relaticle\SystemAdmin\Filament\Pages\Auth\Login as StaffLogin;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ViewUser;
 use Relaticle\SystemAdmin\Http\Middleware\EnsureAuthenticationContext;
 use Relaticle\SystemAdmin\Http\Middleware\IsolateAuthenticationSession;
@@ -130,7 +130,7 @@ function isolatedAuthRequest(array &$cookies, string $method, string $url, array
 }
 
 /** @param array<string, array<string, string>> $cookies */
-function signInIsolatedStaff(array &$cookies, SystemAdministrator $administrator, bool $remember = false): void
+function signInIsolatedStaff(array &$cookies, SystemAdministrator $administrator): void
 {
     $options = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/passkeys/login/options')
         ->assertOk()->json('options');
@@ -143,7 +143,7 @@ function signInIsolatedStaff(array &$cookies, SystemAdministrator $administrator
         'credential' => $assertion['storedCredential'],
     ]);
 
-    isolatedAuthRequest($cookies, 'POST', 'https://staff.example.test/passkeys/login', [...$assertion['payload'], 'remember' => $remember])
+    isolatedAuthRequest($cookies, 'POST', 'https://staff.example.test/passkeys/login', $assertion['payload'])
         ->assertOk();
 }
 
@@ -329,41 +329,6 @@ it('keeps the customer signed in through staff login and logout with identical a
 
     expect(DB::table('sessions')->where('user_id', $customer->id)->exists())->toBeTrue()
         ->and(DB::table('system_administrator_sessions')->where('user_id', $administrator->id)->exists())->toBeFalse();
-});
-
-it('does not restore customer authentication from a parent-domain remember cookie on the staff host', function (): void {
-    $cookies = [];
-    $customer = User::factory()->withWorkspace()->create();
-    isolatedAuthRequest($cookies, 'POST', 'https://app.example.test/login', [
-        'email' => $customer->email,
-        'password' => 'password',
-        'remember' => true,
-    ])->assertOk();
-
-    $recaller = Auth::guard('web')->getRecallerName();
-    expect($cookies['.example.test'])->toHaveKey($recaller);
-
-    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/login')->assertOk();
-    $sessions = DB::table('system_administrator_sessions')->get();
-
-    expect($sessions)->toHaveCount(1)
-        ->and($sessions->sole()->user_id)->toBeNull();
-    $payload = unserialize(base64_decode($sessions->sole()->payload));
-    expect($payload)->not->toHaveKey(Auth::guard('web')->getName());
-});
-
-it('ignores a legacy staff remember cookie outside the staff host', function (): void {
-    $cookies = [];
-    $administrator = SystemAdministrator::factory()->create();
-    signInIsolatedStaff($cookies, $administrator, remember: true);
-    $recaller = Auth::guard('sysadmin')->getRecallerName();
-    $cookies['.example.test'][$recaller] = $cookies['staff.example.test'][$recaller];
-
-    isolatedAuthRequest($cookies, 'GET', 'https://example.test/passkeys/login/options')->assertOk();
-
-    expect(DB::table('sessions')->where('user_id', $administrator->id)->exists())->toBeFalse();
-    $payload = unserialize(base64_decode(DB::table('sessions')->sole()->payload));
-    expect($payload)->not->toHaveKey(Auth::guard('sysadmin')->getName());
 });
 
 it('serves staff blog previews while still requiring a valid signature', function (): void {

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Filament\Pages\Dashboard;
@@ -17,7 +18,6 @@ use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
 use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 use Laravel\Passkeys\Passkey;
 use Laravel\Socialite\Facades\Socialite;
@@ -221,23 +221,6 @@ test('a confirmation inside the confirmation window still satisfies the gate', f
         ->assertNotified(__('profile.notifications.logged_out_other_sessions.success'));
 });
 
-test('a genuine remember-me cookie with enrolled MFA is suspended and its recaller cookie cleared', function (): void {
-    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
-    $rememberToken = Str::random(60);
-    $user->forceFill(['remember_token' => $rememberToken])->save();
-
-    $recallerName = 'remember_web_'.sha1(SessionGuard::class);
-    $recallerValue = "{$user->getAuthIdentifier()}|{$rememberToken}|{$user->password}";
-
-    $this->withCookie($recallerName, $recallerValue)
-        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
-        ->assertRedirect(route('two-factor.login'))
-        ->assertCookieExpired($recallerName);
-
-    $this->assertGuest('web');
-    expect($user->fresh()->remember_token)->toBe($rememberToken);
-});
-
 test('a restored session with enrolled MFA is suspended before reaching a protected page', function (): void {
     $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $user->forceFill(['remember_token' => 'original-remember-token'])->save();
@@ -250,6 +233,20 @@ test('a restored session with enrolled MFA is suspended before reaching a protec
     $this->assertGuest('web');
     expect(session('auth.pending.method'))->toBe('remembered');
     expect($user->fresh()->remember_token)->toBe('original-remember-token');
+});
+
+test('completes a sign-in that was pending with the old remember flag', function (): void {
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
+    AuthenticationSession::begin($user, AuthMethod::PASSWORD, null);
+    session()->put('auth.pending.remember', true);
+
+    $response = $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ]);
+
+    $response->assertRedirect();
+    $this->assertAuthenticatedAs($user);
+    $response->assertCookieMissing('remember_web_'.sha1(SessionGuard::class));
 });
 
 test('a restored session stays challenged across repeated requests until MFA completes', function (): void {

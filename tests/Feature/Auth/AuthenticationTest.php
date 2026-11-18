@@ -25,6 +25,7 @@ use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
@@ -205,10 +206,33 @@ test('the Fortify password route completes login without MFA', function (): void
     $this->post(route('login.store'), [
         'email' => $user->email,
         'password' => 'password',
+    ])->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+it('sets no remember-me cookie on password sign-in', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
         'remember' => 'on',
     ])->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
 
     $this->assertAuthenticatedAs($user);
+    expect(collect($response->headers->getCookies())->map->getName()->filter(fn (string $name): bool => str_starts_with($name, 'remember_web_')))->toBeEmpty();
+});
+
+it('ignores an old remember-me cookie once the session is gone', function (): void {
+    $user = User::factory()->withWorkspace()->create(['remember_token' => null]);
+    $recaller = Auth::guard('web')->getRecallerName();
+
+    $this->withCookie($recaller, "{$user->getKey()}|old-remember-token|{$user->password}")
+        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
+        ->assertRedirect();
+
+    $this->assertGuest('web');
 });
 
 test('a recovery code completes pending password MFA', function (): void {
@@ -1059,7 +1083,6 @@ test('signup creates a user and sends a verification email', function (): void {
     Notification::assertSentTo($user, VerifyEmail::class);
 
     $this->assertAuthenticated();
-    expect($user->fresh()->remember_token)->not->toBeNull();
 });
 
 test('signup with a matching invitation auto-verifies the email and fires Verified', function (): void {
@@ -1359,8 +1382,8 @@ test('the remember me checkbox no longer renders on the login page', function ()
         ->assertDontSee(__('filament-panels::auth/pages/login.form.remember.label'));
 });
 
-test('password login always remembers the session even without a checkbox', function (): void {
-    $user = User::factory()->withWorkspace()->create();
+test('password login stores no remember token', function (): void {
+    $user = User::factory()->withWorkspace()->create(['remember_token' => null]);
 
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
@@ -1370,7 +1393,7 @@ test('password login always remembers the session even without a checkbox', func
         ->assertHasNoErrors();
 
     $this->assertAuthenticated();
-    expect($user->fresh()->remember_token)->not->toBeNull();
+    expect($user->fresh()->remember_token)->toBeNull();
 });
 
 test('switching accounts cancels pending MFA without authenticating', function (): void {

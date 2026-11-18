@@ -7,8 +7,6 @@ namespace App\Support\Auth;
 use App\Enums\AuthMethod;
 use App\Models\User;
 use App\Models\UserSocialAccount;
-use Illuminate\Auth\SessionGuard;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -54,7 +52,7 @@ final readonly class AuthenticationSession
         'manage_mfa',
     ];
 
-    public static function begin(User $user, AuthMethod $method, ?string $credentialId, bool $remember): void
+    public static function begin(User $user, AuthMethod $method, ?string $credentialId): void
     {
         self::clear();
 
@@ -64,13 +62,12 @@ final readonly class AuthenticationSession
             'method' => $method->value,
             'credential_id' => $credentialId,
             'fingerprint' => self::fingerprint($user, $method, $credentialId),
-            'remember' => $remember,
             'expires_at' => now()->addMinutes(self::LIFETIME_MINUTES)->getTimestamp(),
         ]);
     }
 
     /**
-     * @return array{}|array{id: string, user_id: string, method: string, credential_id: string|null, fingerprint: string, remember: bool, expires_at: int}
+     * @return array{}|array{id: string, user_id: string, method: string, credential_id: string|null, fingerprint: string, expires_at: int}
      */
     public static function pending(): array
     {
@@ -89,8 +86,6 @@ final readonly class AuthenticationSession
             || ! array_key_exists('credential_id', $pending)
             || (! is_string($pending['credential_id']) && $pending['credential_id'] !== null)
             || ! is_string($pending['fingerprint'])
-            || ! array_key_exists('remember', $pending)
-            || ! is_bool($pending['remember'])
             || ! is_int($pending['expires_at'])
         ) {
             return [];
@@ -102,7 +97,6 @@ final readonly class AuthenticationSession
             'method' => $pending['method'],
             'credential_id' => $pending['credential_id'],
             'fingerprint' => $pending['fingerprint'],
-            'remember' => $pending['remember'],
             'expires_at' => $pending['expires_at'],
         ];
     }
@@ -118,7 +112,6 @@ final readonly class AuthenticationSession
             self::RESUME_KEY,
             'auth.password_confirmed_at',
             'login.id',
-            'login.remember',
         ]);
     }
 
@@ -537,19 +530,6 @@ final readonly class AuthenticationSession
         };
     }
 
-    // Read viaRemember() before logoutCurrentDevice(), which clears the recaller
-    // this reports on. Drops only this device, keeping other devices remembered.
-    public static function suspendRemembered(): bool
-    {
-        /** @var SessionGuard $guard */
-        $guard = Auth::guard('web');
-        $viaRemember = $guard->viaRemember();
-
-        $guard->logoutCurrentDevice();
-
-        return $viaRemember;
-    }
-
     public static function completeFor(User $user): bool
     {
         if (! $user->hasEnabledTwoFactorAuthentication()) {
@@ -580,7 +560,7 @@ final readonly class AuthenticationSession
     }
 
     /**
-     * @return array{}|array{id: string, user_id: string, method: string, credential_id: string|null, fingerprint: string, remember: bool, expires_at: int}
+     * @return array{}|array{id: string, user_id: string, method: string, credential_id: string|null, fingerprint: string, expires_at: int}
      */
     public static function consume(User $user): array
     {
