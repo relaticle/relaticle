@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support;
 
+use App\Actions\CustomFields\CreateCustomField;
 use App\Enums\CrmEntity;
 use App\Models\CustomField;
 use App\Models\User;
@@ -16,10 +17,8 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Data\FieldTypeData;
-use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Facades\Entities;
-use Relaticle\CustomFields\FeatureSystem\FeatureManager;
 
 /**
  * The single rule set for custom-field definitions written outside a Filament form.
@@ -65,9 +64,8 @@ final readonly class CustomFieldDefinitionValidator
             )],
             'code' => ['nullable', 'string', 'max:50', 'alpha_dash', self::uniqueDefinition('code', $tenantId, $entityType)],
             'lookup_type' => ['nullable', $requiresLookupType ? 'required' : 'prohibited', 'string', Rule::in($lookupTypes)],
-            'options' => ['nullable', ...self::optionsPresence($type), 'array', "max:{$maxOptions}"],
+            'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
             'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
-            'options.*.settings.color' => ['nullable', 'hex_color'],
             'settings' => ['nullable', 'array'],
         ], [
             'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CrmEntity::morphAliases()).'.',
@@ -86,14 +84,10 @@ final readonly class CustomFieldDefinitionValidator
             'settings.array' => 'Pass `settings` as an object of setting names to values.',
         ] + self::optionNameMessages())->validate();
 
-        $settings = Arr::except($validated['settings'] ?? [], 'encrypted');
-        $encryption = self::validatedEncryption($type, $validated['settings'] ?? []);
+        $settings = $validated['settings'] ?? [];
 
-        if ($settings !== [] || $encryption !== []) {
-            $validated['settings'] = [
-                ...($settings === [] ? [] : self::validatedSettings(new CustomField(['type' => $type, 'entity_type' => $entityType]), $settings)),
-                ...$encryption,
-            ];
+        if ($settings !== []) {
+            $validated['settings'] = self::validatedSettings(new CustomField(['type' => $type, 'entity_type' => $entityType]), $settings);
         }
 
         return $validated;
@@ -164,28 +158,6 @@ final readonly class CustomFieldDefinitionValidator
         }
 
         return $validated;
-    }
-
-    // Encryption is chosen once, at creation: the settings rules shared with updates never accept it.
-    /**
-     * @param  array<string, mixed>  $settings
-     * @return array{encrypted?: bool}
-     *
-     * @throws ValidationException
-     */
-    private static function validatedEncryption(string $type, array $settings): array
-    {
-        $encryptable = in_array($type, self::creatableTypes(), true)
-            && FeatureManager::isEnabled(CustomFieldsFeature::FIELD_ENCRYPTION)
-            && CustomFieldsType::getFieldType($type)?->encryptable === true;
-
-        $validated = Validator::make(
-            ['settings' => Arr::only($settings, 'encrypted')],
-            ['settings.encrypted' => [$encryptable ? 'boolean' : 'prohibited']],
-            ['settings.encrypted.prohibited' => "Field type \"{$type}\" cannot be encrypted."],
-        )->validate();
-
-        return array_map(boolval(...), $validated['settings'] ?? []);
     }
 
     /**
@@ -349,7 +321,6 @@ final readonly class CustomFieldDefinitionValidator
             $data['options'] = array_values(array_map(
                 static fn (mixed $option): array => [
                     'name' => trim(is_array($option) ? (string) ($option['name'] ?? '') : (string) $option),
-                    ...(filled(data_get($option, 'settings.color')) ? ['settings' => ['color' => data_get($option, 'settings.color')]] : []),
                 ],
                 $data['options'],
             ));
@@ -358,19 +329,9 @@ final readonly class CustomFieldDefinitionValidator
         return $data;
     }
 
-    // The package's own form offers an options list for these types, and a tags input takes its options as suggestions.
-    /**
-     * @return list<string>
-     */
-    private static function optionsPresence(string $type): array
+    private static function expectsOptions(string $type): bool
     {
-        $fieldType = in_array($type, self::creatableTypes(), true) ? CustomFieldsType::getFieldType($type) : null;
-
-        return match (true) {
-            $fieldType === null, ! $fieldType->dataType->isChoiceField(), $fieldType->withoutUserOptions, $fieldType->requiresLookupType => ['prohibited'],
-            $fieldType->acceptsArbitraryValues => [],
-            default => ['required'],
-        };
+        return in_array($type, CreateCustomField::CHOICE_TYPES, true);
     }
 
     public static function maxFields(): int

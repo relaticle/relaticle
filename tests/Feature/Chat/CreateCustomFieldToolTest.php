@@ -223,37 +223,6 @@ it('creates a currency field in the requested currency with its own decimals', f
         ->and($field->settings->visible_in_list)->toBeFalse();
 });
 
-it('creates an encrypted field with colored options and shows both on the card', function (): void {
-    proposeCustomFields($this->convId, [
-        'entity_type' => 'company',
-        'name' => 'Tier',
-        'type' => 'select',
-        'options' => [['name' => 'Gold', 'settings' => ['color' => '#f59e0b']], ['name' => 'Silver']],
-        'settings' => ['encrypted' => true, 'enable_option_colors' => true],
-    ]);
-
-    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
-
-    expect(array_column($pending->display_data['fields'], 'value', 'label'))->toMatchArray(['Options' => 'Gold (#f59e0b), Silver', 'Encrypted' => 'Yes']);
-
-    $field = approveSoleFieldProposal($pending, $this->owner);
-
-    expect($field->settings->encrypted)->toBeTrue()
-        ->and($field->options->firstWhere('sort_order', 0)->settings->color)->toBe('#f59e0b');
-});
-
-it('refuses encryption on a type that cannot be encrypted', function (): void {
-    $decoded = proposeCustomFields($this->convId, [
-        'entity_type' => 'company',
-        'name' => 'Founded',
-        'type' => 'date',
-        'settings' => ['encrypted' => true],
-    ]);
-
-    expect($decoded['error'])->toContain('Field type "date" cannot be encrypted.')
-        ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
-});
-
 it('refuses a setting the field type does not take', function (): void {
     $decoded = proposeCustomFields($this->convId, [
         'entity_type' => 'company',

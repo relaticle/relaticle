@@ -11,20 +11,20 @@ use App\Enums\WorkspaceCapability;
 use App\Models\CustomField;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
-use App\Support\CustomFieldSettingsSchema;
 use Closure;
 use Filament\Actions\Action;
-use Filament\Forms\Components\Toggle;
+use Filament\Forms\Components\Repeater;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
-use Filament\Schemas\Components\Component;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
-use Filament\Support\Enums\Width;
-use Illuminate\Support\Arr;
+use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\HtmlString;
 use Illuminate\Validation\ClosureValidationRule;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
-use Relaticle\CustomFields\Filament\Management\Forms\Components\TypeField;
-use Relaticle\CustomFields\Filament\Management\Schemas\FieldForm;
+use Relaticle\CustomFields\Facades\Entities;
 
 trait CreatesTableAttribute
 {
@@ -45,16 +45,12 @@ trait CreatesTableAttribute
         return Action::make($name)
             ->label(__('filament/panel.tables.views.create_attribute'))
             ->modalHeading(__('filament/panel.tables.views.create_attribute'))
-            ->modalWidth(Width::ScreenLarge)
-            ->slideOver()
+            ->modalWidth('md')
             ->modalSubmitActionLabel(__('filament/panel.tables.views.create_attribute_submit'))
             ->authorize(fn (): bool => $this->canCreateTableAttribute())
-            ->mountUsing(fn (Schema $schema, array $arguments): Schema => $schema->fill([
-                'entity_type' => $this->attributeEntity()->value,
-                'type' => ($type ?? $this->presetAttributeType($arguments) ?? CustomFieldType::TEXT)->value,
-            ]))
-            ->schema(fn (): array => $this->tableAttributeFields($type))
-            ->action(fn (array $data, Schema $schema) => $created($this->createTableAttribute($type instanceof CustomFieldType ? $this->lockedAttributeData($data, $type) : $data, $schema)));
+            ->mountUsing(fn (Schema $schema): Schema => $schema->fill())
+            ->schema(fn (array $arguments): array => $this->tableAttributeFields($type, $this->presetAttributeType($arguments)))
+            ->action(fn (array $data, Schema $schema) => $created($this->createTableAttribute($type instanceof CustomFieldType ? [...$data, 'type' => $type->value] : $data, $schema)));
     }
 
     protected function canCreateTableAttribute(): bool
@@ -77,51 +73,52 @@ trait CreatesTableAttribute
     }
 
     /**
-     * @return array<int, Component>
+     * @return list<Select|TextInput|Repeater>
      */
-    private function tableAttributeFields(?CustomFieldType $type): array
-    {
-        $fields = FieldForm::schema(withOptionsRelationship: false);
-
-        if ($type instanceof CustomFieldType) {
-            $this->lockAttributeType($fields);
-        }
-
-        return $fields;
-    }
-
-    // A fixed type is the board's grouping field, and the board never groups by an encrypted one.
-    /**
-     * @param  array<int, mixed>  $components
-     */
-    private function lockAttributeType(array $components): void
-    {
-        foreach ($components as $component) {
-            if (! $component instanceof Component) {
-                continue;
-            }
-
-            if ($component instanceof TypeField) {
-                $component->disabled();
-            } elseif ($component instanceof Toggle && $component->getName() === 'settings.encrypted') {
-                $component->hidden();
-            } else {
-                $this->lockAttributeType((array) $component->getDefaultChildComponents());
-            }
-        }
-    }
-
-    /**
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
-    private function lockedAttributeData(array $data, CustomFieldType $type): array
+    private function tableAttributeFields(?CustomFieldType $type, ?CustomFieldType $preset = null): array
     {
         return [
-            ...$data,
-            'type' => $type->value,
-            'settings' => Arr::except((array) ($data['settings'] ?? []), 'encrypted'),
+            TextInput::make('name')
+                ->label(__('filament/panel.tables.views.attribute_name'))
+                ->required()
+                ->maxLength(CustomFieldDefinitionValidator::NAME_MAX_LENGTH)
+                ->autofocus(),
+            Select::make('type')
+                ->label(__('filament/panel.tables.views.attribute_type'))
+                ->options($this->tableAttributeTypeOptions())
+                ->allowHtml()
+                ->native(false)
+                ->default(($type ?? $preset ?? CustomFieldType::TEXT)->value)
+                ->disabled($type instanceof CustomFieldType)
+                ->required()
+                ->selectablePlaceholder(false)
+                ->position('bottom')
+                ->live(),
+            Repeater::make('options')
+                ->label(__('filament/panel.tables.views.attribute_options'))
+                ->schema([TextInput::make('name')->hiddenLabel()->placeholder(__('filament/panel.tables.views.attribute_option_placeholder'))->required()->maxLength(255)])
+                ->addActionLabel(__('filament/panel.tables.views.attribute_add_option'))
+                ->minItems(1)
+                ->maxItems(CustomFieldDefinitionValidator::maxOptions())
+                ->visible(fn (Get $get): bool => in_array($type->value ?? $get('type'), CreateCustomField::CHOICE_TYPES, true)),
+            Select::make('lookup_type')
+                ->label(__('filament/panel.tables.views.attribute_lookup'))
+                ->options(Entities::getLookupOptions())
+                ->native(false)
+                ->required()
+                ->visible(fn (Get $get): bool => $this->typeRequiresLookup((string) ($type->value ?? $get('type')))),
         ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function tableAttributeTypeOptions(): array
+    {
+        return array_map(
+            fn (array $type): string => $type['icon'] === null ? e($type['label']) : $this->typeOptionHtml($type['icon'], $type['label'])->toHtml(),
+            $this->tableAttributeTypes(),
+        );
     }
 
     /**
@@ -136,6 +133,17 @@ trait CreatesTableAttribute
         }
 
         return $types;
+    }
+
+    private function typeOptionHtml(string $icon, string $label): Htmlable
+    {
+        return new HtmlString('<span class="flex items-center gap-2">'.svg($icon, 'size-4 shrink-0')->toHtml().'<span>'.e($label).'</span></span>');
+    }
+
+    private function typeRequiresLookup(string $type): bool
+    {
+        return in_array($type, CustomFieldDefinitionValidator::creatableTypes(), true)
+            && CustomFieldsType::getFieldType($type)?->requiresLookupType === true;
     }
 
     /**
@@ -172,25 +180,7 @@ trait CreatesTableAttribute
             $payload['lookup_type'] = $data['lookup_type'];
         }
 
-        $settings = $this->tableAttributeSettings((array) ($data['settings'] ?? []));
-
-        if ($settings !== []) {
-            $payload['settings'] = $settings;
-        }
-
         return $payload;
-    }
-
-    // The form nests type settings under `additional` and still carries the retired `searchable` toggle.
-    /**
-     * @param  array<string, mixed>  $settings
-     * @return array<string, mixed>
-     */
-    private function tableAttributeSettings(array $settings): array
-    {
-        $flat = [...Arr::except($settings, 'additional'), ...(array) ($settings['additional'] ?? [])];
-
-        return array_filter(Arr::except($flat, CustomFieldSettingsSchema::RETIRED), fn (mixed $value): bool => $value !== null);
     }
 
     /**
@@ -227,9 +217,8 @@ trait CreatesTableAttribute
         return match (true) {
             $key === 'name' && isset($failed['name'][ClosureValidationRule::class]) => ['name', [__('filament/panel.tables.views.attribute_name_taken', ['name' => (string) ($data['name'] ?? '')])]],
             $key === 'entity_type' && isset($failed['entity_type'][ClosureValidationRule::class]) => ['name', [__('filament/panel.tables.views.attribute_limit_reached', ['max' => CustomFieldDefinitionValidator::maxFields()])]],
-            $segments[0] === 'options' && isset($segments[1]) => [$this->tableAttributeOptionPath($segments, $rowKeys), $messages],
+            $segments[0] === 'options' && isset($segments[1]) => [$this->tableAttributeOptionPath($segments, $rowKeys), isset($failed[$key]['Distinct']) ? [__('filament/panel.tables.views.attribute_option_repeated')] : $messages],
             in_array($segments[0], ['name', 'type', 'options', 'lookup_type'], true) => [$key, $messages],
-            $segments[0] === 'settings' && isset($segments[1]) => [$key, $messages],
             default => ['name', $messages],
         };
     }

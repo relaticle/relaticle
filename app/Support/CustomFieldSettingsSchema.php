@@ -35,7 +35,6 @@ final readonly class CustomFieldSettingsSchema
         'visible_in_list' => 'custom-fields::custom-fields.field.form.visible_in_list',
         'visible_in_view' => 'custom-fields::custom-fields.field.form.visible_in_view',
         'list_toggleable_hidden' => 'custom-fields::custom-fields.field.form.list_toggleable_hidden',
-        'encrypted' => 'custom-fields::custom-fields.field.form.encrypted',
         // Retired setting, kept so old activity log entries still label it.
         'searchable' => 'custom-fields::custom-fields.field.form.searchable',
         'enable_option_colors' => 'custom-fields::custom-fields.field.form.enable_option_colors',

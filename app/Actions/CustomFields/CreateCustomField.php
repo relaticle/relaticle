@@ -45,22 +45,20 @@ final readonly class CreateCustomField
             // someone else claimed the name must fail rather than write a duplicate.
             $validated = CustomFieldDefinitionValidator::forCreate($user, $data);
 
-            /** @var list<array{name: string, settings?: array{color: string}}> $options */
-            $options = is_array($validated['options'] ?? null) ? $validated['options'] : [];
+            $optionNames = array_column(is_array($validated['options'] ?? null) ? $validated['options'] : [], 'name');
             $attributes = $this->attributes($workspaceId, $validated);
 
-            $field = DB::transaction(function () use ($workspaceId, $attributes, $options): CustomField {
+            $field = DB::transaction(function () use ($workspaceId, $attributes, $optionNames): CustomField {
                 $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
                 /** @var CustomField $created */
                 $created = CustomField::query()->create([$tenantKey => $workspaceId, ...$attributes]);
 
-                foreach ($options as $index => $option) {
+                foreach ($optionNames as $index => $optionName) {
                     $created->options()->create([
                         $tenantKey => $workspaceId,
-                        'name' => $option['name'],
+                        'name' => $optionName,
                         'sort_order' => $index,
-                        'settings' => ['color' => $option['settings']['color'] ?? null],
                     ]);
                 }
 
