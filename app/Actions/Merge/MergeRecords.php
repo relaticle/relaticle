@@ -150,11 +150,9 @@ final readonly class MergeRecords
     {
         $message = Arr::first($mergedValues->overLimit);
 
-        if ($message === null) {
-            return;
+        if ($message !== null) {
+            throw ValidationException::withMessages(['picked_id' => $message]);
         }
-
-        throw ValidationException::withMessages(['picked_id' => $message]);
     }
 
     private function unavailable(): ValidationException
