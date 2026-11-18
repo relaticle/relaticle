@@ -34,6 +34,10 @@ use Livewire\Attributes\Renderless;
  */
 final class MergeRecordPicker extends Field
 {
+    private const int MAX_SEARCH_LENGTH = 100;
+
+    private const int MAX_RESULTS = 25;
+
     protected string $view = 'filament.app.merge-record';
 
     private Company|People|null $currentWithCounts = null;
@@ -57,13 +61,13 @@ final class MergeRecordPicker extends Field
         $subject = $this->subject();
         abort_unless(MergeRecordAction::canMerge($subject), 403);
 
-        $search = mb_substr(trim($search), 0, 100);
+        $search = mb_substr(trim($search), 0, self::MAX_SEARCH_LENGTH);
 
         $records = $this->searchQuery()
             ->whereKeyNot($subject->getKey())
             ->when($search !== '', fn (Builder $query): Builder => $query->where(fn (Builder $match): Builder => $this->matching($match, $search)))
             ->orderBy('name')
-            ->limit(25)
+            ->limit(self::MAX_RESULTS)
             ->get();
 
         return array_values($records->map(function (Company|People $record): array {
