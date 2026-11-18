@@ -52,7 +52,8 @@ it('leaves the chosen language out of a typed turn', function (): void {
         ->not->toContain('German');
 });
 
-function promptedInstructionsFor(User $user, MessageOrigin $origin): string
+/** @param array{id: string, name: string, kind: 'text'|'rows', row_count: int}|null $attachment */
+function promptedInstructionsFor(User $user, MessageOrigin $origin, string $message = 'Hallo', ?array $attachment = null): string
 {
     $conversationId = (string) Str::uuid7();
     DB::table('agent_conversations')->insert([
@@ -70,10 +71,11 @@ function promptedInstructionsFor(User $user, MessageOrigin $origin): string
     new ProcessChatMessage(
         user: $user,
         workspace: $user->currentWorkspace,
-        message: 'Hallo',
+        message: $message,
         conversationId: $conversationId,
         resolved: ['provider' => 'anthropic', 'model' => 'claude-sonnet-4-6', 'id' => 'claude-sonnet-4-6', 'source' => 'auto'],
         origin: $origin,
+        attachment: $attachment,
     )->handle(resolve(CreditService::class));
 
     $instructions = '';
@@ -91,6 +93,13 @@ it('hands the provider the chosen language on a system-opened turn', function ()
     $user = User::factory()->withPersonalWorkspace()->create(['locale' => 'de']);
 
     expect(promptedInstructionsFor($user, MessageOrigin::DataArrived))
+        ->toContain("## Chosen language\nThe user's chosen language is German.");
+});
+
+it('hands the provider the chosen language on a typed turn that carries only an attachment', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create(['locale' => 'de']);
+
+    expect(promptedInstructionsFor($user, MessageOrigin::Typed, '', ['id' => (string) Str::uuid7(), 'name' => 'leads.csv', 'kind' => 'rows', 'row_count' => 3]))
         ->toContain("## Chosen language\nThe user's chosen language is German.");
 });
 

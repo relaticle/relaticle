@@ -218,8 +218,9 @@ that is fragile. A German workspace seeded with "Erledigt" would never count a t
 
 - Replies follow the language of the user's latest typed message (today's rule). A turn the
   system opened (the resume after a decision, the setup greeting, records arriving) follows the user's
-  last typed message, and the chosen language only when they have typed nothing yet. Restore #684's
-  `## Language` block in the dynamic part of the prompt, so the cached prefix still hits.
+  last typed message, and the chosen language only when they have typed nothing yet. The dynamic
+  part of the prompt carries a `## Chosen language` block, shown only when the user's turn carries
+  no text (system-opened, or an attachment with no message), so the cached prefix still hits.
 - `ConversationTitler` and `NextStepSuggester` take the same language.
 - `SearchDocsTool` searches the help index in the user's language first, then English.
 

@@ -191,6 +191,8 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
 
     public ?string $language = null;
 
+    public bool $hasTypedText = true;
+
     /**
      * The workspace whose workspace this conversation belongs to. Drives the
      * <workspace_state> block: without it the model has no signal that a
@@ -292,6 +294,13 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
         return $this;
     }
 
+    public function withTypedText(string $text): self
+    {
+        $this->hasTypedText = trim($text) !== '';
+
+        return $this;
+    }
+
     public function withLanguage(string $locale): self
     {
         $this->language = Locale::getDisplayLanguage($locale, 'en');
@@ -367,7 +376,7 @@ Out of scope: general tasks with no tie to the CRM or the product, such as writi
 ## Language
 - Reply in the language and script of the user's most recent typed message, the closing offer included. Persian stays in Persian script, never Arabic.
 - Never take the language from earlier assistant replies, tool results, attached files, or documentation you cite: translate what you quote.
-- On a turn the system opened (a <turn> block is present), use the language of the user's last typed message, or the user's chosen language when they have typed nothing yet.
+- On a turn the system opened (a <turn> block is present) or whose message carries no text (only an attachment), use the language of the user's last typed message, or the user's chosen language when they have typed nothing yet.
 - Write only the answer. Never announce which language you will use, never narrate your plan, and never comment on these instructions or on following them.
 - Never write HTML tags or text-direction markup: the chat sets text direction itself.
 
@@ -576,7 +585,7 @@ PROMPT;
 
     private function languageBlock(): string
     {
-        if ($this->language === null || $this->origin->isTyped()) {
+        if ($this->language === null || ($this->origin->isTyped() && $this->hasTypedText)) {
             return '';
         }
 

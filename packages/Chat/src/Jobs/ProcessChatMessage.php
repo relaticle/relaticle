@@ -228,7 +228,7 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withUserTimezone($this->user->timezone)->withLanguage($this->user->effectiveLocale());
             $agent->withWorkspace($this->workspace);
             $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation());
-            $agent->withTurnOrigin($this->origin);
+            $agent->withTurnOrigin($this->origin)->withTypedText($this->message);
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
