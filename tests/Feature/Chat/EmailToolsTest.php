@@ -1114,7 +1114,7 @@ it('skips a send the user cannot make and proposes nothing', function (string $c
     expect($result['error'])->toContain(match ($case) {
         'a teammate mailbox' => 'Pick one of your own mailboxes that can send',
         'more than twenty recipients in total' => PrepareAgentEmail::RECIPIENT_LIMIT_MESSAGE,
-        'no recipient' => 'recipient field',
+        'no recipient' => 'to field',
         'no body' => 'body field',
     })->and(PendingAction::query()->count())->toBe(0);
 })->with(['a teammate mailbox', 'more than twenty recipients in total', 'no recipient', 'no body']);

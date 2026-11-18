@@ -76,6 +76,24 @@ function mergedVendorLangPath(string $namespace, string $overrideRoot, string $l
     return $path;
 }
 
+/** @return list<string> the dotted keys the app's own override defines for a locale, so a package's own stray key is not ours to fix */
+function overrideKeys(string $overrideRoot, string $locale): array
+{
+    $keys = [];
+
+    foreach (glob("{$overrideRoot}/{$locale}/*.php") ?: [] as $file) {
+        $flatten = function (array $strings, string $prefix) use (&$flatten, &$keys): void {
+            foreach ($strings as $key => $value) {
+                is_array($value) ? $flatten($value, "{$prefix}.{$key}") : $keys[] = "{$prefix}.{$key}";
+            }
+        };
+
+        $flatten(require $file, basename($file, '.php'));
+    }
+
+    return $keys;
+}
+
 /** @return array<string, array{string, string}> */
 function localeRootRows(): array
 {
@@ -113,6 +131,11 @@ it('translates every English key of a root into a locale', function (string $loc
     }
 
     $orphaned = array_map(fn (array $entry): string => $entry['key'], $diff['orphaned']);
+
+    if ($isVendor) {
+        $orphaned = array_values(array_intersect($orphaned, overrideKeys(dirname(__DIR__, 2).'/'.$root, $locale)));
+    }
+
     expect($orphaned)->toBe([], "{$root} holds {$locale} keys with no English source");
     $keptEnglish = translationsKeptEnglish()[$root] ?? [];
 

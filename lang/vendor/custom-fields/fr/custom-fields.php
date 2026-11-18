@@ -58,7 +58,7 @@ return [
             'encrypted' => 'Chiffré',
             'encrypted_help' => 'Lorsque cette option est activée, les valeurs de cet attribut sont stockées de façon sécurisée grâce au chiffrement.',
             'searchable' => 'Recherchable',
-            'searchable_help' => 'Lorsque cette option est activée, ce champ peut être utilisé dans les recherches.',
+            'searchable_help' => 'Lorsque cette option est activée, cet attribut peut être utilisé dans les recherches.',
             'visible_in_list' => 'Visible dans la liste',
             'visible_in_list_help' => 'Affiche cet attribut dans les vues en liste.',
             'list_toggleable_hidden' => 'Masqué par défaut, affichable',
@@ -104,7 +104,7 @@ return [
             'conditional_visibility' => [
                 'label' => 'Visibilité conditionnelle',
                 'enable' => 'Activer la visibilité conditionnelle',
-                'enable_help' => 'Affiche ou masque ce champ selon la valeur d\'autres champs, avec des expressions de type Statamic',
+                'enable_help' => 'Affiche ou masque cet attribut selon la valeur d\'autres attributs, avec des expressions de type Statamic',
                 'condition_type' => 'Type de condition',
                 'condition_type_help' => 'Choisissez le comportement de la condition',
                 'if' => 'Afficher si (l\'expression est vraie)',

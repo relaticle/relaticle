@@ -175,7 +175,7 @@ return [
         'terms' => 'conditions d\'utilisation',
         'company_id' => 'entreprise',
         'contact_id' => 'interlocuteur',
-        'account_owner_id' => 'responsable du compte',
+        'account_owner_id' => 'responsable',
         'onboarding_use_case' => 'cas d\'usage',
         'onboarding_other_use_case' => 'autre cas d\'usage',
         'onboarding_referral_source' => 'comment vous nous avez trouvés',

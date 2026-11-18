@@ -175,7 +175,7 @@ return [
         'terms' => 'términos',
         'company_id' => 'empresa',
         'contact_id' => 'persona de contacto',
-        'account_owner_id' => 'responsable de la cuenta',
+        'account_owner_id' => 'responsable',
         'onboarding_use_case' => 'caso de uso',
         'onboarding_other_use_case' => 'otro caso de uso',
         'onboarding_referral_source' => 'cómo nos encontraste',
