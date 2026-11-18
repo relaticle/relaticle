@@ -69,8 +69,8 @@ it('un-stars a record', function (): void {
 it('does not duplicate a favorite starred twice', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    app(AddFavoriteRecord::class)->execute($this->user, $company);
-    app(AddFavoriteRecord::class)->execute($this->user, $company);
+    resolve(AddFavoriteRecord::class)->execute($this->user, $company);
+    resolve(AddFavoriteRecord::class)->execute($this->user, $company);
 
     expect(FavoriteRecord::query()->ownedBy($this->user, $this->workspace->getKey())->count())->toBe(1);
 });
@@ -80,7 +80,7 @@ it('appends a new favorite after existing items', function (): void {
     FavoriteRecord::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey(), 'position' => 2]);
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
-    $favorite = app(AddFavoriteRecord::class)->execute($this->user, $company);
+    $favorite = resolve(AddFavoriteRecord::class)->execute($this->user, $company);
 
     expect($favorite->position)->toBe(3);
 });
