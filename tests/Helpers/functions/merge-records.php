@@ -88,7 +88,7 @@ function mergeMedia(Company|People $record, string $collection): Media
 
 function mergedRecord(): Company|People
 {
-    $subject = Activity::query()->where('event', AppEventPalette::RecordMerged->value)->latest('id')->firstOrFail()->subject;
+    $subject = Activity::query()->where('event', AppEventPalette::RecordMerged->value)->whereNotNull('properties->merged_name')->latest('id')->firstOrFail()->subject;
 
     return $subject instanceof Company || $subject instanceof People ? $subject : throw new RuntimeException('No merged record');
 }

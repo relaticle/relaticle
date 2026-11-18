@@ -34,7 +34,7 @@ emails in a merge comes straight back on the next sync.
 | 9 | More than 5 domains or emails | Block the merge. The dialog names the list over the limit (`getMaxValues()`, 5) so the member trims it first. Dropping extras would let mailbox sync recreate the duplicate |
 | 10 | Sample data | The new record takes the priority record's `creation_source`. When that is `CreationSource::SAMPLE` and the other record's is not, it takes the other record's, so `RemoveSampleData` never deletes what was merged |
 | 11 | The new record's creator and dates | `creator_id` and `creation_source` come from the same original: the priority record, or the other one in decision 10's sample case. A mailbox-synced record stays automated. `created_at` is the merge time |
-| 12 | The new record's timeline | No `created` row. One `record_merged` entry names both originals and who merged them, and both originals' history moves onto it |
+| 12 | Timelines | History stays where it happened: each original keeps its own (changed 2026-11-18). The new record has no `created` row. The new record continues the priority record: each merge adds one entry naming the other record, "<member> merged <name> into this record", and the priority record's earlier merge entries carry over. The other record's merge entries stay on it. No value changes are logged. Each original gets a `record_merged` entry naming the record it went into |
 | 13 | Old URLs of the originals | No redirect. An old URL opens the soft-deleted original, as after any delete. A `merged_into_id` pointer with a redirect on the record page was weighed and left out for now: it needs a migration |
 
 ## Phases
@@ -69,8 +69,8 @@ the two closures each wrapper passed were its only content, so `MergeRecords` no
 merge and dispatches the per-entity differences through exhaustive `match` expressions that PHPStan
 fails the moment a third entity joins the `Company|People` union. `MergeRecords` owns the
 authorization checks, the transaction, the lock on both rows, the limit check, the sample-data rule,
-creating the new record, the link and history moves, the `RecordMerged` events and both soft deletes. It composes
-`CombineRecordValues`, `MoveRecordLinks` and `MoveRecordHistory`, and the pivot-moving steps share
+creating the new record, the link moves, the `RecordMerged` events, both soft deletes and the merge entries. It composes
+`CombineRecordValues`, `MoveRecordLinks` and `LogRecordMerge`, and the pivot-moving steps share
 `MoveMorphPivot`. A company owns people and opportunities. A person is only a point of contact.
 Per-entity facts the dialog needs (the identifying list, the count chips) come from `CrmEntity` and
 `RecordIdentity`, not from a branch on the record type.
@@ -152,23 +152,25 @@ All of it runs in one database transaction.
 
 1. Lock both originals with one select in id order (`lockForUpdate`), so two members merging the
    same records, in either direction, wait instead of interleaving or deadlocking.
-2. Combine the values and check the limits.
-3. Insert the new record with its name, workspace, `creator_id` and `creation_source` (decisions 10
-   and 11), with model events muted. That writes no `created` activity row, runs no
+2. Insert the new record with its name, workspace, `creator_id` and `creation_source` (decisions 10
+   and 11), with model events muted. It comes before the values are combined, because a record-type
+   value that names an original is rewritten to the new record's id. That writes no `created` activity row, runs no
    `CompanyObserver::created` or `PeopleObserver::created`, and queues no favicon fetch before the
    record has domains. `ScheduleAssistantArrivalTurn` would otherwise start an onboarding turn for a
    record whose source is `mcp`.
+3. Combine the values and check the limits.
 4. Move everything listed under What moves, from `priority` first and then from `other`. The order
    decides ties: a link both originals hold keeps `priority`'s row, and `priority`'s logo moves.
    `RecordMerged` fires once per original.
-5. Move both originals' history, then write one `record_merged` entry on the new record. It stores
-   both names (`merged_names`) and who merged them, so the timeline reads "<member> merged
-   <priority> and <other> into this record".
-6. Soft-delete both originals through the model, so each writes its own `deleted` activity row.
-   Their own custom attribute values stay on them.
-7. Write the combined values to the new record through `UpdateCompany` or `UpdatePeople`, with
-   activity logging off, so the timeline gets no `updated` or `custom_field_changes` row listing
-   every value.
+5. Soft-delete both originals through the model, so each writes its own `deleted` activity row.
+   Their own custom attribute values and history stay on them.
+6. Write the combined values to the new record through `UpdateCompany` or `UpdatePeople`, with
+   activity logging off, so the timeline gets no `updated` or `custom_field_changes` row.
+7. `LogRecordMerge` moves the priority record's own merge entries (those with `merged_name`) to the
+   new record, then writes three `record_merged` entries, each in a batch of its own. The new
+   record's stores the other record's name (`merged_name`) and reads "<member> merged <name> into
+   this record". Each original's stores the new name
+   (`merged_into_name`) and reads "<member> merged this record into <name>".
 
 ## What moves
 
@@ -178,10 +180,9 @@ Each step runs once per original, into the new record.
 - Note, task, email and meeting links (`noteables`, `taskables`, `emailables`, `meetingables`).
   A link the new record already holds from the first original is dropped instead of moved, because
   each table is unique on (item, type, id).
-- Activity history: `activity_log` rows whose subject is an original move to the new record, so its
-  timeline shows both pasts. The originals' `created`, `deleted` and `restored` rows stay on them,
-  because the timeline names the current subject and they would read as the new record's own. Moved
-  batches are rehashed so the two originals' batches never fold together.
+- Activity history does not move. A moved edit would read as the new record's own ("Name: Acme →
+  Acme Corp" on a record named Acme), the two pasts would interleave, and a restored original would
+  come back without its history.
 - `attachments` media the combined rich-text values actually reference, so a copied value keeps its
   images. `UploadClaims` rejects a rich-text value that references media owned by another record,
   so the media moves before the values are written. An image whose text lost the field stays on its
@@ -224,12 +225,15 @@ The member needs `create` on the entity and `delete` on both originals (`Company
 `PeoplePolicy`). Both originals must be in the same workspace, different from each other, and live.
 The action checks all of this itself, as every action does. `MergeRecordAction::canMerge()` hides
 the menu item and the duplicate prompt from a member who lacks `create` on the entity or `delete` on
-the current record.
+the current record, and on a deleted record's page, where the prompt would otherwise offer to merge
+an original into the record it already went into.
 
 ## Known effects
 
 - **Old URLs** of either original open its soft-deleted page, which no longer shows the moved links
-  (decision 13). Notification links and Rela record chips that name an original land there too.
+  (decision 13). Its timeline still shows its own history and ends with "merged this record into
+  <name>", so the reader can find the new record. Notification links and Rela record chips that
+  name an original land there too.
 - **The REST API, the MCP server and Rela** treat both original IDs as deleted. A pending Rela
   proposal that names an original fails at approval, as after any delete.
 - **Saved views and filters** that name an original by ID (for example "Company is any of ...")
@@ -237,7 +241,7 @@ the current record.
   its own change.
 - **Sort by created date.** The new record's `created_at` is the merge time, so it sorts as the
   newest record, and the duplicate prompt, which lists oldest first, lists it last.
-- **Restoring an original** brings back an empty shell: its links already moved. Its emails or
+- **Restoring an original** brings back its values and history, but none of its links: they moved. Its emails or
   domains now belong to the new record, so restore hits the existing `RestoreConflictMessage`, which
   is the right outcome.
 - **Force-deleting an original later** is safe. `people.company_id` and `opportunities.company_id`
@@ -259,8 +263,10 @@ Feature tests through the record page (Livewire `ViewCompany` and `ViewPeople`),
   `other` never overwrites a filled one, and a record-type value naming an original names the new
   record
 - every link listed above moves from both originals, and a link both originals share ends up once
-- history from both originals moves, the timeline has no `created` or `updated` row from the merge,
-  and one `record_merged` entry names both originals and who merged them
+- each original keeps its own history and gets a `record_merged` entry naming the new record; the
+  new record's timeline names the other record, keeps the priority record's earlier merges, and
+  leaves the other record's merges on it
+- no merge and no duplicate prompt on a deleted record's page
 - record-type attributes on a third record that point at either original are repointed
 - no onboarding turn is scheduled when `priority`'s source is `mcp`
 - authorization: a member without `create` on the entity or `delete` on either original is refused,
@@ -273,7 +279,7 @@ attendees moving from both originals, the counters summed into the new record wi
 meeting counted once, both originals' counters zeroed, and the merge with the email feature off.
 
 Rollback and race tests, per entity:
-- a failed final write rolls back the new record, every moved link and the history
+- a failed final write rolls back the new record and every moved link
 - both originals are locked with one select in id order, pinned with `DB::listen`, whichever has
   priority
 - an original that vanishes at the start of the transaction gives the "no longer available" error,
@@ -312,7 +318,7 @@ The picker joins the `MenusTest` dataset, so its rows, icons and height cap foll
 - How the dialog is built in Filament. Built as a `MergeRecordPicker` form field inside the action's
   schema, laid out as above
 - Names and placement of the shared steps inside `app/Actions/Merge/`. Built as `MergeRecords`,
-  `CombineRecordValues`, `MoveRecordLinks`, `MoveRecordHistory` and `MoveMorphPivot`
+  `CombineRecordValues`, `MoveRecordLinks`, `LogRecordMerge` and `MoveMorphPivot`
 - How the search ranks results. Built as name order, 25 results
 - The `record_merged` icon and copy, following `AppEventPalette`. Built as `lucide-merge`, with the
   title and description in `AppEventPalette::title()` and `description()`

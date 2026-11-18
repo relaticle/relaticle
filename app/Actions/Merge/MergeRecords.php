@@ -25,7 +25,7 @@ final readonly class MergeRecords
     public function __construct(
         private CombineRecordValues $combine,
         private MoveRecordLinks $moveLinks,
-        private MoveRecordHistory $moveHistory,
+        private LogRecordMerge $logMerge,
         private UpdateCompany $updateCompany,
         private UpdatePeople $updatePeople,
     ) {}
@@ -52,12 +52,13 @@ final readonly class MergeRecords
                 event(new RecordMerged($merged, $original));
             }
 
-            $this->moveHistory->execute($user, $merged, $priority, $other);
-
             $priority->delete();
             $other->delete();
 
-            return activity()->withoutLogging(fn (): Company|People => $this->saveMergedValues($user, $merged, $mergedValues));
+            $merged = activity()->withoutLogging(fn (): Company|People => $this->saveMergedValues($user, $merged, $mergedValues));
+            $this->logMerge->execute($user, $merged, $priority, $other);
+
+            return $merged;
         });
     }
 

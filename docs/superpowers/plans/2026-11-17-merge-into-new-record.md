@@ -92,3 +92,21 @@ new record, then runs each step twice with the new record as the target: `priori
 - [x] `vendor/bin/pint --dirty --format agent`, `composer test:affected`, then before pushing
       `vendor/bin/rector --dry-run`, `vendor/bin/phpstan analyse`, `composer test:lint`,
       `composer test:arch`.
+
+## Task 7: History stays where it happened (2026-11-18)
+
+**Files:** `app/Actions/Merge/LogRecordMerge.php` (was `MoveRecordHistory`), `app/Actions/Merge/MergeRecords.php`,
+`app/ActivityLog/AppEventPalette.php`, `app/Filament/Actions/MergeRecordAction.php`,
+`app/Filament/Components/Forms/MergeRecordPicker.php`, `lang/en/activity-log.php`, `lang/fr/activity-log.php`,
+the merge tests and `tests/Helpers/functions/merge-records.php`
+
+- [x] Stop moving history: each original keeps its own, and the batch rehash goes.
+- [x] `LogRecordMerge` writes the entry on the new record and a "merged this record into <name>" entry
+      on each original, in en and fr.
+- [x] Each merge adds one entry to the new record, "<member> merged <other> into this record". The
+      priority record's earlier merge entries carry over; the other record's stay on it. No value
+      changes are logged.
+- [x] `canMerge()` is false on a deleted record, so its page offers no merge and no duplicate prompt.
+- [x] Review fixes: people cases for creator, source, onboarding and logged values; the vanish tests
+      assert nothing was created; picker naming; the stale people test name.
+- [ ] Click through in light and dark, including a deleted original's page.

@@ -261,11 +261,11 @@ final class MergeRecordPicker extends Field
         $values = $pairing['values'];
         $picked = $pairing['picked'];
         $current = $this->currentRecord();
-        [$kept, $dropped] = $this->keepPickedFlag() ? [$picked, $current] : [$current, $picked];
+        [$priority, $other] = $this->keepPickedFlag() ? [$picked, $current] : [$current, $picked];
 
         return $this->cardData(
             (string) $values->attributes['name'],
-            $this->image($kept) ?? $this->image($dropped),
+            $this->image($priority) ?? $this->image($other),
             $this->links($values->customFields[$this->identity()->fieldCode()] ?? []),
             fn (string $key): int => (int) $picked->getAttribute("{$key}_count")
                 + (int) $current->getAttribute("{$key}_count")

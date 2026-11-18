@@ -52,11 +52,13 @@ enum AppEventPalette: string implements HasIcon, HasLabel
     private function mergedDescription(TimelineEntry $entry): string
     {
         $causer = $entry->causer?->getAttribute('name');
-        [$first, $second] = array_pad(array_values((array) ($entry->properties['merged_names'] ?? [])), 2, '');
-        $names = ['first' => $first, 'second' => $second];
+        $into = $entry->properties['merged_into_name'] ?? null;
+        [$key, $replace] = is_string($into)
+            ? ['description_into', ['name' => $into]]
+            : ['description', ['name' => $entry->properties['merged_name'] ?? '']];
 
         return is_string($causer) && $causer !== ''
-            ? (string) __('activity-log.events.record_merged.description_by', ['causer' => $causer, ...$names])
-            : (string) __('activity-log.events.record_merged.description', $names);
+            ? (string) __("activity-log.events.record_merged.{$key}_by", ['causer' => $causer, ...$replace])
+            : (string) __("activity-log.events.record_merged.{$key}", $replace);
     }
 }

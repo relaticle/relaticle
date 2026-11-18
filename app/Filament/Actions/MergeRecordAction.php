@@ -36,6 +36,7 @@ final class MergeRecordAction extends Action
     public static function canMerge(Model $record): bool
     {
         return ($record instanceof Company || $record instanceof People)
+            && ! $record->trashed()
             && Gate::allows('create', $record::class)
             && Gate::allows('delete', $record);
     }
