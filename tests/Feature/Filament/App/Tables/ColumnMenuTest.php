@@ -710,7 +710,7 @@ it('never offers a main column in the add panel even when its state says hidden'
         $component->get('tableColumns'),
     ));
 
-    $items = (new Crawler($component->html()))->filter('[data-view-settings-add-panel] [data-view-settings-add-item]')
+    $items = new Crawler($component->html())->filter('[data-view-settings-add-panel] [data-view-settings-add-item]')
         ->each(fn (Crawler $item): ?string => $item->attr('data-attribute'));
 
     expect($items)->not->toContain(...$locked);
@@ -837,14 +837,14 @@ it('drops options and a linked entity the chosen type does not take', function (
         ->and($field->lookup_type)->toBeNull();
 });
 
-it('shows a repeated option on its own row', function (): void {
+it('flags a repeated option on both of its rows', function (): void {
     $count = customFieldCount();
 
     livewire(ListCompanies::class)
         ->mountAction('createTableAttribute')
         ->set('mountedActions.0.data', ['name' => 'Tier', 'type' => 'select', 'options' => ['a' => ['name' => 'Gold'], 'b' => ['name' => 'gold']]])
         ->callMountedAction()
-        ->assertHasActionErrors(['options.b.name' => 'This option is already listed.']);
+        ->assertHasActionErrors(['options.a.name', 'options.b.name']);
 
     expect(customFieldCount())->toBe($count);
 });
@@ -924,6 +924,55 @@ it('falls back to text when the Add column menu sends a type that cannot be crea
         ->mountAction('createTableAttribute', ['type' => $type])
         ->assertActionDataSet(['type' => 'text']);
 })->with(['unknown' => 'nope', 'empty' => '']);
+
+it('opens the same settings the custom attributes page shows', function (): void {
+    livewire(ListCompanies::class)
+        ->mountAction('createTableAttribute')
+        ->assertFormFieldExists('settings.visible_in_list')
+        ->assertFormFieldExists('settings.visible_in_view')
+        ->assertFormFieldExists('settings.encrypted')
+        ->assertFormFieldExists('settings.unique_per_entity_type');
+});
+
+it('stores the settings chosen on the list form', function (): void {
+    livewire(ListCompanies::class)
+        ->callAction('createTableAttribute', data: [
+            'name' => 'Tax ID',
+            'type' => 'text',
+            'settings' => ['visible_in_view' => false, 'encrypted' => true, 'unique_per_entity_type' => true],
+        ])
+        ->assertHasNoActionErrors();
+
+    $settings = CustomField::query()->where('entity_type', 'company')->where('name', 'Tax ID')->sole()->settings;
+
+    expect($settings->visible_in_view)->toBeFalse()
+        ->and($settings->encrypted)->toBeTrue()
+        ->and($settings->unique_per_entity_type)->toBeTrue()
+        ->and($settings->visible_in_list)->toBeTrue();
+});
+
+it('stores option colors and currency settings from the list form', function (): void {
+    $component = livewire(ListCompanies::class);
+
+    $component->callAction('createTableAttribute', data: [
+        'name' => 'Tier',
+        'type' => 'select',
+        'settings' => ['enable_option_colors' => true],
+        'options' => [['name' => 'Gold', 'settings' => ['color' => '#f59e0b']]],
+    ])->assertHasNoActionErrors();
+
+    $component->callAction('createTableAttribute', data: [
+        'name' => 'Budget',
+        'type' => 'currency',
+        'settings' => ['additional' => ['currency_code' => 'EUR']],
+    ])->assertHasNoActionErrors();
+
+    $tier = CustomField::query()->where('entity_type', 'company')->where('name', 'Tier')->sole();
+
+    expect($tier->settings->enable_option_colors)->toBeTrue()
+        ->and($tier->options->sole()->settings->color)->toBe('#f59e0b')
+        ->and(CustomField::query()->where('entity_type', 'company')->where('name', 'Budget')->sole()->settings->additional['currency_code'])->toBe('EUR');
+});
 
 it('puts the Add column button in the actions column header and its menu beside the table', function (): void {
     Filament::bootCurrentPanel();

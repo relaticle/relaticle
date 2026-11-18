@@ -17,8 +17,10 @@ use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Unique;
 use Illuminate\Validation\ValidationException;
 use Relaticle\CustomFields\Data\FieldTypeData;
+use Relaticle\CustomFields\Enums\CustomFieldsFeature;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
 use Relaticle\CustomFields\Facades\Entities;
+use Relaticle\CustomFields\FeatureSystem\FeatureManager;
 
 /**
  * The single rule set for custom-field definitions written outside a Filament form.
@@ -66,6 +68,7 @@ final readonly class CustomFieldDefinitionValidator
             'lookup_type' => ['nullable', $requiresLookupType ? 'required' : 'prohibited', 'string', Rule::in($lookupTypes)],
             'options' => ['nullable', self::expectsOptions($type) ? 'required' : 'prohibited', 'array', "max:{$maxOptions}"],
             'options.*.name' => ['required', 'string', 'max:255', 'distinct:ignore_case'],
+            'options.*.settings.color' => ['nullable', 'hex_color'],
             'settings' => ['nullable', 'array'],
         ], [
             'entity_type.in' => 'Invalid entity type ":input". Must be one of: '.implode(', ', CrmEntity::morphAliases()).'.',
@@ -84,10 +87,14 @@ final readonly class CustomFieldDefinitionValidator
             'settings.array' => 'Pass `settings` as an object of setting names to values.',
         ] + self::optionNameMessages())->validate();
 
-        $settings = $validated['settings'] ?? [];
+        $settings = Arr::except($validated['settings'] ?? [], 'encrypted');
+        $encryption = self::validatedEncryption($type, $validated['settings'] ?? []);
 
-        if ($settings !== []) {
-            $validated['settings'] = self::validatedSettings(new CustomField(['type' => $type, 'entity_type' => $entityType]), $settings);
+        if ($settings !== [] || $encryption !== []) {
+            $validated['settings'] = [
+                ...($settings === [] ? [] : self::validatedSettings(new CustomField(['type' => $type, 'entity_type' => $entityType]), $settings)),
+                ...$encryption,
+            ];
         }
 
         return $validated;
@@ -158,6 +165,28 @@ final readonly class CustomFieldDefinitionValidator
         }
 
         return $validated;
+    }
+
+    // Encryption is chosen once, at creation: the settings rules shared with updates never accept it.
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array{encrypted?: bool}
+     *
+     * @throws ValidationException
+     */
+    private static function validatedEncryption(string $type, array $settings): array
+    {
+        $encryptable = in_array($type, self::creatableTypes(), true)
+            && FeatureManager::isEnabled(CustomFieldsFeature::FIELD_ENCRYPTION)
+            && CustomFieldsType::getFieldType($type)?->encryptable === true;
+
+        $validated = Validator::make(
+            ['settings' => Arr::only($settings, 'encrypted')],
+            ['settings.encrypted' => [$encryptable ? 'boolean' : 'prohibited']],
+            ['settings.encrypted.prohibited' => "Field type \"{$type}\" cannot be encrypted."],
+        )->validate();
+
+        return array_map(boolval(...), $validated['settings'] ?? []);
     }
 
     /**
@@ -321,6 +350,7 @@ final readonly class CustomFieldDefinitionValidator
             $data['options'] = array_values(array_map(
                 static fn (mixed $option): array => [
                     'name' => trim(is_array($option) ? (string) ($option['name'] ?? '') : (string) $option),
+                    ...(filled(data_get($option, 'settings.color')) ? ['settings' => ['color' => data_get($option, 'settings.color')]] : []),
                 ],
                 $data['options'],
             ));

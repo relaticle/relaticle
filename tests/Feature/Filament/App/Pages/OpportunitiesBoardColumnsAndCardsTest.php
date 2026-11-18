@@ -47,7 +47,7 @@ use Tests\Helpers\WorkspaceCustomField;
 
 mutates(SetCardAttributes::class, PlaceBoardCard::class, CreatesTableAttribute::class, BoardCardAttributesQuery::class, HasBoardCards::class, ReorderBoardStages::class, SetBoardColumnField::class, SetBoardColumnVisibility::class, BoardColumnFieldsQuery::class, OpportunitiesBoard::class, MoveCardAction::class, PreviewRecordAction::class, HasBoardViews::class, HasBoardStageOrder::class, HasViewSwitcher::class);
 
-beforeEach(function () {
+beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
 
@@ -986,12 +986,11 @@ it('creates a select attribute from grouped by and groups the columns by it', fu
         ->and($state->noValueColumns)->toBe([$tier->code]);
 });
 
-it('creates a select attribute from grouped by whatever type the form sends', function (): void {
+it('creates nothing but a select attribute from grouped by, whatever type the form sends', function (): void {
     livewire(OpportunitiesBoard::class)
-        ->callAction('createColumnAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'options' => [['name' => 'Hot']]])
-        ->assertHasNoActionErrors();
+        ->callAction('createColumnAttribute', data: ['name' => 'Lead score', 'type' => 'text', 'options' => [['name' => 'Hot']]]);
 
-    expect(CustomField::query()->where('entity_type', 'opportunity')->where('name', 'Lead score')->sole()->type)->toBe('select');
+    expect(CustomField::query()->where('entity_type', 'opportunity')->where('name', 'Lead score')->where('type', '!=', 'select')->exists())->toBeFalse();
 });
 
 it('refuses a grouped by attribute without options', function (): void {

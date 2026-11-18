@@ -1083,7 +1083,8 @@
                     const below = rect.bottom + 4
                     const above = rect.top - 4 - panel.offsetHeight
 
-                    this.left = Math.max(8, Math.min(rect.left, viewportWidth - panel.offsetWidth - 8))
+                    // The Add column header is the last column, so the menu opens leftwards from its button, clear of the window edge.
+                    this.left = Math.max(8, Math.min(rect.right - panel.offsetWidth, viewportWidth - panel.offsetWidth - 8))
                     this.top = below + panel.offsetHeight <= viewportHeight - 8 || above < 8 ? Math.min(below, Math.max(8, viewportHeight - panel.offsetHeight - 8)) : above
                 },
 

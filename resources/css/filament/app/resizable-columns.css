@@ -22,12 +22,17 @@
 
 /* The Add column menu sits at the start of the actions column's header, whatever width that column takes. */
 .fi-ta-resizable-table th:has(> .fi-ta-add-column) {
-    @apply min-w-36 px-2 py-1.5 text-start;
+    @apply min-w-56 px-2 py-1.5 text-start;
 }
 
 /* Placed under its trigger by the script, outside the table's scroll box. */
 .fi-dropdown-panel.fi-ta-add-column-menu {
     @apply fixed z-60 flex w-72 max-w-[calc(100vw-1rem)] flex-col transition-none;
+
+    /* View settings opens its search row with a back button. This one has none, so the text lines up with the row icons. */
+    & .fi-view-settings-search > input {
+        @apply ps-2;
+    }
 }
 
 .fi-ta-add-column-trigger {
