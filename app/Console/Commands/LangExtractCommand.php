@@ -193,7 +193,7 @@ final class LangExtractCommand extends Command
 
         return $directories === []
             ? []
-            : (new Finder)->files()->in($directories)->name(['*.php', '*.js', '*.ts'])->exclude(['lang', 'node_modules', 'dist'])->sortByName();
+            : (new Finder)->files()->in($directories)->name(['*.php', '*.js', '*.ts'])->exclude(['lang', 'node_modules', 'dist', 'cache'])->sortByName();
     }
 
     /**
