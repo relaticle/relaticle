@@ -39,7 +39,7 @@ return [
         ],
         'update_workspace_logo' => [
             'title' => 'Workspace Logo',
-            'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
+            'description' => 'Your logo appears in the workspace switcher, on invitations, and on the invitation page.',
         ],
         'assistant' => [
             'description' => 'Choose what :assistant, the built-in AI assistant, may do for members of this workspace.',
@@ -49,7 +49,7 @@ return [
         ],
         'add_workspace_member' => [
             'title' => 'Invite people',
-            'description' => 'Send an email invitation, or share a link that lets people join themselves.',
+            'description' => 'Invite people by email. Each person gets their own invitation.',
         ],
         'workspace_members' => [
             'title' => 'Members',
