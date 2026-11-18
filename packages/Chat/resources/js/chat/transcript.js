@@ -345,7 +345,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         if (this.sameCalendarDay(iso, yesterday)) return yesterdayLabel;
-        return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+        return new Date(iso).toLocaleDateString(document.documentElement.lang || undefined, { month: 'long', day: 'numeric', year: 'numeric' });
     },
 
     // Per-message render decorations, keyed by position in `messages`.
@@ -1629,7 +1629,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return [
             this.batchLine(action, items),
             ...items.flatMap((item, index) => this.isSkipped(action, index)
-                ? [this.offLine(`${action.pending_action_id}:${index}`, action.itemResults[index].outcome, this.proposalItemLabel(item) || item.summary || '', null)]
+                ? [this.offLine(`${action.pending_action_id}:${index}`, action.itemResults[index].outcome, this.proposalItemLabel(item, action) || item.summary || '', null)]
                 : []),
         ];
     },
@@ -1689,7 +1689,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
 
         const names = operation === 'delete'
-            ? done.map((item) => this.proposalItemLabel(item) || item.summary).filter(Boolean).join(', ')
+            ? done.map((item) => this.proposalItemLabel(item, action) || item.summary).filter(Boolean).join(', ')
             : (action.moved_total ?? '');
 
         return {
@@ -1726,20 +1726,18 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const resolvedLabel = action?.record?.label;
         if (typeof resolvedLabel === 'string' && resolvedLabel !== '') return resolvedLabel;
 
-        return this.quotedSummaryTitle(action?.display?.summary);
+        return action?.display?.name || this.proposalTitleValue(action?.entity_type, action?.display?.fields);
     },
 
-    // A batch item's record identity: its display title holds the operation
-    // ("Create Task"), so the record name only exists inside the quoted summary.
-    proposalItemLabel(item) {
-        return this.quotedSummaryTitle(item?.summary);
+    // A batch item's display title holds the operation ("Create Task"), so the
+    // record name is the value of its title row.
+    proposalItemLabel(item, action) {
+        return item?.name || this.proposalTitleValue(action?.entity_type, item?.fields);
     },
 
-    quotedSummaryTitle(summary) {
-        if (typeof summary !== 'string') return '';
-
-        const match = summary.match(/"(.*)"/u);
-        return match?.[1] || '';
+    proposalTitleValue(entityType, fields) {
+        const receipt = this.proposalTexts.receipts[entityType] ?? {};
+        return this.fieldValue(fields, receipt.titleLabels ?? [], receipt.titleKey);
     },
 
     // Proposals from one assistant turn are ONE decision, so the transcript shows

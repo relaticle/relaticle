@@ -25,9 +25,19 @@ enum ProposalEntity: string
     case SampleData = 'sample_data';
     case WebAccess = 'web_access';
 
-    public function singularName(): string
+    public function inlineName(): string
     {
-        return __("enums/proposal-entity.singular.{$this->value}");
+        return __("enums/proposal-entity.noun.{$this->value}");
+    }
+
+    public function pluralTitle(int $count): string
+    {
+        return trans_choice("enums/proposal-entity.plural_title.{$this->value}", $count);
+    }
+
+    public function createLabel(): string
+    {
+        return __(':verb :entity', ['verb' => $this->createVerb(), 'entity' => $this->inlineName()]);
     }
 
     public function plural(int $count): string
@@ -117,6 +127,31 @@ enum ProposalEntity: string
     public function createTitle(): string
     {
         return __("enums/proposal-entity.create_title.{$this->value}");
+    }
+
+    public function batchTitle(PendingActionOperation $operation, int $count): string
+    {
+        return match ($operation) {
+            PendingActionOperation::Create => __(':verb :entities', ['verb' => $this->createVerb(), 'entities' => $this->pluralTitle($count)]),
+            PendingActionOperation::Update => __('Update :entities', ['entities' => $this->pluralTitle($count)]),
+            PendingActionOperation::Delete => __('Delete :count :entities', ['count' => $count, 'entities' => $this->pluralTitle($count)]),
+        };
+    }
+
+    public function batchSummary(PendingActionOperation $operation, int $count): string
+    {
+        $verb = match ($operation) {
+            PendingActionOperation::Create => $this->createVerb(),
+            PendingActionOperation::Update => __('Update'),
+            PendingActionOperation::Delete => __('Delete'),
+        };
+
+        return __(':verb :count :entities', ['verb' => $verb, 'count' => $count, 'entities' => $this->plural($count)]);
+    }
+
+    private function createVerb(): string
+    {
+        return __("enums/proposal-entity.create_verb.{$this->value}");
     }
 
     public function createSummary(string $title): string

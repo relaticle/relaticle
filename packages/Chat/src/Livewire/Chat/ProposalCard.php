@@ -16,7 +16,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -623,7 +622,8 @@ final class ProposalCard extends BaseLivewireComponent
             'excludableCodes' => $this->excludableCodesOf($step),
             'titleKey' => $entity->titleKey(),
             'titleLabels' => $entity->titleLabels(),
-            'entityNoun' => Str::lower($entity->singularName()),
+            'entityNoun' => $entity->inlineName(),
+            'createLabel' => $entity->createLabel(),
             'deletes' => $entity->deletes($step->operation),
             'followUpLabel' => $entity->followUpLabel(),
             'refLinks' => $this->refLinksOf($step, $pendingIds),
@@ -722,22 +722,7 @@ final class ProposalCard extends BaseLivewireComponent
             return '';
         }
 
-        if ($step->operation === PendingActionOperation::Create) {
-            $record = $this->currentRecord($step);
-            $title = $record[$step->entity_type->titleKey()] ?? null;
-
-            if (is_string($title) && $title !== '') {
-                return $title;
-            }
-        }
-
-        $summary = $this->stepSummary($step);
-
-        if (preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
-            return $matches[1];
-        }
-
-        return '';
+        return ProposalLabel::name($step->entity_type, $this->currentRecord($step), $this->currentRecordDisplay($step)) ?? '';
     }
 
     /**
@@ -762,50 +747,21 @@ final class ProposalCard extends BaseLivewireComponent
             return [
                 'index' => $index,
                 'summary' => is_string($summary) ? $summary : '',
-                'label' => $this->itemLabel($step->entity_type, $display),
+                'label' => $this->itemLabel($step->entity_type, $payload->recordAtOrEmpty($index), $display),
                 'fields' => $this->withOverwrittenValues($step, $index, $this->visibleRows($step, is_array($fields) ? array_values($fields) : [])),
             ];
         }, $this->unresolvedIndices($step));
     }
 
     /**
-     * The identity a batch row leads with: the entity's title value when the row carries one
-     * (an invitation's address), otherwise the name quoted in its summary.
+     * The identity a batch row leads with: the record's own name, from its data or its title row.
      *
+     * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $display
      */
-    private function itemLabel(ProposalEntity $entity, array $display): string
+    private function itemLabel(ProposalEntity $entity, array $data, array $display): string
     {
-        $fields = is_array($display['fields'] ?? null) ? $display['fields'] : [];
-
-        foreach ($fields as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            $isTitleRow = ($row['code'] ?? null) === null
-                ? in_array($row['label'] ?? null, $entity->titleLabels(), true)
-                : $row['code'] === $entity->titleKey();
-            $value = $row['value'] ?? null;
-
-            if ($isTitleRow && is_string($value) && $value !== '') {
-                return $value;
-            }
-        }
-
-        return $this->labelFromDisplay($display);
-    }
-
-    /**
-     * @param  array<string, mixed>  $display
-     */
-    private function labelFromDisplay(array $display): string
-    {
-        $summary = $display['summary'] ?? null;
-
-        // The quoted record name comes first: the real tools set each item's `title`
-        // to the generic entity title ("Create Person"), which is the eyebrow, not an identity.
-        $name = ProposalLabel::quotedName($display);
+        $name = ProposalLabel::name($entity, $data, $display);
 
         if ($name !== null) {
             return $name;
@@ -816,6 +772,8 @@ final class ProposalCard extends BaseLivewireComponent
         if (is_string($title) && $title !== '') {
             return $title;
         }
+
+        $summary = $display['summary'] ?? null;
 
         return is_string($summary) ? $summary : '';
     }
@@ -1317,7 +1275,7 @@ final class ProposalCard extends BaseLivewireComponent
             static fn (array $repeat): array => [
                 'text' => __('":name" was created earlier in this conversation. Approving adds another :entity with that name.', [
                     'name' => $repeat['name'],
-                    'entity' => Str::lower($step->entity_type->singularName()),
+                    'entity' => $step->entity_type->inlineName(),
                 ]),
                 'url' => $repeat['url'],
             ],
@@ -1961,7 +1919,7 @@ final class ProposalCard extends BaseLivewireComponent
 
     private function reportResolveFailure(PendingAction $pendingAction, string $message): void
     {
-        $this->addError('resolve', $message);
+        $this->addError('resolve', ApprovalFailureMessage::displayed($message));
 
         // Persisted so the model can explain the failure later: without this
         // the card is the only witness, and a proposal discarded after a failed
@@ -1971,7 +1929,7 @@ final class ProposalCard extends BaseLivewireComponent
         $this->dispatch(
             'proposal:resolve-failed',
             pendingActionId: $pendingAction->getKey(),
-            message: $message,
+            message: ApprovalFailureMessage::displayed($message),
             context: $this->context,
         );
     }

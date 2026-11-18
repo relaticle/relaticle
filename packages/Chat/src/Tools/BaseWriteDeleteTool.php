@@ -9,7 +9,6 @@ use App\Models\User;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -177,6 +176,7 @@ abstract class BaseWriteDeleteTool implements Tool
             return [
                 'title' => __('Delete :entity', ['entity' => $this->entityLabel()]),
                 'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                'name' => $name,
                 'fields' => [['label' => __('Name'), 'value' => $name]],
             ];
         }
@@ -187,19 +187,15 @@ abstract class BaseWriteDeleteTool implements Tool
 
                 return [
                     'summary' => __('Delete :entity ":name"', ['entity' => $this->entityLabel(), 'name' => $name]),
+                    'name' => $name,
                     'fields' => [['label' => __('Name'), 'value' => $name]],
                 ];
             })
             ->all();
 
-        $titleNoun = Str::plural(Str::headline($this->entityLabel()), $count);
-
         return [
-            'title' => __('Delete :count :entities', ['count' => $count, 'entities' => $titleNoun]),
-            'summary' => __('Delete :count :entities', [
-                'count' => $count,
-                'entities' => Str::plural(strtolower($this->entityLabel()), $count),
-            ]),
+            'title' => $this->proposalEntity()->batchTitle(PendingActionOperation::Delete, $count),
+            'summary' => $this->proposalEntity()->batchSummary(PendingActionOperation::Delete, $count),
             'items' => $items,
         ];
     }

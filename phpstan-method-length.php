@@ -44,7 +44,7 @@ return [
                 'Relaticle\Chat\Tools\BaseReadListTool::handle' => 75,
                 'Relaticle\Chat\Tools\BaseWriteCreateTool::handle' => 129,
                 'Relaticle\Chat\Tools\BaseWriteDeleteTool::handle' => 63,
-                'Relaticle\Chat\Tools\BaseWriteUpdateTool::handle' => 162,
+                'Relaticle\Chat\Tools\BaseWriteUpdateTool::handle' => 159,
                 'Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool::handle' => 117,
                 'Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool::handle' => 100,
                 'Relaticle\Chat\Tools\CustomField\SetCustomFieldOptionsTool::handle' => 102,
