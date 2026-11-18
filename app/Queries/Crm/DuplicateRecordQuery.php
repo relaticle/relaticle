@@ -12,11 +12,15 @@ use App\Models\People;
 use App\Models\User;
 use App\Queries\CustomFields\EntitiesByFieldValueQuery;
 use App\Support\CustomFields\CanonicalValue;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
 final readonly class DuplicateRecordQuery
 {
-    public function __construct(private EntitiesByFieldValueQuery $entitiesByFieldValue) {}
+    public function __construct(
+        private EntitiesByFieldValueQuery $entitiesByFieldValue,
+        private WorkspaceCustomFields $workspaceFields,
+    ) {}
 
     /**
      * @return array<string, array{record: Company|People, value: string}>
@@ -65,12 +69,9 @@ final readonly class DuplicateRecordQuery
             return null;
         }
 
-        return CustomField::query()
-            ->withoutGlobalScopes()
-            ->where('tenant_id', $record->workspace_id)
-            ->where('entity_type', $record->getMorphClass())
-            ->where('code', $identity->fieldCode())
-            ->active()
-            ->first();
+        return $this->workspaceFields
+            ->forEntity($record->loadMissing('workspace')->workspace, $record->getMorphClass())
+            ->where('active', true)
+            ->firstWhere('code', $identity->fieldCode());
     }
 }
