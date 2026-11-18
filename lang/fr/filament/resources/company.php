@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 return [
-    // Lowercase to match the en/ convention (Filament title-cases for display contexts).
     'label' => 'entreprise',
     'plural_label' => 'entreprises',
     'navigation_label' => 'Entreprises',
@@ -13,10 +12,10 @@ return [
             'label' => 'Entreprise',
         ],
         'account_owner' => [
-            'label' => 'Responsable du compte',
+            'label' => 'Responsable',
         ],
         'account_owner_id' => [
-            'label' => 'Responsable du compte',
+            'label' => 'Responsable',
         ],
         'created_by' => [
             'label' => 'Créé par',
@@ -35,6 +34,10 @@ return [
         ],
     ],
 
+    'empty_state' => [
+        'description' => 'Les entreprises que vous ajoutez ou importez apparaissent ici.',
+    ],
+
     'pages' => [
         'list' => [
             'actions' => [
@@ -50,9 +53,12 @@ return [
             'infolist' => [
                 'fields' => [
                     'account_owner' => [
-                        'label' => 'Responsable du compte',
+                        'label' => 'Responsable',
                     ],
                 ],
+            ],
+            'activity_log' => [
+                'description' => 'Toute l\'activité de cette entreprise, regroupée par semaine.',
             ],
         ],
     ],

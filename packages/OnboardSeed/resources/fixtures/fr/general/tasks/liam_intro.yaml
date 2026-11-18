@@ -1,0 +1,8 @@
+title: Appel de présentation avec Liam
+assigned_people:
+  - liam
+custom_fields:
+  description: Organisez un appel de présentation de 30 minutes avec Liam pour explorer les possibilités de partenariat média et voir si les attentes concordent.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium
