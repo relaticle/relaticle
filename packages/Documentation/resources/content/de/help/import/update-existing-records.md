@@ -24,9 +24,9 @@ zeigt genau, was erstellt und was aktualisiert wird, bevor sich etwas ändert.
 
 Der Vorschauschritt kennzeichnet dann jede Zeile:
 
-- Einem bestehenden Eintrag zugeordnet → **Update**
-- Kein Treffer oder über den Namen abgeglichen → **Create new**
-- Eine Eintrags-ID, die nicht existiert → **Skip**
+- Einem bestehenden Eintrag zugeordnet → **Aktualisieren**
+- Kein Treffer oder über den Namen abgeglichen → **Neu erstellen**
+- Eine Eintrags-ID, die nicht existiert → **Überspringen**
 
 Wenn Sie keine abgleichbare Spalte zuordnen, warnt der Assistent, dass jede Zeile
 als neu angelegt wird. Sie können zurückgehen und eine zuordnen oder trotzdem

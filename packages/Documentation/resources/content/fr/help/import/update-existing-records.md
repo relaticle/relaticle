@@ -26,7 +26,7 @@ jour avant que quoi que ce soit change.
 L'étape d'aperçu étiquette ensuite chaque ligne :
 
 - Correspond à un enregistrement existant → **Mettre à jour**
-- Aucune correspondance, ou correspondance par Nom → **Créer**
+- Aucune correspondance, ou correspondance par Nom → **Créer un nouveau**
 - Un ID d'enregistrement qui n'existe pas → **Ignorer**
 
 Si vous n'associez aucune colonne de correspondance, l'assistant vous avertit

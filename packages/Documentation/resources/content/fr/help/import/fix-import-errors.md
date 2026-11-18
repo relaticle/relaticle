@@ -23,7 +23,7 @@ ci-dessous ; chaque solution est à votre portée.
 
 | Problème | Solution |
 |---------|----------|
-| Une colonne ne s'est pas associée automatiquement | Choisissez vous-même le champ dans la liste déroulante **Map To** |
+| Une colonne ne s'est pas associée automatiquement | Choisissez vous-même le champ dans la liste déroulante **Associer à** |
 | Un attribut personnalisé manque dans la liste déroulante | Vérifiez le code de l'attribut dans **Paramètres → Attributs personnalisés** |
 | Un champ obligatoire s'affiche en rouge | Associez-lui l'une de vos colonnes CSV |
 
@@ -36,9 +36,8 @@ ci-dessous ; chaque solution est à votre portée.
 | ID d'enregistrement non valide | Réexportez pour obtenir des ID à jour |
 | Option de liste déroulante inconnue | Utilisez le libellé exact de l'option dans les réglages de l'attribut |
 
-À l'étape de vérification, vous pouvez aussi **Fix** une valeur une seule fois
-pour la corriger dans toutes les lignes qui la contiennent, ou **Skip** une
-valeur. Les lignes sont quand même importées, avec ce seul champ laissé vide.
+À l'étape de vérification, vous pouvez aussi corriger une valeur une seule fois (**Corriger cette valeur**)
+pour la corriger dans toutes les lignes qui la contiennent, ou l'ignorer (**Ignorer cette valeur**). Les lignes sont quand même importées, avec ce seul champ laissé vide.
 
 ## Dates ambiguës
 
@@ -62,7 +61,7 @@ d'autres outils.
 
 | Problème | Solution |
 |---------|----------|
-| Bloqué sur « Processing » | Les gros imports s'exécutent en arrière-plan ; revenez dans quelques minutes |
+| Bloqué sur « Traitement en cours… » | Les gros imports s'exécutent en arrière-plan ; revenez dans quelques minutes |
 | Certaines lignes ont échoué | Téléchargez les lignes en échec, corrigez-les, réimportez uniquement celles-ci |
 | Doublons inattendus | Associez une colonne unique (e-mail, domaine ou ID) ; voir [Mettre à jour des enregistrements existants](/fr/help/import/update-existing-records) |
 

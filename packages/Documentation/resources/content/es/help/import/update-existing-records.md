@@ -24,9 +24,9 @@ muestra exactamente qué se creará y qué se actualizará antes de que algo cam
 
 El paso de vista previa etiqueta entonces cada fila:
 
-- Coincide con un registro existente → **Update**
-- Sin coincidencia, o coincidencia por Nombre → **Create new**
-- Un ID de registro que no existe → **Skip**
+- Coincide con un registro existente → **Actualizar**
+- Sin coincidencia, o coincidencia por Nombre → **Crear nuevo**
+- Un ID de registro que no existe → **Omitir**
 
 Si no asigna ninguna columna que permita coincidencias, el asistente le avisa
 que todas las filas se crearán como nuevas. Puede volver y asignar una, o

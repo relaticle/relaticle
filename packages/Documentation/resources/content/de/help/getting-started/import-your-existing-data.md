@@ -16,7 +16,7 @@ aktualisiert werden, bevor sich etwas ändert.
    **Verkaufschancen**.
 2. Klicken Sie auf **Import / Export** und dann auf **Unternehmen importieren**
    (die Beschriftung passt zur Liste, in der Sie sich befinden).
-3. Klicken Sie auf **Choose a .CSV file** oder legen Sie die Datei auf dem
+3. Klicken Sie auf **CSV-Datei auswählen** oder legen Sie die Datei auf dem
    Upload-Bereich ab, mit bis zu 10.000 Zeilen und 10 MB.
 4. Klicken Sie auf **Weiter**.
 
@@ -25,9 +25,9 @@ aktualisiert werden, bevor sich etwas ändert.
 Relaticle ordnet die Spalten Ihrer Datei den Relaticle-Feldern automatisch zu,
 wenn die Namen nah genug beieinanderliegen.
 
-![Der Schritt „Map“, in dem die Werte der Dateispalten Name, Domain und LinkedIn automatisch den Feldern Name, Domains und LinkedIn zugeordnet sind](/help-assets/getting-started/import-your-existing-data-1.png)
+![Der Schritt „Zuordnen“, in dem die Werte der Dateispalten Name, Domain und LinkedIn automatisch den Feldern Name, Domains und LinkedIn zugeordnet sind](/help-assets/getting-started/import-your-existing-data-1.png)
 
-5. Prüfen Sie jedes Feld unter **Map To** und korrigieren Sie falsche
+5. Prüfen Sie jedes Feld unter **Zuordnen zu** und korrigieren Sie falsche
    Zuordnungen.
 6. Klicken Sie auf **Weiter**.
 
@@ -43,7 +43,7 @@ die Sie nicht importieren möchten.
 8. Prüfen Sie die Anzahl der Einträge, die erstellt und aktualisiert werden,
    klicken Sie auf **Import starten** und bestätigen Sie.
 
-![Die Zusammenfassung „Import Complete“ mit 2 erstellt, 0 aktualisiert und 0 fehlgeschlagen](/help-assets/getting-started/import-your-existing-data-2.png)
+![Die Zusammenfassung „Import abgeschlossen“ mit 2 erstellt, 0 aktualisiert und 0 fehlgeschlagen](/help-assets/getting-started/import-your-existing-data-2.png)
 
 Jeder frühere Import steht auf der Seite **Importverlauf** unter dem Namen Ihres
 Arbeitsbereichs, einschließlich der Zahl der erstellten, aktualisierten,
@@ -51,8 +51,8 @@ Arbeitsbereichs, einschließlich der Zahl der erstellten, aktualisierten,
 
 ## Wenn eine Spalte nicht automatisch zugeordnet wird, ordnen Sie sie von Hand zu
 
-Öffnen Sie das Dropdown unter **Map To** für diese Spalte und wählen Sie das
-passende Feld selbst aus. Oder klicken Sie auf **Clear mapping**, um die Spalte
+Öffnen Sie das Dropdown unter **Zuordnen zu** für diese Spalte und wählen Sie das
+passende Feld selbst aus. Oder klicken Sie auf **Zuordnung entfernen**, um die Spalte
 ganz vom Import auszuschließen.
 
 Regeln zur Dateiformatierung, zum Abgleichen und Aktualisieren bestehender

@@ -23,7 +23,7 @@ Cada solución es algo que puede hacer usted mismo.
 
 | Problema | Solución |
 |---------|----------|
-| Una columna no se asignó automáticamente | Elija usted mismo el campo en el menú desplegable **Map To** |
+| Una columna no se asignó automáticamente | Elija usted mismo el campo en el menú desplegable **Asignar a** |
 | Falta un atributo personalizado en el menú desplegable | Revise el código del campo en **Configuración → Atributos personalizados** |
 | Un campo obligatorio aparece en rojo | Asígnele una de las columnas de su CSV |
 
@@ -36,8 +36,8 @@ Cada solución es algo que puede hacer usted mismo.
 | ID de registro no válido | Vuelva a exportar para obtener IDs nuevos |
 | Opción de selección desconocida | Use la etiqueta exacta de la opción tal como aparece en los ajustes del campo |
 
-En el paso de revisión también puede corregir un valor una sola vez (**Fix**)
-para que se corrija en todas las filas que lo tienen, u omitirlo (**Skip**). Las
+En el paso de revisión también puede corregir un valor una sola vez (**Corregir este valor**)
+para que se corrija en todas las filas que lo tienen, u omitirlo (**Omitir**). Las
 filas se importan igual, con ese campo vacío.
 
 ## Fechas ambiguas
@@ -61,7 +61,7 @@ formato más seguro para exportar desde otras herramientas.
 
 | Problema | Solución |
 |---------|----------|
-| Se queda en "Processing" | Las importaciones grandes se ejecutan en segundo plano. Vuelva en unos minutos |
+| Se queda en «Procesando…» | Las importaciones grandes se ejecutan en segundo plano. Vuelva en unos minutos |
 | Algunas filas fallaron | Descargue las filas fallidas, corríjalas y vuelva a importar solo esas |
 | Duplicados inesperados | Asigne una columna única (correo electrónico, dominio o ID). Consulte [Actualice registros existentes con una importación](/es/help/import/update-existing-records) |
 

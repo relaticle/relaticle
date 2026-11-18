@@ -40,8 +40,8 @@ Jane Smith,acme.com,jane@acme.com,CTO
 ```
 
 Asigne la columna `company` a la relación Empresa y elija **Dominio** en
-**Match by**, para que `acme.com` se vincule con la empresa existente. Si elige
-**Nombre** en **Match by**, siempre se crea una empresa nueva.
+**Buscar coincidencias por**, para que `acme.com` se vincule con la empresa existente. Si elige
+**Nombre** en **Buscar coincidencias por**, siempre se crea una empresa nueva.
 
 ## Oportunidades
 

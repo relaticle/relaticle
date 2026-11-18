@@ -38,9 +38,9 @@ John Doe,acme.com,john@acme.com,CEO
 Jane Smith,acme.com,jane@acme.com,CTO
 ```
 
-Associez la colonne `company` à la relation Entreprise et choisissez la
-correspondance par **Domaine**, pour que `acme.com` se lie à l'entreprise
-existante. Choisir la correspondance par **Nom** crée toujours une nouvelle
+Associez la colonne `company` à la relation Entreprise et choisissez
+**Domaine** sous **Faire correspondre par**, pour que `acme.com` se lie à l'entreprise
+existante. Choisir **Nom** sous **Faire correspondre par** crée toujours une nouvelle
 entreprise.
 
 ## Opportunités

@@ -16,7 +16,7 @@ d'enregistrements seront créés ou mis à jour avant que quoi que ce soit chang
    latérale.
 2. Cliquez sur **Importer / Exporter**, puis sur **Importer des entreprises** (le libellé
    correspond à la liste où vous êtes).
-3. Cliquez sur **Choose a .CSV file**, ou déposez-le sur la zone de
+3. Cliquez sur **Choisir un fichier CSV**, ou déposez-le sur la zone de
    téléversement, dans la limite de 10 000 lignes et 10 Mo.
 4. Cliquez sur **Continuer**.
 
@@ -25,9 +25,9 @@ d'enregistrements seront créés ou mis à jour avant que quoi que ce soit chang
 Relaticle associe automatiquement les colonnes de votre fichier aux champs de
 Relaticle quand les noms sont assez proches.
 
-![L'étape Map, avec les colonnes du fichier Name, Domain et LinkedIn associées automatiquement aux champs Nom, Domaines et LinkedIn](/help-assets/getting-started/import-your-existing-data-1.png)
+![L'étape « Associer », avec les colonnes du fichier Name, Domain et LinkedIn associées automatiquement aux champs Nom, Domaines et LinkedIn](/help-assets/getting-started/import-your-existing-data-1.png)
 
-5. Vérifiez chaque champ **Map To** et corrigez ceux qui ont été mal associés.
+5. Vérifiez chaque champ **Associer à** et corrigez ceux qui ont été mal associés.
 6. Cliquez sur **Continuer**.
 
 ## Vérifier et corriger les valeurs
@@ -41,7 +41,7 @@ importer.
 8. Vérifiez le nombre d'enregistrements qui seront créés et mis à jour, cliquez
    sur **Démarrer l'import**, puis confirmez.
 
-![Le résumé Import Complete indiquant 2 créés, 0 mis à jour et 0 en échec](/help-assets/getting-started/import-your-existing-data-2.png)
+![Le résumé « Import terminé » indiquant 2 créés, 0 mis à jour et 0 en échec](/help-assets/getting-started/import-your-existing-data-2.png)
 
 Chaque import passé figure sur la page **Historique des imports**, sous le nom
 de votre espace de travail, avec le nombre de lignes créées, mises à jour,
@@ -49,8 +49,8 @@ ignorées ou en échec.
 
 ## Si une colonne ne s'associe pas automatiquement, associez-la à la main
 
-Ouvrez la liste déroulante sous **Map To** pour cette colonne et choisissez
-vous-même le bon champ, ou cliquez sur **Clear mapping** pour laisser
+Ouvrez la liste déroulante sous **Associer à** pour cette colonne et choisissez
+vous-même le bon champ, ou cliquez sur **Supprimer l'association** pour laisser
 complètement cette colonne hors de l'import.
 
 Pour les règles de mise en forme des fichiers, la correspondance et la mise à

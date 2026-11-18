@@ -23,7 +23,7 @@ das Symptom heraus. Jede Lösung können Sie selbst umsetzen.
 
 | Problem | Lösung |
 |---------|----------|
-| Eine Spalte wurde nicht automatisch zugeordnet | Das Feld selbst im Dropdown **Map To** auswählen |
+| Eine Spalte wurde nicht automatisch zugeordnet | Das Feld selbst im Dropdown **Zuordnen zu** auswählen |
 | Ein benutzerdefiniertes Attribut fehlt im Dropdown | Den Code des Feldes unter **Einstellungen → Benutzerdefinierte Attribute** prüfen |
 | Ein Pflichtfeld erscheint rot | Eine Ihrer CSV-Spalten diesem Feld zuordnen |
 
@@ -36,9 +36,9 @@ das Symptom heraus. Jede Lösung können Sie selbst umsetzen.
 | Ungültige Eintrags-ID | Neu exportieren, um aktuelle IDs zu erhalten |
 | Unbekannte Auswahloption | Exakt die Optionsbezeichnung aus den Einstellungen des Feldes verwenden |
 
-Im Prüfschritt können Sie einen Wert auch einmal mit **Fix** korrigieren, sodass
-die Korrektur in jeder Zeile gilt, die ihn enthält, oder einen Wert mit **Skip**
-überspringen. Die Zeilen werden trotzdem importiert, nur dieses eine Feld bleibt
+Im Prüfschritt können Sie einen Wert auch einmal korrigieren (**Diesen Wert korrigieren**), sodass
+die Korrektur in jeder Zeile gilt, die ihn enthält, oder einen Wert mit **Überspringen**
+auslassen. Die Zeilen werden trotzdem importiert, nur dieses eine Feld bleibt
 leer.
 
 ## Mehrdeutige Datumsangaben
@@ -63,7 +63,7 @@ weshalb sie das sicherste Format für den Export aus anderen Werkzeugen sind.
 
 | Problem | Lösung |
 |---------|----------|
-| Hängt bei „Processing“ | Große Importe laufen im Hintergrund. Schauen Sie in einigen Minuten noch einmal nach |
+| Hängt bei „Wird verarbeitet…“ | Große Importe laufen im Hintergrund. Schauen Sie in einigen Minuten noch einmal nach |
 | Einige Zeilen sind fehlgeschlagen | Die fehlgeschlagenen Zeilen herunterladen, korrigieren und nur diese erneut importieren |
 | Unerwartete Duplikate | Eine eindeutige Spalte zuordnen (E-Mail, Domain oder ID). Siehe [Bestehende Einträge per Import aktualisieren](/de/help/import/update-existing-records) |
 

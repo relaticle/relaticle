@@ -16,19 +16,19 @@ antes de que algo cambie.
    lateral.
 2. Haga clic en **Importar / Exportar** y luego en **Importar empresas** (la
    etiqueta cambia según la lista en la que esté).
-3. Haga clic en **Choose a .CSV file**, o suelte el archivo en el área de carga.
+3. Haga clic en **Elegir un archivo CSV**, o suelte el archivo en el área de carga.
    El límite es de 10,000 filas y 10 MB.
-4. Haga clic en **Continue**.
+4. Haga clic en **Continuar**.
 
 ## Asigne sus columnas
 
 Relaticle asigna automáticamente las columnas de su archivo a los campos de
 Relaticle cuando los nombres se parecen lo suficiente.
 
-![El paso Map, con los valores de columna Name, Domain y LinkedIn asignados automáticamente a los campos Name, Domains y LinkedIn](/help-assets/getting-started/import-your-existing-data-1.png)
+![El paso «Asignar», con los valores de columna Name, Domain y LinkedIn asignados automáticamente a los campos Name, Domains y LinkedIn](/help-assets/getting-started/import-your-existing-data-1.png)
 
-5. Revise cada campo en **Map To** y corrija los que se asignaron mal.
-6. Haga clic en **Continue**.
+5. Revise cada campo en **Asignar a** y corrija los que se asignaron mal.
+6. Haga clic en **Continuar**.
 
 ## Revise y corrija valores
 
@@ -36,11 +36,11 @@ Relaticle valida cada valor único de cada columna y los agrupa en **Todos**,
 **Requiere revisión**, **Modificados** y **Omitidos**. Edite un valor en la misma
 fila para corregirlo, u omita una fila que no quiera importar.
 
-7. Haga clic en **Continue** cuando esté conforme con los valores asignados.
+7. Haga clic en **Continuar** cuando esté conforme con los valores asignados.
 8. Revise el número de registros que se crearán y actualizarán, haga clic en
    **Iniciar importación** y confirme.
 
-![El resumen Import Complete con 2 created, 0 updated y 0 failed](/help-assets/getting-started/import-your-existing-data-2.png)
+![El resumen «Importación completada» con 2 creados, 0 actualizados y 0 fallidos](/help-assets/getting-started/import-your-existing-data-2.png)
 
 Todas las importaciones anteriores aparecen en la página **Historial de importaciones**,
 bajo el nombre de su espacio de trabajo, con la cantidad de filas creadas,
@@ -48,8 +48,8 @@ actualizadas, omitidas o con error.
 
 ## Si una columna no se asigna automáticamente, asígnela a mano
 
-Abra el menú desplegable de **Map To** para esa columna y elija usted mismo el
-campo correcto, o haga clic en **Clear mapping** para dejar esa columna fuera de
+Abra el menú desplegable de **Asignar a** para esa columna y elija usted mismo el
+campo correcto, o haga clic en **Quitar asignación** para dejar esa columna fuera de
 la importación.
 
 Para conocer las reglas de formato de archivo, cómo encontrar y actualizar

@@ -40,8 +40,8 @@ Jane Smith,acme.com,jane@acme.com,CTO
 ```
 
 Ordnen Sie die Spalte `company` der Beziehung Unternehmen zu und wählen Sie
-**Match by Domain**, damit `acme.com` mit dem bestehenden Unternehmen verknüpft
-wird. Wählen Sie stattdessen **Match by Name**, wird immer ein neues Unternehmen
+**Abgleichen nach** mit **Domain**, damit `acme.com` mit dem bestehenden Unternehmen verknüpft
+wird. Wählen Sie stattdessen **Name** bei **Abgleichen nach**, wird immer ein neues Unternehmen
 angelegt.
 
 ## Verkaufschancen
