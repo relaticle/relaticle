@@ -205,9 +205,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->redirectGuestsTo(function (Request $request): string {
             // The login page's signup branch handles both an invited email that
-            // already has an account and one that does not, from the same URL,
-            // and a shared join link carries no email to tell them apart with.
-            if ($request->routeIs('workspace-invitations.token.accept', 'workspaces.join')) {
+            // already has an account and one that does not, from the same URL.
+            if ($request->routeIs('workspace-invitations.token.accept')) {
                 return Filament::getLoginUrl();
             }
 

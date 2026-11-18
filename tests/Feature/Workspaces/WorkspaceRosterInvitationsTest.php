@@ -108,13 +108,6 @@ test('resending the same invitation twice inside the window is throttled', funct
     Mail::assertQueuedCount(1);
 });
 
-test('no per-invitation copy link action is offered', function (): void {
-    $invitation = pendingInvitation($this->workspace);
-
-    livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->assertActionDoesNotExist(TestAction::make('copyInviteLink')->table($invitation->id));
-});
-
 test('a viewer cannot resend or revoke an invitation', function (): void {
     $viewer = User::factory()->create();
     $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);

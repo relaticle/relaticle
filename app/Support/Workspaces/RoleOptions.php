@@ -41,16 +41,6 @@ final readonly class RoleOptions
     }
 
     /**
-     * @return array<string, string>
-     */
-    public static function forInviteLink(): array
-    {
-        return self::labels()
-            ->except(WorkspaceRole::Admin->value)
-            ->all();
-    }
-
-    /**
      * @return array<string, array<string, bool>>
      */
     public static function matrix(): array

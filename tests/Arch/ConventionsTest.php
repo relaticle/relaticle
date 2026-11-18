@@ -631,7 +631,6 @@ it('reads workspace authorization only through the capability map', function ():
         'app/Enums/WorkspaceRole.php',
         'app/Actions/Jetstream/RemoveWorkspaceMember.php',
         'tests/Feature/CRM/WorkspaceAuthorizationTest.php',
-        'tests/Feature/Workspaces/InviteLinkTokenTest.php',
         'tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php',
         'tests/Feature/Workspaces/UpdateWorkspaceMemberRoleTest.php',
         'tests/Feature/Workspaces/WorkspaceMembersCrossTenantTest.php',

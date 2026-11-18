@@ -17,7 +17,6 @@ use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Notifications\Notification;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -553,17 +552,10 @@ test('offers an admin every role but admin in the invite modal', function (): vo
         ->assertSchemaComponentExists('role', checkComponentUsing: fn (Select $component): bool => array_keys($component->getOptions()) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]);
 });
 
-test('shows a hint for every role option in the invite-link default role picker', function (): void {
+test('offers no invite link on the members page', function (): void {
     livewire(InviteWorkspaceMembers::class, ['workspace' => $this->workspace])
-        ->mountAction('manageInviteLink')
-        ->assertSchemaComponentExists('invite_link_default_role', checkComponentUsing: function (Radio $component): bool {
-            $options = $component->getOptions();
-            $descriptions = $component->getDescriptions();
-
-            return array_keys($options) === [WorkspaceRole::Member->value, WorkspaceRole::Viewer->value]
-                && $descriptions[WorkspaceRole::Member->value] === __('workspaces.roles.member.description')
-                && $descriptions[WorkspaceRole::Viewer->value] === __('workspaces.roles.viewer.description');
-        });
+        ->assertSee(__('workspaces.actions.invite_people'))
+        ->assertDontSee('Invite link');
 });
 
 test('the compare-roles modal marks every cell exactly as WorkspaceRole::capabilities() says, not a hand-written copy', function (): void {

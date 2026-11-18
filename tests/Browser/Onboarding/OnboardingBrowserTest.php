@@ -205,12 +205,12 @@ it('moves the preview panel with the setup step', function (): void {
         ->assertScript($visibleStages, []);
 });
 
-it('changes the invite button when an address is typed and confirms the copied link', function (): void {
+it('changes the invite button when an address is typed', function (): void {
     Queue::fake();
 
     $user = User::factory()->create();
 
-    $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
+    walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
         ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Help us customize your workspace')
@@ -219,46 +219,10 @@ it('changes the invite button when an address is typed and confirms the copied l
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
         ->assertDontSee('Send invites and get started')
+        ->assertDontSee('Copy link')
         ->type('[id="form.emails"]', 'maya@acme.com')
         ->assertSee('Send invites and get started');
-
-    $page->assertSee('Copy link')
-        ->script('navigator.clipboard.writeText = () => Promise.resolve()');
-
-    $page->assertDontSee('Link copied.')
-        ->press('Copy link')
-        ->assertSee('Link copied.');
 });
-
-it('shows the invite link to copy by hand when the clipboard is unavailable', function (string $clipboard): void {
-    Queue::fake();
-
-    $user = User::factory()->create();
-    $manualLink = '[data-invite-link-manual]';
-
-    $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
-        ->assertScript(ACTION_MODALS_READY, true)
-        ->press("I'll add people and companies myself")
-        ->waitForText('Help us customize your workspace')
-        ->assertScript(asyncAlpineComponentsLoaded())
-        ->click('[for$="onboarding_use_case-other"]')
-        ->press('button:visible:has-text("Continue")')
-        ->waitForText('Invite your team')
-        ->assertMissing($manualLink);
-
-    $token = Workspace::query()->where('slug', 'acme-sales')->value('invite_link_token');
-
-    $page->script("(() => { {$clipboard} })()");
-
-    $page->press('Copy link')
-        ->assertVisible($manualLink)
-        ->assertScript("new URL(document.querySelector('{$manualLink}').value).pathname", route('workspaces.join', ['token' => $token], absolute: false))
-        ->assertScript("(field => field.selectionStart === 0 && field.selectionEnd === field.value.length)(document.querySelector('{$manualLink}'))", true)
-        ->assertDontSee('Link copied.');
-})->with([
-    'write rejected' => "navigator.clipboard.writeText = () => Promise.reject(new Error('denied'))",
-    'no clipboard api' => "Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })",
-]);
 
 it('stores the use case and its sub-option chosen in the browser', function (): void {
     Queue::fake();
