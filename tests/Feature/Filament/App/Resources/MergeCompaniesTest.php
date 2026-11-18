@@ -281,6 +281,21 @@ it('blocks a merge over a field\'s own maximum and says one value when the limit
     expect(Company::query()->whereKey($duplicate->getKey())->exists())->toBeTrue();
 });
 
+it('leaves another workspace\'s rows alone even when they point at an original', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $foreignOwner = User::factory()->withWorkspace()->create();
+    $foreignPerson = People::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create();
+    $foreignOpportunity = Opportunity::factory()->recycle([$foreignOwner, $foreignOwner->currentWorkspace])->create();
+    DB::table('people')->where('id', $foreignPerson->getKey())->update(['company_id' => $duplicate->getKey()]);
+    DB::table('opportunities')->where('id', $foreignOpportunity->getKey())->update(['company_id' => $duplicate->getKey()]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    expect(DB::table('people')->where('id', $foreignPerson->getKey())->value('company_id'))->toBe($duplicate->getKey())
+        ->and(DB::table('opportunities')->where('id', $foreignOpportunity->getKey())->value('company_id'))->toBe($duplicate->getKey());
+});
+
 it('bumps updated_at on repointed people and opportunities', function (): void {
     $kept = mergeCompanyRecord($this->workspace, $this->user);
     $duplicate = mergeCompanyRecord($this->workspace, $this->user);

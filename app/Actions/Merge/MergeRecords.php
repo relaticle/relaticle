@@ -80,6 +80,7 @@ final readonly class MergeRecords
         match (true) {
             $merged instanceof Company => $this->moveCompanyLinks($merged, (string) $original->getKey()),
             $merged instanceof People => DB::table('opportunities')
+                ->where('workspace_id', $merged->workspace_id)
                 ->where('contact_id', $original->getKey())
                 ->update(['contact_id' => $merged->getKey(), 'updated_at' => now()]),
         };
@@ -87,14 +88,20 @@ final readonly class MergeRecords
 
     private function moveCompanyLinks(Company $merged, string $originalId): void
     {
-        DB::table('people')->where('company_id', $originalId)->update(['company_id' => $merged->getKey(), 'updated_at' => now()]);
-        DB::table('opportunities')->where('company_id', $originalId)->update(['company_id' => $merged->getKey(), 'updated_at' => now()]);
+        foreach (['people', 'opportunities'] as $table) {
+            DB::table($table)
+                ->where('workspace_id', $merged->workspace_id)
+                ->where('company_id', $originalId)
+                ->update(['company_id' => $merged->getKey(), 'updated_at' => now()]);
+        }
+
         $this->moveLogoIfMergedHasNone($merged, $originalId);
     }
 
     private function moveLogoIfMergedHasNone(Company $merged, string $originalId): void
     {
         $logoOf = fn (string $recordId): Builder => DB::table('media')
+            ->where('workspace_id', $merged->workspace_id)
             ->where('model_type', $merged->getMorphClass())
             ->where('model_id', $recordId)
             ->where('collection_name', MediaCollection::Logo->value);
