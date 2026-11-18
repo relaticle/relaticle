@@ -70,10 +70,12 @@ use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
 use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
 use Relaticle\Cloud\Marketing\Http\Controllers\AssistantPagesController;
 use Relaticle\Cloud\Marketing\Http\Middleware\AddVaryAcceptHeader;
+use Relaticle\Cloud\Marketing\Http\Middleware\SetPublicLocale;
 use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
 use Relaticle\Cloud\Marketing\Services\DiscordService;
 use Relaticle\Cloud\Marketing\Services\DockerHubService;
 use Relaticle\Cloud\Marketing\Services\GitHubService;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 
 final class CloudServiceProvider extends ServiceProvider
 {
@@ -176,7 +178,7 @@ final class CloudServiceProvider extends ServiceProvider
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
             'ink.features.mcp' => true,
-            'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class])),
+            'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class, SetPublicLocale::class.':'.LocalizedUrl::DEFAULT_LOCALE])),
             'ink.views' => [
                 'index' => 'cloud::blog.index',
                 'show' => 'cloud::blog.show',
@@ -190,9 +192,8 @@ final class CloudServiceProvider extends ServiceProvider
 
     private function registerMarketingRoutes(): void
     {
-        Route::middleware('web')->group(function (): void {
-            $this->loadRoutesFrom(__DIR__.'/../routes/marketing.php');
-        });
+        $this->registerGlobalRoutes();
+        $this->registerLocalizedRoutes(__DIR__.'/../routes/marketing.php');
     }
 
     private function registerDocsRoutes(): void
@@ -201,9 +202,30 @@ final class CloudServiceProvider extends ServiceProvider
             return;
         }
 
+        $this->registerLocalizedRoutes(__DIR__.'/../routes/docs.php');
+    }
+
+    private function registerGlobalRoutes(): void
+    {
         Route::middleware('web')->group(function (): void {
-            $this->loadRoutesFrom(__DIR__.'/../routes/docs.php');
+            $this->loadRoutesFrom(__DIR__.'/../routes/global.php');
         });
+    }
+
+    private function registerLocalizedRoutes(string $file): void
+    {
+        Route::middleware(['web', SetPublicLocale::class.':'.LocalizedUrl::DEFAULT_LOCALE])->group(function () use ($file): void {
+            $this->loadRoutesFrom($file);
+        });
+
+        foreach (array_diff(config('app.available_locales'), [LocalizedUrl::DEFAULT_LOCALE]) as $locale) {
+            Route::middleware(['web', SetPublicLocale::class.':'.$locale])
+                ->prefix($locale)
+                ->name("{$locale}.")
+                ->group(function () use ($file): void {
+                    $this->loadRoutesFrom($file);
+                });
+        }
     }
 
     private function linkWebsiteFromCore(): void

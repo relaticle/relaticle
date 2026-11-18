@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Docs\Http\Controllers;
 
+use App\Support\Locales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
@@ -13,6 +14,7 @@ use Relaticle\Cloud\Docs\Support\DocsNavigation;
 use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Cloud\Marketing\Support\CompetitorFacts;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
@@ -95,7 +97,7 @@ final readonly class HelpController
      */
     public function llmsTxt(): Response
     {
-        return response($this->llmsTxtBody(), 200, [
+        return response(Locales::within(LocalizedUrl::DEFAULT_LOCALE, fn (): string => $this->llmsTxtBody()), 200, [
             'Content-Type' => 'text/plain; charset=UTF-8',
         ]);
     }

@@ -21,31 +21,31 @@ final readonly class MarketingNavigation
             new NavItem(__('Product'), children: array_values(array_filter([
                 new NavItem(
                     (string) config('chat.assistant_name'),
-                    route('ai'),
+                    LocalizedUrl::route('ai'),
                     icon: 'rela',
                     description: __('The AI teammate that proposes every change'),
                 ),
                 new NavItem(
                     __('Features'),
-                    url('/#features'),
+                    LocalizedUrl::route('home').'#features',
                     icon: 'features',
                     description: __('Records, pipelines, and custom attributes'),
                 ),
                 Feature::active(EmailIntegration::class) ? new NavItem(
                     __('Email and calendar'),
-                    route('emailAndCalendar'),
+                    LocalizedUrl::route('emailAndCalendar'),
                     icon: 'email',
                     description: __(':providers on every record', ['providers' => $this->mailProviderNames()]),
                 ) : null,
                 new NavItem(
                     __('Self-hosted'),
-                    route('selfHosted'),
+                    LocalizedUrl::route('selfHosted'),
                     icon: 'self-hosted',
                     description: __('Run the whole CRM on your own server'),
                 ),
                 Feature::active(Documentation::class) ? new NavItem(
                     __('MCP and API'),
-                    route('documentation.index'),
+                    LocalizedUrl::route('documentation.index'),
                     icon: 'api',
                     description: __('Drive Relaticle from your own tools'),
                 ) : null,
@@ -54,7 +54,7 @@ final readonly class MarketingNavigation
                 new NavItem(__('Learn'), children: $this->resourceItems(withDetail: true)),
                 new NavItem(__('Compare'), children: $this->comparisonItems()),
             ])),
-            new NavItem(__('Pricing'), route('pricing')),
+            new NavItem(__('Pricing'), LocalizedUrl::route('pricing')),
         ];
     }
 
@@ -84,28 +84,28 @@ final readonly class MarketingNavigation
     {
         return [
             new NavItem(__('Product'), children: array_values(array_filter([
-                new NavItem(__(':name AI assistant', ['name' => (string) config('chat.assistant_name')]), route('ai')),
-                new NavItem(__('Features'), url('/#features')),
-                Feature::active(EmailIntegration::class) ? new NavItem(__('Email and calendar'), route('emailAndCalendar')) : null,
-                new NavItem(__('Pricing'), route('pricing')),
-                new NavItem(__('Self-hosted'), route('selfHosted')),
+                new NavItem(__(':name AI assistant', ['name' => (string) config('chat.assistant_name')]), LocalizedUrl::route('ai')),
+                new NavItem(__('Features'), LocalizedUrl::route('home').'#features'),
+                Feature::active(EmailIntegration::class) ? new NavItem(__('Email and calendar'), LocalizedUrl::route('emailAndCalendar')) : null,
+                new NavItem(__('Pricing'), LocalizedUrl::route('pricing')),
+                new NavItem(__('Self-hosted'), LocalizedUrl::route('selfHosted')),
                 ...array_map(
                     fn (ConnectableAssistant $assistant): NavItem => new NavItem(
                         __('For :name', ['name' => $assistant->label()]),
-                        route($assistant->routeName()),
+                        LocalizedUrl::route($assistant->routeName()),
                     ),
                     ConnectableAssistant::cases(),
                 ),
             ]))),
             new NavItem(__('Resources'), children: [
                 ...$this->resourceItems(),
-                new NavItem(__('AI-native CRM'), route('aiNativeCrm')),
+                new NavItem(__('AI-native CRM'), LocalizedUrl::route('aiNativeCrm')),
             ]),
             new NavItem(__('Compare'), children: $this->comparisonItems()),
             new NavItem(__('Company'), children: [
-                new NavItem(__('Contact'), route('contact')),
-                new NavItem(__('Security'), route('security')),
-                new NavItem(__('Press kit'), route('press')),
+                new NavItem(__('Contact'), LocalizedUrl::route('contact')),
+                new NavItem(__('Security'), LocalizedUrl::route('security')),
+                new NavItem(__('Press kit'), LocalizedUrl::route('press')),
             ]),
         ];
     }
@@ -124,8 +124,8 @@ final readonly class MarketingNavigation
     public function legal(): array
     {
         return [
-            new NavItem(__('Privacy Policy'), url('privacy-policy')),
-            new NavItem(__('Terms of Service'), url('terms-of-service')),
+            new NavItem(__('Privacy Policy'), LocalizedUrl::route('policy.show')),
+            new NavItem(__('Terms of Service'), LocalizedUrl::route('terms.show')),
         ];
     }
 
@@ -169,17 +169,17 @@ final readonly class MarketingNavigation
         return array_values(array_filter([
             Feature::active(Documentation::class) ? new NavItem(
                 __('Help center'),
-                route('help.index'),
+                LocalizedUrl::route('help.index'),
                 ...$detail('help', __('Guides for every part of the product')),
             ) : null,
             Feature::active(Documentation::class) ? new NavItem(
                 __('Developers'),
-                route('documentation.index'),
+                LocalizedUrl::route('documentation.index'),
                 ...$detail('developers', __('Self-hosting, MCP, and contributing')),
             ) : null,
             Feature::active(Blog::class) ? new NavItem(
                 __('Blog'),
-                route('blog.index'),
+                LocalizedUrl::route('blog.index'),
                 ...$detail('blog', __('How we build an open-source CRM')),
             ) : null,
         ]));
@@ -199,7 +199,7 @@ final readonly class MarketingNavigation
         return array_values(array_map(
             fn (string $slug): NavItem => new NavItem(
                 __('Relaticle vs :name', ['name' => $facts[$slug]['name']]),
-                route('compare.show', ['competitor' => $slug]),
+                LocalizedUrl::route('compare.show', ['competitor' => $slug]),
             ),
             config('comparisons.compare', []),
         ));
@@ -213,7 +213,7 @@ final readonly class MarketingNavigation
         return array_values(array_map(
             fn (string $slug): NavItem => new NavItem(
                 __(':name alternative', ['name' => $facts[$slug]['name']]),
-                route('alternatives.show', ['competitor' => $slug]),
+                LocalizedUrl::route('alternatives.show', ['competitor' => $slug]),
             ),
             config('comparisons.alternatives', []),
         ));
