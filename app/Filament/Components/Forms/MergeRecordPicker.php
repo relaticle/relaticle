@@ -238,7 +238,7 @@ final class MergeRecordPicker extends Field
             $record->name,
             $this->image($record),
             $this->details($record),
-            fn (string $key): int => (int) $record->getAttribute("{$key}_count"),
+            fn (string $relation): int => (int) $record->getAttribute(Str::snake($relation).'_count'),
         );
     }
 
@@ -256,19 +256,18 @@ final class MergeRecordPicker extends Field
             (string) $values->attributes['name'],
             $this->image($pairing['priority']) ?? $this->image($pairing['other']),
             $this->links($values->customFields[$this->identity()->fieldCode()] ?? []),
-            fn (string $key): int => (int) $picked->getAttribute("{$key}_count")
-                + (int) $current->getAttribute("{$key}_count")
-                - $this->sharedCount($key, $pairing),
+            fn (string $relation): int => (int) $picked->getAttribute(Str::snake($relation).'_count')
+                + (int) $current->getAttribute(Str::snake($relation).'_count')
+                - $this->sharedCount($relation, $pairing),
         );
     }
 
     /**
      * @param  Pairing  $pairing
      */
-    private function sharedCount(string $key, array $pairing): int
+    private function sharedCount(string $relation, array $pairing): int
     {
-        $name = Str::camel($key);
-        $currentLinks = $this->currentRecord()->{$name}();
+        $currentLinks = $this->currentRecord()->{$relation}();
 
         if (! $currentLinks instanceof MorphToMany) {
             return 0;
@@ -276,7 +275,7 @@ final class MergeRecordPicker extends Field
 
         $relatedKey = $currentLinks->getRelated()->getQualifiedKeyName();
 
-        return $pairing['picked']->{$name}()
+        return $pairing['picked']->{$relation}()
             ->whereIn($relatedKey, $currentLinks->select($relatedKey))
             ->count();
     }
@@ -307,11 +306,11 @@ final class MergeRecordPicker extends Field
     {
         $icons = $this->entity()->mergeCountIcons();
 
-        return array_map(function (string $relation, string $icon) use ($count): array {
-            $key = Str::snake($relation);
-
-            return ['key' => $key, 'icon' => $icon, 'count' => $count($key)];
-        }, array_keys($icons), $icons);
+        return array_map(fn (string $relation, string $icon): array => [
+            'key' => Str::snake($relation),
+            'icon' => $icon,
+            'count' => $count($relation),
+        ], array_keys($icons), $icons);
     }
 
     /**
