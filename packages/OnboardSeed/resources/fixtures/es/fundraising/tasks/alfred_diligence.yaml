@@ -1,0 +1,8 @@
+title: 'Preparar los materiales de auditoría previa para Sequoia'
+assigned_people:
+  - alfred
+custom_fields:
+  description: 'Reunir los estados financieros, la tabla de capitalización y las métricas de producto para la revisión de auditoría previa de Sequoia.'
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

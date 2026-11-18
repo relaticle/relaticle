@@ -1,0 +1,8 @@
+title: 'Solicitar los recursos de marca a Lisa'
+assigned_people:
+  - lisa
+custom_fields:
+  description: 'Pedir a Lisa las pautas de marca actualizadas y los recursos de diseño necesarios para los materiales de la campaña en conjunto.'
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Low

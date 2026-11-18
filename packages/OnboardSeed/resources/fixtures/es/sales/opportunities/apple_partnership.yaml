@@ -1,0 +1,6 @@
+name: 'Alianza para desarrolladores con Apple'
+company: apple
+custom_fields:
+  amount: 25000
+  close_date: '{{ +1m }}'
+  stage: Needs Analysis

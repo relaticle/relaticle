@@ -9,7 +9,7 @@ return [
     'empty_state' => 'Aún no hay actividad.',
     'load_more' => 'Cargar más',
     'loading' => 'Cargando…',
-    'scroll_to_load_more' => 'Desplázate para cargar más…',
+    'scroll_to_load_more' => 'Desplácese para cargar más…',
 
     'groups' => [
         'this_week' => 'Esta semana',

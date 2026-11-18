@@ -1,0 +1,8 @@
+title: 'Cerrar el acuerdo de comarketing con Rachel'
+assigned_people:
+  - rachel
+custom_fields:
+  description: 'Completar las condiciones de la alianza de comarketing con HubSpot y enviar a Rachel el acuerdo final para su aprobación.'
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

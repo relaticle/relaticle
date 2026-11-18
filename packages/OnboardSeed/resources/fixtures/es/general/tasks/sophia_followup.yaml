@@ -1,0 +1,8 @@
+title: 'Dar seguimiento a Sophia sobre las condiciones del contrato'
+assigned_people:
+  - sophia
+custom_fields:
+  description: 'Contactar a Sophia para tratar la estructura del contrato, los entregables y las condiciones de facturación del servicio de asesoría.'
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

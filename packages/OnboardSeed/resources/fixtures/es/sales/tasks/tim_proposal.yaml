@@ -1,0 +1,8 @@
+title: 'Enviar la propuesta a Tim'
+assigned_people:
+  - tim
+custom_fields:
+  description: 'Preparar y enviar la propuesta final para la alianza de desarrolladores con Apple.'
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: Medium
