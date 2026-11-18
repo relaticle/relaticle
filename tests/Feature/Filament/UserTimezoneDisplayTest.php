@@ -230,3 +230,17 @@ it('renders a custom-field datetime on a record page in the panel format, not a 
         ->assertSee('Aug 19, 2026 08:30')
         ->assertDontSee('2026-08-19 08:30:00');
 });
+
+it('formats date-only values day first for a german reader and keeps english unchanged', function (string $locale, string $format): void {
+    actAsTokyoUser();
+
+    Locales::apply($locale);
+
+    expect(Table::make(new ManageNotes)->getDefaultDateDisplayFormat())->toBe($format)
+        ->and(CustomFields::dateDisplayFormat())->toBe($format);
+})->with([
+    'en' => ['en', 'M j, Y'],
+    'de' => ['de', 'd.m.Y'],
+    'es' => ['es', 'd/m/Y'],
+    'fr' => ['fr', 'd/m/Y'],
+]);

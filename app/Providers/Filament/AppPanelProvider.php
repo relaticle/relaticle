@@ -187,6 +187,7 @@ final class AppPanelProvider extends PanelProvider
     {
         Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
             ? $table
+                ->defaultDateDisplayFormat(fn (): string => __('formats.date'))
                 ->defaultDateTimeDisplayFormat(fn (): string => __('formats.date_time'))
                 ->reorderableColumns()
                 ->stackedOnMobile()
@@ -197,14 +198,20 @@ final class AppPanelProvider extends PanelProvider
             : $table);
     }
 
+    private function useCustomFieldDateFormats(string $locale): void
+    {
+        CustomFieldsConfig::useDateDisplayFormat(trans('formats.date', [], $locale));
+        CustomFieldsConfig::useDateTimeDisplayFormat(trans('formats.date_time', [], $locale));
+    }
+
     private function formatDateTimesInSchemas(): void
     {
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
-            ? $schema->defaultDateTimeDisplayFormat(fn (): string => __('formats.date_time'))
+            ? $schema->defaultDateDisplayFormat(fn (): string => __('formats.date'))->defaultDateTimeDisplayFormat(fn (): string => __('formats.date_time'))
             : $schema);
 
-        CustomFieldsConfig::useDateTimeDisplayFormat(__('formats.date_time'));
-        Event::listen(LocaleUpdated::class, fn (LocaleUpdated $event): CustomFieldsConfig => CustomFieldsConfig::useDateTimeDisplayFormat(trans('formats.date_time', [], $event->locale)));
+        $this->useCustomFieldDateFormats(app()->getLocale());
+        Event::listen(LocaleUpdated::class, fn (LocaleUpdated $event) => $this->useCustomFieldDateFormats($event->locale));
     }
 
     /**
