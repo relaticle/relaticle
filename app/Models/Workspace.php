@@ -104,7 +104,6 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_step',
 ])]
 #[Hidden([
-    'invite_link_token',
     'stripe_id',
     'pm_type',
     'pm_last_four',
