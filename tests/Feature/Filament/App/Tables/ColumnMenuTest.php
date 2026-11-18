@@ -919,11 +919,11 @@ it('opens the create attribute form on the type picked from the Add column menu,
         ->and(newAttributeColumns($component, $before))->toHaveCount(1);
 });
 
-it('falls back to text when the Add column menu sends a type that cannot be created', function (string $type): void {
+it('falls back to text when the Add column menu sends a type that cannot be created', function (string|array $type): void {
     livewire(ListCompanies::class)
         ->mountAction('createTableAttribute', ['type' => $type])
         ->assertActionDataSet(['type' => 'text']);
-})->with(['unknown' => 'nope', 'empty' => '']);
+})->with(['unknown' => 'nope', 'empty' => '', 'not a string' => [['select']]]);
 
 it('puts the Add column button in the actions column header and its menu beside the table', function (): void {
     Filament::bootCurrentPanel();

@@ -67,7 +67,7 @@ trait CreatesTableAttribute
      */
     private function presetAttributeType(array $arguments): ?CustomFieldType
     {
-        $type = (string) ($arguments['type'] ?? '');
+        $type = $arguments['type'] ?? null;
 
         return in_array($type, CustomFieldDefinitionValidator::creatableTypes(), true) ? CustomFieldType::tryFrom($type) : null;
     }
