@@ -223,7 +223,7 @@ One task per language, same shape. Task 10 is `de`, Task 11 is `es`, Task 12 is 
 
 - [ ] **Step 1: Translate** in batches of one lang file group at a time, with the glossary and the address rule in context. Placeholders (`:name`, `:count`), pipe plurals and HTML stay intact.
 - [ ] **Step 2: Second pass**: check every file against the glossary's "Never use" column, the address rule and the writing rules.
-- [ ] **Step 3: Run** `php artisan test --compact tests/Arch/TranslationsTest.php --filter=xx` and `composer test:arch`. Expect the `xx` row to PASS.
+- [ ] **Step 3: Run** `php artisan test --compact tests/Arch/TranslationsTest.php --filter='xx (lang|packages/ImportWizard|lang/vendor)'` and `composer test:arch`. Expect the `xx` rows of the core, ImportWizard and vendor roots to PASS. The `xx packages/Cloud/lang` row waits for Task 17, and Cloud's `admin.php` stays English through `translationsKeptEnglish()`.
 - [ ] **Step 4: Walk** sign-up, onboarding, the companies list, a record page, Rela and the profile in `xx` with agent-browser in light and dark, screenshot each into `.context/i18n/xx/`. Any English on screen is a missing key: fix it at its source and re-run Step 3.
 - [ ] **Step 5: Commit** `feat(i18n): translate the app into <language>`.
 
@@ -302,7 +302,7 @@ Task 17 does marketing (`packages/Cloud/lang/{de,es,fr}.json`, plus any Cloud PH
 
 - [ ] **Step 1: Translate** with the glossary and address rule in context. Docs keep the same paths, front matter keys, headings structure, link targets (rewritten to the language's URLs through `DocUrl` conventions) and image paths. Values in front matter carry no bare `: `.
 - [ ] **Step 2: Second pass** against the glossary and the writing rules.
-- [ ] **Step 3: Run** `php artisan test --compact packages/Cloud/tests/Feature/Marketing/LocalizedPagesTest.php tests/Feature/Documentation/DocsTranslationParityTest.php tests/Feature/Documentation/HelpContentIntegrityTest.php` and `composer test:arch`. Expect PASS on every language row.
+- [ ] **Step 3: Run** `php artisan test --compact packages/Cloud/tests/Feature/Marketing/LocalizedPagesTest.php tests/Feature/Documentation/DocsTranslationParityTest.php tests/Feature/Documentation/HelpContentIntegrityTest.php` and `composer test:arch`. Expect PASS on every language row, including `php artisan test --compact tests/Arch/TranslationsTest.php --filter='xx packages/Cloud/lang'` for each language.
 - [ ] **Step 4: Walk** the homepage, pricing, one compare page, help index, one help article and one developer guide in each language with agent-browser, light and dark, plus a 390px viewport for the homepage.
 - [ ] **Step 5: Commit** `feat(i18n): translate the marketing site` and `feat(i18n): translate the help and developer docs`.
 

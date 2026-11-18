@@ -967,14 +967,14 @@ it('names the assistant one way and keeps the documented MCP tool count true', f
     foreach (['lang', 'resources/views', 'resources/data', 'packages'] as $directory) {
         $files = new RegexIterator(
             new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory)),
-            '/\.(php|md|js)$/',
+            '/\.(php|md|js|json)$/',
         );
 
         /** @var SplFileInfo $file */
         foreach ($files as $file) {
             $relativePath = str_replace($root.'/', '', $file->getPathname());
 
-            if ($directory !== 'packages' || preg_match('#^packages/\w+/resources/#', $relativePath) === 1) {
+            if ($directory !== 'packages' || preg_match('#^packages/\w+/(resources|lang)/#', $relativePath) === 1) {
                 $paths[] = $file->getPathname();
             }
         }
@@ -1027,7 +1027,7 @@ it('keeps published copy and source free of em-dashes', function (): void {
     foreach ($directories as $directory) {
         $files = new RegexIterator(
             new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
-            '/\.(php|md|js|css)$/',
+            '/\.(php|md|js|css|json)$/',
         );
 
         /** @var SplFileInfo $file */

@@ -121,7 +121,7 @@ final readonly class HelpController
         $lines = [
             '# '.config('app.name'),
             '',
-            '> '.__('Open-source, self-hosted CRM with a built-in AI chat and an MCP server for external AI agents.'),
+            '> '.__('Open-source, self-hosted CRM with Rela, the built-in AI assistant, and an MCP server for external AI agents.'),
         ];
 
         array_push($lines, '', '## '.__('When to use Relaticle'), '', ...$this->llmsTxtWhenToUseEntries());

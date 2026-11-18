@@ -15,7 +15,7 @@ use Symfony\Component\Finder\SplFileInfo;
         {--check : Write nothing and exit 1 when a catalogue differs from the source}')]
 final class LangExtractCommand extends Command
 {
-    private const string CALL_PATTERN = '/(?<![\w$>:\\\\])(?:@lang|__|trans_choice|trans)\(\s*(?:\'((?:[^\'\\\\]|\\\\.)*)\'|"((?:[^"\\\\]|\\\\.)*)")\s*[,)]/s';
+    private const string CALL_PATTERN = '/(?<![\w$>:\\\\])(?:@lang|__|trans_choice|trans|Lang::(?:get|string|choice))\(\s*(?:\'((?:[^\'\\\\]|\\\\.)*)\'|"((?:[^"\\\\]|\\\\.)*)")\s*[,)]/s';
 
     private const string NAMESPACE_PATTERN = '/^[A-Za-z0-9_-]+::/';
 
@@ -181,7 +181,7 @@ final class LangExtractCommand extends Command
      */
     private function sourceFiles(): iterable
     {
-        $directories = [base_path('app'), base_path('resources')];
+        $directories = [base_path('app'), base_path('bootstrap'), base_path('resources')];
 
         foreach (glob(base_path('packages/*'), GLOB_ONLYDIR) ?: [] as $package) {
             if (basename($package) !== self::SKIPPED_PACKAGE) {
