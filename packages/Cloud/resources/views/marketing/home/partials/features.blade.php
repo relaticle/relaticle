@@ -51,7 +51,7 @@
             :lead="__('Work from Claude or ChatGPT.')"
             :facts="[__('One consent screen, no API keys'), __('Acts as you, in the one workspace you approved'), __('Any MCP client with a personal access token')]"
             :link-label="__('Relaticle for Claude')"
-            :link-href="route(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude->routeName())"
+            :link-href="LocalizedUrl::route(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::Claude->routeName())"
             :quote="$quotes['agents'] ?? null"
         >
             {{ __('It reads and updates the same records you do, with your permissions.') }}

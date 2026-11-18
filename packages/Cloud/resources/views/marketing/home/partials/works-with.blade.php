@@ -43,7 +43,7 @@
 
             @foreach($clients as [$icon, $color, $name, $assistant])
                 @if($assistant)
-                    <a href="{{ route($assistant->routeName()) }}" class="flex items-center justify-center gap-2.5 px-4 py-5 md:py-6 hover:bg-tint transition-colors">
+                    <a href="{{ LocalizedUrl::route($assistant->routeName()) }}" class="flex items-center justify-center gap-2.5 px-4 py-5 md:py-6 hover:bg-tint transition-colors">
                         <x-dynamic-component :component="$icon" class="w-5 h-5 shrink-0 {{ $color }}"/>
                         <span class="text-sm font-semibold tracking-tight text-gray-800 dark:text-gray-200">{{ $name }}</span>
                     </a>

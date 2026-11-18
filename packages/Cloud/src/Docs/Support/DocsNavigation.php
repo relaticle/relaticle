@@ -77,7 +77,7 @@ final readonly class DocsNavigation
                 [
                     'title' => $apiReference['title'],
                     'description' => $apiReference['description'],
-                    'url' => url($apiReference['url']),
+                    'url' => url(DocUrl::localePrefix().$apiReference['url']),
                     'path' => null,
                 ],
             ],

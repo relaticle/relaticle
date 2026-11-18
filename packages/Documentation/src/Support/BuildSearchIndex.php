@@ -43,7 +43,8 @@ final readonly class BuildSearchIndex
         $signature = $this->signature($pages);
 
         /** @var array{signature: string, records: list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>}|null $cached */
-        $cached = Cache::get(self::CACHE_KEY);
+        $cacheKey = self::CACHE_KEY.str_replace('/', '.', DocUrl::localePrefix());
+        $cached = Cache::get($cacheKey);
 
         if (is_array($cached) && $cached['signature'] === $signature) {
             return $cached['records'];
@@ -51,7 +52,7 @@ final readonly class BuildSearchIndex
 
         $records = $this->build($pages);
 
-        Cache::forever(self::CACHE_KEY, ['signature' => $signature, 'records' => $records]);
+        Cache::forever($cacheKey, ['signature' => $signature, 'records' => $records]);
 
         return $records;
     }

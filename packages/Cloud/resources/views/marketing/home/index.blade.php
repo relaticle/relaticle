@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $proposalExpiry = \Carbon\CarbonInterval::minutes((int) config('chat.pending_action_expiry_minutes'))->cascade()->forHumans();
@@ -68,7 +69,7 @@
                 ->applicationSubCategory('CRM')
                 ->operatingSystem('Linux, macOS, Windows')
                 ->description("The open-source AI CRM for selling without a sales team. Self-hosted with {$assistantName}, a built-in AI assistant (with @-mentions, approval before every write, voice, and persistent history), plus an MCP server, REST API, and custom attributes. Connect any external agent: Claude, ChatGPT, Gemini, or open-source models.")
-                ->url(url('/'))
+                ->url(LocalizedUrl::route('home'))
                 ->offers(\Spatie\SchemaOrg\Schema::offer()->name('Self-hosted')->description('Free to self-host under the AGPL-3.0 license.')->price('0')->priceCurrency('USD'))
                 ->setProperty('featureList', array_values(array_filter([
                     "{$assistantName}, a built-in AI assistant with @-mentions to records, approval before every write, and voice input",
@@ -85,7 +86,7 @@
             )
             ->organization(fn ($org) => $org
                 ->name('Relaticle')
-                ->url(url('/'))
+                ->url(LocalizedUrl::route('home'))
                 ->logo(asset('web-app-manifest-512x512.png'))
                 ->sameAs(array_filter([
                     'https://github.com/relaticle/relaticle',
@@ -94,7 +95,7 @@
             )
             ->website(fn ($site) => $site
                 ->name('Relaticle')
-                ->url(url('/'))
+                ->url(LocalizedUrl::route('home'))
             );
     @endphp
 

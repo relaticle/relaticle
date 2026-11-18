@@ -320,7 +320,7 @@
                 </div>
                 <div class="mt-auto flex flex-wrap gap-3">
                     @foreach(\Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::cases() as $assistant)
-                        <x-cloud::marketing.button variant="secondary" size="sm" :href="route($assistant->routeName())" iconTrailing="lucide-arrow-right">
+                        <x-cloud::marketing.button variant="secondary" size="sm" :href="LocalizedUrl::route($assistant->routeName())" iconTrailing="lucide-arrow-right">
                             {{ __('Relaticle for :assistant', ['assistant' => $assistant->label()]) }}
                         </x-cloud::marketing.button>
                     @endforeach

@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Middleware\SetPublicLocale;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
@@ -136,12 +137,48 @@ it('sets html lang and og:locale from the prefix', function (): void {
         ->and($english->filter('meta[property="og:locale"]')->attr('content'))->toBe('en_US');
 });
 
-it('keeps links on a German page German', function (string $path): void {
-    $html = (string) $this->get('/de/pricing')->assertOk()->getContent();
-    $hrefs = (new Crawler($html))->filter('a[href]:not([hreflang])')->each(fn (Crawler $a): string => rtrim((string) $a->attr('href'), '/'));
+function nonLocalizedPublicPath(string $path): bool
+{
+    return in_array($path, ['/login', '/register', '/discord', '/llms.txt', '/openapi.json', '/openapi.yaml', '/.well-known/security.txt', '/security.txt'], true)
+        || Str::startsWith($path, ['/blog', '/brand/', '/images/', '/build/', '/storage/', '/app', '/auth']);
+}
 
-    expect($hrefs)->not->toContain(rtrim(url($path), '/'));
-})->with(['/', '/pricing', '/security', '/contact', '/privacy-policy', '/terms-of-service', '/ai', '/self-hosted', '/help', '/developers', '/ai-native-crm', '/press']);
+function unlocalizedHrefsOn(string $html, string $locale): array
+{
+    $host = parse_url(url('/'), PHP_URL_HOST);
+
+    return collect((new Crawler($html))->filter('a[href]:not([hreflang])')->each(fn (Crawler $a): string => (string) $a->attr('href')))
+        ->filter(fn (string $href): bool => $href !== '' && ! Str::startsWith($href, ['#', '?', 'mailto:', 'tel:', 'javascript:']))
+        ->map(fn (string $href): array => parse_url($href) ?: [])
+        ->filter(fn (array $parts): bool => ($parts['host'] ?? $host) === $host)
+        ->map(fn (array $parts): string => $parts['path'] ?? '/')
+        ->reject(fn (string $path): bool => $path === "/{$locale}" || Str::startsWith($path, "/{$locale}/") || nonLocalizedPublicPath($path))
+        ->unique()
+        ->values()
+        ->all();
+}
+
+it('keeps every link on every localized public page German', function (): void {
+    $paths = [
+        '/', '/pricing', '/press', '/ai', '/ai-native-crm', '/self-hosted', '/crm-for-claude', '/crm-for-chatgpt', '/security',
+        '/email-and-calendar', '/contact', '/privacy-policy', '/terms-of-service', '/help', '/help/getting-started',
+        '/help/getting-started/create-your-first-company', '/developers', '/developers/mcp',
+        ...array_map(fn (string $slug): string => "/compare/relaticle-vs-{$slug}", config('comparisons.compare')),
+        ...array_map(fn (string $slug): string => "/alternatives/{$slug}", config('comparisons.alternatives')),
+    ];
+
+    $offenders = [];
+
+    foreach ($paths as $path) {
+        $html = (string) $this->get(publicPageUrl('de', $path))->assertOk()->getContent();
+
+        foreach (unlocalizedHrefsOn($html, 'de') as $href) {
+            $offenders[] = "{$path} -> {$href}";
+        }
+    }
+
+    expect($offenders)->toBe([]);
+});
 
 it('sets the locale cookie', function (): void {
     $this->get('/de/pricing')->assertCookie(Locales::COOKIE, 'de', false);

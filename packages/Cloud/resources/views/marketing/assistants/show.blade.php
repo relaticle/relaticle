@@ -4,7 +4,7 @@
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $docsActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
     $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
-    $pageUrl = route($assistant->routeName());
+    $pageUrl = LocalizedUrl::route($assistant->routeName());
     $name = $assistant->label();
     $sibling = $assistant->sibling();
     $isChatGpt = $assistant === \Relaticle\Cloud\Marketing\Enums\ConnectableAssistant::ChatGPT;
@@ -143,7 +143,7 @@
         <div class="bg-surface border-rail flex flex-col gap-3 border-t px-6 py-5 sm:flex-row sm:items-center md:px-8">
             <p class="type-prose text-gray-700 dark:text-gray-300">
                 {{ __('Using :sibling instead?', ['sibling' => $sibling->label()]) }}
-                <a href="{{ route($sibling->routeName()) }}" class="{{ $linkClass }}">{{ __('Relaticle for :sibling', ['sibling' => $sibling->label()]) }}</a>
+                <a href="{{ LocalizedUrl::route($sibling->routeName()) }}" class="{{ $linkClass }}">{{ __('Relaticle for :sibling', ['sibling' => $sibling->label()]) }}</a>
             </p>
             @if($docsActive)
                 <x-cloud::marketing.button variant="secondary" size="sm" href="{{ LocalizedUrl::route('help.show', ['category' => 'ai-assistant', 'slug' => 'connect-claude-or-chatgpt']) }}" class="sm:ml-auto">
