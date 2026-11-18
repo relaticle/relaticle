@@ -109,6 +109,17 @@ it('shows no prompt without a live duplicate in the same workspace', function (s
         ->assertDontSeeHtml('data-duplicate-prompt');
 })->with(['unshared', 'trashed', 'other workspace']);
 
+it('shows no prompt once the domains attribute is deactivated', function (): void {
+    $company = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline'], ['domains' => ['harborline.com']]);
+    mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Harborline Logistics'], ['domains' => ['harborline.com']]);
+
+    duplicatePrompt($company)->assertViewHas('hasDuplicates', true);
+
+    WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains')->update(['active' => false]);
+
+    duplicatePrompt($company)->assertViewHas('hasDuplicates', false);
+});
+
 it('hides the prompt from a member who cannot merge', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, customFields: ['domains' => ['harborline.com']]);
     mergeCompanyRecord($this->workspace, $this->user, customFields: ['domains' => ['harborline.com']]);

@@ -35,12 +35,14 @@ use Illuminate\Database\Events\TransactionBeginning;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 use Tests\Helpers\WorkspaceCustomField;
 
 mutates(MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, LogRecordMerge::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
@@ -198,6 +200,18 @@ it('hides merge from a member who cannot create, update and delete records', fun
     $this->actingAs($viewer);
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])->assertActionHidden(mergeRecordAction());
+});
+
+it('offers no merge to a member who may create and delete records but not update them', function (): void {
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    Gate::before(fn (User $user, string $ability): ?bool => $ability === 'update' ? false : null);
+
+    livewire(ViewCompany::class, ['record' => $kept->getKey()])->assertActionHidden(mergeRecordAction());
+
+    expect(fn (): mixed => resolve(MergeRecords::class)->execute($this->user, $kept, $duplicate))->toThrow(HttpException::class);
+
+    expect(Company::query()->count())->toBe(2);
 });
 
 it('refuses the merge when the member loses merge rights while the dialog is open', function (): void {
