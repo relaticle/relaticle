@@ -61,3 +61,15 @@ it('focuses the search box when the Add column menu opens, so Escape closes it f
 
     waitUntil($page, '!document.querySelector("#add-column-menu").checkVisibility() && document.activeElement.matches("[data-add-column-trigger]")');
 });
+
+it('opens the Add column menu as wide as View settings', function (): void {
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900);
+    $page->click('.fi-view-settings-trigger')->assertVisible('.fi-view-settings-panel');
+    $viewSettingsWidth = $page->script('document.querySelector(".fi-view-settings-panel").closest(".fi-dropdown-panel").getBoundingClientRect().width');
+    $page->keys('.fi-view-settings-trigger', 'Escape');
+
+    $page->script('document.querySelector("[data-add-column-trigger]").click()');
+    waitUntil($page, 'document.querySelector("#add-column-menu").checkVisibility()');
+
+    expect($page->script('document.querySelector("#add-column-menu").getBoundingClientRect().width'))->toBe($viewSettingsWidth);
+});
