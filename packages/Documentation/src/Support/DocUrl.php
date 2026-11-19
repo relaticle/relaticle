@@ -74,9 +74,7 @@ final readonly class DocUrl
     {
         $locale = app()->getLocale();
 
-        return $locale !== Config::string('app.default_locale') && Route::has("{$locale}.help.index")
-            ? "/{$locale}"
-            : '';
+        return Route::has("{$locale}.help.index") ? "/{$locale}" : '';
     }
 
     public static function areaTitle(string $area): string
