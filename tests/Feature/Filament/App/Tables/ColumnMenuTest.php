@@ -925,7 +925,7 @@ it('falls back to text when the Add column menu sends a type that cannot be crea
         ->assertActionDataSet(['type' => 'text']);
 })->with(['unknown' => 'nope', 'empty' => '', 'not a string' => [['select']], 'retired' => 'file-upload']);
 
-it('puts the Add column button and its menu in the actions column header', function (): void {
+it('puts the Add column button in the actions column header and its menu beside the table', function (): void {
     Filament::bootCurrentPanel();
     Company::factory()->recycle($this->user)->create();
 
@@ -935,7 +935,7 @@ it('puts the Add column button and its menu in the actions column header', funct
 
     expect($hidden)->not->toBeNull()
         ->and($page->filter('thead th > .fi-ta-add-column [data-add-column-trigger]')->count())->toBe(1)
-        ->and($page->filter('thead th > .fi-ta-add-column [data-add-column]')->count())->toBe(1)
+        ->and($page->filter('table [data-add-column]')->count())->toBe(0)
         ->and($page->filter('[data-add-column] [data-add-column-create]')->count())->toBe(1)
         ->and($page->filter('[data-add-column] [data-add-column-type]')->count())->toBeGreaterThan(0)
         ->and($page->filter("[data-add-column] [data-attribute=\"{$hidden['name']}\"]")->count())->toBe(1);

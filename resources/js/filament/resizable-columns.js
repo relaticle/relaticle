@@ -1021,7 +1021,8 @@
         })
     }
 
-    // The Add column menu in the actions column's header: show a hidden attribute, or create one of a picked type.
+    // The Add column menu the actions column's header opens: show a hidden attribute, or create one of a picked type.
+    // It sits outside the table, so the table's sideways scroll never clips it, and is placed under its trigger.
     function registerAddColumn() {
         window.Alpine.data('tableAddColumn', () => {
             let panel
@@ -1036,16 +1037,13 @@
                     create: '[data-add-column-create]',
                 }),
                 creating: false,
+                trigger: null,
+                placed: false,
+                top: 0,
+                left: 0,
 
                 init() {
                     panel = this.$el
-
-                    // Reopens on the search, focused even from a click, so Enter picks and Escape closes straight away.
-                    panel.closest('.fi-dropdown-panel')?.addEventListener('dropdown-opened', () => {
-                        this.creating = false
-                        this.query = ''
-                        this.$nextTick(() => this.focusAddStart())
-                    })
                 },
 
                 // There is no back button here, so a touch screen focuses nothing rather than zoom into the search box.
@@ -1053,14 +1051,70 @@
                     if (!window.avoidsSearchFocus()) panel.querySelector('[data-add-column-search]')?.focus({ preventScroll: true })
                 },
 
+                open(trigger) {
+                    if (this.trigger === trigger) {
+                        this.close(true)
+
+                        return
+                    }
+
+                    this.close(false)
+                    this.trigger = trigger
+                    this.creating = false
+                    this.query = ''
+                    this.placed = false
+                    trigger.setAttribute('aria-expanded', 'true')
+
+                    // Measured a frame after Alpine reveals it: before that its size reads 0.
+                    this.$nextTick(() => requestAnimationFrame(() => {
+                        if (this.trigger !== trigger) return
+
+                        this.place()
+                        this.placed = true
+                        this.$nextTick(() => this.focusAddStart())
+                    }))
+                },
+
+                // Opens on the side with room for it, or the roomier side, and stops 16px short of the window edge.
+                place() {
+                    const rect = this.trigger.getBoundingClientRect()
+                    const viewportWidth = document.documentElement.clientWidth
+                    const roomBelow = document.documentElement.clientHeight - rect.bottom - 20
+                    const roomAbove = rect.top - 20
+
+                    panel.style.removeProperty('--menu-room')
+                    const opensBelow = panel.offsetHeight <= roomBelow || roomBelow >= roomAbove
+                    panel.style.setProperty('--menu-room', `${opensBelow ? roomBelow : roomAbove}px`)
+
+                    // The Add column header is the last column, so the menu opens leftwards from its button, clear of the window edge.
+                    this.left = Math.max(8, Math.min(rect.right - panel.offsetWidth, viewportWidth - panel.offsetWidth - 8))
+                    this.top = opensBelow ? rect.bottom + 2 : rect.top - 2 - panel.offsetHeight
+                },
+
+                close(returnFocus) {
+                    if (this.trigger === null) return
+
+                    const trigger = this.trigger
+                    this.trigger = null
+                    trigger.setAttribute('aria-expanded', 'false')
+
+                    if (returnFocus && trigger.isConnected) trigger.focus()
+                },
+
                 openCreate() {
                     this.creating = true
-                    this.$nextTick(() => requestAnimationFrame(() => panel.querySelector('[data-add-column-type]')?.focus()))
+                    this.$nextTick(() => requestAnimationFrame(() => {
+                        this.place()
+                        panel.querySelector('[data-add-column-type]')?.focus()
+                    }))
                 },
 
                 closeCreate() {
                     this.creating = false
-                    this.$nextTick(() => requestAnimationFrame(() => panel.querySelector('[data-add-column-create]')?.focus()))
+                    this.$nextTick(() => requestAnimationFrame(() => {
+                        this.place()
+                        panel.querySelector('[data-add-column-create]')?.focus()
+                    }))
                 },
 
                 stepTypes(delta) {
@@ -1068,7 +1122,6 @@
                 },
 
                 create(type) {
-                    this.close()
                     labelFocus = { target: (table) => table.querySelector('[data-add-column-trigger]'), opened: false }
                     this.$wire.mountAction('createTableAttribute', { type })
                 },
@@ -1077,7 +1130,7 @@
                     if (this.pending.includes(name)) return
 
                     this.pending.push(name)
-                    this.close()
+                    this.close(false)
 
                     try {
                         await this.$wire.toggleTableColumn(name)
