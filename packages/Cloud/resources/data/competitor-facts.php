@@ -313,7 +313,7 @@ return [
         'stars_verified' => '2026-11-19',
         'contributors' => 'n/a',
         'contributors_verified' => '2026-11-19',
-        'pricing' => 'Plus $29, Professional $49, Enterprise $99 per user/mo, USD, billed annually; no monthly price is listed; 14-day trial, no credit card; see insightly.com/pricing',
+        'pricing' => 'Plus $29, Professional $49, Enterprise $99 per user/mo, USD, billed annually; 14-day trial, no credit card; see insightly.com/pricing',
         'pricing_verified' => '2026-11-19',
         'stack' => 'Closed-source SaaS, proprietary stack',
         'self_host' => 'Cloud only; no self-hosted plan is listed',
@@ -401,7 +401,7 @@ return [
         'pricing_verified' => '2026-11-19',
         'stack' => 'Closed-source SaaS, proprietary stack',
         'self_host' => 'Cloud only; no self-hosted plan is listed',
-        'ai' => 'An MCP server built and maintained by the NetHunt CRM team, listed on every plan, that connects ChatGPT, Claude, Grok and other tools over OAuth; an assistant can search records, create and update deals, analyze the pipeline and create folders and added fields, within what the connected user may view and edit',
+        'ai' => 'An MCP server built and maintained by the NetHunt CRM team, listed on the Basic, Basic Plus, Business and Business Plus plans, that connects ChatGPT, Claude, Grok and other tools over OAuth; an assistant can search records, create and update deals, analyze the pipeline and create folders and added fields, within what the connected user may view and edit',
         'extensibility' => 'NetHunt API v2',
         'source_urls' => [
             'website' => 'https://nethunt.com',
