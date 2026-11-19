@@ -18,12 +18,6 @@ use Symfony\Component\Yaml\Yaml;
  * value objects, keyed by their path. Nav, search, sitemap entries, and the
  * `.md` variant of a page all derive from this manifest. The content files
  * are the single source of truth, never front matter.
- *
- * English lives at {root}/{area}/..., every other language at
- * {root}/{locale}/{area}/... with the same relative paths. One manifest is
- * built per language and a page missing from a language is absent there, never
- * borrowed from English. Resolved as a container singleton, the current
- * language's manifest is parsed eagerly here in the constructor.
  */
 final readonly class DocsRepository
 {
@@ -138,6 +132,7 @@ final readonly class DocsRepository
         return [$pages, $categories];
     }
 
+    // Other languages mirror the English tree under {root}/{locale}. A page missing there is absent, never borrowed.
     private function root(string $locale): string
     {
         $root = (string) config('documentation.content_path');
