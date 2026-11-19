@@ -39,16 +39,32 @@ final class LocalStdioTransport extends StdioTransport
     {
         stream_set_blocking($this->input, false);
 
+        $buffer = '';
+
         while (! feof($this->input)) {
-            if (($line = fgets($this->input)) === false) {
+            $chunk = fgets($this->input);
+
+            if ($chunk === false) {
                 Sleep::usleep(10000);
 
                 continue;
             }
 
-            if (is_callable($this->handler)) {
-                ($this->handler)($line);
+            $buffer .= $chunk;
+
+            if (str_ends_with($buffer, "\n")) {
+                $this->handle($buffer);
+                $buffer = '';
             }
+        }
+
+        $this->handle($buffer);
+    }
+
+    private function handle(string $line): void
+    {
+        if (trim($line) !== '' && is_callable($this->handler)) {
+            ($this->handler)($line);
         }
     }
 }
