@@ -90,8 +90,8 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
         }
 
         return [
-            'title' => 'Update Company',
-            'summary' => "Update company \"{$model->getAttribute('name')}\"",
+            'title' => __('Update Company'),
+            'summary' => __('Update company ":name"', ['name' => $model->getAttribute('name')]),
             'fields' => $fields,
         ];
     }

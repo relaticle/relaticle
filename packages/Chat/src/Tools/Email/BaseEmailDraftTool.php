@@ -89,7 +89,7 @@ abstract class BaseEmailDraftTool extends BaseWriteCreateTool
     {
         return [
             'title' => $this->proposalEntity()->createTitle(),
-            'summary' => $this->emailSummary('Save email draft', $record),
+            'summary' => $this->emailSummary('save', $record),
             'fields' => $this->emailRows($record),
         ];
     }

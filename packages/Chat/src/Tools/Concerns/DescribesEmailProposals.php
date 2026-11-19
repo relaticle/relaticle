@@ -165,9 +165,13 @@ trait DescribesEmailProposals
         $recipients = array_values(array_filter((array) ($data['to'] ?? []), is_string(...)));
         $subject = (string) ($data['subject'] ?? '');
 
-        return $recipients === []
-            ? "{$action}: {$subject}"
-            : "{$action} to {$recipients[0]}: {$subject}";
+        $replace = ['recipient' => $recipients[0] ?? '', 'subject' => $subject];
+
+        return match ($action) {
+            'send' => $recipients === [] ? __('Send email: :subject', $replace) : __('Send email to :recipient: :subject', $replace),
+            'save' => $recipients === [] ? __('Save email draft: :subject', $replace) : __('Save email draft to :recipient: :subject', $replace),
+            default => $recipients === [] ? __('Update email draft: :subject', $replace) : __('Update email draft to :recipient: :subject', $replace),
+        };
     }
 
     private function mailbox(string $accountId): ?ConnectedAccount

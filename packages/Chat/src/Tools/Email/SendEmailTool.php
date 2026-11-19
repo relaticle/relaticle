@@ -111,7 +111,7 @@ final class SendEmailTool extends BaseWriteCreateTool
     {
         return [
             'title' => $this->proposalEntity()->createTitle(),
-            'summary' => $this->emailSummary('Send email', $record),
+            'summary' => $this->emailSummary('send', $record),
             'fields' => $this->sendTimeRows($record),
         ];
     }

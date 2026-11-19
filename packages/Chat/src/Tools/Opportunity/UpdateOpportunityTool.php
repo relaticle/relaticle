@@ -103,8 +103,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
         }
 
         return [
-            'title' => 'Update Opportunity',
-            'summary' => "Update opportunity \"{$model->getAttribute('name')}\"",
+            'title' => __('Update Opportunity'),
+            'summary' => __('Update opportunity ":name"', ['name' => $model->getAttribute('name')]),
             'fields' => $fields,
         ];
     }

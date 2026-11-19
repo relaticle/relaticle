@@ -119,8 +119,8 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
         }
 
         return [
-            'title' => 'Update Task',
-            'summary' => "Update task \"{$model->getAttribute('title')}\"",
+            'title' => __('Update Task'),
+            'summary' => __('Update task ":name"', ['name' => $model->getAttribute('title')]),
             'fields' => $fields,
         ];
     }

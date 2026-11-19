@@ -109,8 +109,8 @@ final class UpdateNoteTool extends BaseWriteUpdateTool
         }
 
         return [
-            'title' => 'Update Note',
-            'summary' => "Update note \"{$model->getAttribute('title')}\"",
+            'title' => __('Update Note'),
+            'summary' => __('Update note ":name"', ['name' => $model->getAttribute('title')]),
             'fields' => $fields,
         ];
     }

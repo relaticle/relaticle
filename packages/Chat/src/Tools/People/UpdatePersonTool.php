@@ -88,7 +88,7 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
 
         return [
             'title' => __('Update Person'),
-            'summary' => "Update person \"{$model->getAttribute('name')}\"",
+            'summary' => __('Update person ":name"', ['name' => $model->getAttribute('name')]),
             'fields' => $fields,
         ];
     }

@@ -22,6 +22,7 @@ use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ProposalConflictNotice;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
+use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\Opportunity\CreateOpportunityTool;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
@@ -244,4 +245,29 @@ it('labels the rows of a create proposal in the user language', function (): voi
         ['Name', 'Unternehmen'],
         ['Name', 'Unternehmen'],
     ]);
+});
+
+it('titles an update proposal in the user language', function (): void {
+    $conversationId = '019df900-4444-7000-8000-0000000000cc';
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
+
+    $display = Locales::within('de', function () use ($conversationId, $company): array {
+        $tool = resolve(UpdateCompanyTool::class);
+        $tool->setConversationId($conversationId);
+        $tool->handle(new Request(['records' => [['id' => (string) $company->getKey(), 'name' => 'Acme Neu']]]));
+
+        return PendingAction::query()->where('conversation_id', $conversationId)->sole()->display_data;
+    });
+
+    expect($display['title'])->toBe('Unternehmen aktualisieren')
+        ->and($display['summary'])->toBe('Unternehmen „Acme“ aktualisieren');
 });
