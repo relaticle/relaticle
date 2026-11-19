@@ -37,7 +37,13 @@ return [
         'email_unavailable' => 'L\'e-mail associé n\'est plus disponible.',
     ],
     'empty' => [
-        'filtered_heading' => 'Aucune demande :status',
+        'filtered_heading' => [
+            'pending' => 'Aucune demande en attente',
+            'approved' => 'Aucune demande approuvée',
+            'denied' => 'Aucune demande refusée',
+            'cancelled' => 'Aucune demande annulée',
+            'expired' => 'Aucune demande expirée',
+        ],
         'filtered_description' => 'Essayez un autre filtre ou effacez le filtre actif.',
         'show_all' => 'Tout afficher',
         'incoming_heading' => 'Aucune demande reçue',

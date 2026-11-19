@@ -264,7 +264,7 @@ return [
     ],
 
     'record_chips' => [
-        'show_all' => 'Alle :count :label anzeigen',
+        'show_all_assignees' => 'Alle :count Zuständigen anzeigen',
     ],
 
     'restore_blocked' => [

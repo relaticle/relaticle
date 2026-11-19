@@ -264,7 +264,7 @@ return [
     ],
 
     'record_chips' => [
-        'show_all' => 'Mostrar :count :label',
+        'show_all_assignees' => 'Mostrar los :count asignados',
     ],
 
     'restore_blocked' => [

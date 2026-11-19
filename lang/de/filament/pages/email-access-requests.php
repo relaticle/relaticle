@@ -37,7 +37,13 @@ return [
         'email_unavailable' => 'Die zugehörige E-Mail ist nicht mehr verfügbar.',
     ],
     'empty' => [
-        'filtered_heading' => 'Keine Anfragen mit Status „:status“',
+        'filtered_heading' => [
+            'pending' => 'Keine ausstehenden Anfragen',
+            'approved' => 'Keine genehmigten Anfragen',
+            'denied' => 'Keine abgelehnten Anfragen',
+            'cancelled' => 'Keine abgebrochenen Anfragen',
+            'expired' => 'Keine abgelaufenen Anfragen',
+        ],
         'filtered_description' => 'Versuchen Sie einen anderen Filter oder entfernen Sie den aktiven.',
         'show_all' => 'Alle anzeigen',
         'incoming_heading' => 'Keine eingehenden Anfragen',

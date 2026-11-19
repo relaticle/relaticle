@@ -37,7 +37,13 @@ return [
         'email_unavailable' => 'El correo asociado ya no está disponible.',
     ],
     'empty' => [
-        'filtered_heading' => 'No hay solicitudes con estado :status',
+        'filtered_heading' => [
+            'pending' => 'No hay solicitudes pendientes',
+            'approved' => 'No hay solicitudes aprobadas',
+            'denied' => 'No hay solicitudes denegadas',
+            'cancelled' => 'No hay solicitudes canceladas',
+            'expired' => 'No hay solicitudes vencidas',
+        ],
         'filtered_description' => 'Pruebe con otro filtro o borre el activo.',
         'show_all' => 'Mostrar todas',
         'incoming_heading' => 'No hay solicitudes recibidas',

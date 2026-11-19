@@ -264,7 +264,7 @@ return [
     ],
 
     'record_chips' => [
-        'show_all' => 'Show all :count :label',
+        'show_all_assignees' => 'Show all :count assignees',
     ],
 
     'restore_blocked' => [
