@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\ImportWizard\Enums;
 
-enum ImportStatus: string
+use Filament\Support\Contracts\HasLabel;
+
+enum ImportStatus: string implements HasLabel
 {
     case Uploading = 'uploading';
     case Mapping = 'mapping';
@@ -13,4 +15,9 @@ enum ImportStatus: string
     case Importing = 'importing';
     case Completed = 'completed';
     case Failed = 'failed';
+
+    public function getLabel(): string
+    {
+        return __('enums/import-status.'.$this->value);
+    }
 }

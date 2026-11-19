@@ -20,9 +20,4 @@ return [
         'mark_failed_description' => 'This import stopped responding. Marking it failed lets you start a new one from the same file.',
     ],
     'title' => 'Import History',
-    'status' => [
-        'completed' => 'Completed',
-        'failed' => 'Failed',
-        'importing' => 'Importing',
-    ],
 ];

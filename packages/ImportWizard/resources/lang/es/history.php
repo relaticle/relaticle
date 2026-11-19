@@ -20,9 +20,4 @@ return [
         'mark_failed_description' => 'Esta importación dejó de responder. Al marcarla como fallida, podrá iniciar una nueva con el mismo archivo.',
     ],
     'title' => 'Historial de importaciones',
-    'status' => [
-        'completed' => 'Completada',
-        'failed' => 'Fallida',
-        'importing' => 'Importando',
-    ],
 ];

@@ -20,9 +20,4 @@ return [
         'mark_failed_description' => 'Cet import ne répond plus. Le marquer comme échoué vous permet d\'en lancer un nouveau avec le même fichier.',
     ],
     'title' => 'Historique des imports',
-    'status' => [
-        'completed' => 'Terminé',
-        'failed' => 'Échoué',
-        'importing' => 'Import en cours',
-    ],
 ];

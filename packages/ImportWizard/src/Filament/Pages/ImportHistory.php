@@ -125,11 +125,9 @@ final class ImportHistory extends Page implements HasTable
                     ->options(ImportEntityType::class),
 
                 SelectFilter::make('status')
-                    ->options([
-                        ImportStatus::Completed->value => __('import-wizard-new::history.status.completed'),
-                        ImportStatus::Failed->value => __('import-wizard-new::history.status.failed'),
-                        ImportStatus::Importing->value => __('import-wizard-new::history.status.importing'),
-                    ]),
+                    ->options(collect([ImportStatus::Completed, ImportStatus::Failed, ImportStatus::Importing])
+                        ->mapWithKeys(fn (ImportStatus $status): array => [$status->value => $status->getLabel()])
+                        ->all()),
             ])
             ->actions([
                 Action::make('downloadFailedRows')

@@ -20,9 +20,4 @@ return [
         'mark_failed_description' => 'Dieser Import reagiert nicht mehr. Wenn Sie ihn als fehlgeschlagen markieren, können Sie mit derselben Datei einen neuen starten.',
     ],
     'title' => 'Importverlauf',
-    'status' => [
-        'completed' => 'Abgeschlossen',
-        'failed' => 'Fehlgeschlagen',
-        'importing' => 'Wird importiert',
-    ],
 ];
