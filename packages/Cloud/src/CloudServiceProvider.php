@@ -74,6 +74,7 @@ use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
 use Relaticle\Cloud\Marketing\Services\DiscordService;
 use Relaticle\Cloud\Marketing\Services\DockerHubService;
 use Relaticle\Cloud\Marketing\Services\GitHubService;
+use Relaticle\Cloud\Referral\Filament\ReferralPanelHooks;
 
 final class CloudServiceProvider extends ServiceProvider
 {
@@ -227,6 +228,7 @@ final class CloudServiceProvider extends ServiceProvider
                 ->pages([BillingPage::class])
                 ->bootUsing(static fn (Panel $panel): Panel => $panel->viteTheme(self::APP_THEME))
                 ->renderHook(PanelsRenderHook::BODY_END, static fn (): string => resolve(BillingPanelHooks::class)->upgradeModal())
+                ->renderHook(AppPanelProvider::SIDEBAR_FOOTER_ACTIONS, static fn (): string => resolve(ReferralPanelHooks::class)->sidebarPrompt())
                 ->renderHook(AppPanelProvider::SIDEBAR_FOOTER_ACTIONS, static fn (): string => resolve(BillingPanelHooks::class)->sidebarBilling());
         });
     }

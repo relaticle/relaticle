@@ -156,6 +156,8 @@ services:
                 - Relaticle\Cloud\Billing\Livewire
                 - Relaticle\Cloud\Docs\Http
                 - Relaticle\Cloud\Marketing\Http
+                - Relaticle\Cloud\Referral\Livewire
+                - Relaticle\Cloud\Referral\Filament
                 - App\Queries
                 - Relaticle\Chat\Queries
                 - Relaticle\Cloud\Billing\Queries

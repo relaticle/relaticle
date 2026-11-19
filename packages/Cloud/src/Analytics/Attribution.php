@@ -8,10 +8,12 @@ use Illuminate\Http\Request;
 
 final readonly class Attribution
 {
+    public const string REFERRAL_SOURCE = 'referral';
+
     private const array SOURCES = [
         'google', 'bing', 'duckduckgo', 'github', 'producthunt', 'linkedin',
         'youtube', 'reddit', 'facebook', 'twitter', 'chatgpt', 'claude',
-        'gemini', 'perplexity', 'newsletter', 'discord', 'hackernews',
+        'gemini', 'perplexity', 'newsletter', 'discord', 'hackernews', self::REFERRAL_SOURCE,
     ];
 
     private const array REFERRERS = [

@@ -77,6 +77,7 @@ return RectorConfig::configure()
             __DIR__.'/app/Models/Pivots/*',
             __DIR__.'/packages/ImportWizard/src/Models/*',
             __DIR__.'/packages/Cloud/src/Analytics/Models/Acquisition.php',
+            __DIR__.'/packages/Cloud/src/Referral/Models/ReferralPrompt.php',
         ],
     ])
     ->withSets([

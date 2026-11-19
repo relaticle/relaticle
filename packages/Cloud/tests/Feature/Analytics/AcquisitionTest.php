@@ -93,6 +93,15 @@ it('attributes a visit from Hacker News by referrer or by tag', function (string
     'tagged link' => ['', '?utm_source=hackernews'],
 ]);
 
+it('attributes a visit through the link users pass to a friend', function (): void {
+    $this->get(url()->getPublicUrl('?utm_source='.Attribution::REFERRAL_SOURCE))
+        ->assertSessionHas('analytics.acquisition.source', 'referral');
+
+    $user = registerAcquiredUser();
+
+    $this->assertDatabaseHas('acquisitions', ['user_id' => $user->getKey(), 'source' => 'referral', 'landing' => 'home']);
+});
+
 it('drops unvetted campaign values and never stores raw referrers or landing paths', function (): void {
     $this->withHeader('referer', 'https://github.com.evil.test/private/person@example.com')
         ->get('/pricing?utm_source[]=github&utm_medium=person@example.com&utm_campaign=person@example.com')->assertOk();

@@ -145,4 +145,16 @@ final class PendingAction extends Model
             ->where('status', PendingActionStatus::Pending)
             ->where('expires_at', '<', now());
     }
+
+    /**
+     * @param  Builder<PendingAction>  $query
+     * @return Builder<PendingAction>
+     */
+    #[Scope]
+    protected function approvedBy(Builder $query, User $user): Builder
+    {
+        return $query
+            ->where('user_id', $user->getKey())
+            ->where('status', PendingActionStatus::Approved);
+    }
 }
