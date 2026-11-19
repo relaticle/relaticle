@@ -31,7 +31,7 @@
         "laravel/horizon": "^5.29",
         "laravel/jetstream": "^5.2",
         "laravel/mcp": "^1.0",
-        "laravel/passkeys": "^0.2",
+        "laravel/passkeys": "^0.3",
         "laravel/passport": "^13",
         "laravel/pennant": "^1.23",
         "laravel/reverb": "^1.10",
