@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\BlogCategoryName)
 @props([
     'post',
     'heading' => 'h2',
@@ -12,7 +13,7 @@
                 </time>
             @endif
             @if($post->category)
-                <span class="type-label text-primary-700 dark:text-primary-300">{{ $post->category->name }}</span>
+                <span class="type-label text-primary-700 dark:text-primary-300">{{ BlogCategoryName::of($post->category) }}</span>
             @endif
         </div>
 
