@@ -10,7 +10,6 @@ use App\Models\Favorite;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
-use Illuminate\Database\UniqueConstraintViolationException;
 
 final readonly class AddFavoriteRecord
 {
@@ -26,14 +25,10 @@ final readonly class AddFavoriteRecord
             'record_id' => $record->getKey(),
         ];
 
-        try {
-            return Favorite::query()->withoutGlobalScopes()->firstOrCreate($keys, [
-                'kind' => FavoriteKind::Record,
-                'parent_id' => $folder?->getKey(),
-                'position' => Favorite::nextPosition($user, $record->workspace_id, $folder?->getKey()),
-            ]);
-        } catch (UniqueConstraintViolationException) {
-            return Favorite::query()->withoutGlobalScopes()->where($keys)->firstOrFail();
-        }
+        return Favorite::query()->withoutGlobalScopes()->firstOrCreate($keys, fn (): array => [
+            'kind' => FavoriteKind::Record,
+            'parent_id' => $folder?->getKey(),
+            'position' => Favorite::nextPosition($user, $record->workspace_id, $folder?->getKey()),
+        ]);
     }
 }
