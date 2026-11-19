@@ -77,7 +77,8 @@ it('deletes a folder and moves its favorites to the end of the top level', funct
         ->assertDispatched('refresh-sidebar');
 
     expect(Favorite::query()->folders()->count())->toBe(0)
-        ->and(favoriteOrder($this->user, $this->workspace))->toBe([$a->getKey(), $b->getKey(), $c->getKey()]);
+        ->and(favoriteOrder($this->user, $this->workspace))->toBe([$a->getKey(), $b->getKey(), $c->getKey()])
+        ->and(Favorite::query()->whereNull('parent_id')->distinct()->count('position'))->toBe(3);
 });
 
 it('moves a trashed favorite out of a deleted folder too', function (): void {

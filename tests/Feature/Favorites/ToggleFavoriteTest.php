@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Favorites\AddFavoriteRecord;
 use App\Actions\Favorites\MoveFavorite;
+use App\Actions\Favorites\RemoveFavoriteRecord;
 use App\Filament\Actions\FavoriteMenuActions;
 use App\Filament\Actions\ToggleFavoriteAction;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
@@ -19,7 +20,7 @@ use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(AddFavoriteRecord::class, ToggleFavoriteAction::class, FavoriteMenuActions::class, MoveFavorite::class, Favorite::class);
+mutates(AddFavoriteRecord::class, RemoveFavoriteRecord::class, ToggleFavoriteAction::class, FavoriteMenuActions::class, MoveFavorite::class, Favorite::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -222,4 +223,28 @@ it('reads the favorites table a fixed number of times per record page render', f
     livewire(ViewCompany::class, ['record' => $company->getKey()]);
 
     expect(collect(DB::getQueryLog())->filter(fn (array $query): bool => str_contains($query['query'], '"favorites"'))->count())->toBe(2);
+});
+
+it("refuses starring another workspace's record", function (): void {
+    $outsider = User::factory()->withWorkspace()->create();
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    expect(fn (): mixed => resolve(AddFavoriteRecord::class)->execute($outsider, $company))
+        ->toThrow(HttpException::class);
+
+    expect(Favorite::query()->withoutGlobalScopes()->count())->toBe(0);
+});
+
+it('refuses un-starring for a member who left the workspace', function (): void {
+    $member = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    favoriteFor($member, $this->workspace, $company, 1);
+    $this->workspace->users()->detach($member);
+    $member->unsetRelation('workspaces');
+
+    expect(fn (): mixed => resolve(RemoveFavoriteRecord::class)->execute($member, $company))
+        ->toThrow(HttpException::class);
+
+    expect(Favorite::query()->withoutGlobalScopes()->whereBelongsTo($member)->count())->toBe(1);
 });
