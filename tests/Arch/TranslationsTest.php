@@ -109,21 +109,19 @@ function overrideKeys(string $overrideRoot, string $locale): array
     return $keys;
 }
 
-/** @return array<string, array{string, string}> */
-function packageJsonCatalogueRows(): array
+/** @return array<string, array<string, string>> */
+function packageJsonCatalogues(string $locale): array
 {
     $base = dirname(__DIR__, 2);
-    $rows = [];
+    $catalogues = [];
 
-    foreach (translatedLocales() as $locale) {
-        foreach (translationRoots() as $root) {
-            if ($root !== 'lang' && is_file("{$base}/{$root}/{$locale}.json")) {
-                $rows["{$locale} {$root}"] = [$locale, $root];
-            }
+    foreach (translationRoots() as $root) {
+        if ($root !== 'lang' && is_file("{$base}/{$root}/{$locale}.json")) {
+            $catalogues[$root] = json_decode((string) file_get_contents("{$base}/{$root}/{$locale}.json"), true, flags: JSON_THROW_ON_ERROR);
         }
     }
 
-    return $rows;
+    return $catalogues;
 }
 
 /** @return array<string, array{string, string}> */
@@ -180,16 +178,18 @@ it('translates every English key of a root into a locale', function (string $loc
     expect($missing)->toBe([]);
 })->with(fn (): array => localeRootRows());
 
-it('gives a key both catalogues define the same value, because the app catalogue wins', function (string $locale, string $root): void {
+it('gives a key both catalogues define the same value, because the app catalogue wins', function (string $locale): void {
     $base = dirname(__DIR__, 2);
     $app = json_decode((string) file_get_contents("{$base}/lang/{$locale}.json"), true, flags: JSON_THROW_ON_ERROR);
-    $package = json_decode((string) file_get_contents("{$base}/{$root}/{$locale}.json"), true, flags: JSON_THROW_ON_ERROR);
+    $drifted = [];
 
-    $drifted = array_keys(array_filter(
-        array_intersect_key($package, $app),
-        fn (string $value, string $key): bool => $value !== $app[$key],
-        ARRAY_FILTER_USE_BOTH,
-    ));
+    foreach (packageJsonCatalogues($locale) as $root => $package) {
+        foreach (array_intersect_key($package, $app) as $key => $value) {
+            if ($value !== $app[$key]) {
+                $drifted[] = "{$root}: {$key}";
+            }
+        }
+    }
 
     expect($drifted)->toBe([]);
-})->with(fn (): array => packageJsonCatalogueRows());
+})->with(fn (): array => array_map(fn (string $locale): array => [$locale], translatedLocales()));
