@@ -26,6 +26,7 @@ use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Actions\UnlinkMeetingFromRecordAction;
 use Relaticle\EmailIntegration\Enums\MeetingLinkedRecordType;
@@ -38,7 +39,6 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MeetingTemporalState;
-use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 final class MeetingDetailInfolist
 {
@@ -189,7 +189,7 @@ final class MeetingDetailInfolist
     private static function descriptionHtml(string $description): string
     {
         if ($description !== strip_tags($description)) {
-            return EmailHtmlSanitizer::sanitize($description) ?? '';
+            return Str::sanitizeHtml($description);
         }
 
         $lines = array_filter(
