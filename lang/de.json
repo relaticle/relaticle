@@ -282,7 +282,7 @@
     "Match options for :label": "Abgleichsoptionen für :label",
     "Match resolution failed": "Zuordnung fehlgeschlagen",
     "Matching messages": "Passende Nachrichten",
-    "Max 10,000 rows • Max 10MB": "Max. 10.000 Zeilen • Max. 10 MB",
+    "Max :rows rows • Max 10MB": "Max. :rows Zeilen • Max. 10 MB",
     "Maximum :count rows allowed.": "Maximal :count Zeilen sind erlaubt.",
     "Mention suggestions": "Erwähnungsvorschläge",
     "Message is too deep.": "Die Nachricht ist zu tief verschachtelt.",

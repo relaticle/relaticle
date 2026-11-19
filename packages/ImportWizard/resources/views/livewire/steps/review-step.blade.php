@@ -1,4 +1,5 @@
 @php
+    use Illuminate\Support\Number;
     use Relaticle\ImportWizard\Enums\DateFormat;
     use Relaticle\ImportWizard\Enums\NumberFormat;
     use Relaticle\ImportWizard\Enums\ReviewFilter;
@@ -108,7 +109,7 @@
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">
                             {{ __('Mapped to') }} <span class="font-medium">{{ $selectedColumn->getLabel() }}</span>
                             @if (!$this->isSelectedColumnValidating)
-                                · {{ __(':count unique values', ['count' => number_format($this->selectedColumnRows->total())]) }}
+                                · {{ __(':count unique values', ['count' => Number::format($this->selectedColumnRows->total())]) }}
                             @endif
                         </p>
                     </div>
@@ -394,7 +395,7 @@
                             {{ __('Previous') }}
                         </button>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ __(':from–:to of :total', ['from' => number_format($this->selectedColumnRows->firstItem()), 'to' => number_format($this->selectedColumnRows->lastItem()), 'total' => number_format($this->selectedColumnRows->total())]) }}
+                            {{ __(':from–:to of :total', ['from' => Number::format($this->selectedColumnRows->firstItem()), 'to' => Number::format($this->selectedColumnRows->lastItem()), 'total' => Number::format($this->selectedColumnRows->total())]) }}
                         </span>
                         <button
                             wire:click="nextPage"

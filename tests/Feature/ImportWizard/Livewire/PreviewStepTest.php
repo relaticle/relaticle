@@ -11,6 +11,7 @@ use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
@@ -121,6 +122,24 @@ it('mounts and renders with summary data', function (): void {
     $component->assertOk()
         ->assertSee('People')
         ->assertSee('Start Import');
+});
+
+it('prints counts with the grouping of the user language', function (): void {
+    $rows = array_map(fn (int $n): array => makePreviewRow($n + 1, ['Name' => "Person {$n}"]), range(1, 1234));
+
+    $store = createPreviewReadyStore($this, ['Name'], [], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+    foreach (array_chunk($rows, 200) as $chunk) {
+        $store->query()->insert($chunk);
+    }
+    $this->import->update(['total_rows' => 1234]);
+
+    Locales::apply('de');
+
+    mountPreviewStep($this)
+        ->assertSee('1.234')
+        ->assertDontSee('1,234');
 });
 
 it('resolves all rows as Create when only name is mapped', function (): void {

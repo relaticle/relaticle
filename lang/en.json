@@ -282,7 +282,7 @@
     "Match options for :label": "Match options for :label",
     "Match resolution failed": "Match resolution failed",
     "Matching messages": "Matching messages",
-    "Max 10,000 rows • Max 10MB": "Max 10,000 rows • Max 10MB",
+    "Max :rows rows • Max 10MB": "Max :rows rows • Max 10MB",
     "Maximum :count rows allowed.": "Maximum :count rows allowed.",
     "Mention suggestions": "Mention suggestions",
     "Message is too deep.": "Message is too deep.",

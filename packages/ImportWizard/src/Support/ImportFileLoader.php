@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\ImportWizard\Support;
 
 use Illuminate\Support\LazyCollection;
+use Illuminate\Support\Number;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Exceptions\ImportFileException;
@@ -46,7 +47,7 @@ final readonly class ImportFileLoader
         throw_if($rowCount === 0, ImportFileException::class, __('CSV file has no data rows'));
 
         if ($rowCount > $this->maxRows()) {
-            throw new ImportFileException(__('Maximum :count rows allowed.', ['count' => $this->maxRows()]));
+            throw new ImportFileException(__('Maximum :count rows allowed.', ['count' => Number::format($this->maxRows())]));
         }
 
         return ['headers' => $headers, 'row_count' => $rowCount];
@@ -172,7 +173,7 @@ final readonly class ImportFileLoader
         return array_slice(array_pad($values, $headerCount, ''), 0, $headerCount);
     }
 
-    private function maxRows(): int
+    public function maxRows(): int
     {
         return (int) config('import-wizard.max_rows', 10_000);
     }

@@ -1,3 +1,5 @@
+@use('Illuminate\Support\Number')
+
 <div
     class="flex flex-col h-full overflow-hidden"
     x-data="{
@@ -31,15 +33,15 @@
                 @if($this->results)
                     <div class="flex items-center gap-4 text-xs ml-auto shrink-0">
                         <span class="flex items-center gap-1.5">
-                            <span class="font-semibold text-success-700 dark:text-success-300">{{ number_format($this->results['created'] ?? 0) }}</span>
+                            <span class="font-semibold text-success-700 dark:text-success-300">{{ Number::format($this->results['created'] ?? 0) }}</span>
                             <span class="text-gray-500 dark:text-gray-400">{{ __('created') }}</span>
                         </span>
                         <span class="flex items-center gap-1.5">
-                            <span class="font-semibold text-primary-700 dark:text-primary-300">{{ number_format($this->results['updated'] ?? 0) }}</span>
+                            <span class="font-semibold text-primary-700 dark:text-primary-300">{{ Number::format($this->results['updated'] ?? 0) }}</span>
                             <span class="text-gray-500 dark:text-gray-400">{{ __('updated') }}</span>
                         </span>
                         <span class="flex items-center gap-1.5">
-                            <span class="font-semibold text-danger-700 dark:text-danger-300">{{ number_format($this->results['failed'] ?? 0) }}</span>
+                            <span class="font-semibold text-danger-700 dark:text-danger-300">{{ Number::format($this->results['failed'] ?? 0) }}</span>
                             <span class="text-gray-500 dark:text-gray-400">{{ __('failed') }}</span>
                         </span>
                     </div>
@@ -64,7 +66,7 @@
                         <p class="text-sm font-medium text-gray-900 dark:text-white">
                             {{ __('Importing...') }}
                             <span class="text-xs font-normal text-gray-500 dark:text-gray-400">
-                                {{ __(':processed of :total rows', ['processed' => number_format($this->processedCount), 'total' => number_format($this->totalRowCount)]) }}
+                                {{ __(':processed of :total rows', ['processed' => Number::format($this->processedCount), 'total' => Number::format($this->totalRowCount)]) }}
                             </span>
                         </p>
                         <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $this->progressPercent }}%</span>
@@ -92,7 +94,7 @@
                     >
                         <x-filament::icon :icon="$entityType->icon()" class="w-3.5 h-3.5"/>
                         {{ $entityType->label() }}
-                        <span class="text-gray-400 dark:text-gray-500">{{ number_format($this->totalRowCount) }}</span>
+                        <span class="text-gray-400 dark:text-gray-500">{{ Number::format($this->totalRowCount) }}</span>
                     </button>
 
                     @foreach($this->relationshipTabs as $tab)
@@ -107,7 +109,7 @@
                         >
                             <x-filament::icon :icon="$tab['icon']" class="w-3.5 h-3.5"/>
                             {{ $tab['label'] }}
-                            <span class="text-gray-400 dark:text-gray-500">{{ number_format($tab['count']) }}</span>
+                            <span class="text-gray-400 dark:text-gray-500">{{ Number::format($tab['count']) }}</span>
                         </button>
                     @endforeach
                 </div>
@@ -118,12 +120,12 @@
                     <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-plus" class="w-3.5 h-3.5 text-success-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->createCount) }}</span>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->createCount) }}</span>
                             {{ __('will be created') }}
                         </span>
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-refresh-cw" class="w-3.5 h-3.5 text-primary-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->updateCount) }}</span>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->updateCount) }}</span>
                             {{ __('will be updated') }}
                         </span>
                     </div>
@@ -198,7 +200,7 @@
                             {{ __('Previous') }}
                         </button>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ __(':from–:to of :total', ['from' => number_format($this->previewRows->firstItem()), 'to' => number_format($this->previewRows->lastItem()), 'total' => number_format($this->previewRows->total())]) }}
+                            {{ __(':from–:to of :total', ['from' => Number::format($this->previewRows->firstItem()), 'to' => Number::format($this->previewRows->lastItem()), 'total' => Number::format($this->previewRows->total())]) }}
                         </span>
                         <button
                             wire:click="nextPage"
@@ -214,12 +216,12 @@
                     <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-link" class="w-3.5 h-3.5 text-primary-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->relationshipStats['link']) }}</span>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->relationshipStats['link']) }}</span>
                             {{ __('will be linked') }}
                         </span>
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-plus" class="w-3.5 h-3.5 text-success-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->relationshipStats['create']) }}</span>
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->relationshipStats['create']) }}</span>
                             {{ __('will be created') }}
                         </span>
                     </div>
@@ -288,7 +290,7 @@
                             {{ __('Previous') }}
                         </button>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ __(':from–:to of :total', ['from' => number_format($this->relationshipSummary->firstItem()), 'to' => number_format($this->relationshipSummary->lastItem()), 'total' => number_format($this->relationshipSummary->total())]) }}
+                            {{ __(':from–:to of :total', ['from' => Number::format($this->relationshipSummary->firstItem()), 'to' => Number::format($this->relationshipSummary->lastItem()), 'total' => Number::format($this->relationshipSummary->total())]) }}
                         </span>
                         <button
                             wire:click="nextPage"

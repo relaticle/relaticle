@@ -75,7 +75,7 @@ final class UploadStep extends Component implements HasForms
 
     public function render(): View
     {
-        return view('import-wizard-new::livewire.steps.upload-step');
+        return view('import-wizard-new::livewire.steps.upload-step', ['maxRows' => resolve(ImportFileLoader::class)->maxRows()]);
     }
 
     public function updatedUploadedFile(): void

@@ -1,3 +1,5 @@
+@use('Illuminate\Support\Number')
+
 <div class="flex flex-col h-full">
     {{-- File Upload Container --}}
     <div class="flex-1 flex flex-col min-h-[12rem]">
@@ -45,7 +47,7 @@
                             <x-filament::icon icon="lucide-list-ordered" class="h-3.5 w-3.5" />
                             <span>{{ __('Rows found') }}</span>
                         </div>
-                        <p class="text-xl font-semibold text-gray-950 dark:text-white mt-1">{{ number_format($rowCount) }}</p>
+                        <p class="text-xl font-semibold text-gray-950 dark:text-white mt-1">{{ Number::format($rowCount) }}</p>
                     </div>
                 </div>
 
@@ -107,7 +109,7 @@
                     {{ __('Drop your .CSV file onto this area to upload') }}
                 </p>
                 <p class="mt-2 text-xs text-gray-400 dark:text-gray-500">
-                    {{ __('Max 10,000 rows • Max 10MB') }}
+                    {{ __('Max :rows rows • Max 10MB', ['rows' => Number::format($maxRows)]) }}
                 </p>
                 <div class="flex items-center gap-4 mt-6 w-full max-w-xs">
                     <div class="flex-1 border-t border-dashed border-gray-300 dark:border-gray-600"></div>

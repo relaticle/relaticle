@@ -282,7 +282,7 @@
     "Match options for :label": "Opciones de coincidencia para :label",
     "Match resolution failed": "Falló la resolución de coincidencias",
     "Matching messages": "Mensajes coincidentes",
-    "Max 10,000 rows • Max 10MB": "Máx. 10.000 filas • Máx. 10 MB",
+    "Max :rows rows • Max 10MB": "Máx. :rows filas • Máx. 10 MB",
     "Maximum :count rows allowed.": "Se permiten como máximo :count filas.",
     "Mention suggestions": "Sugerencias de menciones",
     "Message is too deep.": "El mensaje tiene demasiados niveles.",

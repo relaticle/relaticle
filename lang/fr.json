@@ -282,7 +282,7 @@
     "Match options for :label": "Options de correspondance pour :label",
     "Match resolution failed": "Échec de la résolution des correspondances",
     "Matching messages": "Messages correspondants",
-    "Max 10,000 rows • Max 10MB": "10 000 lignes max. • 10 Mo max.",
+    "Max :rows rows • Max 10MB": ":rows lignes max. • 10 Mo max.",
     "Maximum :count rows allowed.": "Maximum :count lignes autorisées.",
     "Mention suggestions": "Suggestions de mentions",
     "Message is too deep.": "Le message est trop profondément imbriqué.",
