@@ -14,6 +14,7 @@ use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Number;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -266,7 +267,7 @@ final readonly class CustomFieldOptionPlan
             return null;
         }
 
-        $params = ['count' => number_format($moveTotal), 'max' => number_format($moveCap)];
+        $params = ['count' => Number::format($moveTotal), 'max' => Number::format($moveCap)];
 
         return match (true) {
             $cleared !== [] && count($moves) + count($cleared) === 1 => __('":option" would be cleared on :count records. This assistant clears or moves at most :max records in one approval.', ['option' => array_key_first($cleared), ...$params]),

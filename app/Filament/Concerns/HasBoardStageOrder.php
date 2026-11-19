@@ -39,6 +39,7 @@ use Illuminate\Database\Query\JoinClause;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Number;
 use Illuminate\Validation\ValidationException;
 use LogicException;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
@@ -345,7 +346,7 @@ trait HasBoardStageOrder
         $entity = $this->viewSwitcherEntity();
 
         return trans_choice('filament/pages/boards.stage_menu.delete_body', $count, [
-            'count' => number_format($count),
+            'count' => Number::format($count),
             'records' => trans_choice('filament/pages/boards.stage_menu.records.'.$entity->value, $count),
             'attribute' => $this->boardStageNoun(),
             'column' => $this->noValueColumnLabel(),
