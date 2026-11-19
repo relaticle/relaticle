@@ -18,7 +18,7 @@ Interrogez-le dans le chat : « qu'a dit Lena sur les tarifs du T4 ? », « réd
 réponse qui confirme jeudi » ou « envoie à Lena la nouvelle liste de prix ».
 
 - **Lecture.** Rela lit un e-mail au niveau de partage qu'il a pour vous. Le tableau
-  sous [Ce que l'assistant peut lire](#what-the-assistant-can-read) s'applique aussi
+  sous [Ce que l'assistant peut lire](#ce-que-lassistant-peut-lire) s'applique aussi
   à Rela.
 - **Brouillons.** Rela propose un brouillon sur une carte. Cliquez sur **Enregistrer
   le brouillon** : il va dans vos **Brouillons**, où vous le relisez avant

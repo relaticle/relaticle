@@ -18,7 +18,7 @@ Rela braucht außer einem verbundenen Postfach keine Einrichtung. Fragen Sie im 
 Donnerstag bestätigt“ oder „Schicken Sie Lena die neue Preisliste per E-Mail“.
 
 - **Lesen.** Rela liest E-Mails in der Freigabestufe, die für Sie gilt. Die Tabelle
-  unter [Was der Assistent lesen kann](#what-the-assistant-can-read) gilt auch für
+  unter [Was der Assistent lesen kann](#was-der-assistent-lesen-kann) gilt auch für
   Rela.
 - **Entwürfe.** Rela schlägt einen Entwurf auf einer Karte vor. Klicken Sie auf
   **Entwurf speichern**, und er landet in Ihren **Entwürfen**, wo Sie ihn vor dem

@@ -19,7 +19,7 @@ que confirme el jueves" o "envíale a Lena la nueva lista de precios por correo"
 
 - **Lectura.** Rela lee el correo con el nivel de uso compartido que tiene para
   usted. La tabla de
-  [Qué puede leer el asistente](#what-the-assistant-can-read)
+  [Qué puede leer el asistente](#qué-puede-leer-el-asistente)
   también se aplica a Rela.
 - **Borradores.** Rela propone un borrador en una tarjeta. Haga clic en
   **Guardar borrador** y se guarda en sus **Borradores**, donde usted lo revisa

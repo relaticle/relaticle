@@ -89,6 +89,22 @@ it('resolves every internal link -- including anchored and query-qualified ones 
     expect($broken)->toBeEmpty(offendersMessage('Broken internal /help and /developers links', $broken));
 })->with('content locales');
 
+it('resolves every same-page anchor link to a heading of that page', function (string $locale): void {
+    $headingAnchors = new HeadingAnchors;
+
+    $broken = app(DocsRepository::class)->pages($locale)->flatMap(function (DocPage $page) use ($headingAnchors): array {
+        preg_match_all('/\]\(#([^)\s]*)\)/u', withoutFencedCodeBlocks($page->body), $matches);
+        $anchors = $headingAnchors($page->body);
+
+        return collect($matches[1])
+            ->reject(fn (string $fragment): bool => in_array(urldecode($fragment), $anchors, true))
+            ->map(fn (string $fragment): string => "{$page->path} -> #{$fragment}")
+            ->all();
+    });
+
+    expect($broken)->toBeEmpty(offendersMessage('Same-page anchors with no matching heading', $broken));
+})->with('content locales');
+
 it('resolves every referenced image to a file on disk', function (string $locale): void {
     $repo = app(DocsRepository::class);
 
