@@ -6,6 +6,7 @@ namespace App\Providers;
 
 use App\Health\ChatProviderCheck;
 use App\Health\ChatTurnFailureRateCheck;
+use App\Health\SecretFileAccessCheck;
 use App\Health\TorExitListCheck;
 use Illuminate\Support\ServiceProvider;
 use Spatie\CpuLoadHealthCheck\CpuLoadCheck;
@@ -101,6 +102,7 @@ final class HealthServiceProvider extends ServiceProvider
             ...ChatProviderCheck::forConfiguredProviders(),
             ChatTurnFailureRateCheck::new(),
             TorExitListCheck::new(),
+            ...(filled(config('health.secret_access_status_path')) ? [SecretFileAccessCheck::new()] : []),
         ];
     }
 

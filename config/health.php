@@ -44,4 +44,9 @@ return [
      * check has failed
      */
     'json_results_failure_status' => 200,
+
+    /*
+     * The JSON file a host's audit scan writes. Only a host that runs the scan sets it.
+     */
+    'secret_access_status_path' => env('HEALTH_SECRET_ACCESS_STATUS_PATH'),
 ];
