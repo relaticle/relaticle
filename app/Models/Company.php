@@ -143,8 +143,7 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
      */
     public function domainValue(): MorphOne
     {
-        return $this->customFieldValues()
-            ->one()
+        return $this->morphOne(CustomFieldValue::class, 'entity')
             ->whereHas('customField', fn (Builder $field): Builder => $field->where('code', CompanyField::DOMAINS->value))
             ->with('customField');
     }
