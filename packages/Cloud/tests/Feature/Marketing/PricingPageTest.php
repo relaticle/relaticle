@@ -275,7 +275,7 @@ it('discloses the real per-model credit multiplier instead of a flat allowance c
     $this->get('/pricing')
         ->assertOk()
         ->assertSee(__('What counts as an AI credit?'))
-        ->assertSee('3x for Opus 5', false)
+        ->assertSee('3x for Opus 5.5', false)
         ->assertSee('0.5 credits for every tool call')
         ->assertDontSee('One credit is used each time the built-in AI assistant sends a chat reply or generates a record summary.');
 });
@@ -344,8 +344,8 @@ it('never names a model the app cannot actually serve', function (): void {
         ->assertOk()
         ->assertDontSee('Gemini')
         ->assertSee(__('Which AI models does my plan unlock?'))
-        ->assertSee('1x for Sonnet 5;', false)
-        ->assertSee('GPT 5.5 and Opus 5');
+        ->assertSee('1x for Sonnet 5.5 and Sonnet 5;', false)
+        ->assertSee('GPT 5.5 and Opus 5.5');
 });
 
 it('pins the exact membership of every model list derived from the chat catalog', function (): void {
@@ -360,11 +360,11 @@ it('pins the exact membership of every model list derived from the chat catalog'
     $this->get('/pricing')
         ->assertOk()
         // $freeCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Every plan can use Sonnet 5.')
+        ->assertSee('Every plan can use Sonnet 5.5 and Sonnet 5.')
         // $paidCloudModels, via $modelsUnlockAnswer
-        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5 and Opus 5.')
+        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5 and Opus 5.5.')
         // $multiplierOneModels, $multiplierOneHalfModels, $multiplierThreeModels, via $creditFaqAnswer
-        ->assertSee('1x for Sonnet 5; 1.5x for GPT 5.5; 3x for Opus 5)', false);
+        ->assertSee('1x for Sonnet 5.5 and Sonnet 5; 1.5x for GPT 5.5; 3x for Opus 5.5)', false);
 });
 
 /**
@@ -381,9 +381,9 @@ it('names the models a plan includes even when this install holds no provider ke
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee('Every plan can use Sonnet 5.')
-        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5 and Opus 5', false)
-        ->assertSee('3x for Opus 5', false)
+        ->assertSee('Every plan can use Sonnet 5.5 and Sonnet 5.')
+        ->assertSee('Cloud Pro additionally unlocks the higher-multiplier models: GPT 5.5 and Opus 5.5', false)
+        ->assertSee('3x for Opus 5.5', false)
         ->assertDontSee('Gemini');
 });
 

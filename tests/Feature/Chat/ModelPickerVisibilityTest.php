@@ -122,7 +122,7 @@ it('locks premium models in the chat picker for a trial workspace without its ow
 
     expect($state['trialLocked'])->toBeTrue()
         ->and($state['allowedModels'])->toContain('claude-sonnet-5')
-        ->and($state['allowedModels'])->not->toContain('claude-opus-5');
+        ->and($state['allowedModels'])->not->toContain('claude-opus-5-5');
 });
 
 it('locks premium models in the dashboard picker for a trial workspace without its own data', function (): void {
@@ -134,7 +134,7 @@ it('locks premium models in the dashboard picker for a trial workspace without i
 
     expect($state['trialLocked'])->toBeTrue()
         ->and($state['allowedModels'])->toContain('claude-sonnet-5')
-        ->and($state['allowedModels'])->not->toContain('claude-opus-5');
+        ->and($state['allowedModels'])->not->toContain('claude-opus-5-5');
 });
 
 it('keeps premium models locked without the trial flag on the free plan', function (): void {
@@ -143,7 +143,7 @@ it('keeps premium models locked without the trial flag on the free plan', functi
     $state = pickerState(Livewire::test(ChatInterface::class)->html());
 
     expect($state['trialLocked'])->toBeFalse()
-        ->and($state['allowedModels'])->not->toContain('claude-opus-5');
+        ->and($state['allowedModels'])->not->toContain('claude-opus-5-5');
 });
 
 it('unlocks premium models for a trial workspace once it holds its own record', function (): void {
@@ -159,7 +159,7 @@ it('unlocks premium models for a trial workspace once it holds its own record', 
     $state = pickerState(Livewire::test(ChatInterface::class)->html());
 
     expect($state['trialLocked'])->toBeFalse()
-        ->and($state['allowedModels'])->toContain('claude-opus-5');
+        ->and($state['allowedModels'])->toContain('claude-opus-5-5');
 });
 
 it('offers every configured model in the picker on a self-hosted install', function (): void {
