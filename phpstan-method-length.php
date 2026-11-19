@@ -84,7 +84,7 @@ return [
                 'Relaticle\EmailIntegration\Services\GmailService::fetchDelta' => 87,
                 'Relaticle\EmailIntegration\Services\MicrosoftCalendarService::drainOnePage' => 99,
                 'Relaticle\ImportWizard\Enums\DateFormat::getParseFormats' => 73,
-                'Relaticle\ImportWizard\Filament\Pages\ImportHistory::table' => 102,
+                'Relaticle\ImportWizard\Filament\Pages\ImportHistory::table' => 100,
                 'Relaticle\ImportWizard\Jobs\ExecuteImportJob::processRow' => 115,
                 'Relaticle\ImportWizard\Jobs\ExecuteImportJob::runFromStore' => 104,
             ],

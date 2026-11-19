@@ -20,7 +20,7 @@ trait LabelsRelationFromResource
 
     public static function getTitle(Model $ownerRecord, string $pageClass): string
     {
-        return static::labelResource()::getNavigationLabel();
+        return static::labelResource()::getTitleCasePluralModelLabel();
     }
 
     protected static function getModelLabel(): ?string

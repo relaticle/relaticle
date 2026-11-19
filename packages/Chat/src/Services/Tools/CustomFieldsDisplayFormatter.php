@@ -244,7 +244,7 @@ final readonly class CustomFieldsDisplayFormatter
             FieldDataType::DATE => $this->toDate($value)->isoFormat('ll'),
             FieldDataType::DATE_TIME => $this->toDate($value)->setTimezone($timezone)->isoFormat('ll'),
             FieldDataType::TEXT => trim(strip_tags((string) $value)),
-            FieldDataType::BOOLEAN => $value ? __('Yes') : __('No'),
+            FieldDataType::BOOLEAN => $value ? (string) __('Yes') : (string) __('No'),
             default => is_array($value) ? implode(', ', array_map(strval(...), $value)) : (string) $value,
         };
     }
