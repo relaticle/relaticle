@@ -7,7 +7,6 @@ use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager
 use App\Models\People;
 use App\Models\User;
 use Filament\Facades\Filament;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Features\SupportLockedProperties\CannotUpdateLockedPropertyException;
 use Relaticle\EmailIntegration\Actions\SaveEmailDraftAction;
@@ -486,6 +485,27 @@ it('lists and sends the original attachments when forwarding', function (): void
     expect(Storage::disk(EmailAttachment::DISK)->get((string) $sentAttachment->storage_path))->toBe('signed-contract');
 });
 
+it('forwards a received attachment whatever its type', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $attachment = inboundStoredAttachment($this->inboundEmail, 'original.eml', "From: a@example.com\nSubject: Hi\n\nBody\n");
+
+    livewire(EmailComposer::class, ['dock' => 'inline'])
+        ->call('openReply', $this->inboundEmail->id, 'forward')
+        ->set('to', ['forward-to@example.com'])
+        ->set('bodyHtml', '<p>See attached</p>')
+        ->call('send')
+        ->assertHasNoErrors();
+
+    $forward = Email::query()
+        ->where('direction', EmailDirection::OUTBOUND)
+        ->where('creation_source', EmailCreationSource::FORWARD)
+        ->sole();
+
+    expect($forward->attachments->sole()->filename)->toBe('original.eml')
+        ->and($forward->attachments->sole()->storage_path)->not->toBe($attachment->storage_path);
+});
+
 it('does not attach the original files when replying', function (): void {
     Storage::fake(EmailAttachment::DISK);
 
@@ -700,7 +720,7 @@ it('includes a newly uploaded file alongside the original attachments on a forwa
         ->call('openReply', $this->inboundEmail->id, 'forward')
         ->set('to', ['forward-to@example.com'])
         ->set('bodyHtml', '<p>Contract plus note</p>')
-        ->set('attachments', [UploadedFile::fake()->create('cover-note.pdf', 12)])
+        ->set('attachments', [fakePdf('cover-note.pdf', 12)])
         ->call('send')
         ->assertHasNoErrors();
 

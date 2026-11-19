@@ -5,7 +5,6 @@ declare(strict_types=1);
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
-use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Livewire\Livewire;
 use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
@@ -326,7 +325,7 @@ it('deletes a draft from the drafts table, attachment rows and files included', 
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
         ->set('subject', 'Delete from the list')
-        ->set('attachments', [UploadedFile::fake()->create('attached.pdf', 15)])
+        ->set('attachments', [fakePdf('attached.pdf', 15)])
         ->call('close');
 
     $draft = Email::query()->where('subject', 'Delete from the list')->sole();
