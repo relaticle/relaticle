@@ -73,7 +73,7 @@ verbinden.
   jedes andere MCP-fähige Tool dieselbe URL mit einem persönlichen
   Zugriffstoken nutzen kann, so wie Entwickler Cursor verbinden (siehe die
   [Anleitung zum MCP-Server](/de/developers/mcp)).
-- Self-Hosted-Installationen enthalten denselben Konnektor-Server auf Ihrer
+- Selbst gehostete Installationen enthalten denselben Konnektor-Server auf Ihrer
   eigenen Domain. Die [Anleitung zum MCP-Server](/de/developers/mcp)
   beschreibt die Einrichtung.
 - Der Zugriff erneuert sich im Hintergrund selbst. Den Zustimmungsbildschirm

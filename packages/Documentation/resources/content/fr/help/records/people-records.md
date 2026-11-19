@@ -20,8 +20,8 @@ entreprise, ou en masse [par import](/fr/help/import/what-each-record-type-needs
 - **E-mails** : une ou plusieurs adresses, uniques d'une personne à l'autre,
   ce sur quoi s'appuient la correspondance à l'import et la prévention des
   doublons.
-- **Numéro de téléphone**, **Poste**, **LinkedIn** : la fiche de coordonnées
-  habituelle.
+- **Numéro de téléphone**, **Poste**, **LinkedIn** : les coordonnées
+  habituelles.
 - Plus les attributs personnalisés de votre espace de travail pour les
   personnes.
 

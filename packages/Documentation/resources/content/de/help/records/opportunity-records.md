@@ -1,13 +1,13 @@
 ---
 title: Verkaufschancen-Einträge
-description: Abschlüsse mit Betrag, Abschlussdatum und Phase, verknüpft mit einem Unternehmen und einer Person, in der Liste oder auf dem Board.
+description: Verkaufschancen mit Betrag, Abschlussdatum und Phase, verknüpft mit einem Unternehmen und einer Person, in der Liste oder auf dem Board.
 order: 3
 updated: "2026-11-13"
 related: [help/getting-started/track-a-deal-through-the-pipeline, help/custom-fields/edit-the-options-in-a-select-field, help/records/company-records]
 ---
 
-Eine Verkaufschance ist ein laufender Abschluss: was er wert ist, wann er
-abgeschlossen sein soll, in welcher Phase er steckt und mit wem er läuft.
+Eine Verkaufschance ist ein laufendes Verkaufsprojekt: was es wert ist, wann es
+abgeschlossen sein soll, in welcher Phase es steckt und mit wem es läuft.
 Verkaufschancen sind die Einträge hinter Ihrem Pipeline-Board.
 
 ## Die Felder
@@ -15,7 +15,7 @@ Verkaufschancen sind die Einträge hinter Ihrem Pipeline-Board.
 - **Name**: erforderlich.
 - **Unternehmen** und **Ansprechpartner**: das Unternehmen und die Person, mit
   denen Sie arbeiten, beide auf der Eintragsseite verknüpft.
-- **Betrag**: der Wert des Abschlusses, standardmäßig als Badge auf den
+- **Betrag**: der Wert der Verkaufschance, standardmäßig als Badge auf den
   Board-Karten angezeigt.
 - **Abschlussdatum**: steuert die Badges „Schließt heute“ und „überfällig“ des
   Boards.
@@ -28,9 +28,9 @@ Verkaufschancen sind die Einträge hinter Ihrem Pipeline-Board.
 
 Die Seite **Verkaufschancen** hat neben der Überschrift eine Ansichtsauswahl.
 **Alle Verkaufschancen** ist die vollständige, sortierbare Tabelle. **Pipeline**
-ist das Board. Es gruppiert Abschlüsse standardmäßig in eine Spalte pro Phase.
+ist das Board. Es gruppiert Verkaufschancen standardmäßig in eine Spalte pro Phase.
 Die Seite öffnet sich damit, bis Sie eine andere Ansicht an die Spitze der
-Auswahl verschieben. Das Ziehen einer Karte ist der Weg, einen Abschluss
+Auswahl verschieben. Das Ziehen einer Karte ist der Weg, eine Verkaufschance
 [voranzubringen](/de/help/getting-started/track-a-deal-through-the-pipeline).
 Klicken Sie über dem Board auf **Filter**, um es nach den meisten Attributen
 einzugrenzen. Klicken Sie auf **Sortieren**, um die Karten in jeder Spalte zu
@@ -42,7 +42,7 @@ gezogen haben.
 zu bilden. Schalten Sie unter **Sichtbare Spalten** eine Spalte aus, um sie
 auszublenden. Ziehen Sie eine Spaltenüberschrift oder die Liste unter **Sichtbare
 Spalten**, um die Spalten in Ihre eigene Reihenfolge zu bringen. Schalten Sie
-**Ohne Phase** ein, um eine erste Spalte für Abschlüsse ohne Phase hinzuzufügen.
+**Ohne Phase** ein, um eine erste Spalte für Verkaufschancen ohne Phase hinzuzufügen.
 Wählen Sie unter **Swimlanes** die Option **Unternehmen**, um das Board in eine
 Lane pro Unternehmen zu teilen. Eine **Sortierung** ordnet auch die Karten
 innerhalb jeder Lane.
@@ -56,21 +56,21 @@ vollständig um. Um eine Phase einzuklappen, doppelklicken Sie auf eine leere
 Stelle ihrer Spalte oder klicken Sie auf ihre Überschrift und wählen **Phase
 einklappen**. Klicken Sie auf ihre eingeklappte Leiste, um sie wieder
 auszuklappen. Das Board merkt sich diese Einstellungen, Ihre Filter und Ihre
-Sortierung nur für Sie, und die Einstellungen des Feldes Phase bleiben, wie sie
+Sortierung nur für Sie, und die Einstellungen des Attributs Phase bleiben, wie sie
 sind. Wählen Sie in der Ansichtsauswahl
 **Neue Ansicht erstellen**, um das Board als Ansicht zu speichern, die nur Sie
 sehen.
 
 Inhaber und Administratoren können im Kopfmenü einer Phase **Konfetti**
-einschalten. Wer danach einen Abschluss in diese Phase verschiebt, sieht auf dem
+einschalten. Wer danach eine Verkaufschance in diese Phase verschiebt, sieht auf dem
 eigenen Bildschirm Konfetti. Mitglieder und Betrachter sehen den Schalter nicht,
 und die Einstellung gilt für den ganzen Arbeitsbereich.
 
-Die Schaltfläche **Erstellen** in der Kopfzeile legt einen Abschluss in der
+Die Schaltfläche **Erstellen** in der Kopfzeile legt eine Verkaufschance in der
 ersten sichtbaren Spalte an. Jede Spalte hat außerdem eine eigene
-Hinzufügen-Schaltfläche, um einen Abschluss direkt in dieser Phase anzulegen.
+Hinzufügen-Schaltfläche, um eine Verkaufschance direkt in dieser Phase anzulegen.
 Fahren Sie mit der Maus über eine Karte und klicken Sie auf ihre
-Vorschau-Schaltfläche, um den Abschluss in einem Seitenbereich zu öffnen, ohne
+Vorschau-Schaltfläche, um die Verkaufschance in einem Seitenbereich zu öffnen, ohne
 das Board zu verlassen. In der Liste steht dieselbe Schaltfläche neben dem Namen.
 
 ## Die Eintragsseite

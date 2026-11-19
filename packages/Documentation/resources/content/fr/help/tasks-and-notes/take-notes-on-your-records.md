@@ -13,7 +13,7 @@ concernés.
 
 ## Créer une note
 
-- Depuis la liste **Notes**, cliquez sur **Nouvelle note**, écrivez, et liez des
+- Depuis la liste **Notes**, cliquez sur **Créer**, écrivez, et liez des
   **Entreprises** et des **Personnes** au fur et à mesure.
 - Depuis la page d'une entreprise, d'une personne ou d'une opportunité, utilisez
   l'onglet **Notes**. La note est créée déjà rattachée à cet enregistrement. Les

@@ -21,7 +21,7 @@ sind.
 
 Öffnen Sie eine Person, ein Unternehmen oder eine Verkaufschance und klicken Sie auf
 den Tab **Meetings**. Jede Zeile zeigt den Titel, die Uhrzeit, die Teilnehmer, den
-Status und **Meine Antwort**.
+Status und **Meine Zusage**.
 
 Relaticle verknüpft ein Meeting mit einer Person, wenn die Adresse eines Teilnehmers
 zur E-Mail-Adresse dieser Person passt, und mit einem Unternehmen anhand der Domain
@@ -29,8 +29,8 @@ des Teilnehmers.
 
 ![Der Tab Meetings einer Person mit einem bestätigten Meeting samt Uhrzeit, Teilnehmern und einer zugesagten Antwort](/help-assets/email-and-calendar/see-meetings-and-link-them-to-records-1.png)
 
-Öffnen Sie ein Meeting über das Zeilenmenü. Sie sehen die **Teilnehmer**, die
-**Verknüpften Einträge**, die **Beschreibung** und **Im Kalender öffnen**, womit der
+Öffnen Sie ein Meeting über das Zeilenmenü. Sie sehen die Abschnitte **Teilnehmer**,
+**Verknüpfte Einträge** und **Beschreibung** sowie **Im Kalender öffnen**, womit der
 Termin in Google Kalender oder Outlook geöffnet wird.
 
 ## Ein Meeting mit einem weiteren Eintrag verknüpfen

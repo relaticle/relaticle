@@ -50,7 +50,7 @@ invitación.
 Relaticle sincroniza todas las carpetas de correo, incluidas las carpetas dentro
 de su bandeja de entrada y las carpetas a las que una regla mueve correo. Excluye
 **Borradores**, **Correo no deseado**, **Elementos eliminados**,
-**Bandeja de salida**, **Clutter** y **Historial de conversaciones**, junto con
+**Bandeja de salida**, **Clutter** e **Historial de conversaciones**, junto con
 cualquier carpeta dentro de ellas.
 
 ## Qué sucede después de conectar

@@ -7,7 +7,7 @@ related: [help/ai-assistant/choose-an-ai-model, help/workspace/billing-and-plans
 ---
 
 Sur Relaticle Cloud, chaque message que vous envoyez à l'assistant consomme des
-crédits sur le quota mensuel de votre espace de travail. Une réponse simple
+crédits sur l'allocation mensuelle de votre espace de travail. Une réponse simple
 coûte un crédit, et chaque outil que l'assistant utilise pour répondre s'y
 ajoute. Les crédits sont partagés par tout l'espace de travail, pas par
 personne.
@@ -44,9 +44,9 @@ Le coût final est établi une fois la réponse terminée.
 Relaticle Cloud n'a pas d'offre gratuite. Le prix de chaque offre figure dans
 [Facturation et offres](/fr/help/workspace/billing-and-plans).
 
-Les quotas Cloud se réinitialisent avec votre période de facturation. Les
+Les allocations Cloud se réinitialisent avec votre période de facturation. Les
 espaces de travail payants peuvent aussi acheter des packs de crédits. Les
-crédits achetés ne sont utilisés qu'après le quota mensuel et
+crédits achetés ne sont utilisés qu'après l'allocation mensuelle et
 **n'expirent jamais**. Votre solde restant pour la période s'affiche sur la
 page **Facturation**, sous le nom de votre espace de travail.
 

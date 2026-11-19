@@ -6,14 +6,14 @@ updated: "2026-11-13"
 related: [help/getting-started/add-your-first-person, help/getting-started/use-custom-fields]
 ---
 
-Eine Verkaufschance ist ein laufender Abschluss. Sie wandert als Karte auf dem
+Eine Verkaufschance ist ein laufendes Verkaufsprojekt. Sie wandert als Karte auf dem
 Board der Verkaufschancen durch Ihre Pipeline. Legen Sie sie an und ziehen Sie
-ihre Karte in die nächste Spalte, sobald der Abschluss voranschreitet, bis hin
+ihre Karte in die nächste Spalte, sobald sie voranschreitet, bis hin
 zu Gewonnen oder Verloren.
 
 1. Klicken Sie in der Seitenleiste auf **Verkaufschancen**.
 2. Klicken Sie auf **Erstellen**.
-3. Geben Sie den Namen des Abschlusses in **Name** ein. Das ist das einzige
+3. Geben Sie den Namen der Verkaufschance in **Name** ein. Das ist das einzige
    Pflichtfeld.
 4. Wählen Sie ein **Unternehmen** und einen **Ansprechpartner** aus, wenn die
    Verkaufschance mit einem verbunden ist.
@@ -44,7 +44,7 @@ aus, um ihre Spalte auszublenden. Schalten Sie **Ohne Phase** ein, um eine erste
 Spalte für Verkaufschancen ohne Phase hinzuzufügen. Ziehen Sie eine
 Verkaufschance dorthin, wird ihre Phase geleert. Die Reihenfolge wird nur für Sie
 gespeichert, andere Mitglieder behalten ihre eigene. Sie ändert nie die
-Reihenfolge in den Einstellungen des Feldes **Phase**, die für alle die
+Reihenfolge in den Einstellungen des Attributs **Phase**, die für alle die
 Ausgangsreihenfolge bleibt. Eine später hinzugefügte Phase reiht sich am Ende
 Ihrer Reihenfolge ein.
 
@@ -62,9 +62,9 @@ auf **Bearbeiten**, wählen Sie eine neue **Phase** und klicken Sie auf
 
 ## Wenn die Phasennamen nicht zu Ihrem Vertriebsprozess passen, bearbeiten Sie sie
 
-Phase ist ein Feld wie jedes andere. Klicken Sie oben in der Seitenleiste auf
+Phase ist ein Attribut wie jedes andere. Klicken Sie oben in der Seitenleiste auf
 den Namen Ihres Arbeitsbereichs, klicken Sie auf **Benutzerdefinierte
 Attribute**, wählen Sie den Tab **Verkaufschancen** und öffnen Sie **Phase** über
 das Menü **Aktionen**. Sie können Phasen umbenennen, neu einfärben, umsortieren
-oder neue hinzufügen. Wie Feldeinstellungen funktionieren, steht unter
+oder neue hinzufügen. Wie Attributeinstellungen funktionieren, steht unter
 [Benutzerdefinierte Attribute verwenden](/de/help/getting-started/use-custom-fields).

@@ -109,7 +109,7 @@ Relaticle stocke certaines valeurs d'attributs personnalisés sous une seule for
 
 | Champ | Stocké sous la forme |
 |---|---|
-| Téléphone | E.164, comme `+14155550100`. Une extension est conservée sous la forme `;ext=12` |
+| Téléphone | E.164, comme `+14155550100`. Un numéro de poste est conservé sous la forme `;ext=12` |
 | Un champ de domaine, comme `domains` pour une entreprise | Le nom d'hôte seul en minuscules, sans schéma, sans `www.` et sans chemin |
 | Autres liens | L'URL, avec son nom d'hôte en minuscules |
 | Date et heure | L'instant en UTC. `2026-10-01T13:00:00+05:00` est stocké comme 08:00 UTC |
@@ -152,4 +152,4 @@ Les paramètres de filtre à plat de l'ancienne API, comme `company_id`, `create
 
 ## Offres et crédits
 
-Sur Relaticle Cloud, l'API REST fait partie de Cloud Pro et de l'essai. Les requêtes API ne dépensent jamais de crédits IA : seuls les messages envoyés à Rela, l'assistant intégré, en dépensent. Les installations auto-hébergées incluent l'API sans frais.
+Sur Relaticle Cloud, l'API REST fait partie de Cloud Pro et de l'essai. Les requêtes API ne dépensent jamais de crédits d'IA : seuls les messages envoyés à Rela, l'assistant intégré, en dépensent. Les installations auto-hébergées incluent l'API sans frais.

@@ -36,8 +36,7 @@ ninguna configuración adicional.
 
 ## Editar y reordenar
 
-Haga clic en la fila de un atributo para renombrarlo, cambiar sus opciones o
-ajustar sus ajustes: todo menos el tipo. Arrastre el control al inicio de cada
+Haga clic en la fila de un atributo para renombrarlo, cambiar sus opciones o modificar sus ajustes: todo menos el tipo. Arrastre el control al inicio de cada
 fila para reordenar los atributos. Los formularios y las páginas de registro
 siguen el orden que defina.
 

@@ -8,14 +8,14 @@ related: [help/tasks-and-notes/use-the-task-board, help/records/company-records,
 
 Une tâche est une relance avec une échéance : rappeler le client, envoyer la
 proposition, relancer pour le contrat. Créez des tâches depuis la liste **Tâches**
-avec **Nouvelle tâche**, ou depuis la page d'une entreprise, d'une personne ou d'une
+avec **Créer**, ou depuis la page d'une entreprise, d'une personne ou d'une
 opportunité. Les tâches créées à cet endroit arrivent déjà liées à l'enregistrement.
 
 ## Ce que contient une tâche
 
 - **Titre** : obligatoire, le seul champ indispensable.
-- **Statut** : À faire, En cours ou Terminé par défaut. Ces options sont
-  [à renommer à votre guise](/fr/help/custom-fields/edit-the-options-in-a-select-field),
+- **Statut** : À faire, En cours ou Terminé par défaut. Vous pouvez
+  [les renommer à votre guise](/fr/help/custom-fields/edit-the-options-in-a-select-field),
   et elles définissent par défaut les colonnes du board.
 - **Priorité** : Basse, Moyenne ou Haute.
 - **Échéance** : alimente la mise en évidence des retards et le résumé quotidien.

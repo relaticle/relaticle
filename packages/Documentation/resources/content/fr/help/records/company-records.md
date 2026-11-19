@@ -24,7 +24,7 @@ sont rattachées. Seul le nom est obligatoire. Tout le reste peut venir plus tar
 - Plus tous les attributs personnalisés que votre espace de travail a ajoutés
   pour les entreprises.
 
-**Le logo s'occupe de lui-même.** Quand une entreprise a un domaine et pas
+**Le logo se met en place tout seul.** Quand une entreprise a un domaine et pas
 encore de logo, Relaticle récupère l'icône du site en arrière-plan et la
 conserve.
 
@@ -40,10 +40,10 @@ créateur, tous les champs visibles) ainsi que ces onglets :
 | Aperçu | La page s'ouvre ici. Voyez en un coup d'œil les champs clés, la prochaine tâche à échéance, et l'activité récente, les notes et les tâches ouvertes |
 | Activité | Un historique en lecture seule de qui a changé quoi |
 | Personnes | Ajoutez une nouvelle personne directement dans cette entreprise |
-| Tâches | Créez une tâche déjà liée ici, ou **Attacher** une tâche existante |
+| Tâches | Créez une tâche déjà liée ici, ou rattachez une tâche existante avec **Attacher** |
 | Notes | Pareil : créez-en une nouvelle ou attachez-en une existante |
 
-Chaque section de **Aperçu** liste jusqu'à trois éléments. **Tout voir** ouvre
+Chaque section de l'onglet **Aperçu** liste jusqu'à trois éléments. **Tout voir** ouvre
 l'onglet correspondant, et **+** crée une note ou une tâche liée ici.
 
 Quand la synchronisation des e-mails et de l'agenda est activée, des onglets

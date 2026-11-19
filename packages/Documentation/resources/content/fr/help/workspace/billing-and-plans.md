@@ -15,7 +15,7 @@ membres voient à qui s'adresser.
 ## Ce que coûte Cloud Pro
 
 Cloud Pro est l'offre d'entrée de gamme : membres et enregistrements illimités, 2 000
-crédits IA par mois, des modèles IA premium, jusqu'à 10 boîtes mail connectées,
+crédits d'IA par mois, des modèles IA premium, jusqu'à 10 boîtes mail connectées,
 l'API REST et le MCP server, et un support par e-mail. Elle coûte **19 $ par mois et
 par espace de travail, facturés annuellement** (228 $ par an), ou **24 $ par mois
 facturés mensuellement**. Pour les déploiements plus importants, la mise en place
@@ -25,7 +25,7 @@ détails.
 ## Ce que coûte Cloud Scale
 
 Cloud Scale s'adresse aux équipes qui travaillent sur Relaticle toute la journée. Elle
-inclut tout Cloud Pro, porte l'allocation à 5 000 crédits IA par mois, autorise
+inclut tout Cloud Pro, porte l'allocation à 5 000 crédits d'IA par mois, autorise
 jusqu'à 50 boîtes mail connectées, triple le débit de l'API REST et du MCP server, et
 s'accompagne d'un support prioritaire. Elle coûte **49 $ par mois et par espace de
 travail, facturés annuellement** (588 $ par an), ou **59 $ par mois facturés
@@ -37,14 +37,14 @@ changement au prorata.
 Votre premier espace de travail Cloud démarre **automatiquement un essai Pro de 14
 jours, sans carte bancaire**. Un espace de travail que vous ajoutez plus tard ne
 démarre son propre essai que tant que vous êtes abonné sur un autre. Sinon, il s'ouvre
-sur le choix de l'offre. L'essai inclut tout Cloud Pro, avec 300 crédits IA et une
+sur le choix de l'offre. L'essai inclut tout Cloud Pro, avec 300 crédits d'IA et une
 boîte mail connectée. Les modèles IA premium se débloquent dès que l'espace de
 travail contient un enregistrement à lui. Abonnez-vous pendant l'essai et l'allocation
 complète de l'offre démarre tout de suite.
 À la fin de l'essai, abonnez-vous depuis la page Facturation pour garder l'accès à
 Cloud. Sans abonnement, l'espace de travail est mis en pause. Si vous avez besoin de
 plus de temps, le propriétaire peut prolonger l'essai de 7 jours, une seule fois,
-depuis la page Facturation. Les crédits IA ne se renouvellent pas pendant la
+depuis la page Facturation. Les crédits d'IA ne se renouvellent pas pendant la
 prolongation. Relaticle Cloud n'a pas d'offre gratuite.
 
 Nous conservons un espace de travail d'essai en pause pendant 60 jours après la
@@ -63,12 +63,12 @@ paiement. Les changements d'offre passent par nous.
 ## Si l'abonnement prend fin
 
 L'espace de travail est **mis en pause**. L'application, l'API, le MCP server et Rela
-s'effacent, mais **vos enregistrements sont en sécurité** et restent stockés.
+ne sont plus accessibles, mais **vos enregistrements sont en sécurité** et restent stockés.
 Se réabonner rétablit tout exactement comme avant. Le propriétaire peut toujours
 supprimer un espace de travail en pause, et son délai de grâce de suppression de 30
 jours s'applique comme d'habitude.
 
-## Crédits IA
+## Crédits d'IA
 
 L'allocation mensuelle de crédits de l'offre se renouvelle à chaque période de
 facturation. Les espaces de travail payants peuvent acheter des **packs de crédits**
@@ -76,7 +76,7 @@ ponctuels depuis la page Facturation. Les crédits achetés ne sont dépensés q
 l'allocation mensuelle et n'expirent jamais. La même page indique combien de crédits
 l'espace de travail a utilisés sur la période. Ce que sont les crédits et ce que
 coûtent les messages est expliqué dans
-[Crédits IA et limites de débit](/fr/help/ai-assistant/ai-credits-and-limits).
+[Crédits d'IA et limites de débit](/fr/help/ai-assistant/ai-credits-and-limits).
 
 ## Plutôt l'auto-hébergement
 

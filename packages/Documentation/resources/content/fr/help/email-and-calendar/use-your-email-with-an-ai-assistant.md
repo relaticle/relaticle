@@ -40,7 +40,7 @@ peut lire et enregistrer des brouillons.
 
 ## Connecter Claude ou ChatGPT
 
-Un connecteur ajouté avant l'arrivée de l'accès aux e-mails n'a aucun accès tant que
+Un connecteur ajouté avant l'arrivée de l'accès aux e-mails n'en a aucun tant que
 vous ne le reconnectez pas.
 
 ### Donner l'accès aux e-mails à un connecteur
@@ -128,7 +128,7 @@ Pour un connecteur, cliquez sur **Révoquer** sous **Connecteurs IA**. Les e-mai
 qu'il avait mis en file d'attente et qui ne sont pas partis ne sont pas envoyés. Ils
 attendent dans la **Boîte d'envoi**, sous **Échoués**, où vous pouvez en envoyer un
 vous-même avec **Réessayer**. Un connecteur n'a pas de réglage propre aux e-mails :
-un assistant qui doit garder vos enregistrements sans vos e-mails a donc besoin d'un
+un assistant qui doit gérer vos enregistrements sans vos e-mails a donc besoin d'un
 jeton d'accès dont les cases e-mail sont vides. Pour un jeton d'accès, cliquez sur
 son icône **Autorisations** et décochez les cases e-mail.
 

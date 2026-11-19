@@ -6,7 +6,7 @@ updated: "2026-11-08"
 related: [help/email-and-calendar/connect-your-google-account, help/email-and-calendar/connect-your-microsoft-account, help/email-and-calendar/send-email-to-many-people, help/email-and-calendar/request-access-to-an-email]
 ---
 
-Les e-mails synchronisés vivent sur l'enregistrement concerné. Ouvrez une personne,
+Les e-mails synchronisés se trouvent sur l'enregistrement concerné. Ouvrez une personne,
 une entreprise ou une opportunité et cliquez sur son onglet **E-mails** pour lire la
 conversation et y répondre. Relaticle associe chaque e-mail aux personnes par adresse
 e-mail et aux entreprises par domaine.
@@ -48,11 +48,11 @@ haut de l'enregistrement. L'adresse de l'enregistrement est déjà dans **À**.
 - **Joindre des fichiers**, **Signature** et **Utiliser un modèle** se trouvent sous
   le message.
 
-Fermez un message avant de l'envoyer et il est enregistré comme brouillon.
+Si vous fermez un message avant de l'envoyer, il est enregistré comme brouillon.
 
 ## Ajouter une signature
 
-Dans le compositeur, cliquez sur **Signature**, puis sur **Nouvelle signature**.
+Dans l'éditeur d'e-mails, cliquez sur **Signature**, puis sur **Nouvelle signature**.
 Donnez-lui un nom, écrivez le contenu et cochez **Utiliser comme signature par
 défaut** pour l'ajouter à chaque e-mail de cette boîte mail. Vous pouvez aussi gérer
 les signatures depuis l'onglet **Signatures** de la boîte mail, sous **Paramètres de
@@ -74,6 +74,6 @@ onglets.
 
 ## Si Relaticle ne peut pas envoyer depuis votre boîte mail
 
-Le compositeur affiche **Relaticle ne peut pas encore envoyer depuis cette boîte
+L'éditeur d'e-mails affiche **Relaticle ne peut pas encore envoyer depuis cette boîte
 mail** quand la boîte mail a été connectée sans droit d'envoi. Cliquez sur
 **Accorder l'autorisation** et approuvez l'accès chez Google ou Microsoft.

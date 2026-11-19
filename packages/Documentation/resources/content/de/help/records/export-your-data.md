@@ -14,7 +14,7 @@ eine [Massenaktualisierung per Import](/de/help/import/update-existing-records).
 ## Eine Liste exportieren
 
 1. Öffnen Sie die Liste des Eintragstyps.
-2. Klicken Sie auf **Import / Export** und dann auf **Exportieren**.
+2. Klicken Sie auf **Import / Export** und dann auf **Exportiere Unternehmen** (die Beschriftung passt zur Liste, in der Sie sich befinden).
 3. Wählen Sie die Spalten und das Format.
 
 Auf einem Board der Verkaufschancen oder Aufgaben exportiert dieselbe

@@ -6,8 +6,7 @@ updated: "2026-08-13"
 related: [help/custom-fields/add-and-manage-fields, help/getting-started/track-a-deal-through-the-pipeline, help/tasks-and-notes/use-the-task-board]
 ---
 
-Les choix à l'intérieur de chaque attribut de type liste sont à vous de
-modifier, y compris les deux listes pour lesquelles Relaticle a des idées bien
+Vous pouvez modifier les choix de chaque attribut de type liste, y compris les deux listes pour lesquelles Relaticle a des idées bien
 arrêtées : l'attribut **Étape** de l'opportunité (votre pipeline) et l'attribut
 **Statut** de la tâche (les colonnes de votre board).
 
@@ -38,7 +37,6 @@ colonnes masquées propres à chaque membre s'appliquent par-dessus. Renommer
 
 ## Couleurs
 
-Si l'attribut a **Activer les couleurs des options** activé (c'est le cas de
-Étape par défaut), chaque option reçoit un échantillon de couleur, utilisé pour
+Si l'attribut a **Activer les couleurs des options** activé (c'est le cas d'Étape par défaut), chaque option reçoit un échantillon de couleur, utilisé pour
 les badges dans les listes et sur les cartes du board. Définissez les couleurs
 dans le même éditeur d'options.

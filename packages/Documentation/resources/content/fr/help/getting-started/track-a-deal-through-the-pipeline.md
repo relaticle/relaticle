@@ -51,7 +51,7 @@ ajoutée plus tard rejoint la fin de votre ordre.
 
 Faites glisser la carte d'une opportunité de sa colonne actuelle vers la
 colonne de l'étape suivante. Le changement est enregistré dès que vous la
-déposez, sans avoir à ouvrir l'enregistrement. Avec un **Trier** défini, vous
+déposez, sans avoir à ouvrir l'enregistrement. Quand un tri est défini avec **Trier**, vous
 pouvez toujours faire glisser une carte vers une autre colonne, mais pas la
 réorganiser à la main.
 

@@ -95,7 +95,7 @@ plan ne l'envoie jamais.
   **expiré**. Si c'est la plus récente, **Proposer à nouveau** donne une carte
   neuve.
 - Vous ne pouvez pas régénérer une réponse tant que sa proposition est en
-  attente. Réglez d'abord la carte.
+  attente. Traitez d'abord la carte.
 
 ## Qui peut proposer quoi
 

@@ -83,15 +83,15 @@ Deben estar definidas o los contenedores se negarán a iniciar.
 | `APP_URL` | `http://localhost` | URL completa en la que se accede a Relaticle. Incluya el esquema. |
 | `TRUSTED_HOSTS` | `localhost` | Nombres de host adicionales que acepta la aplicación, separados por comas. El host de `APP_URL` y los hosts de cualquier `*_DOMAIN` siempre se aceptan. Mantenga `localhost` en la lista, porque la comprobación de estado del contenedor lo usa. |
 | `TRUSTED_PROXIES` | (vacío) | Direcciones de proxy cuyos encabezados `X-Forwarded-For`, `-Proto` y `-Port` cree la aplicación, separadas por comas, como IP o rangos CIDR. Vacío confía en todos los rangos privados (10/8, 172.16/12, 192.168/16, loopback), lo que necesitan Traefik, Coolify y Dokploy. Redúzcalo a su proxy, por ejemplo la puerta de enlace o la subred de su red Docker, para que ningún otro contenedor o par del host pueda falsificar una IP de cliente. `*` confía en cualquier remitente y no es seguro. Nunca publique el puerto de la aplicación directamente en una red no confiable. |
-| `SESSION_SECURE_COOKIE` | (vacío) | Envía la cookie de sesión solo por HTTPS. Vacío significa segura cuando `APP_URL` empieza con `https://`, y no segura en caso contrario. Defina `true` o `false` para anularlo. Sirva las instalaciones de producción por HTTPS. El navegador descarta una cookie Secure enviada por HTTP simple, así que una instalación con HTTP simple debe dejarla vacía o en `false`, o nadie podrá iniciar sesión. Una instalación `https://` que también abre por HTTP simple, por ejemplo por IP de la red local, necesita `false` para que ese acceso funcione. |
+| `SESSION_SECURE_COOKIE` | (vacío) | Envía la cookie de sesión solo por HTTPS. Vacío significa segura cuando `APP_URL` empieza con `https://`, y no segura en caso contrario. Defina `true` o `false` para anularlo. Sirva las instalaciones de producción por HTTPS. El navegador descarta una cookie Secure enviada por HTTP simple, así que una instalación con HTTP simple debe dejarla vacía o en `false`, o nadie podrá iniciar sesión. Una instalación `https://` que usted también abre por HTTP simple, por ejemplo por IP de la red local, necesita `false` para que ese acceso funcione. |
 | `HSTS_MAX_AGE` | `15552000` | Segundos durante los cuales los navegadores siguen forzando HTTPS para su host. El encabezado `Strict-Transport-Security` se envía solo cuando `APP_ENV=production` y la solicitud es HTTPS. Defina `0` para que los navegadores lo olviden. |
 | `HSTS_INCLUDE_SUBDOMAINS` | `false` | Defina `true` para extender HSTS a todos los subdominios del host. Déjelo desactivado si algún subdominio hermano, como un host de intranet, se sirve por HTTP simple. |
 | `CSP_MODE` | `enforce` | Content-Security-Policy para las páginas HTML. `report-only` envía la política completa como un encabezado de solo informe, y `off` la omite. `frame-ancestors`, `object-src` y `base-uri` se siguen aplicando en todos los modos. |
-| `CSP_SCRIPT_SRC`, `CSP_STYLE_SRC`, `CSP_IMG_SRC`, `CSP_FONT_SRC`, `CSP_CONNECT_SRC`, `CSP_FRAME_SRC` | (vacío) | Orígenes adicionales para esa directiva, separados por comas. Defina `CSP_IMG_SRC` cuando los archivos multimedia o las fotos de perfil se carguen desde la URL de un bucket en otro host. El origen del websocket se agrega por usted. |
+| `CSP_SCRIPT_SRC`, `CSP_STYLE_SRC`, `CSP_IMG_SRC`, `CSP_FONT_SRC`, `CSP_CONNECT_SRC`, `CSP_FRAME_SRC` | (vacío) | Orígenes adicionales para esa directiva, separados por comas. Defina `CSP_IMG_SRC` cuando los archivos multimedia o las fotos de perfil se carguen desde la URL de un bucket en otro host. El origen del websocket se agrega automáticamente. |
 | `APP_PORT` | `80` | Puerto del host al que se enlaza el contenedor de la aplicación. |
 | `APP_PANEL_DOMAIN` | (vacío) | Defínala para el enrutamiento por subdominio (por ejemplo, `app.example.com`). Déjela vacía para el modo por ruta (`/app`). |
 | `PASSKEYS_USER_HANDLE_SECRET` | `APP_KEY` | Deriva el identificador de usuario opaco de WebAuthn que se guarda en cada autenticador. Asígnele su propio valor aleatorio (`openssl rand -base64 32`) antes de que alguien registre una llave de acceso, para que rotar `APP_KEY` más adelante no cambie el identificador de todos los usuarios. |
-| `REQUIRE_EMAIL_VERIFICATION` | `true` | Cuando es `false`, los usuarios inician sesión sin verificar su correo. Es útil para quienes se autoalojan y aún no han configurado SMTP. El administrador que cree con `make:filament-user` se verifica automáticamente en cualquier caso, así que el valor predeterminado `true` es seguro para instalaciones nuevas con Docker. Defínala como `false` solo si su panel está en una red privada: con la verificación desactivada, cualquiera que llegue a la página de inicio de sesión puede crear una cuenta que funciona. |
+| `REQUIRE_EMAIL_VERIFICATION` | `true` | Cuando es `false`, los usuarios inician sesión sin verificar su correo. Es útil para quienes autoalojan Relaticle y aún no han configurado SMTP. El administrador que cree con `make:filament-user` se verifica automáticamente en cualquier caso, así que el valor predeterminado `true` es seguro para instalaciones nuevas con Docker. Defínala como `false` solo si su panel está en una red privada: con la verificación desactivada, cualquiera que llegue a la página de inicio de sesión puede crear una cuenta que funciona. |
 | `LOG_CHANNEL` | `stderr` | Destino de los registros. Se recomienda `stderr` para Docker. |
 | `LOG_LEVEL` | `warning` | Nivel mínimo de registro. Use `debug` para solucionar problemas. |
 
@@ -147,7 +147,7 @@ Una instalación autoalojada no incluye páginas legales, y las políticas de re
 
 | Variable | Predeterminado | Descripción |
 |----------|---------|-------------|
-| `RELATICLE_PRIVACY_URL` | (vacío) | Su política de privacidad. Se enlaza desde el pie de las páginas de inicio de sesión, las pantallas de incorporación, la página de eliminación programada y la página de cuentas de correo. Sin definir, no hay enlace. |
+| `RELATICLE_PRIVACY_URL` | (vacío) | Su política de privacidad. Se enlaza desde el pie de las páginas de inicio de sesión, las pantallas de incorporación, la página de eliminación programada y la página de buzones. Sin definir, no hay enlace. |
 | `RELATICLE_TERMS_URL` | (vacío) | Sus términos de servicio. Se enlazan desde el pie del inicio de sesión, las pantallas de incorporación y la página de eliminación programada. Sin definir, no hay enlace. |
 | `RELATICLE_CONTACT_URL` | (vacío) | Su página de contacto o soporte. Se enlaza desde el pie del inicio de sesión. Sin definir, no hay enlace. |
 | `DOCUMENTATION_PUBLIC_URL` | `https://relaticle.com` | El sitio que sirve el centro de ayuda y las guías para desarrolladores. Rela y los enlaces de ayuda del panel apuntan aquí. Defínala con su propio espejo si aloja uno. |
@@ -216,7 +216,7 @@ Active o desactive funciones. Todas están habilitadas de forma predeterminada, 
 
 | Variable | Predeterminado | Descripción |
 |----------|---------|-------------|
-| `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Carga datos de ejemplo (empresas, personas y tareas de muestra) al crear un espacio de trabajo nuevo. Defina `false` para empezar con un espacio de trabajo vacío. |
+| `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Carga datos de ejemplo (empresas, personas y tareas de ejemplo) al crear un espacio de trabajo nuevo. Defina `false` para empezar con un espacio de trabajo vacío. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Habilita el inicio de sesión social con Google y Microsoft. Defina `false` para usar solo el inicio de sesión con correo, contraseña y llave de acceso. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Sirve la especificación OpenAPI en `/openapi.json` y `/openapi.yaml`, y muestra el enlace a la guía de MCP en la página de tokens de acceso. Defina `false` para quitar ambos. La especificación existe solo después de que `php artisan scribe:generate` la escribe. La imagen de Docker y los pasos manuales no ejecutan ese comando, y la compilación de Laravel Cloud sí. La referencia de la API en `/developers/api` es una página de documentación de relaticle.com y carga la misma especificación. |
 | `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Habilita la sincronización de correo y calendario para cuentas de Google y Microsoft, el redactor de correo y las páginas de ayuda de Correo y calendario. Requiere `GMAIL_CLIENT_ID` y `GMAIL_CLIENT_SECRET`. Las cuentas de Microsoft también necesitan `AZURE_CLIENT_ID` y `AZURE_CLIENT_SECRET`. |
@@ -275,7 +275,7 @@ El panel `sysadmin` en `{APP_URL}/sysadmin` es una superficie de administración
 docker compose exec app php artisan sysadmin:create
 ```
 
-El panel abre en el tablero **Instance** en `{APP_URL}/sysadmin/instance`, y `{APP_URL}/sysadmin` redirige allí. Cuenta los usuarios, espacios de trabajo, empresas, personas y oportunidades de todos los espacios de trabajo de su instalación. Las páginas de ingresos, suscripciones y créditos de IA que muestra el panel del personal de relaticle.com pertenecen al paquete cloud y no existen aquí.
+El panel se abre en el tablero **Instance** en `{APP_URL}/sysadmin/instance`, y `{APP_URL}/sysadmin` redirige allí. Cuenta los usuarios, espacios de trabajo, empresas, personas y oportunidades de todos los espacios de trabajo de su instalación. Las páginas de ingresos, suscripciones y créditos de IA que muestra el panel del personal de relaticle.com pertenecen al paquete cloud y no existen aquí.
 
 ---
 
@@ -327,7 +327,7 @@ crm.example.com {
 }
 ```
 
-Caddy gestiona los certificados SSL automáticamente mediante Let's Encrypt, y reenvía los websockets sin configuración adicional. Traefik también.
+Caddy se encarga de los certificados SSL automáticamente mediante Let's Encrypt, y reenvía los websockets sin configuración adicional. Traefik también.
 
 ### Traefik
 
@@ -392,7 +392,7 @@ Haga clic en **Deploy**. Dokploy descargará las imágenes e iniciará los 6 con
 1. Vaya a la pestaña **Domains** del servicio `app`
 2. Agregue su dominio (por ejemplo, `crm.yourdomain.com`)
 3. Defina el puerto del contenedor como `8080`
-4. Active HTTPS (Dokploy gestiona Let's Encrypt automáticamente)
+4. Active HTTPS (Dokploy se encarga de Let's Encrypt automáticamente)
 
 ### 6. Crear el usuario administrador
 
@@ -492,7 +492,7 @@ PASSPORT_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----..."
 PASSPORT_PUBLIC_KEY="-----BEGIN PUBLIC KEY-----..."
 ```
 
-Genere las claves de Passport una sola vez con `php artisan passport:keys --force` en su equipo y pegue el contenido de `storage/oauth-private.key` y `storage/oauth-public.key`.
+Genere las claves de Passport una sola vez con `php artisan passport:keys --force` en su máquina local y pegue el contenido de `storage/oauth-private.key` y `storage/oauth-public.key`.
 
 `FILAMENT_FILESYSTEM_DISK` debe ser `s3`. Si no se define, las exportaciones del CRM se escriben en el disco de una réplica y las descargas desde otra réplica fallan. Nunca la apunte al bucket público: las exportaciones contienen datos de clientes.
 
@@ -829,7 +829,7 @@ Causas frecuentes:
 3. Pruebe con: `docker compose exec app php artisan tinker --execute "Mail::raw('Test', fn(\$m) => \$m->to('you@example.com')->subject('Test'))"`
 4. Revise los registros: `docker compose logs app | grep -i mail`
 
-### El chat se queda en "Thinking..."
+### El chat se queda en "Pensando…"
 
 Desde octubre de 2026, una respuesta aparece unos segundos después de guardarse incluso sin websocket. Si el chat sigue esperando, la respuesta no se está produciendo:
 

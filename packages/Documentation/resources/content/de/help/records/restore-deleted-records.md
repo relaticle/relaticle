@@ -27,7 +27,7 @@ wiederherzustellen.
 
 Bei aktivem Filter für gelöschte Einträge sehen der Inhaber des Arbeitsbereichs
 und Administratoren in dieser Leiste unter **Mehr** außerdem **Ausgewählte
-endgültig löschen**. Das entfernt den Eintrag für immer. Es gibt kein Rückgängig,
+endgültig löschen**. Das entfernt den Eintrag für immer. Das lässt sich nicht rückgängig machen,
 und auch der Relaticle-Support kann ihn nicht zurückholen. Im Zweifel
 [exportieren Sie die Einträge zuerst](/de/help/records/export-your-data).
 

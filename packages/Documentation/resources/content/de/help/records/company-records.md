@@ -13,7 +13,7 @@ Nur der Name ist erforderlich. Alles andere kann später folgen.
 ## Die Felder
 
 - **Name**: erforderlich und die einzige eingebaute Spalte.
-- **Verantwortlicher**: das zuständige Mitglied. Wählen Sie jedes Mitglied des
+- **Verantwortlicher**: das zuständige Mitglied. Wählen Sie ein beliebiges Mitglied des
   Arbeitsbereichs.
 - **ICP**: ein Schalter für „entspricht unserem idealen Kundenprofil“, praktisch
   als Listenfilter.
@@ -39,7 +39,7 @@ Verantwortlicher, Ersteller, jedes sichtbare Feld) sowie diese Tabs:
 | Übersicht | Die Seite öffnet sich hier. Schlüsselfelder, die nächste fällige Aufgabe sowie letzte Aktivität, Notizen und offene Aufgaben auf einen Blick |
 | Aktivität | Ein schreibgeschützter Verlauf, wer was geändert hat |
 | Personen | Eine neue Person direkt in diesem Unternehmen anlegen |
-| Aufgaben | Eine hier vorverknüpfte Aufgabe erstellen oder eine bestehende **Verknüpfen** |
+| Aufgaben | Eine hier vorverknüpfte Aufgabe erstellen oder eine bestehende über **Verknüpfen** hinzufügen |
 | Notizen | Genauso: neu erstellen oder bestehende verknüpfen |
 
 Jeder Abschnitt in der **Übersicht** listet bis zu drei Elemente. **Alle

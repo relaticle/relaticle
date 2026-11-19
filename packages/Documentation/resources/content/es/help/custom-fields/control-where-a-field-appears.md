@@ -30,7 +30,7 @@ diario.
   mayoría de los atributos desde la fila de filtros que hay sobre ella. Los
   atributos de Área de texto, Editor de texto enriquecido y Selector de color no
   tienen filtro, ni tampoco un atributo cifrado. Consulte
-  [Encuentre lo que busca con la búsqueda y los filtros](/es/help/getting-started/find-anything-with-search-and-filters).
+  [Encuentre todo con búsqueda y filtros](/es/help/getting-started/find-anything-with-search-and-filters).
 - La **búsqueda** no necesita ningún ajuste. Rela y el MCP server comparan los
   valores de los atributos de Texto, Área de texto, Correo electrónico, Número de
   teléfono, Enlace, Dominio y Selector de color. Omiten los atributos de

@@ -40,5 +40,5 @@ erscheinen nach der Einrichtung in derselben Auswahl.
 
 Ihre Auswahl wird in dem Browser gespeichert, in dem Sie sie getroffen haben,
 und gilt für alle Nachrichten, die Sie ab dann senden. Sie gilt pro Person,
-Ihre Teamkollegen wählen also selbst. Der Wechsel zurück zu **Auto** ist
+andere Mitglieder wählen also selbst. Der Wechsel zurück zu **Auto** ist
 jederzeit unbedenklich.

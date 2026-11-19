@@ -13,7 +13,7 @@ Relaticle ordnet Ihre Kundendaten in fünf verbundenen Eintragstypen:
 |--------|---------|---------|
 | **Unternehmen** | Organisationen, mit denen Sie arbeiten | Acme Corporation |
 | **Personen** | Die Einzelpersonen, mit denen Sie arbeiten | John Doe, CEO bei Acme |
-| **Verkaufschancen** | Abschlüsse in Ihrer Vertriebs-Pipeline | Q1-Unternehmensvertrag |
+| **Verkaufschancen** | Laufende Verkaufsprojekte in Ihrer Pipeline | Q1-Unternehmensvertrag |
 | **Aufgaben** | Zu erledigende Schritte | Angebot nachfassen |
 | **Notizen** | Informationen, die Sie festhalten möchten | Gesprächsnotizen aus einem Telefonat |
 

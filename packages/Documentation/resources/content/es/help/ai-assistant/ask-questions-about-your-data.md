@@ -59,5 +59,4 @@ partir del primer intercambio.
 
 Cada respuesta tiene controles debajo: copiarla, regenerarla o calificarla con
 un pulgar hacia arriba o hacia abajo para que el equipo sepa cómo le va al
-asistente. También puede editar un mensaje que ya envió, y la conversación se
-reproduce desde ese punto.
+asistente. También puede editar un mensaje que ya envió, y la conversación se vuelve a generar desde ese punto.

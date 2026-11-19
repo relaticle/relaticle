@@ -42,8 +42,7 @@ visibles**, desactive una columna para ocultarla. Arrastre el encabezado de una
 columna, o arrastre la lista en **Columnas visibles**, para poner las columnas en
 su propio orden. Active **Sin Etapa** para agregar una primera columna con las
 oportunidades que no tienen etapa. En **Carriles**, elija **Empresa** para dividir
-el tablero en un carril por empresa. Un **Ordenar** también ordena las tarjetas
-dentro de cada carril.
+el tablero en un carril por empresa. Un orden definido con **Ordenar** también se aplica a las tarjetas dentro de cada carril.
 
 En **Atributos visibles**, elija qué muestra cada tarjeta, cambie su orden y agregue
 más con **Agregar atributo a la vista**. **Mostrar etiquetas de atributos** y

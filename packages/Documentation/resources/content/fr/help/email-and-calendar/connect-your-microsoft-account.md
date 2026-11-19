@@ -21,7 +21,7 @@ concernés, et vous pouvez envoyer depuis Relaticle avec cette adresse.
    **Boîtes mail connectées**.
 
 La page **E-mails**, l'onglet **E-mails** d'un enregistrement et le panneau
-**Réunions** de **Accueil** affichent le même bouton tant que vous n'avez connecté
+**Réunions** de la page **Accueil** affichent le même bouton tant que vous n'avez connecté
 aucune boîte mail.
 
 ![L'onglet Boîtes mail sous E-mail et agenda, avec le bouton Connecter une boîte mail Microsoft à côté de Connecter une boîte mail Google, sous les boîtes mail connectées](/help-assets/email-and-calendar/connect-your-google-account-1.png)
@@ -51,7 +51,7 @@ uniquement votre propre réponse à une invitation.
 Relaticle synchronise tous les dossiers de courrier, y compris les dossiers dans
 votre boîte de réception et ceux où une règle déplace le courrier. Il exclut
 **Brouillons**, **Courrier indésirable**, **Éléments supprimés**, **Boîte d'envoi**,
-**Clutter** et **Historique des conversations**, ainsi que tout dossier qu'ils
+**Courrier pêle-mêle** et **Historique des conversations**, ainsi que tout dossier qu'ils
 contiennent.
 
 ## Ce qui se passe après la connexion
@@ -71,9 +71,9 @@ pour ses paramètres, **Définir par défaut** et **Déconnecter la boîte mail*
 
 ## Si Microsoft demande l'approbation d'un administrateur
 
-Certaines organisations laissent seul un administrateur approuver une nouvelle
+Dans certaines organisations, seul un administrateur peut approuver une nouvelle
 application. Demandez à votre administrateur Microsoft 365 d'approuver Relaticle,
-puis connectez-vous à nouveau.
+puis connectez à nouveau la boîte mail.
 
 ## Si la boîte mail affiche Reconnexion nécessaire
 

@@ -21,8 +21,7 @@ explica en Límites de uso más abajo.
 ## Cuánto cuesta un mensaje
 
 En Relaticle Cloud, el costo depende del multiplicador del modelo (consulte
-[Elegir un modelo de IA](/es/help/ai-assistant/choose-an-ai-model)) más un
-pequeño monto por cada herramienta que el asistente usa al responder. Buscar
+[Elegir un modelo de IA](/es/help/ai-assistant/choose-an-ai-model)) más un pequeño cargo adicional por cada herramienta que el asistente usa al responder. Buscar
 registros, leer una empresa y redactar una propuesta cuentan cada uno. Una
 pregunta simple con el modelo predeterminado cuesta 1 crédito. Una solicitud de
 varios pasos con un modelo 3x cuesta más. Cada búsqueda web suma 2 créditos

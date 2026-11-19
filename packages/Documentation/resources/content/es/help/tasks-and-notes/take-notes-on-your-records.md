@@ -17,7 +17,7 @@ que tratan.
   **Empresas** y **Personas** sobre la marcha.
 - Desde la página de una empresa, persona u oportunidad, use la pestaña
   **Notas**. La nota se crea ya adjunta a ese registro. En las empresas y
-  oportunidades también puede **Adjuntar** una nota existente desde allí.
+  oportunidades también puede **Vincular** una nota existente desde allí.
 
 Una nota puede estar en varios registros a la vez. Adjunte la nota de la reunión
 de arranque a la empresa *y* a las dos personas que estuvieron en la sala. Si la

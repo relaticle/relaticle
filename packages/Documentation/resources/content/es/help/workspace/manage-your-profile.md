@@ -31,7 +31,7 @@ Las cuentas sin contraseña muestran **Establecer contraseña** en la misma secc
 
 ## Llaves de acceso
 
-Una llave de acceso lo hace iniciar sesión con Face ID, Touch ID o el bloqueo de
+Una llave de acceso le permite iniciar sesión con Face ID, Touch ID o el bloqueo de
 pantalla de su dispositivo, en lugar de una contraseña. **Llaves de acceso**
 enumera las que tiene en su cuenta, cuándo se agregó cada una y cuándo se usó por
 última vez.
@@ -69,15 +69,12 @@ Use un código de recuperación si no puede acceder a su aplicación de autentic
 ## Sesiones del navegador
 
 **Sesiones del navegador** enumera todos los lugares donde ha iniciado sesión:
-dispositivo, navegador y última actividad. **Cerrar otras sesiones del navegador**
-cierra la sesión en todos los dispositivos excepto el que está usando. Hágalo
-siempre que haya usado un equipo compartido.
+dispositivo, navegador y última actividad. **Cerrar las demás sesiones del navegador** cierra la sesión en todos los dispositivos excepto el que está usando. Hágalo siempre que haya usado un dispositivo compartido.
 
 Cambiar o restablecer su contraseña también cierra la sesión en sus otros
 dispositivos.
 
-En una instalación autoalojada que guarda las sesiones en Redis, **Cerrar otras
-sesiones del navegador** funciona de otra manera. Cierra la sesión de un
+En una instalación autoalojada que guarda las sesiones en Redis, **Cerrar las demás sesiones del navegador** funciona de otra manera. Cierra la sesión de un
 dispositivo solo después de que este permanece inactivo durante dos horas, la
 duración predeterminada de la sesión. Un dispositivo con Relaticle abierto
 mantiene la sesión iniciada. Cambie su contraseña para cerrarla de inmediato.

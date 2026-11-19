@@ -14,8 +14,7 @@ alle mit Zugriff auf, ob sie beigetreten sind oder nicht.
 
 ## Eine aktuelle Änderung bei den Rollen
 
-Die Rolle Editor heißt jetzt Mitglied. Auch die Administratorrolle wurde neu benannt,
-in der Oberfläche steht dafür jetzt Administrator.
+Die Rolle Editor heißt jetzt Mitglied.
 Administratoren können jetzt benutzerdefinierte Attribute verwalten, was früher nur
 der Inhaber konnte. Prüfen Sie Ihre Liste **Mitglieder**, wenn Sie die Administratorrolle
 früher vergeben haben. Betrachter können keine Daten mehr exportieren. Geben Sie daher
@@ -50,7 +49,7 @@ löschen und die Abrechnung.
 
 Der Inhaber ist keine Rolle, die Sie vergeben. Wer den Arbeitsbereich besitzt,
 erscheint immer mit einem Badge **Inhaber**, hat keine Rolle, die sich ändern ließe,
-und kann den Arbeitsbereich weder verlassen noch entfernt werden.
+und kann den Arbeitsbereich weder verlassen noch daraus entfernt werden.
 
 Überall, wo Sie eine Rolle wählen, in **Mitglieder einladen**, **Rolle ändern** oder
 **Einladungslink**, steht **Rollen vergleichen** neben der Auswahl. Es öffnet diese
@@ -67,8 +66,8 @@ Eine eingeladene Person erscheint sofort in der Liste **Mitglieder**, über alle
 angenommen haben, markiert mit **Einladung ausstehend**, mit der Rolle, die sie
 erhält, und der verbleibenden Gültigkeit der Einladung. Das Aktionsmenü bietet:
 
-- **Erneut senden** der E-Mail.
-- **Widerrufen** der Einladung.
+- **Erneut senden** verschickt die E-Mail noch einmal.
+- **Widerrufen** zieht die Einladung zurück.
 
 Eine Einladung gilt 48 Stunden. Danach steht in der Zeile **Einladung abgelaufen**,
 und **Erneut senden** stellt eine neue aus.

@@ -23,11 +23,11 @@ Cliquez sur **Filtrer** pour réduire tout le board selon la plupart des attribu
 Filtrez par **Assignés** pour voir la charge d'une personne. Cliquez sur **Trier**
 pour ordonner les cartes de chaque colonne. Ouvrez **Paramètres de la vue** et
 choisissez **Assigné à** sous **Couloirs** pour diviser le board en un couloir par
-assigné. Un **Tri** ordonne aussi les cartes à l'intérieur de chaque couloir.
+assigné. Un tri défini avec **Trier** ordonne aussi les cartes à l'intérieur de chaque couloir.
 
 Sans tri, les cartes gardent l'ordre dans lequel vous les avez déplacées. Avec un tri
 défini, vous pouvez toujours déplacer une carte vers une autre colonne, mais pas la
-réordonner à la main. Les boutons à la fin de la ligne de filtres réduisent ou
+réordonner à la main. Les boutons à la fin de la rangée de filtres réduisent ou
 développent toutes les colonnes, et basculent les cartes entre compactes et
 complètes. Pour réduire une seule colonne, double-cliquez sur une partie vide de
 celle-ci, ou cliquez sur son en-tête et choisissez **Réduire la colonne (statut)**.
@@ -40,7 +40,7 @@ Cliquez sur son rail réduit pour la développer à nouveau.
 - **Faites glisser une carte** vers une autre colonne pour changer son statut. Le
   changement s'enregistre dès qu'elle atterrit.
 - **Ajoutez une tâche sur place** avec le bouton **+** en haut de n'importe quelle
-  colonne. Le statut est déjà réglé sur cette colonne. **Nouvelle tâche** dans
+  colonne. Le statut est déjà réglé sur cette colonne. **Créer** dans
   l'en-tête démarre dans la première colonne visible.
 - **Modifiez ou supprimez** une carte depuis le menu de la carte elle-même.
 
@@ -50,7 +50,7 @@ Faites glisser l'en-tête d'une colonne vers la gauche ou la droite pour déplac
 statut. Vous pouvez aussi cliquer sur **Paramètres de la vue** en haut du board et
 faire glisser les statuts sous **Colonnes visibles**. Le menu d'un statut y propose
 aussi **Monter** et **Descendre**. Désactivez un statut pour masquer sa colonne.
-Activez **Sans statut** pour ajouter une première colonne pour les tâches sans statut.
+Activez **Sans Statut** pour ajouter une première colonne pour les tâches sans statut.
 L'ordre est enregistré pour vous seul, les autres membres gardent le leur. Le board
 retient aussi vos filtres, votre tri et vos couloirs. Choisissez **Créer une vue**
 dans le sélecteur de vues pour l'enregistrer comme une vue que vous seul voyez. Cela

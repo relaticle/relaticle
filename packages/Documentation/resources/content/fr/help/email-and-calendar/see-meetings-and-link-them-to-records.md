@@ -1,6 +1,6 @@
 ---
 title: Voir et lier les réunions aux enregistrements
-description: Consultez les événements d'agenda synchronisés sur Accueil et vos enregistrements, répondez à une invitation et liez une réunion à un enregistrement.
+description: Consultez les événements d'agenda synchronisés sur la page Accueil et vos enregistrements, répondez à une invitation et liez une réunion à un enregistrement.
 order: 8
 updated: "2026-10-05"
 related: [help/email-and-calendar/connect-your-google-account, help/email-and-calendar/connect-your-microsoft-account, help/email-and-calendar/set-workspace-email-privacy, help/records/opportunity-records]
@@ -8,12 +8,12 @@ related: [help/email-and-calendar/connect-your-google-account, help/email-and-ca
 
 Une fois votre boîte mail Google ou Microsoft connectée, les événements de votre
 agenda se synchronisent dans Relaticle sous forme de réunions. Vous voyez votre
-journée sur **Accueil**, et chaque enregistrement affiche les réunions qui le
+journée sur la page **Accueil**, et chaque enregistrement affiche les réunions qui le
 concernent.
 
 ## Voir votre journée
 
-Le panneau **Réunions** de **Accueil** liste vos réunions du jour. Utilisez le
+Le panneau **Réunions** de la page **Accueil** liste vos réunions du jour. Utilisez le
 sélecteur de date pour consulter un autre jour. C'est votre propre agenda : il
 montre les réunions de vos boîtes mail connectées et celles auxquelles vous êtes
 invité.

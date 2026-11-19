@@ -43,7 +43,7 @@ Alle anderen Spalten sind optional. Eine leere Zelle lässt das Feld einfach lee
 ## Spalten für benutzerdefinierte Attribute
 
 Benennen Sie Spalten für benutzerdefinierte Attribute mit dem Präfix
-`custom_fields_`, gefolgt vom Code des Feldes:
+`custom_fields_`, gefolgt vom Code des Attributs:
 
 ```
 custom_fields_industry
@@ -51,9 +51,9 @@ custom_fields_emails
 custom_fields_website
 ```
 
-Den Code jedes Feldes finden Sie unter **Einstellungen → Benutzerdefinierte
-Attribute** in der Spalte **Code**. Der Assistent ordnet auch ähnliche Namen
-automatisch zu, sodass eine Spalte namens „Industry“ meist ohne Präfix beim Feld
+Den Code jedes Attributs finden Sie unter **Einstellungen → Benutzerdefinierte
+Attribute** in der Spalte **Code**. Der Import-Assistent ordnet auch ähnliche Namen
+automatisch zu, sodass eine Spalte namens „Industry“ meist ohne Präfix beim Attribut
 Industry landet. Das Präfix macht die Zuordnung exakt.
 
 ## Werte nach Feldtyp formatieren

@@ -15,7 +15,7 @@ reprennent les informations propres à chaque personne.
 1. Ouvrez la liste **Personnes** ou **Entreprises**.
 2. Cochez les enregistrements que vous voulez joindre.
 3. Cliquez sur **Envoyer un e-mail** dans la barre qui apparaît en bas de la liste.
-4. Le compositeur s'ouvre sous le titre **Nouvel e-mail en masse** avec la liste des
+4. L'éditeur d'e-mails s'ouvre sous le titre **Nouvel e-mail en masse** avec la liste des
    destinataires. **Ajouter des destinataires** en ajoute d'autres.
 5. Écrivez l'objet et le message. **Insérer une variable** ajoute une balise de
    fusion, comme le nom complet ou l'entreprise.
@@ -25,12 +25,12 @@ Les enregistrements sélectionnés sans adresse e-mail sont ignorés, et Relatic
 indique combien.
 
 Vous pouvez aussi partir de n'importe quel nouvel e-mail. Activez **Envoi en masse**
-dans le compositeur et ajoutez-y des destinataires.
+dans l'éditeur d'e-mails et ajoutez-y des destinataires.
 
 ## Réutiliser un message avec un modèle
 
 Rédigez le message une fois, puis cliquez sur **Utiliser un modèle** et **Enregistrer
-comme modèle** dans le compositeur. Cochez **Partager avec l'espace de travail** pour
+comme modèle** dans l'éditeur d'e-mails. Cochez **Partager avec l'espace de travail** pour
 que tout le monde puisse l'utiliser.
 
 Les modèles sont listés sous **E-mails**, dans l'onglet **Modèles**. Cliquez sur

@@ -12,12 +12,12 @@ der Absatz Hintergrund, der in kein Feld passt. Notizen haben einen Titel, einen
 
 ## Eine Notiz erstellen
 
-- Klicken Sie in der Liste **Notizen** auf **Neue Notiz**, schreiben Sie und
+- Klicken Sie in der Liste **Notizen** auf **Erstellen**, schreiben Sie und
   verknüpfen Sie dabei **Unternehmen** und **Personen**.
 - Nutzen Sie auf der Seite eines Unternehmens, einer Person oder einer Verkaufschance
   den Tab **Notizen**. Die Notiz wird bereits an diesen Eintrag angehängt erstellt.
   Bei Unternehmen und Verkaufschancen können Sie dort auch eine vorhandene Notiz
-  **Anhängen**.
+  über **Verknüpfen** hinzufügen.
 
 Eine Notiz kann an mehreren Einträgen gleichzeitig hängen. Hängen Sie die Notiz zum
 Kickoff-Meeting an das Unternehmen *und* an die beiden Personen, die im Raum waren.

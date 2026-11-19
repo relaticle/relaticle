@@ -17,7 +17,7 @@ einzelne E-Mail ändern. Ihre eigenen E-Mails sehen Sie immer vollständig.
 | **Privat** | Nichts. Nur Sie sehen die E-Mail. |
 | **Nur Teilnehmer** | Die Teilnehmer und den Zeitpunkt. |
 | **Betreffzeile und Teilnehmer** | Die Betreffzeile, die Teilnehmer und den Zeitpunkt. |
-| **Voller Zugriff** | Den Inhalt, die Betreffzeile und die Anhänge. |
+| **Vollzugriff** | Den Inhalt, die Betreffzeile und die Anhänge. |
 
 Ein neuer Arbeitsbereich beginnt mit **Nur Teilnehmer**. Andere Mitglieder sehen,
 dass Sie mit einer Person oder einem Unternehmen in Kontakt waren, aber nicht,
@@ -35,7 +35,7 @@ eigenen Stufen.
 
 Beim Speichern werden auch die E-Mails aktualisiert, die dieses Postfach schon
 synchronisiert hat, mit Ausnahme der E-Mails, die Sie einzeln geändert haben. Bei
-**Voller Zugriff** müssen Sie zuerst eine Bestätigung eintippen, weil dadurch der
+**Vollzugriff** müssen Sie zuerst eine Bestätigung eintippen, weil dadurch der
 Inhalt jeder E-Mail in diesem Postfach geteilt wird.
 
 Bei der Einrichtung eines Arbeitsbereichs werden Sie nach jedem verbundenen

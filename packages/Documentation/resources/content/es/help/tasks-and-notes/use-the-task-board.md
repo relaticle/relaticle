@@ -19,7 +19,7 @@ insignia de **Fecha de vencimiento** y los avatares de los asignados. La
 insignia de fecha cambia a "Vence hoy", "Vence mañana" o "(vencida)" a medida que
 se acerca la fecha. Elija qué muestra una tarjeta en **Atributos visibles**, dentro de **Configuración de la vista**.
 
-Haga clic en **Filtrar** para acotar todo el tablero según la mayoría de los atributos. Filtre por **Asignados** para ver la carga de una persona. Haga clic en **Ordenar** para ordenar las tarjetas de cada columna. Abra **Configuración de la vista** y elija **Asignado** en **Carriles** para dividir el tablero en un carril por asignado. Un **Orden** también ordena las tarjetas dentro de cada carril.
+Haga clic en **Filtrar** para acotar todo el tablero según la mayoría de los atributos. Filtre por **Asignados** para ver la carga de una persona. Haga clic en **Ordenar** para ordenar las tarjetas de cada columna. Abra **Configuración de la vista** y elija **Asignado** en **Carriles** para dividir el tablero en un carril por asignado. Un orden definido con **Ordenar** también se aplica a las tarjetas dentro de cada carril.
 
 Sin un orden, las tarjetas conservan el orden en que usted las arrastró. Con un orden definido, aún puede arrastrar una tarjeta a otra columna, pero no reordenarla a mano. Los botones al final de la fila de filtros contraen o expanden todas las columnas, y alternan las tarjetas entre compactas y completas. Para contraer una sola columna, haga doble clic en una parte vacía de ella, o haga clic en su encabezado y elija **Contraer columna (estado)**. Haga clic en su riel contraído para expandirla de nuevo.
 

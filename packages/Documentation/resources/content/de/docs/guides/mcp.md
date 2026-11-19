@@ -220,8 +220,8 @@ Der Server stellt 50 Tools bereit. Sie decken Kontokontext, entitätsübergreife
 | `create-task-tool` | Erstellt eine neue Aufgabe (erfordert `title`) |
 | `update-task-tool` | Aktualisiert eine Aufgabe per ID |
 | `delete-task-tool` | Löscht eine Aufgabe per ID mit Soft Delete |
-| `attach-task-to-entities-tool` | Verknüpft eine Aufgabe mit Unternehmen, Personen, Verkaufschancen oder weist Benutzer zu. Fügt hinzu, ohne bestehende Verknüpfungen zu entfernen. |
-| `detach-task-from-entities-tool` | Löst die Verknüpfung einer Aufgabe mit Unternehmen, Personen, Verkaufschancen oder hebt die Zuweisung von Benutzern auf |
+| `attach-task-to-entities-tool` | Verknüpft eine Aufgabe mit Unternehmen, Personen, Verkaufschancen oder weist Mitglieder zu. Fügt hinzu, ohne bestehende Verknüpfungen zu entfernen. |
+| `detach-task-from-entities-tool` | Löst die Verknüpfung einer Aufgabe mit Unternehmen, Personen, Verkaufschancen oder hebt die Zuweisung von Mitgliedern auf |
 
 ### Notizen
 
@@ -246,7 +246,7 @@ Eine eingeplante E-Mail bleibt an die Verbindung gebunden, die sie eingeplant ha
 | Tool | Beschreibung |
 |------|--------------|
 | `list-emails-tool` | Listet E-Mails mit den neuesten zuerst auf, mit optionaler Suche und Filtern nach verknüpftem Eintrag, Richtung, Thread, Status und Datum. Die E-Mail eines Mitglieds erscheint, sobald sie synchronisiert oder gesendet ist, und die eigenen Entwürfe und der Postausgang des Benutzers erscheinen ebenfalls. Betreff und Vorschautext erscheinen nur, wo die Freigabestufe es erlaubt. |
-| `get-email-tool` | Ruft eine E-Mail per ID ab, mit Status und Sendezeit. Text und Namen der Anhänge erscheinen nur bei vollem Zugriff, und ein langer Text wird gekürzt. |
+| `get-email-tool` | Ruft eine E-Mail per ID ab, mit Status und Sendezeit. Text und Namen der Anhänge erscheinen nur bei Vollzugriff, und ein langer Text wird gekürzt. |
 | `list-email-accounts-tool` | Listet die Postfächer auf, die der Benutzer in diesem Arbeitsbereich verbunden hat, mit der ID für das Entwerfen und der Angabe, ob jedes senden kann. |
 | `create-email-draft-tool` | Speichert einen Entwurf in einem Postfach des Benutzers, als reinen Text oder Markdown, mit der Standardsignatur, sofern Sie sie nicht abschalten. Es wird nichts gesendet: Der Benutzer prüft den Entwurf in Relaticle. |
 | `update-email-draft-tool` | Überschreibt einen gespeicherten Entwurf mit denselben Argumenten wie beim Erstellen. Angehängte Dateien bleiben erhalten. |

@@ -1,5 +1,5 @@
 ---
-title: E-Mails an einem Eintrag lesen, beantworten
+title: E-Mails an einem Eintrag lesen und beantworten
 description: Finden Sie jede synchronisierte Unterhaltung an einer Person, einem Unternehmen oder einer Verkaufschance, antworten Sie oder leiten Sie sie weiter.
 order: 3
 updated: "2026-11-08"

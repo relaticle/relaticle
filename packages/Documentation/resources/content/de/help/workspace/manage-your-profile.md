@@ -39,8 +39,8 @@ jeder hinzugefügt wurde und wann er zuletzt verwendet wurde.
 
 **Passkey hinzufügen** bestätigt zunächst, dass Sie es sind, und übergibt dann an Ihren
 Browser oder Passwortmanager, der den Schlüssel erstellt. Relaticle benennt ihn nach
-dem Authenticator, den es erkennt. Mit **Umbenennen** bezeichnen Sie ihn lieber nach
-dem Gerät. **Entfernen** nimmt einen Passkey aus Ihrem Konto. Dieses Gerät kann Sie
+dem Authenticator, den es erkennt. Möchten Sie ihn lieber nach dem Gerät benennen, nutzen Sie
+**Umbenennen**. **Entfernen** nimmt einen Passkey aus Ihrem Konto. Dieses Gerät kann Sie
 dann nicht mehr anmelden. Relaticle behält Ihre letzte Anmeldemethode. Fügen Sie einen
 weiteren Passkey hinzu oder legen Sie ein Passwort fest, bevor Sie ihn entfernen.
 
@@ -83,7 +83,7 @@ abgemeldet.
 
 Bei einer selbst gehosteten Installation, die Sitzungen in Redis speichert, funktioniert
 **Andere Browsersitzungen abmelden** anders. Ein Gerät wird erst abgemeldet, nachdem es
-zwei Stunden lang inaktiv war, der standardmäßigen Sitzungsdauer. Ein Gerät mit
+zwei Stunden lang inaktiv war (die standardmäßige Sitzungsdauer). Ein Gerät mit
 geöffnetem Relaticle bleibt angemeldet. Ändern Sie Ihr Passwort, um es sofort
 abzumelden.
 

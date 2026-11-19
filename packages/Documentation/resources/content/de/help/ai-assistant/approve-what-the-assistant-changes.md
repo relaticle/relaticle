@@ -6,9 +6,9 @@ updated: "2026-11-06"
 related: [help/ai-assistant/ask-questions-about-your-data, help/getting-started/use-custom-fields, help/email-and-calendar/use-your-email-with-an-ai-assistant]
 ---
 
-Wenn Sie den Assistenten bitten, etwas zu ändern („Erstelle eine
-Folgeaufgabe für Acme“, „Verschiebe diese Verkaufschance nach Verhandlung“,
-„Lösche diese drei Notizen“), schreibt er nie direkt in Ihr CRM. Er entwirft
+Wenn Sie den Assistenten bitten, etwas zu ändern („Erstellen Sie eine
+Folgeaufgabe für Acme“, „Verschieben Sie diese Verkaufschance nach Verhandlung“,
+„Löschen Sie diese drei Notizen“), schreibt er nie direkt in Ihr CRM. Er entwirft
 die Änderung als Vorschlagskarte an der Stelle des Nachrichtenfelds und
 wartet. Genehmigen oder verwerfen Sie sie, um weiter zu chatten.
 
@@ -21,8 +21,8 @@ setzt. Bei einer Aktualisierung steht der alte Wert durchgestrichen neben dem
 neuen. Von dort aus können Sie Folgendes tun:
 
 - **Genehmigen.** Die Schaltfläche zählt, was sie schreibt: **Genehmigen**,
-  bei mehreren Änderungen **3 Änderungen genehmigen**. Eine Löschung heißt
-  rot **2 Aufgaben löschen**. `⌘↵` genehmigt per Tastatur, außer bei
+  bei mehreren Änderungen **3 Änderungen genehmigen**. Eine Löschung zeigt
+  in Rot **2 Aufgaben löschen**. `⌘↵` genehmigt per Tastatur, außer bei
   Löschungen, E-Mails, Einladungen und Überschreibungen, die immer einen
   Klick brauchen.
 - **Zuerst ein Attribut bearbeiten.** Klicken Sie auf den Stift neben einem
@@ -55,7 +55,7 @@ gelesen haben.
 
 ## Stapel und Pläne
 
-Eine Anfrage kann bis zu 25 Einträge vorschlagen. „Füge diese fünf Personen
+Eine Anfrage kann bis zu 25 Einträge vorschlagen. „Fügen Sie diese fünf Personen
 aus meinen Meeting-Notizen hinzu“ kommt als eine Karte, die alle fünf
 auflistet. Lassen Sie die weg, die Sie nicht möchten, und genehmigen Sie den
 Rest. Löschungen funktionieren genauso.
@@ -99,7 +99,7 @@ senden**. Das Genehmigen eines Plans sendet sie nie.
   **abgelaufen**. Ist es der jüngste, liefert **Erneut vorschlagen** eine
   frische Karte.
 - Eine Antwort lässt sich nicht neu generieren, solange ihr Vorschlag aussteht.
-  Klären Sie zuerst die Karte.
+  Entscheiden Sie zuerst über die Karte.
 
 ## Wer was vorschlagen kann
 

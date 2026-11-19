@@ -31,8 +31,8 @@ Sie können auch mit jeder neuen E-Mail beginnen. Aktivieren Sie im Editor
 ## Eine Nachricht mit einer Vorlage wiederverwenden
 
 Schreiben Sie die Nachricht einmal, und klicken Sie dann im Editor auf **Vorlage
-verwenden** und **Als Vorlage speichern**. Aktivieren Sie **Mit meinem Arbeitsbereich
-teilen**, damit alle sie nutzen können.
+verwenden** und **Als Vorlage speichern**. Aktivieren Sie **Mit Arbeitsbereich teilen**,
+damit alle sie nutzen können.
 
 Vorlagen stehen unter **E-Mails** auf dem Tab **Vorlagen**. Mit **Neue Vorlage**
 schreiben Sie eine von Grund auf.

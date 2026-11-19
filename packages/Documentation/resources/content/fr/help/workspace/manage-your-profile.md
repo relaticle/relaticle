@@ -99,12 +99,12 @@ d'assignation de tâches et le résumé quotidien, décrits dans
 Pour demander la suppression de votre compte, écrivez à [privacy@relaticle.com](mailto:privacy@relaticle.com) ou [contactez-nous](/fr/contact).
 Pour une installation auto-hébergée, contactez la personne qui l'administre.
 
-Si **Supprimer le compte** est disponible en bas de **Profil**, vous pouvez y planifier
+Si **Supprimer le compte** est disponible en bas de **Profil**, vous pouvez y programmer
 la suppression. Saisissez l'e-mail de votre compte et confirmez votre identité. La
-suppression est planifiée **dans 30 jours**. Connectez-vous pendant ces 30 jours et
+suppression est programmée **dans 30 jours**. Connectez-vous pendant ces 30 jours et
 choisissez **Conserver mon compte** pour l'annuler. Après le délai de grâce, votre
 compte et vos données personnelles sont supprimés définitivement. Les enregistrements
 des espaces de travail partagés restent.
 
-Avant de planifier la suppression, retirez les autres membres des espaces de travail
+Avant de programmer la suppression, retirez les autres membres des espaces de travail
 dont vous êtes propriétaire, ou supprimez ces espaces de travail.

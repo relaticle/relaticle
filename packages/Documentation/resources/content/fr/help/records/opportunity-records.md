@@ -42,7 +42,7 @@ choisissez un autre attribut à choix unique pour construire les colonnes. Sous
 l'en-tête d'une colonne, ou la liste sous **Colonnes visibles**, pour mettre les
 colonnes dans votre ordre. Activez **Sans Étape** pour ajouter une première
 colonne pour les opportunités sans étape. Sous **Couloirs**, choisissez
-**Entreprise** pour diviser le board en un couloir par entreprise. Un **Trier**
+**Entreprise** pour diviser le board en un couloir par entreprise. Un tri défini avec **Trier**
 ordonne aussi les cartes à l'intérieur de chaque couloir.
 
 Sous **Attributs visibles**, choisissez ce que chaque carte affiche, réordonnez-le

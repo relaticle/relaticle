@@ -26,13 +26,13 @@ Boards).
 Die Änderung wirkt überall gleichzeitig: in Formularen, Listenfiltern und den
 Boards, deren Spalten von den Optionen und ihrer Reihenfolge ausgehen. Die
 eigene Reihenfolge und die ausgeblendeten Spalten jedes Mitglieds gelten
-darüber. Benennen Sie „Prospecting“ in „Neuer Lead“ um, bekommt die
+darüber. Benennen Sie „Akquise“ in „Neuer Lead“ um, bekommt die
 Board-Spalte die neue Bezeichnung. Fügen Sie die Option „Vertrag gesendet“
 hinzu, entsteht eine Spalte.
 
 ## Was mit vorhandenen Einträgen passiert
 
-- **Umbenennen** einer Option behält jeden Eintrag, der auf sie zeigt. Die
+- Beim **Umbenennen** einer Option bleiben alle Einträge mit ihr verknüpft. Die
   Einträge zeigen den neuen Namen sofort.
 - **Entfernen** einer Option leert sie bei den Einträgen, die sie genutzt
   haben. Sie zeigen einen leeren Wert, bis jemand eine neue Option wählt.

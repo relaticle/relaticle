@@ -55,7 +55,7 @@ Le point d'accès MCP publie ses métadonnées OAuth à ces adresses :
 
 Les clients qui prennent en charge l'enregistrement dynamique de client (RFC 7591), dont Claude.ai, Claude Desktop, Claude Code et les connecteurs personnalisés de ChatGPT, s'enregistrent automatiquement et vous guident dans un parcours de consentement en un clic. PKCE est obligatoire (`S256`). Un client peut envoyer un paramètre `resource` (RFC 8707). Il doit désigner ce MCP server, sinon la requête est refusée avec `invalid_target`.
 
-Au moment du consentement, vous choisissez **un espace de travail** pour le connecteur. Ce choix est définitif pour ce connecteur : pour le pointer vers un autre espace de travail, révoquez-le et reconnectez-vous. Les espaces de travail en pause ne peuvent pas être sélectionnés. Abonnez-vous d'abord, sinon le connecteur n'aurait aucune donnée à lire.
+Au moment du consentement, vous choisissez **un espace de travail** pour le connecteur. Ce choix est définitif pour ce connecteur : pour le pointer vers un autre espace de travail, révoquez-le et connectez-le à nouveau. Les espaces de travail en pause ne peuvent pas être sélectionnés. Abonnez-vous d'abord, sinon le connecteur n'aurait aucune donnée à lire.
 
 L'écran de consentement liste ce que le connecteur pourra faire, et la liste suit votre rôle dans l'espace de travail que vous choisissez. Quand l'e-mail est activé, tous les rôles obtiennent la lecture et la rédaction de brouillons, et les rôles Propriétaire, Administrateur et Membre obtiennent l'envoi. Le client ne peut demander ni plus ni moins. Relaticle affiche cet écran à chaque autorisation d'un connecteur, si bien que le connecteur détient toujours ce que son utilisateur a vu. Chaque appel d'outil vérifie aussi votre rôle à ce moment-là, donc un changement de rôle s'applique aux connecteurs que vous avez ajoutés plus tôt.
 
@@ -220,8 +220,8 @@ Le serveur fournit 50 outils. Ils couvrent le contexte du compte, la découverte
 | `create-task-tool` | Crée une nouvelle tâche (exige `title`) |
 | `update-task-tool` | Modifie une tâche par ID |
 | `delete-task-tool` | Supprime une tâche par ID (suppression logique) |
-| `attach-task-to-entities-tool` | Lie une tâche à des entreprises, des personnes, des opportunités, ou l'assigne à des utilisateurs. Ajoute sans retirer les liens existants. |
-| `detach-task-from-entities-tool` | Délie une tâche d'entreprises, de personnes, d'opportunités, ou retire l'assignation d'utilisateurs |
+| `attach-task-to-entities-tool` | Lie une tâche à des entreprises, des personnes, des opportunités, ou l'assigne à des membres. Ajoute sans retirer les liens existants. |
+| `detach-task-from-entities-tool` | Délie une tâche d'entreprises, de personnes, d'opportunités, ou retire l'assignation de membres |
 
 ### Notes
 
@@ -264,7 +264,7 @@ Un e-mail en file d'attente reste lié à la connexion qui l'y a mis. Il n'est p
 | `upload-file` | Stocke un fichier dans l'espace de travail à partir d'une URL https publique, d'un corps en base64 avec `filename`, ou d'un `upload_id`. Renvoie `suggested_markdown` pour intégrer le fichier dans un champ d'éditeur enrichi comme le corps d'une note, ainsi que `file_id` pour le fichier stocké. Types autorisés : pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, jusqu'à 10 Mo. 60 appels par heure et par espace de travail. |
 | `create-upload-url` | Obtient une URL signée valable cinq minutes vers laquelle faire un `PUT` du corps d'un fichier, puis transmettez l'`upload_id` renvoyé à `upload-file` dans l'heure. Un corps non stocké à ce moment-là est supprimé. 60 appels par heure et par espace de travail. |
 
-Les téléversements restent en attente pendant 24 heures. Enregistrer un enregistrement dont le corps d'éditeur enrichi intègre le fichier le réclame, et les fichiers non réclamés sont purgés.
+Les téléversements restent en attente pendant 24 heures. Le fichier est réclamé dès qu'un enregistrement dont le corps d'éditeur enrichi l'intègre est sauvegardé. Les fichiers non réclamés sont purgés.
 
 Les outils de liste des entités acceptent `filter`, `sort`, `include`, `per_page` (15 par défaut, 25 au maximum) et `page`. `sort` est un objet avec `field` et `direction` (`asc` ou `desc`). `include` est une liste de relations au singulier ou de décomptes de relations. Un outil de liste refuse tout autre argument. Pour trouver des enregistrements par des mots dans toutes les entités, utilisez l'outil `search`.
 
@@ -316,7 +316,7 @@ Les champs natifs et les relations se placent au niveau supérieur. Les attribut
 Un nœud de relation contient la même grammaire de filtre, appliquée aux enregistrements liés. Les noms qu'il contient appartiennent à l'entité liée.
 
 - Les relations d'enregistrements acceptent `$in`, `$not_in` (ID d'enregistrements) et `$is_empty`, ou des conditions sur l'enregistrement lié.
-- Les relations de membres acceptent `$in`, `$not_in` (ID de membres) et `$is_empty`. Les noms et les e-mails des membres ne sont pas filtrables. Une personne qui a quitté l'espace de travail compte comme aucun membre, donc un enregistrement qu'elle a créé correspond à `{"creator": {"$is_empty": true}}`.
+- Les relations de membres acceptent `$in`, `$not_in` (ID de membres) et `$is_empty`. Les noms et les e-mails des membres ne sont pas filtrables. Une personne qui a quitté l'espace de travail ne compte plus comme membre, donc un enregistrement qu'elle a créé correspond à `{"creator": {"$is_empty": true}}`.
 - Une relation vers plusieurs enregistrements correspond quand au moins un enregistrement lié correspond. Toutes les conditions d'un même nœud de relation s'appliquent au même enregistrement lié. Pour trouver les enregistrements sans aucun lien, enveloppez le nœud dans `$not`.
 - Les relations s'imbriquent sur 2 niveaux au plus, comme `company` puis `people`.
 
@@ -345,7 +345,7 @@ Les champs zone de texte, texte enrichi et couleur n'acceptent aucun filtre. Les
 - Les valeurs de téléphone correspondent quel que soit le format. Un opérande de téléphone exige un indicatif de pays, comme `+1 415 555 0100`. Un opérande sans indicatif renvoie l'erreur `phone_number needs a country code, for example +1 415 555 0100.`
 - Les tags correspondent à la valeur stockée exacte.
 - Un champ d'enregistrement accepte les ID des enregistrements auxquels il est lié.
-- `$contains`, `$starts_with` et `$ends_with` ignorent la casse. Sur un champ qui contient plusieurs valeurs, ils correspondent quand une valeur correspond. Ils comparent l'opérande tel que saisi à la valeur telle que stockée. Un téléphone est stocké sous la forme `+14155550100`, avec une extension sous la forme `;ext=12` et sans espaces, donc `+1415` correspond et `+1 415` non. Un lien ne garde un schéma que si l'un a été saisi, donc `https://acme` correspond à `https://acme.com/team` et `acme` non. Un domaine est stocké sous forme de simple hôte, sans schéma ni `www.`.
+- `$contains`, `$starts_with` et `$ends_with` ignorent la casse. Sur un champ qui contient plusieurs valeurs, ils correspondent quand une valeur correspond. Ils comparent l'opérande tel que saisi à la valeur telle que stockée. Un téléphone est stocké sous la forme `+14155550100`, avec un numéro de poste sous la forme `;ext=12` et sans espaces, donc `+1415` correspond et `+1 415` non. Un lien ne garde un schéma que si un schéma a été saisi, donc `https://acme` correspond à `https://acme.com/team` et `acme` non. Un domaine est stocké sous forme de simple hôte, sans schéma ni `www.`.
 - `$not_in` et `$has_none` correspondent aussi aux enregistrements dont le champ est vide.
 - Le lien d'un champ d'enregistrement vers un enregistrement supprimé compte comme aucun lien.
 

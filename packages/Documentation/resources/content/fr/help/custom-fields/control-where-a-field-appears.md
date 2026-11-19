@@ -28,7 +28,7 @@ mais que vous n'avez pas besoin de voir au quotidien.
 ## Filtres et tri
 
 - **Les filtres** ne demandent aucun réglage. Vous pouvez filtrer une liste par
-  la plupart des attributs depuis la ligne de filtres au-dessus. Les attributs
+  la plupart des attributs depuis la rangée de filtres au-dessus. Les attributs
   Zone de texte, Éditeur de texte enrichi et Sélecteur de couleur n'ont pas de
   filtre, pas plus qu'un attribut chiffré. Voir
   [Tout trouver avec la recherche et les filtres](/fr/help/getting-started/find-anything-with-search-and-filters).

@@ -35,7 +35,7 @@ ab.
 
 Ihr erster Cloud-Arbeitsbereich startet **automatisch eine 14-tägige Testphase für
 Pro, ohne Karte**. Ein später hinzugefügter Arbeitsbereich startet nur dann eine
-eigene Testphase, solange Sie in einem anderen ein Abonnement haben. Andernfalls
+eigene Testphase, wenn Sie in einem anderen Arbeitsbereich ein Abonnement haben. Andernfalls
 öffnet er sich auf der Tarifauswahl. Die Testphase umfasst alles aus Cloud Pro, mit
 300 KI-Credits und einem verbundenen Postfach. Premium-KI-Modelle werden frei, sobald
 der Arbeitsbereich einen eigenen Eintrag enthält. Schließen Sie während der Testphase
@@ -61,8 +61,8 @@ aktualisieren die Zahlungsmethode. Tarifänderungen laufen über uns.
 
 ## Wenn das Abonnement ausläuft
 
-Der Arbeitsbereich wird **pausiert**. Die App, die API, der MCP-Server und Rela treten
-zurück, aber **Ihre Einträge sind sicher** und bleiben gespeichert. Wenn Sie erneut
+Der Arbeitsbereich wird **pausiert**. Die App, die API, der MCP-Server und Rela sind
+nicht mehr verfügbar, aber **Ihre Einträge sind sicher** und bleiben gespeichert. Wenn Sie erneut
 abonnieren, ist alles genau wie zuvor wiederhergestellt. Ein pausierter Arbeitsbereich
 kann vom Inhaber weiterhin gelöscht werden, und die Löschfrist von 30 Tagen gilt wie
 gewohnt.

@@ -13,8 +13,7 @@ por dirección de correo y con empresas por dominio.
 
 ## Lea una conversación
 
-Cada fila muestra el asunto, los participantes, la primera línea y el buzón por
-el que llegó, como **via** y un nombre. Use **Buscar correos…** para acotar la
+Cada fila muestra el asunto, los participantes, la primera línea y el buzón por el que llegó, como **a través de** y un nombre. Use **Buscar correos…** para acotar la
 lista.
 
 Haga clic en una fila para abrir el correo. El lector muestra al remitente, a los
@@ -44,7 +43,7 @@ del registro ya está en **Para**.
 
 - **De** elige la cuenta conectada desde la que se envía.
 - **CC** y **CCO** agregan esos campos.
-- La barra de herramientas da formato al texto, y **Insertar variable** agrega
+- La barra de herramientas da formato al texto, e **Insertar variable** agrega
   una variable de combinación: nombre completo, empresa, número de teléfono,
   cargo, LinkedIn o la fecha de hoy.
 - **Adjuntar archivos**, **Firma** y **Usar plantilla** están debajo del

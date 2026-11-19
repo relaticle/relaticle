@@ -13,7 +13,7 @@ que vous pouvez lier pendant l'association, et un exemple de CSV fonctionnel.
 ## Entreprises
 
 - `name` (obligatoire)
-- `account_owner_email` : l'e-mail d'un membre, pour attribuer la propriété
+- `account_owner_email` : l'e-mail d'un membre, pour désigner le responsable
 - Les attributs personnalisés avec le préfixe `custom_fields_`
 
 ```

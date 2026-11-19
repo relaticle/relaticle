@@ -55,5 +55,5 @@ complètement cette colonne hors de l'import.
 
 Pour les règles de mise en forme des fichiers, la correspondance et la mise à
 jour des enregistrements existants, et les corrections des valeurs signalées
-par l'assistant, consultez les articles
+par l'assistant d'import, consultez les articles
 [Importer des données](/fr/help/import).

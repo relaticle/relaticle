@@ -41,7 +41,7 @@ Klick auf die eingeklappte Leiste klappt sie wieder aus.
 - **Ziehen Sie eine Karte** in eine andere Spalte, um ihren Status zu ändern. Die
   Änderung wird beim Ablegen gespeichert.
 - **Eine Aufgabe direkt hinzufügen** können Sie mit der Schaltfläche **+** oben in
-  jeder Spalte. Der Status ist dann auf diese Spalte voreingestellt. **Neue Aufgabe**
+  jeder Spalte. Der Status ist dann auf diese Spalte voreingestellt. **Erstellen**
   in der Kopfzeile beginnt in der ersten sichtbaren Spalte.
 - **Bearbeiten oder löschen** Sie eine Karte über das Menü auf der Karte selbst.
 
@@ -50,11 +50,11 @@ Klick auf die eingeklappte Leiste klappt sie wieder aus.
 Ziehen Sie eine Spaltenkopfzeile nach links oder rechts, um diesen Status zu
 verschieben. Sie können auch oben am Board auf **Ansichtseinstellungen** klicken und
 die Status unter **Sichtbare Spalten** ziehen. Das Menü eines Status enthält dort auch
-**Nach oben verschieben** und **Nach unten verschieben**. Schalten Sie dort einen
+**Nach oben** und **Nach unten**. Schalten Sie dort einen
 Status aus, um seine Spalte auszublenden. Schalten Sie **Ohne Status** ein, um eine
 erste Spalte für Aufgaben ohne Status hinzuzufügen. Die Reihenfolge wird nur für Sie
 gespeichert, andere Mitglieder behalten ihre eigene. Das Board merkt sich auch Ihre
-Filter, Ihre Sortierung und Ihre Lanes. Wählen Sie im Ansichtsumschalter **Neue
+Filter, Ihre Sortierung und Ihre Lanes. Wählen Sie in der Ansichtsauswahl **Neue
 Ansicht erstellen**, um sie als Ansicht zu speichern, die nur Sie sehen. Die eigene
 Reihenfolge des Attributs **Status** bleibt davon unberührt, und ein später hinzugefügter
 Status reiht sich am Ende Ihrer Reihenfolge ein.
@@ -72,4 +72,4 @@ Optionen sind von Haus aus Zu erledigen, In Bearbeitung und Erledigt. Der
 Inhaber des Arbeitsbereichs oder ein Administrator kann sie umbenennen, weitere
 hinzufügen oder sie auf der Seite Benutzerdefinierte Attribute umordnen. Mit dieser
 Reihenfolge beginnt das Board jedes Mitglieds:
-[die Optionen eines Auswahlattributs bearbeiten](/de/help/custom-fields/edit-the-options-in-a-select-field).
+[die Optionen eines Auswahl-Attributs bearbeiten](/de/help/custom-fields/edit-the-options-in-a-select-field).

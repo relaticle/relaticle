@@ -38,7 +38,7 @@ qui n'a besoin que d'une personne et d'une note ne crée que ces deux-là.
 4. De retour dans Maxforms, activez les enregistrements voulus et associez chaque
    champ de Relaticle à une réponse du formulaire. Vos attributs personnalisés
    sont listés à côté des attributs intégrés.
-5. Enregistrez, envoyez un envoi de test et ouvrez les nouveaux enregistrements
+5. Enregistrez, faites un envoi de test et ouvrez les nouveaux enregistrements
    dans Relaticle.
 
 Maxforms demande deux autorisations : lire vos enregistrements, et les créer et
@@ -54,8 +54,8 @@ Dans la carte Relaticle de Maxforms, associez la réponse e-mail du formulaire �
 E-mails, puis choisissez E-mails sous **Match existing people by**. Faites de
 même avec Domaines pour les entreprises.
 
-Une personne qui renvoie le formulaire met alors à jour sa personne et son
-entreprise existantes. L'opportunité, la note et la tâche sont de nouveau
+Si une même personne renvoie le formulaire, sa personne et son entreprise
+existantes sont mises à jour. L'opportunité, la note et la tâche sont de nouveau
 créées à chaque fois.
 
 ## Voir et révoquer la connexion
@@ -64,8 +64,7 @@ Ouvrez **Paramètres → Jetons d'accès** depuis le menu de votre avatar. Maxfo
 apparaît dans la liste **Connecteurs IA**, à côté des assistants que vous avez
 connectés, avec l'espace de travail dans lequel il écrit. **Révoquer** coupe son
 accès immédiatement, pour tous les formulaires que vous avez connectés. Les
-nouveaux envois échouent alors à la livraison jusqu'à ce que vous vous
-reconnectiez.
+nouveaux envois échouent alors jusqu'à ce que vous reconnectiez Maxforms.
 
 ## Bon à savoir
 
@@ -77,4 +76,4 @@ reconnectiez.
   travail choisi sur l'écran de consentement.
 - Un espace de travail en pause ne peut pas être choisi sur l'écran de
   consentement. Les livraisons vers un espace de travail qui se met en pause plus
-  tard échouent jusqu'à ce qu'il soit de nouveau abonné.
+  tard échouent jusqu'à ce que son abonnement soit réactivé.

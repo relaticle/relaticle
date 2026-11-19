@@ -6,9 +6,7 @@ updated: "2026-08-13"
 related: [help/custom-fields/add-and-manage-fields, help/getting-started/track-a-deal-through-the-pipeline, help/tasks-and-notes/use-the-task-board]
 ---
 
-Las opciones dentro de cada atributo de tipo selección son suyas para editar, e
-incluyen las dos selecciones con las que Relaticle viene con ideas muy
-definidas: el atributo **Etapa** de la oportunidad (su pipeline) y el atributo
+Usted puede editar las opciones de cualquier atributo de tipo selección, incluidas las dos selecciones que Relaticle trae ya definidas con criterio propio: el atributo **Etapa** de la oportunidad (su pipeline) y el atributo
 **Estado** de la tarea (las columnas de su tablero).
 
 1. Haga clic en el nombre de su espacio de trabajo en la parte superior de la

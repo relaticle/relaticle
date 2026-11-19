@@ -51,7 +51,7 @@ Bedacht, denn der Typ eines Attributs ist nach dem Erstellen gesperrt.
 Auswahl-Attribute bringen ihre eigenen Optionslisten mit. Siehe
 [Optionen eines Auswahl-Attributs bearbeiten](/de/help/custom-fields/edit-the-options-in-a-select-field).
 
-## Spezial
+## Sonstige Typen
 
 | Typ | Geeignet für |
 |-----|--------------|

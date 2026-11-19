@@ -147,14 +147,14 @@ Eine selbst gehostete Installation liefert keine rechtlichen Seiten mit, und die
 
 | Variable | Standard | Beschreibung |
 |----------|---------|-------------|
-| `RELATICLE_PRIVACY_URL` | (leer) | Ihre Datenschutzerklärung. Sie ist aus der Fußzeile der Anmeldeseiten, den Onboarding-Bildschirmen, der Seite zur geplanten Löschung und der Seite der E-Mail-Konten verlinkt. Nicht gesetzt bedeutet kein Link. |
+| `RELATICLE_PRIVACY_URL` | (leer) | Ihre Datenschutzerklärung. Sie ist aus der Fußzeile der Anmeldeseiten, den Onboarding-Bildschirmen, der Seite zur geplanten Löschung und der Seite Postfächer verlinkt. Nicht gesetzt bedeutet kein Link. |
 | `RELATICLE_TERMS_URL` | (leer) | Ihre Nutzungsbedingungen. Sie sind aus der Fußzeile der Anmeldung, den Onboarding-Bildschirmen und der Seite zur geplanten Löschung verlinkt. Nicht gesetzt bedeutet kein Link. |
 | `RELATICLE_CONTACT_URL` | (leer) | Ihre Kontakt- oder Support-Seite. Sie ist aus der Fußzeile der Anmeldung verlinkt. Nicht gesetzt bedeutet kein Link. |
 | `DOCUMENTATION_PUBLIC_URL` | `https://relaticle.com` | Die Website, die das Hilfecenter und die Entwickler-Leitfäden bereitstellt. Rela und die Hilfelinks des Panels verweisen dorthin. Setzen Sie sie auf Ihren eigenen Mirror, wenn Sie einen betreiben. |
 
 ### E-Mail und Kalender
 
-Die Synchronisierung von E-Mails und Kalendern ist standardmäßig aus. Schalten Sie sie mit `RELATICLE_FEATURE_EMAIL_INTEGRATION=true` ein. Mitglieder können dann Google-Konten verbinden, und Microsoft-Konten, sobald Sie einen Microsoft-Client konfiguriert haben.
+Die Synchronisierung von E-Mails und Kalendern ist standardmäßig aus. Schalten Sie sie mit `RELATICLE_FEATURE_EMAIL_INTEGRATION=true` ein. Mitglieder können dann Google-Postfächer verbinden, und Microsoft-Postfächer, sobald Sie einen Microsoft-Client konfiguriert haben.
 
 Google-Postfächer brauchen einen eigenen Google-OAuth-Client, getrennt von dem für die Anmeldung über soziale Netzwerke, mit aktivierter Gmail API und Google Calendar API.
 
@@ -219,12 +219,12 @@ Schalten Sie Funktionen ein oder aus. Alle sind standardmäßig aktiviert, sofer
 | `RELATICLE_FEATURE_ONBOARD_SEED` | `true` | Legt Demodaten an (Beispielunternehmen, Personen, Aufgaben), wenn ein neuer Arbeitsbereich erstellt wird. Setzen Sie `false`, um mit einem leeren Arbeitsbereich zu starten. |
 | `RELATICLE_FEATURE_SOCIAL_AUTH` | `true` | Aktiviert die Anmeldung mit Google und Microsoft. Setzen Sie `false`, um nur die Anmeldung mit E-Mail, Passwort und Passkey zu nutzen. |
 | `RELATICLE_FEATURE_DOCUMENTATION` | `true` | Stellt die OpenAPI-Spezifikation unter `/openapi.json` und `/openapi.yaml` bereit und zeigt den Link zum MCP-Leitfaden auf der Seite der Zugriffstoken. Setzen Sie `false`, um beides zu entfernen. Die Spezifikation existiert erst, nachdem `php artisan scribe:generate` sie geschrieben hat. Das Docker-Image und die manuellen Schritte führen diesen Befehl nicht aus, der Build von Laravel Cloud schon. Die API-Referenz unter `/developers/api` ist eine Dokumentationsseite von relaticle.com und lädt dieselbe Spezifikation. |
-| `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Aktiviert die Synchronisierung von E-Mails und Kalendern für Google- und Microsoft-Konten, den E-Mail-Editor und die Hilfeseiten zu E-Mail und Kalender. Erfordert `GMAIL_CLIENT_ID` und `GMAIL_CLIENT_SECRET`. Microsoft-Konten brauchen außerdem `AZURE_CLIENT_ID` und `AZURE_CLIENT_SECRET`. |
+| `RELATICLE_FEATURE_EMAIL_INTEGRATION` | `false` | Aktiviert die Synchronisierung von E-Mails und Kalendern für Google- und Microsoft-Postfächer, den E-Mail-Editor und die Hilfeseiten zu E-Mail und Kalender. Erfordert `GMAIL_CLIENT_ID` und `GMAIL_CLIENT_SECRET`. Microsoft-Postfächer brauchen außerdem `AZURE_CLIENT_ID` und `AZURE_CLIENT_SECRET`. |
 | `RELATICLE_FEATURE_SIGNUP_CHALLENGE` | `false` | Verlangt von neuen Registrierungen eine Cloudflare-Turnstile-Prüfung. Sie bleibt für normale Browser unsichtbar und zeigt nur dann ein Kontrollkästchen, wenn Cloudflare eines braucht. Erfordert `TURNSTILE_SITE_KEY` und `TURNSTILE_SECRET_KEY`. Das Flag lehnt außerdem Registrierungen von Tor-Exit-Relays ab, wofür keine Schlüssel nötig sind. Es prüft die Exit-Liste des Tor Project, die stündlich aktualisiert wird. Die Anmeldung über Tor funktioniert weiterhin. Solange das Flag aktiv ist, erstellt die Registrierung per E-Mail höchstens 3 Konten pro Tag und IP-Adresse und 5 pro Stunde für die gesamte Installation. Die Anmeldung mit Google und Microsoft zählt nie mit. Ändern Sie die Obergrenzen mit `RELATICLE_SIGNUP_MAX_PER_IP_PER_DAY` und `RELATICLE_SIGNUP_MAX_PER_HOUR`, und setzen Sie eine auf `0`, um sie auszuschalten. Das Flag speichert außerdem die IP-Adresse und den Browser jeder neuen Registrierung für Systemadministratoren und löscht den Eintrag nach 90 Tagen. |
 
 `RELATICLE_FEATURE_BLOG` bewirkt bei einer selbst gehosteten Installation nichts. Es schaltet die Blogseiten ein, die im Cloud-Paket liegen. Das Docker-Image lässt dieses Paket weg, ebenso die Marketing-Website und die Seiten der Hilfe und der Entwickler-Leitfäden.
 
-Lassen Sie `RELATICLE_FEATURE_BILLING` ungesetzt, denn in einer selbst gehosteten Installation kann nichts ein Abonnement starten. Ist es aktiv, gilt für jeden Arbeitsbereich, der nach der Abrechnungsmigration vom Juli 2026 Ihrer Installation erstellt wurde, der Tarif „Kostenlos“ oder „Testphase beendet“. Bei einer neuen Installation ist das jeder Arbeitsbereich. Beide verweigern den Zugriff, deshalb stoppen für diese Arbeitsbereiche das Senden von E-Mails sowie die Synchronisierung von Postfächern und Kalendern. E-Mails, die für sie bereits eingeplant sind, werden als fehlgeschlagen markiert und nicht erneut gesendet, wenn Sie das Flag wieder ausschalten. Die Seite der Zugriffstoken erhält außerdem einen Hilfelink zum Webformular.
+Lassen Sie `RELATICLE_FEATURE_BILLING` ungesetzt, denn in einer selbst gehosteten Installation kann nichts ein Abonnement starten. Ist es aktiv, gilt für jeden Arbeitsbereich, der erstellt wurde, nachdem Ihre Installation die Abrechnungsmigration vom Juli 2026 ausgeführt hat, der Tarif „Kostenlos“ oder „Testphase beendet“. Bei einer neuen Installation ist das jeder Arbeitsbereich. Beide verweigern den Zugriff, deshalb stoppen für diese Arbeitsbereiche das Senden von E-Mails sowie die Synchronisierung von Postfächern und Kalendern. E-Mails, die für sie bereits eingeplant sind, werden als fehlgeschlagen markiert und nicht erneut gesendet, wenn Sie das Flag wieder ausschalten. Die Seite der Zugriffstoken erhält außerdem einen Hilfelink zum Webformular.
 
 ---
 
@@ -562,7 +562,7 @@ docker compose pull
 docker compose up -d
 ```
 
-Datenbankmigrationen laufen beim Start automatisch. Der App-Container wendet alle ausstehenden Migrationen an, bevor er Verkehr bedient.
+Datenbankmigrationen laufen beim Start automatisch. Der App-Container wendet alle ausstehenden Migrationen an, bevor er Anfragen annimmt.
 
 ### 4. Compose-Datei aktualisieren
 
@@ -829,7 +829,7 @@ Häufige Ursachen:
 3. Testen Sie mit: `docker compose exec app php artisan tinker --execute "Mail::raw('Test', fn(\$m) => \$m->to('you@example.com')->subject('Test'))"`
 4. Prüfen Sie die Logs: `docker compose logs app | grep -i mail`
 
-### Der Chat bleibt bei „Thinking...“
+### Der Chat bleibt bei „Denkt nach…“
 
 Seit Oktober 2026 erscheint eine Antwort wenige Sekunden nach dem Speichern, auch ohne Websocket. Wartet der Chat trotzdem, wird die Antwort nicht erzeugt:
 

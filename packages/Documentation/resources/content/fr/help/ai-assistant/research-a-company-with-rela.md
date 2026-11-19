@@ -18,7 +18,7 @@ pourraient nous convenir ». Quand Rela a besoin du web, il demande avant de
 chercher. Une carte au-dessus de la zone de message montre ce qu'il veut
 chercher et pourquoi, avec trois boutons :
 
-- **Autoriser** laisse Rela chercher sur le web pour cette seule demande. Votre message suivant redemande.
+- **Autoriser** laisse Rela chercher sur le web pour cette seule demande. Rela vous redemandera à votre prochain message.
 - **Toujours autoriser** fait la même chose et cesse de demander à partir de là.
 - **Refuser** garde Rela sur les données de votre espace de travail. Il répond à partir de vos enregistrements et précise qu'il n'a pas utilisé le web.
 
@@ -37,7 +37,7 @@ Ouvrez **Paramètres** depuis le menu de votre avatar, puis **Rela**, et sous **
 
 | Choix | Ce qui se passe |
 |--------|--------------|
-| Toujours demander | Rela demande avant chaque demande de recherche. C'est le choix par défaut. |
+| Toujours demander | Rela demande votre accord avant chaque recherche. C'est le choix par défaut. |
 | Toujours autoriser | Rela cherche sans demander. |
 | Ne pas autoriser | Rela ne cherche jamais sur le web et répond uniquement à partir de votre espace de travail. |
 

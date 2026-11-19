@@ -6,7 +6,7 @@ updated: "2026-08-12"
 related: [help/getting-started/add-your-first-person, help/getting-started/import-your-existing-data]
 ---
 
-Un enregistrement d'entreprise suit une société à qui vous vendez ou avec qui
+Un enregistrement d'entreprise suit une entreprise à laquelle vous vendez ou avec laquelle
 vous travaillez : son nom, qui gère la relation, et les personnes, tâches et
 notes qui y sont liées. Un nom suffit pour en créer un. Le reste peut attendre.
 

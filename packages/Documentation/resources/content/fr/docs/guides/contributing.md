@@ -49,7 +49,7 @@ Workspace ─┬─ User (via Membership)
            └─ Note (many-to-many with Company, People, Opportunity)
 ```
 
-### Multi-tenance
+### Architecture multi-tenant
 
 Les données de chaque espace de travail sont isolées grâce au trait `HasWorkspace`. Chaque requête est automatiquement limitée à l'espace de travail courant.
 

@@ -24,7 +24,7 @@ das Symptom heraus. Jede Lösung können Sie selbst umsetzen.
 | Problem | Lösung |
 |---------|----------|
 | Eine Spalte wurde nicht automatisch zugeordnet | Das Feld selbst im Dropdown **Zuordnen zu** auswählen |
-| Ein benutzerdefiniertes Attribut fehlt im Dropdown | Den Code des Feldes unter **Einstellungen → Benutzerdefinierte Attribute** prüfen |
+| Ein benutzerdefiniertes Attribut fehlt im Dropdown | Den Code des Attributs unter **Einstellungen → Benutzerdefinierte Attribute** prüfen |
 | Ein Pflichtfeld erscheint rot | Eine Ihrer CSV-Spalten diesem Feld zuordnen |
 
 ## Prüfungsprobleme
@@ -34,16 +34,16 @@ das Symptom heraus. Jede Lösung können Sie selbst umsetzen.
 | Ungültige E-Mail-Adresse | Das Format korrigieren: `user@domain.com` |
 | Ungültiges Datum | ISO-, europäisches oder amerikanisches Format durchgehend einheitlich verwenden |
 | Ungültige Eintrags-ID | Neu exportieren, um aktuelle IDs zu erhalten |
-| Unbekannte Auswahloption | Exakt die Optionsbezeichnung aus den Einstellungen des Feldes verwenden |
+| Unbekannte Auswahloption | Exakt die Optionsbezeichnung aus den Einstellungen des Attributs verwenden |
 
 Im Prüfschritt können Sie einen Wert auch einmal korrigieren (**Diesen Wert korrigieren**), sodass
-die Korrektur in jeder Zeile gilt, die ihn enthält, oder einen Wert mit **Überspringen**
+die Korrektur in jeder Zeile gilt, die ihn enthält, oder einen Wert mit **Diesen Wert überspringen**
 auslassen. Die Zeilen werden trotzdem importiert, nur dieses eine Feld bleibt
 leer.
 
 ## Mehrdeutige Datumsangaben
 
-Der Assistent liest drei Datumsformate und erkennt, welches eine Spalte
+Der Import-Assistent liest drei Datumsformate und erkennt, welches eine Spalte
 verwendet:
 
 | Format | Muster | Beispiel |
@@ -69,7 +69,7 @@ weshalb sie das sicherste Format für den Export aus anderen Werkzeugen sind.
 
 ## Gut zu wissen
 
-- **Es gibt kein Rückgängigmachen.** Testen Sie mit einer Stichprobe von 5 bis 10
+- **Ein Import lässt sich nicht rückgängig machen.** Testen Sie mit einer Stichprobe von 5 bis 10
   Zeilen, bevor Sie die ganze Datei importieren.
 - **Ein fehlgeschlagener Import behält seine erfolgreichen Zeilen.** Korrigieren
   Sie nur die heruntergeladenen fehlgeschlagenen Zeilen und importieren Sie diese

@@ -1,6 +1,6 @@
 ---
 title: KI-Credits und Ratenlimits
-description: Wie Assistentennachrichten in Relaticle Cloud Credits verbrauchen, was jeder Tarif enthält und was bei null passiert. Self-Hosted hat kein Credit-Limit.
+description: Wie Assistentennachrichten in Relaticle Cloud Credits verbrauchen, was jeder Tarif enthält und was bei null passiert. Selbst gehostet gibt es kein Credit-Limit.
 order: 4
 updated: "2026-11-04"
 related: [help/ai-assistant/choose-an-ai-model, help/workspace/billing-and-plans]
@@ -12,7 +12,7 @@ kostet einen Credit, und jedes Tool, das der Assistent für die Antwort nutzt,
 erhöht den Preis. Die Credits teilt sich der ganze Arbeitsbereich, sie gelten
 nicht pro Person.
 
-## Self-Hosted-Installationen
+## Selbst gehostete Installationen
 
 Eine selbst gehostete Installation hat kein Credit-Limit. Der Assistent läuft
 mit Ihrem eigenen Anbieterschlüssel oder einem lokalen Modell, und Sie bezahlen
@@ -39,7 +39,7 @@ Die endgültigen Kosten stehen fest, sobald die Antwort vollständig ist.
 | Cloud Pro Testphase | 300 | 30 |
 | Cloud Scale | 5.000 | 60 |
 | Enterprise | Mit Ihrem Team vereinbart | Mit Ihrem Team vereinbart |
-| Self-Hosted | Nicht gemessen | 60, festgelegt über `CHAT_RATE_LIMIT_PER_MINUTE` (0 für kein Limit) |
+| Self-Hosted | Unbegrenzt | 60, festgelegt über `CHAT_RATE_LIMIT_PER_MINUTE` (0 für kein Limit) |
 
 Relaticle Cloud hat keinen kostenlosen Tarif. Was jeder Tarif kostet, steht
 unter [Abrechnung und Tarife](/de/help/workspace/billing-and-plans).

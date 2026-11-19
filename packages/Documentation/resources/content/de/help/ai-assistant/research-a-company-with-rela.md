@@ -13,7 +13,7 @@ und die gefundenen Seiten lesen.
 
 ## So läuft eine Recherche-Anfrage ab
 
-Fragen Sie in einfachen Worten, zum Beispiel „Recherchiere Filaforms und sag
+Fragen Sie in einfachen Worten, zum Beispiel „Recherchieren Sie Filaforms und sagen Sie
 mir, ob sie zu uns passen könnten“. Braucht Rela das Web, fragt es vor der
 Suche nach. Eine Karte über dem Nachrichtenfeld zeigt, wonach es suchen
 möchte und warum, mit drei Schaltflächen:
@@ -24,7 +24,7 @@ möchte und warum, mit drei Schaltflächen:
 
 Während Rela arbeitet, zeigt der Chat, wonach es sucht und welche Seite es
 gerade liest. Die Antwort endet mit einer Zeile **Quellen**: ein Link für
-jede Seite, die Rela zitiert hat, und er öffnet sich in einem neuen Tab.
+jede Seite, die Rela zitiert hat. Jeder Link öffnet sich in einem neuen Tab.
 
 Rela schreibt nie von sich aus in Ihre Einträge, was es gefunden hat. Schlägt
 es vor, eine Notiz hinzuzufügen oder ein Attribut auszufüllen, genehmigen Sie
@@ -42,7 +42,7 @@ Sie unter **Websuche** eine Option:
 | Immer zulassen | Rela sucht, ohne zu fragen. |
 | Nicht zulassen | Rela durchsucht das Web nie und antwortet nur aus Ihrem Arbeitsbereich. |
 
-Die Wahl gilt nur für Sie. Ihre Teamkollegen wählen selbst.
+Die Wahl gilt nur für Sie. Andere Mitglieder wählen selbst.
 
 ## Die Websuche für den ganzen Arbeitsbereich ausschalten
 

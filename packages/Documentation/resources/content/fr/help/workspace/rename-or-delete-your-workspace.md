@@ -30,13 +30,13 @@ invitez vos premiers membres, par e-mail ou en copiant le lien d'invitation vala
 7 jours.
 
 Clients distincts, activités distinctes, ou bac à sable pour essayer des choses :
-chaque espace de travail garde entièrement pour lui ses données, ses champs et son
+chaque espace de travail garde entièrement pour lui ses données, ses attributs et son
 offre.
 
 ## Le supprimer
 
 En bas de Paramètres de l'espace de travail, **Supprimer l'espace de travail** clôture
-un espace de travail avec un filet de sécurité : la suppression est planifiée **dans
+un espace de travail avec un filet de sécurité : la suppression est programmée **dans
 30 jours**, et la page affiche un bouton **Annuler la suppression** pendant tout le
 délai de grâce. Après ces 30 jours, l'espace de travail et tous ses enregistrements
 sont supprimés définitivement. [Exportez donc vos données](/fr/help/records/export-your-data)

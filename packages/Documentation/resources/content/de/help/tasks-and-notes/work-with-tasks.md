@@ -8,7 +8,7 @@ related: [help/tasks-and-notes/use-the-task-board, help/records/company-records,
 
 Eine Aufgabe ist eine Nachfassaktion mit Frist: den Kunden zurückrufen, das Angebot
 senden, den Vertrag nachverfolgen. Erstellen Sie Aufgaben in der Liste **Aufgaben** mit
-**Neue Aufgabe** oder auf der Seite eines Unternehmens, einer Person oder einer
+**Erstellen** oder auf der Seite eines Unternehmens, einer Person oder einer
 Verkaufschance. Dort erstellte Aufgaben sind bereits mit dem Eintrag verknüpft.
 
 ## Was zu einer Aufgabe gehört

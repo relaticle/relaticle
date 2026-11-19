@@ -5,7 +5,7 @@ order: 2
 ---
 
 Alles rund um das Übernehmen von Daten in Relaticle: eine CSV-Datei
-vorbereiten, die der Assistent auf Anhieb akzeptiert, Zeilen mit bereits
+vorbereiten, die der Import-Assistent auf Anhieb akzeptiert, Zeilen mit bereits
 vorhandenen Einträgen verknüpfen und die Werte klären, die er unterwegs
 markiert.
 

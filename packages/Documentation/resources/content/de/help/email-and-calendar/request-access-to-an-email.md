@@ -15,7 +15,7 @@ mehr. Es genehmigt oder lehnt die Anfrage ab, und die E-Mail öffnet sich nur f�
 2. Klicken Sie bei der eingeschränkten E-Mail auf **Zugriff bei [Name des Mitglieds]
    anfragen**.
 3. Wählen Sie die **Angefragte Zugriffsstufe**: **Betreffzeile und Teilnehmer** oder
-   **Voller Zugriff**.
+      **Vollzugriff**.
 4. Klicken Sie auf **Absenden**.
 
 Die Zeile zeigt **Angefragt**, bis das Mitglied antwortet. Relaticle benachrichtigt

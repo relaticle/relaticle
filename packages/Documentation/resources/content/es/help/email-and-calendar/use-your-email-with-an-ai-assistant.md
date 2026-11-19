@@ -14,8 +14,7 @@ que usted ve en Relaticle.
 ## Pregúntele a Rela por su correo
 
 Rela no necesita más configuración que un buzón conectado. Pídale en el chat:
-"¿qué dijo Lena sobre las tarifas del cuarto trimestre?", "redacta una respuesta
-que confirme el jueves" o "envíale a Lena la nueva lista de precios por correo".
+"¿qué dijo Lena sobre las tarifas del cuarto trimestre?", "redacte una respuesta que confirme el jueves" o "envíele a Lena la nueva lista de precios por correo".
 
 - **Lectura.** Rela lee el correo con el nivel de uso compartido que tiene para
   usted. La tabla de

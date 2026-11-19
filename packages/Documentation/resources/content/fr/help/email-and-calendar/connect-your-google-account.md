@@ -22,7 +22,7 @@ Microsoft 365, consultez
 5. Google vous renvoie vers Relaticle, et la boîte mail apparaît sous
    **Boîtes mail connectées**.
 
-La page **E-mails** et le panneau **Réunions** de **Accueil** affichent le même
+La page **E-mails** et le panneau **Réunions** de la page **Accueil** affichent le même
 bouton tant que vous n'avez connecté aucune boîte mail.
 
 ![L'onglet Boîtes mail sous E-mail et agenda, avec une boîte mail Google connectée marquée Par défaut et Synchronisé, au-dessus des boutons Connecter une boîte mail Google et Connecter une boîte mail Microsoft](/help-assets/email-and-calendar/connect-your-google-account-1.png)
@@ -62,8 +62,8 @@ de blocage de cette boîte mail** et **Signatures** ont chacun leur onglet.
 Le menu de la ligne est le même pour une boîte mail Google et une boîte mail
 Microsoft.
 
-- **Définir par défaut** fait de cette boîte mail celle depuis laquelle le
-  compositeur envoie quand vous en avez plusieurs.
+- **Définir par défaut** fait de cette boîte mail celle depuis laquelle
+  l'éditeur d'e-mails envoie quand vous en avez plusieurs.
 - **Déconnecter la boîte mail** arrête la synchronisation, supprime les jetons
   d'accès que Relaticle détient et retire les signatures de la boîte mail.
 

@@ -15,8 +15,8 @@ Namen. Alles andere kann warten.
 2. Klicken Sie oben rechts auf **Erstellen**.
 3. Geben Sie den Namen des Unternehmens in **Name** ein. Das ist das einzige
    Pflichtfeld.
-4. Wählen Sie einen **Verantwortlicher** aus, wenn Sie das Unternehmen einem
-   Mitglied zuweisen möchten.
+4. Wählen Sie unter **Verantwortlicher** ein Mitglied aus, wenn Sie das
+   Unternehmen jemandem zuweisen möchten.
 5. Füllen Sie **Domains** und **LinkedIn** aus oder schalten Sie **ICP** ein,
    wenn Sie die Angaben schon kennen. Sie können sie auch später ergänzen.
 6. Klicken Sie auf **Erstellen**.

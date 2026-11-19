@@ -105,5 +105,5 @@ et Lecteur. **Retirer** sort un membre de l'espace de travail : ses enregistreme
 restent, il perd l'accès. Tout membre sauf le propriétaire peut **Quitter** lui-même
 l'espace de travail. Le propriétaire n'a pas l'action **Quitter**.
 
-La liste se recherche par nom ou par adresse e-mail, ce qui garde une longue liste
+Vous pouvez rechercher dans la liste par nom ou par adresse e-mail, ce qui garde une longue liste
 facile à parcourir.

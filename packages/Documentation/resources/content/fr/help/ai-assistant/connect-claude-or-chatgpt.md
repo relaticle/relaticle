@@ -65,7 +65,7 @@ parti. Vous pouvez toujours le reconnecter plus tard.
 
 - Fonctionne avec un espace de travail Relaticle Cloud actif. Un espace de
   travail en pause ne peut pas être sélectionné sur l'écran de consentement tant
-  qu'il n'est pas de nouveau abonné.
+  que son abonnement n'est pas réactivé.
 - Claude et ChatGPT sont aujourd'hui les assistants dotés d'un parcours de
   connecteur intégré, mais le serveur parle le standard ouvert MCP : tout autre
   outil compatible MCP peut donc utiliser la même URL avec un jeton d'accès

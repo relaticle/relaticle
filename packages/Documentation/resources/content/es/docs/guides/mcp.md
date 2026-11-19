@@ -22,7 +22,7 @@ Con el MCP server de Relaticle, su asistente de IA puede:
 - **Leer los esquemas de las entidades** para entender sus atributos personalizados
 - **Obtener una visión general del CRM** con conteos de registros y actividad reciente
 
-Las escrituras hechas por MCP se aplican de inmediato. La tarjeta de aprobación pertenece al asistente integrado en Relaticle, y un cliente MCP depende de sus propias confirmaciones. Hay herramientas de correo para una conexión a la que se dio acceso al correo. Las reuniones no se exponen. Un correo enviado es la única escritura que no se aplica de inmediato: primero se retiene y su usuario puede cancelarlo, en Relaticle o mediante el agente que lo envió.
+Las escrituras hechas por MCP se aplican de inmediato. La tarjeta de aprobación pertenece al asistente integrado en Relaticle, y un cliente MCP depende de sus propias confirmaciones. Hay herramientas de correo para una conexión a la que se dio acceso al correo. Las reuniones no se exponen. Un correo enviado es la única escritura que no se aplica de inmediato: primero se retiene y la persona que usa el agente puede cancelarlo, en Relaticle o mediante el agente que lo envió.
 
 ---
 
@@ -57,9 +57,9 @@ Los clientes que admiten Dynamic Client Registration (RFC 7591), incluidos Claud
 
 En el consentimiento elige **un espacio de trabajo** para el conector. Esa elección es permanente para ese conector: para dirigirlo a otro espacio de trabajo, revóquelo y conéctelo de nuevo. Los espacios de trabajo en pausa no se pueden seleccionar. Suscríbase primero, o el conector no tendría datos que leer.
 
-La pantalla de consentimiento enumera lo que el conector podrá hacer, y la lista sigue su rol en el espacio de trabajo que elija. Donde el correo está activado, todos los roles obtienen lectura y redacción de borradores, y los roles de propietario, administrador y miembro obtienen el envío. El cliente no puede pedir más ni menos. Relaticle muestra esta pantalla cada vez que un conector se autoriza, así que el conector siempre tiene lo que su usuario vio. Cada llamada a una herramienta también comprueba su rol en ese momento, así que un cambio de rol se aplica a los conectores que agregó antes.
+La pantalla de consentimiento enumera lo que el conector podrá hacer, y la lista sigue su rol en el espacio de trabajo que elija. Donde el correo está activado, todos los roles obtienen lectura y redacción de borradores, y los roles de propietario, administrador y miembro obtienen el envío. El cliente no puede pedir más ni menos. Relaticle muestra esta pantalla cada vez que un conector se autoriza, así que el conector siempre tiene lo que vio la persona que lo autorizó. Cada llamada a una herramienta también comprueba su rol en ese momento, así que un cambio de rol se aplica a los conectores que agregó antes.
 
-Los tokens de acceso duran 30 días y los tokens de actualización 90 días. Los clientes compatibles se actualizan en silencio en segundo plano.
+Los tokens de acceso duran 30 días y los tokens de actualización 90 días. Los clientes compatibles renuevan los tokens en silencio, en segundo plano.
 
 ### Revocar un conector
 
@@ -169,7 +169,7 @@ El servidor ofrece 50 herramientas. Cubren el contexto de la cuenta, el descubri
 
 | Herramienta | Descripción |
 |------|-------------|
-| `who-ami-tool` | Obtiene al usuario autenticado con su zona horaria, su espacio de trabajo actual, los miembros del espacio de trabajo y las habilidades del token |
+| `who-ami-tool` | Obtiene al usuario autenticado con su zona horaria, su espacio de trabajo actual, los miembros del espacio de trabajo y los permisos del token |
 
 ### Inteligencia del espacio de trabajo
 
@@ -179,7 +179,7 @@ El servidor ofrece 50 herramientas. Cubren el contexto de la cuenta, el descubri
 | `get-crm-summary-tool` | Obtiene los conteos de registros, los totales del pipeline por etapa y el estado de vencimiento de las tareas en su zona horaria |
 | `aggregate-opportunities-tool` | Agrupa los conteos y montos de las oportunidades por etapa o empresa, con límites de fecha opcionales |
 | `list-activity-tool` | Lista los cambios recientes del CRM con sus autores, enlaces a los registros y diferencias por campo. Una cuenta eliminada aparece como `Former member` |
-| `list-custom-fields-tool` | Lista las definiciones de atributos personalizados (campos personalizados) activas e inactivas, incluidas las opciones de selección |
+| `list-custom-fields-tool` | Lista las definiciones de atributos personalizados (custom fields) activas e inactivas, incluidas las opciones de selección |
 
 ### Empresas
 
@@ -251,7 +251,7 @@ Un correo en cola sigue ligado a la conexión que lo puso en cola. No se envía 
 | `create-email-draft-tool` | Guarda un borrador en uno de los buzones del usuario, como texto plano o markdown, con la firma predeterminada salvo que la desactive. No se envía nada: el usuario revisa el borrador en Relaticle. |
 | `update-email-draft-tool` | Reescribe un borrador guardado con los mismos argumentos que para crearlo. Los archivos adjuntos se conservan. |
 | `delete-email-draft-tool` | Elimina un borrador guardado y sus archivos adjuntos. |
-| `send-email-tool` | Envía un correo desde uno de los buzones del usuario, ahora o a la hora elegida. Cada correo espera unos minutos antes de salir, y su usuario puede cancelarlo desde las notificaciones o la Bandeja de salida. |
+| `send-email-tool` | Envía un correo desde uno de los buzones del usuario, ahora o a la hora elegida. Cada correo espera unos minutos antes de salir, y el usuario puede cancelarlo desde las notificaciones o la Bandeja de salida. |
 | `send-email-draft-tool` | Envía un borrador guardado tal como está, incluidas las ediciones del propio usuario, y lo quita de Borradores. Se retiene como cualquier otro envío. |
 | `cancel-email-tool` | Cancela un correo en cola antes de que salga. |
 | `reschedule-email-tool` | Cambia cuándo sale un correo en cola. El usuario recibe un aviso nuevo desde el que puede cancelar. |
@@ -262,7 +262,7 @@ Un correo en cola sigue ligado a la conexión que lo puso en cola. No se envía 
 | Herramienta | Descripción |
 |------|-------------|
 | `upload-file` | Almacena un archivo en el espacio de trabajo desde una URL https pública, un cuerpo base64 con `filename` o un `upload_id`. Devuelve `suggested_markdown` para incrustar el archivo en un campo de editor de texto enriquecido, como el cuerpo de una nota, además de `file_id` para el archivo almacenado. Tipos permitidos: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, de hasta 10 MB. 60 llamadas por hora por espacio de trabajo. |
-| `create-upload-url` | Obtiene una URL firmada de cinco minutos a la que enviar un cuerpo de archivo con `PUT`, y luego pase el `upload_id` devuelto a `upload-file` dentro de una hora. Un cuerpo no almacenado para entonces se elimina. 60 llamadas por hora por espacio de trabajo. |
+| `create-upload-url` | Obtiene una URL firmada, válida cinco minutos, a la que enviar un cuerpo de archivo con `PUT`. Luego se pasa el `upload_id` devuelto a `upload-file` dentro de una hora. Un cuerpo no almacenado para entonces se elimina. 60 llamadas por hora por espacio de trabajo. |
 
 Las subidas quedan pendientes durante 24 horas. Guardar un registro cuyo cuerpo de editor de texto enriquecido incrusta el archivo lo reclama. Los archivos no reclamados se purgan.
 
@@ -301,7 +301,7 @@ Los campos nativos y las relaciones van en el nivel superior. Los atributos pers
 | Tareas | Campos nativos `title`, `created_at`, `updated_at`, `creation_source`, `assigned_to_me`. Relaciones de registro `companies`, `people`, `opportunities`. Relaciones de miembro `creator`, `assignees`. |
 | Notas | Campos nativos `title`, `created_at`, `updated_at`, `creation_source`. Relaciones de registro `companies`, `people`, `opportunities`. Relación de miembro `creator`. |
 
-`name` y `title` aceptan los operadores de texto. `created_at` y `updated_at` aceptan los operadores de fecha y hora. Un operando de fecha es `YYYY-MM-DD` o una fecha y hora ISO 8601 como `2026-10-01T09:30:00Z`, y cualquier otro formato es un error. Una fecha y hora con desfase, como `2026-10-01T13:00:00+05:00`, se lee como el mismo instante en UTC. En estos campos y en un campo personalizado de fecha y hora, una fecha sin hora cubre ese día completo en la zona horaria del usuario del token, que devuelve la herramienta de identidad. `creation_source` es una selección única con los valores `web`, `sample`, `import`, `api`, `mcp`, `chat`, `mailbox` y `system`. `stale_days` coincide con oportunidades por días completos sin actividad, como en `{"$gte": 30}`. `assigned_to_me` acepta `{"$eq": true}`.
+`name` y `title` aceptan los operadores de texto. `created_at` y `updated_at` aceptan los operadores de fecha y hora. Un operando de fecha es `YYYY-MM-DD` o una fecha y hora ISO 8601 como `2026-10-01T09:30:00Z`, y cualquier otro formato es un error. Una fecha y hora con desfase, como `2026-10-01T13:00:00+05:00`, se lee como el mismo instante en UTC. En estos campos y en un atributo personalizado de fecha y hora, una fecha sin hora cubre ese día completo en la zona horaria del usuario del token, que devuelve la herramienta de identidad. `creation_source` es una selección única con los valores `web`, `sample`, `import`, `api`, `mcp`, `chat`, `mailbox` y `system`. `stale_days` coincide con oportunidades por días completos sin actividad, como en `{"$gte": 30}`. `assigned_to_me` acepta `{"$eq": true}`.
 
 #### Combinar condiciones
 
@@ -316,7 +316,7 @@ Los campos nativos y las relaciones van en el nivel superior. Los atributos pers
 Un nodo de relación contiene la misma gramática de filtro, aplicada a los registros relacionados. Los nombres dentro de él pertenecen a la entidad relacionada.
 
 - Las relaciones de registro aceptan `$in`, `$not_in` (IDs de registro) y `$is_empty`, o condiciones sobre el registro relacionado.
-- Las relaciones de miembro aceptan `$in`, `$not_in` (IDs de miembro) y `$is_empty`. Los nombres y correos de los miembros no se pueden filtrar. Quien dejó el espacio de trabajo cuenta como ningún miembro, así que un registro que creó coincide con `{"creator": {"$is_empty": true}}`.
+- Las relaciones de miembro aceptan `$in`, `$not_in` (IDs de miembro) y `$is_empty`. Los nombres y correos de los miembros no se pueden filtrar. Quien dejó el espacio de trabajo ya no cuenta como miembro, así que un registro que creó coincide con `{"creator": {"$is_empty": true}}`.
 - Una relación de varios registros coincide cuando al menos un registro relacionado coincide. Todas las condiciones de un mismo nodo de relación se aplican al mismo registro relacionado. Para encontrar registros sin ninguno, envuelva el nodo en `$not`.
 - Las relaciones se anidan como máximo 2 niveles, como `company` y luego `people`.
 
@@ -347,7 +347,7 @@ Los campos de área de texto, texto enriquecido y color no aceptan filtro. Tampo
 - Un campo de registro acepta los IDs de los registros a los que se vincula.
 - `$contains`, `$starts_with` y `$ends_with` ignoran las mayúsculas y minúsculas. En un campo con varios valores, coinciden cuando cualquier valor coincide. Comparan el operando tal como se escribió con el valor tal como está almacenado. Un teléfono se almacena como `+14155550100`, con una extensión como `;ext=12` y sin espacios, así que `+1415` coincide y `+1 415` no. Un enlace conserva un esquema solo cuando se escribió uno, así que `https://acme` coincide con `https://acme.com/team` y `acme` no. Un dominio se almacena como host simple, sin esquema ni `www.`.
 - `$not_in` y `$has_none` también coinciden con los registros donde el campo está vacío.
-- El vínculo de un campo de registro con un registro eliminado cuenta como ningún vínculo.
+- El vínculo de un campo de registro con un registro eliminado equivale a no tener vínculo.
 
 #### Límites
 
@@ -409,7 +409,7 @@ El servidor expone cinco recursos de esquema que describen los campos de cada en
 | `relaticle://schema/task` | Campos y atributos personalizados de la tarea |
 | `relaticle://schema/note` | Campos y atributos personalizados de la nota |
 
-La compatibilidad con recursos varía según el cliente MCP. Use `get-crm-schema-tool` antes de escribir un atributo personalizado (campo personalizado) cuando su cliente no exponga los recursos automáticamente.
+La compatibilidad con recursos varía según el cliente MCP. Use `get-crm-schema-tool` antes de escribir un atributo personalizado (custom field) cuando su cliente no exponga los recursos automáticamente.
 
 ---
 

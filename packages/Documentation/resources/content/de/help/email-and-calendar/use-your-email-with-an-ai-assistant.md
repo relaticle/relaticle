@@ -52,7 +52,7 @@ keinen, bis Sie ihn erneut verbinden.
 2. Fügen Sie Relaticle dem Assistenten erneut hinzu. Die Schritte stehen unter
    [Claude oder ChatGPT mit Relaticle verbinden](/de/help/ai-assistant/connect-claude-or-chatgpt).
 3. Wählen Sie auf dem Zustimmungsbildschirm von Relaticle den Arbeitsbereich.
-4. Lesen Sie die Liste dessen, was der Assistent tun können wird, und klicken Sie auf
+4. Lesen Sie die Liste der Dinge, die der Assistent tun darf, und klicken Sie auf
    **Autorisieren**.
 
 Die Liste richtet sich nach Ihrer Rolle im gewählten Arbeitsbereich.
@@ -82,7 +82,7 @@ Die Namen der Stufen stehen unter
 | Freigabestufe | Was der Assistent erhält |
 |---|---|
 | Ihre eigenen E-Mails | Alles, einschließlich BCC-Empfängern. |
-| **Voller Zugriff** | Den Absender, die Empfänger in An und CC, den Betreff, den Nachrichtentext und die Namen der Anhänge. |
+| **Vollzugriff** | Den Absender, die Empfänger in An und CC, den Betreff, den Nachrichtentext und die Namen der Anhänge. |
 | **Betreffzeile und Teilnehmer** | Den Absender, die Empfänger in An, den Betreff und den Zeitpunkt. |
 | **Nur Teilnehmer** | Den Absender, die Empfänger in An und den Zeitpunkt. |
 | **Privat** | Nichts. Die E-Mail erscheint nicht. |

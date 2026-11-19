@@ -63,7 +63,7 @@ formato más seguro para exportar desde otras herramientas.
 |---------|----------|
 | Se queda en «Procesando…» | Las importaciones grandes se ejecutan en segundo plano. Vuelva en unos minutos |
 | Algunas filas fallaron | Descargue las filas fallidas, corríjalas y vuelva a importar solo esas |
-| Duplicados inesperados | Asigne una columna única (correo electrónico, dominio o ID). Consulte [Actualice registros existentes con una importación](/es/help/import/update-existing-records) |
+| Duplicados inesperados | Asigne una columna única (correo electrónico, dominio o ID). Consulte [Actualice registros con una importación](/es/help/import/update-existing-records) |
 
 ## Conviene saber
 

@@ -48,7 +48,7 @@ El evento permanece en su calendario.
 
 Abra la reunión. El botón junto a su título muestra su respuesta actual. Haga
 clic en él y elija **Aceptar**, **Tal vez** o **Rechazar**. Relaticle envía la
-respuesta a su calendario de Google o Outlook. Si usted rechaza, la reunión
+respuesta a su calendario de Google u Outlook. Si usted rechaza, la reunión
 permanece en el calendario para los demás invitados.
 
 ## Si no se pudo actualizar su respuesta

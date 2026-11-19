@@ -6,7 +6,7 @@ updated: "2026-08-12"
 related: [help/getting-started/create-your-first-company, help/getting-started/track-a-deal-through-the-pipeline]
 ---
 
-Un enregistrement de personne représente quiconque vous côtoyez : quelqu'un
+Un enregistrement de personne représente toute personne avec qui vous êtes en contact : quelqu'un
 d'une entreprise à laquelle vous vendez, un candidat, ou toute autre personne
 que vous voulez suivre. Un nom suffit pour en créer un.
 

@@ -71,7 +71,7 @@ reciente ofrece **Proponer de nuevo**.
 
 Un correo se aprueba de uno en uno. Su tarjeta muestra todos los destinatarios y
 el mensaje completo, y su botón dice **Enviar correo electrónico**. Un plan
-muestra el correo como "Luego enviar un correo …" y nunca lo envía junto con el
+muestra el correo como "Luego enviar correo electrónico …" y nunca lo envía junto con el
 resto: cuando aprueba el plan, el correo recibe una tarjeta para él solo y
 espera su propio **Enviar correo electrónico**.
 Consulte [Use su correo con un asistente de IA](/es/help/email-and-calendar/use-your-email-with-an-ai-assistant).

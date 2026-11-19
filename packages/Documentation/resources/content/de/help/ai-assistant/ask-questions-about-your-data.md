@@ -8,7 +8,7 @@ related: [help/ai-assistant/approve-what-the-assistant-changes, help/ai-assistan
 
 Der Assistent liest die Unternehmen, Personen, Verkaufschancen, Aufgaben und
 Notizen Ihres Arbeitsbereichs. So können Sie Fragen stellen, statt sich durch
-Listen zu klicken: „Welche Verkaufschancen schließen diesen Monat?“, „Fasse
+Listen zu klicken: „Welche Verkaufschancen schließen diesen Monat?“, „Fassen Sie
 alles zusammen, was wir über Acme wissen“, „Wie hoch ist der gesamte
 Pipeline-Wert pro Phase?“.
 

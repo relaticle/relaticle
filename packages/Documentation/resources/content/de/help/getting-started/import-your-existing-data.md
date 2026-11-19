@@ -56,5 +56,5 @@ passende Feld selbst aus. Oder klicken Sie auf **Zuordnung entfernen**, um die S
 ganz vom Import auszuschließen.
 
 Regeln zur Dateiformatierung, zum Abgleichen und Aktualisieren bestehender
-Einträge und Lösungen für Werte, die der Assistent markiert, finden Sie in den
+Einträge und Lösungen für Werte, die der Import-Assistent markiert, finden Sie in den
 Artikeln unter [Daten importieren](/de/help/import).

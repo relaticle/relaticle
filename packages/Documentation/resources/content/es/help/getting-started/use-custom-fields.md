@@ -42,6 +42,5 @@ fila de filtros sobre la lista de ese tipo de registro. Consulte
 ## Si un atributo está marcado como Sistema, puede editarlo pero no eliminarlo
 
 Atributos como Monto, Fecha de cierre y Etapa en las oportunidades, o Dominios en
-las empresas, vienen con Relaticle y llevan una insignia de **Sistema**. Ábralo
-desde su menú **Acciones** para cambiarle el nombre, o para reordenar, cambiar el
+las empresas, vienen con Relaticle y llevan una insignia de **Sistema**. Abra uno desde su menú **Acciones** para cambiarle el nombre, o para reordenar, cambiar el
 color o agregar sus opciones. Lo único es que el menú no ofrece **Eliminar**.

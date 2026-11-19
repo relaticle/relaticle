@@ -14,17 +14,15 @@ trabajo, y los demás miembros ven a quién pedírselas.
 
 ## Cuánto cuesta Cloud Pro
 
-Cloud Pro es el plan de entrada: usuarios y registros ilimitados, 2000 créditos
+Cloud Pro es el plan de entrada: usuarios y registros ilimitados, 2,000 créditos
 de IA al mes, modelos de IA premium, hasta 10 buzones conectados, la API REST y
 el MCP server, y soporte por correo. Cuesta **$19/mes por espacio de trabajo con
-facturación anual** ($228 al año), o **$24/mes con facturación mensual**. Para
-implementaciones más grandes, la implementación Enterprise comienza en $20 000
-al año. La [página de precios](/es/pricing) tiene los detalles.
+facturación anual** ($228 al año), o **$24/mes con facturación mensual**. Para despliegues más grandes, la implementación Enterprise comienza en $20,000 al año. La [página de precios](/es/pricing) tiene los detalles.
 
 ## Cuánto cuesta Cloud Scale
 
 Cloud Scale es para los equipos que trabajan todo el día en Relaticle. Incluye
-todo lo de Cloud Pro, sube la asignación a 5000 créditos de IA al mes, permite
+todo lo de Cloud Pro, sube la asignación a 5,000 créditos de IA al mes, permite
 hasta 50 buzones conectados, triplica el rendimiento de la API REST y del MCP
 server, y viene con soporte prioritario. Cuesta **$49/mes por espacio de trabajo
 con facturación anual** ($588 al año), o **$59/mes con facturación mensual**.
@@ -60,8 +58,7 @@ cambios de plan pasan por nosotros.
 
 ## Si la suscripción vence
 
-El espacio de trabajo se **pausa**. La aplicación, la API, el MCP server y Rela
-se hacen a un lado, pero **sus registros están seguros** y siguen almacenados. Al
+El espacio de trabajo se **pausa**. La aplicación, la API, el MCP server y Rela dejan de estar disponibles, pero **sus registros están seguros** y siguen almacenados. Al
 volver a suscribirse, todo se restablece exactamente como estaba. El propietario
 aún puede eliminar un espacio de trabajo en pausa, y su período de gracia de 30
 días para la eliminación se aplica como de costumbre.
@@ -69,8 +66,7 @@ días para la eliminación se aplica como de costumbre.
 ## Créditos de IA
 
 La asignación mensual de créditos del plan se restablece en cada período de
-facturación. Los espacios de trabajo de pago pueden comprar **paquetes de
-créditos** de un solo uso desde la página de Facturación. Los créditos comprados
+facturación. Los espacios de trabajo de pago pueden comprar **paquetes de créditos** de compra única desde la página de Facturación. Los créditos comprados
 se gastan solo después de la asignación mensual y nunca vencen. La misma página
 muestra cuántos créditos ha usado el espacio de trabajo en este período. Qué son
 los créditos y cuánto cuestan los mensajes se explica en

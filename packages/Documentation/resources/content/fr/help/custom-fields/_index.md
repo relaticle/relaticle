@@ -1,6 +1,6 @@
 ---
 title: Attributs personnalisés
-description: Adaptez chaque type d'enregistrement à votre process avec vos propres attributs, options et règles de visibilité.
+description: Adaptez chaque type d'enregistrement à votre façon de travailler avec vos propres attributs, options et règles de visibilité.
 order: 5
 ---
 

@@ -50,7 +50,7 @@ voulez pas de ce contexte.
 Vous pouvez joindre à un message un fichier CSV, TXT ou MD de 10 Mo maximum.
 Rela propose les enregistrements qu'il contient, 25 à la fois au maximum. Pour
 un CSV plus volumineux de personnes ou d'entreprises, il renvoie vers
-l'assistant d'importation avec vos colonnes déjà associées.
+l'assistant d'import avec vos colonnes déjà associées.
 
 Pour tout ce qu'il ne peut pas faire dans le chat, comme exporter des
 enregistrements vers un fichier, il vous renvoie vers la bonne page au lieu de
@@ -60,7 +60,7 @@ deviner.
 
 Chaque chat est enregistré. Dans le groupe **Chats** de la barre latérale, vous
 pouvez renommer ou supprimer une conversation depuis sa ligne. **Tous les chats**
-ouvre une liste consultable de toutes les conversations. Les titres sont
+ouvre la liste de toutes les conversations, avec une recherche. Les titres sont
 générés automatiquement à partir du premier échange.
 
 Chaque réponse a des commandes en dessous : la copier, la régénérer, ou la noter
