@@ -35,11 +35,10 @@ it('does not interfere with a non-blog gate for a regular user', function (): vo
 });
 
 it('denies blog deletion to a staff member demoted below super administrator', function (string $model, string $tool): void {
-    config(['ink.mcp.guard' => 'sysadmin']);
     $administrator = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
     $record = $model::factory()->create();
 
-    BlogServer::actingAs($administrator, 'sysadmin')
+    BlogServer::actingAs($administrator, config('ink.mcp.guard'))
         ->tool($tool, ['id' => $record->getKey()])
         ->assertHasErrors(['This action is unauthorized.']);
 

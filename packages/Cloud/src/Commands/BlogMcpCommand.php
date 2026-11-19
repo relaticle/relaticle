@@ -7,8 +7,11 @@ namespace Relaticle\Cloud\Commands;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\Auth;
-use Laravel\Sanctum\PersonalAccessToken;
+use Relaticle\Cloud\Blog\BlogMcpStreams;
+use Relaticle\Cloud\Blog\LocalStdioTransport;
+use Relaticle\Ink\Mcp\BlogServer;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
@@ -16,9 +19,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 #[Signature('blog:mcp')]
 final class BlogMcpCommand extends Command
 {
-    public const string HANDLE = 'blog';
-
-    public function handle(): int
+    public function handle(Container $container, BlogMcpStreams $streams): int
     {
         $administrators = SystemAdministrator::query()
             ->where('role', SystemAdministratorRole::SuperAdministrator)
@@ -33,13 +34,20 @@ final class BlogMcpCommand extends Command
             return self::FAILURE;
         }
 
-        // Ink asks a HasApiTokens caller for a token ability. There is no token over stdio, and the Gate still decides.
-        $administrator = $administrators->first();
-        $administrator->withAccessToken(new PersonalAccessToken(['abilities' => ['*']]));
+        $administratorId = $administrators->first()->getKey();
+        $guard = Auth::guard(config('ink.mcp.guard'));
+        $actAsAdministrator = function () use ($administratorId, $guard): void {
+            $administrator = SystemAdministrator::query()->find($administratorId);
 
-        config(['ink.mcp.guard' => 'sysadmin']);
-        Auth::guard('sysadmin')->setUser($administrator);
+            $administrator === null ? $guard->forgetUser() : $guard->setUser($administrator);
+        };
 
-        return $this->call('mcp:start', ['handle' => self::HANDLE]);
+        $actAsAdministrator();
+
+        $transport = new LocalStdioTransport($actAsAdministrator, $streams->input, $streams->output);
+        $container->make(BlogServer::class, ['transport' => $transport])->start();
+        $transport->run();
+
+        return self::SUCCESS;
     }
 }

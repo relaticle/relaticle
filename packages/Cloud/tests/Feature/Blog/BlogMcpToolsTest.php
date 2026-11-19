@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Models\User;
-use Laravel\Sanctum\TransientToken;
 use Relaticle\Ink\Mcp\BlogServer;
 use Relaticle\Ink\Mcp\Tools\CreatePostTool;
 use Relaticle\Ink\Models\Category;
@@ -17,19 +16,17 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 // would never generate a mutant for it.
 
 beforeEach(function (): void {
-    config(['ink.mcp.guard' => 'sysadmin']);
     $this->admin = SystemAdministrator::factory()->create([
         'role' => SystemAdministratorRole::SuperAdministrator,
         'email' => 'founder@relaticle.com',
     ]);
-    $this->admin->withAccessToken(new TransientToken);
     $this->category = Category::factory()->create(['name' => 'Engineering']);
 });
 
 it('creates a post as the super administrator through the local server', function (): void {
     $author = User::factory()->create(['email' => 'founder@relaticle.com']);
 
-    BlogServer::actingAs($this->admin, 'sysadmin')
+    BlogServer::actingAs($this->admin, config('ink.mcp.guard'))
         ->tool(CreatePostTool::class, [
             'title' => 'Agent-Native CRM',
             'content' => 'Body text.',
@@ -43,7 +40,7 @@ it('creates a post as the super administrator through the local server', functio
 });
 
 it('fails loudly when no user account matches the sysadmin email', function (): void {
-    BlogServer::actingAs($this->admin, 'sysadmin')
+    BlogServer::actingAs($this->admin, config('ink.mcp.guard'))
         ->tool(CreatePostTool::class, [
             'title' => 'Orphan Post',
             'content' => 'Body.',

@@ -30,8 +30,8 @@ return [
     'middleware' => ['web', ProvideMarkdownResponse::class, RequireBlogFrontEnd::class],
 
     /*
-     * The blog MCP server is not served over HTTP. `php artisan blog:mcp` serves it over
-     * stdio and resolves the caller from this guard.
+     * The guard ink resolves an MCP caller from. The host that serves the blog MCP
+     * server sets it, and nothing serves it over HTTP.
      */
     'mcp' => [
         'guard' => 'sysadmin',

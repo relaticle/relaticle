@@ -36,7 +36,6 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Events\WebhookHandled;
-use Laravel\Mcp\Facades\Mcp;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Cloud\Admin\CloudAdminPlugin;
@@ -66,6 +65,7 @@ use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\Cloud\Blog\BlogMcpStreams;
 use Relaticle\Cloud\Commands\BlogMcpCommand;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
@@ -76,7 +76,6 @@ use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
 use Relaticle\Cloud\Marketing\Services\DiscordService;
 use Relaticle\Cloud\Marketing\Services\DockerHubService;
 use Relaticle\Cloud\Marketing\Services\GitHubService;
-use Relaticle\Ink\Mcp\BlogServer;
 
 final class CloudServiceProvider extends ServiceProvider
 {
@@ -84,6 +83,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->bind(BlogMcpStreams::class, static fn (): BlogMcpStreams => new BlogMcpStreams(STDIN, STDOUT));
         $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
             ? $app->make(PlanEntitlements::class)
             : $app->make(SelfHostedEntitlements::class));
@@ -127,7 +127,7 @@ final class CloudServiceProvider extends ServiceProvider
         Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
         $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class, BlogMcpCommand::class]);
-        Mcp::local(BlogMcpCommand::HANDLE, BlogServer::class);
+        $this->registerBlogPreviewRoute();
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('billing:process-trials')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
@@ -189,6 +189,13 @@ final class CloudServiceProvider extends ServiceProvider
                 'feed' => 'cloud::blog.feed',
             ],
         ]);
+    }
+
+    private function registerBlogPreviewRoute(): void
+    {
+        if (! config('ink.features.public_routes')) {
+            $this->loadRoutesFrom(base_path('vendor/relaticle/ink/routes/preview.php'));
+        }
     }
 
     private function registerMarketingRoutes(): void

@@ -484,7 +484,16 @@ it('still honors a Sanctum personal access token with its own workspace_id', fun
  */
 it('rejects a personal access token minted for a tokenable outside the users provider', function (): void {
     $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
-    $token = $admin->createToken('blog-token', ['posts:read'])->plainTextToken;
+    $token = Str::random(40);
+    DB::table('personal_access_tokens')->insert([
+        'tokenable_type' => $admin->getMorphClass(),
+        'tokenable_id' => $admin->getKey(),
+        'name' => 'blog-token',
+        'token' => hash('sha256', $token),
+        'abilities' => '["posts:read"]',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
 
     $this->withHeaders(['Authorization' => 'Bearer '.$token])
         ->postJson('/mcp', [
@@ -506,7 +515,7 @@ it('rejects a personal access token minted for a tokenable outside the users pro
 it('fails closed with 403 instead of a type error when the resolved caller is not a User', function (): void {
     $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
 
-    Sanctum::actingAs($admin, ['posts:read']);
+    $this->actingAs($admin, 'sanctum');
 
     $this->postJson('/mcp', [
         'jsonrpc' => '2.0',

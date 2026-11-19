@@ -11,6 +11,7 @@ use App\Models\Workspace;
 use App\Support\Http\RequestAbility;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Laravel\Sanctum\TransientToken;
@@ -206,7 +207,16 @@ describe('real-token middleware chain', function (): void {
 
     it('rejects a personal access token minted for a tokenable outside the users provider', function (): void {
         $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
-        $token = $admin->createToken('blog-token', ['posts:read'])->plainTextToken;
+        $token = Str::random(40);
+        DB::table('personal_access_tokens')->insert([
+            'tokenable_type' => $admin->getMorphClass(),
+            'tokenable_id' => $admin->getKey(),
+            'name' => 'blog-token',
+            'token' => hash('sha256', $token),
+            'abilities' => '["posts:read"]',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
 
         $this->withToken($token)
             ->getJson('/api/v1/companies')
