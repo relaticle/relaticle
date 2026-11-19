@@ -12,6 +12,7 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
 use App\Services\AvatarService;
+use App\Support\Media\UploadAllowlist;
 use Filament\Actions\Action;
 use Filament\Actions\Concerns\InteractsWithActions;
 use Filament\Actions\Contracts\HasActions;
@@ -966,15 +967,15 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
     }
 
     /**
-     * Enforce the size caps as files arrive, dropping (and deleting) anything
-     * over them rather than reporting an error and leaving the file in state.
-     * An invalid attachment left in `$attachments` would still be stored and
-     * sent by {@see self::send()}, which does not re-check.
+     * Enforce the size caps and the type allowlist as files arrive, dropping (and
+     * deleting) anything over them. An invalid attachment left in `$attachments`
+     * would still be stored and sent by {@see self::send()}, which does not re-check.
      */
     public function updatedAttachments(): void
     {
         $kept = [];
-        $rejected = [];
+        $tooLarge = [];
+        $wrongType = [];
         $total = array_sum(array_column($this->savedAttachments, 'size'));
 
         foreach ($this->attachments as $file) {
@@ -985,7 +986,14 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
             $size = $file->getSize();
 
             if ($size > ForwardAttachmentCopyService::MAX_ATTACHMENT_BYTES || $total + $size > ForwardAttachmentCopyService::MAX_ATTACHMENTS_TOTAL_BYTES) {
-                $rejected[] = $file->getClientOriginalName();
+                $tooLarge[] = $file->getClientOriginalName();
+                $file->delete();
+
+                continue;
+            }
+
+            if (! UploadAllowlist::isAllowedEmailAttachment($file)) {
+                $wrongType[] = $file->getClientOriginalName();
                 $file->delete();
 
                 continue;
@@ -997,19 +1005,27 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->attachments = $kept;
 
-        if ($rejected === []) {
-            return;
+        if ($tooLarge !== []) {
+            Notification::make()
+                ->warning()
+                ->title(__('filament/emails/composer.notifications.attachment_too_large.title'))
+                ->body(__('filament/emails/composer.notifications.attachment_too_large.body', [
+                    'files' => implode(', ', $tooLarge),
+                    'max' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENT_BYTES),
+                    'total' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENTS_TOTAL_BYTES),
+                ]))
+                ->send();
         }
 
-        Notification::make()
-            ->warning()
-            ->title(__('filament/emails/composer.notifications.attachment_too_large.title'))
-            ->body(__('filament/emails/composer.notifications.attachment_too_large.body', [
-                'files' => implode(', ', $rejected),
-                'max' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENT_BYTES),
-                'total' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENTS_TOTAL_BYTES),
-            ]))
-            ->send();
+        if ($wrongType !== []) {
+            Notification::make()
+                ->warning()
+                ->title(__('filament/emails/composer.notifications.attachment_type_not_allowed.title'))
+                ->body(__('filament/emails/composer.notifications.attachment_type_not_allowed.body', [
+                    'files' => implode(', ', $wrongType),
+                ]))
+                ->send();
+        }
     }
 
     public function removeAttachment(int $index): void
