@@ -15,11 +15,11 @@
     ])
 >
     <a
-        href="{{ $url }}"
+        {!! $url !== null ? 'href="'.e($url).'"' : '' !!}
         {{-- Not wire:navigate: it cancels mousedown, so the row could never be dragged, and it navigated on every drop. --}}
         x-on:click="
             $store.sidebar.isMobile && $store.sidebar.close()
-            if ($event.button === 0 && ! ($event.metaKey || $event.ctrlKey || $event.shiftKey || $event.altKey)) {
+            if ($el.hasAttribute('href') && $event.button === 0 && ! ($event.metaKey || $event.ctrlKey || $event.shiftKey || $event.altKey)) {
                 $event.preventDefault()
                 Livewire.navigate($el.href)
             }

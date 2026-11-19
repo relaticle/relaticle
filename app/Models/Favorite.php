@@ -18,8 +18,9 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
-use Illuminate\Support\Once;
+use Illuminate\Support\Facades\Validator;
 use Relaticle\Flowforge\Services\DecimalPosition;
+use WeakMap;
 
 /**
  * @property string $user_id
@@ -36,6 +37,9 @@ final class Favorite extends Model
 {
     public const int NAME_MAX_LENGTH = 60;
 
+    /** @var WeakMap<Model, array<array-key, ?self>>|null */
+    private static ?WeakMap $ownedFor = null;
+
     /** @use HasFactory<FavoriteFactory> */
     use HasFactory;
 
@@ -44,8 +48,8 @@ final class Favorite extends Model
 
     protected static function booted(): void
     {
-        self::saved(fn (): null => Once::flush());
-        self::deleted(fn (): null => Once::flush());
+        self::saved(fn (): null => self::$ownedFor = null);
+        self::deleted(fn (): null => self::$ownedFor = null);
     }
 
     /**
@@ -105,14 +109,22 @@ final class Favorite extends Model
     {
         $name = trim($name);
 
-        abort_if($name === '' || mb_strlen($name) > self::NAME_MAX_LENGTH, 422);
+        Validator::make(['name' => $name], ['name' => ['required', 'string', 'max:'.self::NAME_MAX_LENGTH]])->validate();
 
         return $name;
     }
 
     public static function ownedFor(User $user, Company|People|Opportunity $record): ?self
     {
-        return once(fn (): ?self => self::query()->ownedBy($user, $record->workspace_id)->forRecord($record)->first());
+        self::$ownedFor ??= new WeakMap;
+        $byUser = self::$ownedFor[$record] ?? [];
+
+        if (! array_key_exists($user->getKey(), $byUser)) {
+            $byUser[$user->getKey()] = self::query()->ownedBy($user, $record->workspace_id)->forRecord($record)->first();
+            self::$ownedFor[$record] = $byUser;
+        }
+
+        return $byUser[$user->getKey()];
     }
 
     public static function nextPosition(User $user, string $workspaceId, ?string $parentId): string

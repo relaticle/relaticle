@@ -1,7 +1,7 @@
 # Favorites: pin companies, people and opportunities to the sidebar
 
 **Date:** 2026-11-19
-**Status:** Built on `favorites-pin-companies-people-and-opportunities`, except the two rules marked below. Revises issue #1194, which still holds the first version
+**Status:** Built on `favorites-pin-companies-people-and-opportunities`, except the merge rule marked below. Revises issue #1194, which still holds the first version
 
 ## Summary
 
@@ -67,8 +67,8 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
 - A deleted record leaves the group. A restored record comes back to the same place.
 - When two records are merged (#1193), favorites of the removed record move to the kept one.
   **Not built yet:** nothing in the merge touches favorites.
-- A member who loses access to a record no longer sees its favorite. **Not built yet:**
-  `FavoritesQuery` filters by owner and workspace only, and checks no policy.
+- A member who loses access to a record no longer sees its favorite. `FavoritesQuery` asks the record's `view` policy.
+- A record deleted for good takes its favorites with it, through the `ForgetsFavorites` observer concern.
 
 ## How it is built
 
@@ -78,7 +78,7 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
 | Add, remove a favorite | `AddFavoriteRecord`, `RemoveFavoriteRecord` in `app/Actions/Favorites` |
 | Move by menu or drag | `MoveFavorite`: into a folder, out of one, or between two neighbours. It rebalances the list when two neighbours leave no room |
 | Create, rename, delete a folder | `CreateFavoriteFolder`, `RenameFavoriteFolder`, `DeleteFavoriteFolder`. `Favorite::folderName()` holds the name rule |
-| A record's favorite | `Favorite::forRecord()` scope and `Favorite::ownedFor()`, memoized per request and cleared on every favorites write |
+| A record's favorite | `Favorite::forRecord()` scope and `Favorite::ownedFor()`, memoized per record object in a `WeakMap` and cleared on every favorites write |
 | Header star | `App\Filament\Actions\ToggleFavoriteAction` |
 | Header "..." menu items | `App\Filament\Actions\FavoriteMenuActions` |
 | Sidebar group | `App\Livewire\App\FavoritesSidebarNav`, rendered at `SIDEBAR_NAV_END` |

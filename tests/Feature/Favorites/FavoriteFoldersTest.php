@@ -5,12 +5,14 @@ declare(strict_types=1);
 use App\Actions\Favorites\CreateFavoriteFolder;
 use App\Actions\Favorites\DeleteFavoriteFolder;
 use App\Actions\Favorites\RenameFavoriteFolder;
+use App\Enums\FavoriteKind;
 use App\Livewire\App\FavoritesSidebarNav;
 use App\Models\Company;
 use App\Models\Favorite;
 use App\Models\User;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Illuminate\Validation\ValidationException;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -48,7 +50,7 @@ it('refuses a blank or too long folder name', function (string $name): void {
         ->callAction('createFolder', data: ['name' => $name])
         ->assertHasFormErrors(['name']);
 
-    expect(fn (): mixed => resolve(CreateFavoriteFolder::class)->execute($this->user, $this->workspace, $name))->toThrow(HttpException::class);
+    expect(fn (): mixed => resolve(CreateFavoriteFolder::class)->execute($this->user, $this->workspace, $name))->toThrow(ValidationException::class);
 
     expect(Favorite::query()->folders()->count())->toBe(0);
 })->with(['blank' => '   ', 'too long' => fn (): string => str_repeat('a', 61)]);
@@ -103,4 +105,15 @@ it('refuses renaming or deleting another member\'s folder', function (): void {
     expect(fn (): mixed => resolve(DeleteFavoriteFolder::class)->execute($this->user, $folder))->toThrow(HttpException::class);
 
     expect($folder->refresh()->name)->toBe('Theirs');
+});
+
+it('stores every kind of favorite the database shape allows', function (): void {
+    foreach (FavoriteKind::cases() as $kind) {
+        $favorite = match ($kind) {
+            FavoriteKind::Record => favoriteFor($this->user, $this->workspace, folderCompany('Acme Corp'), 1),
+            FavoriteKind::Folder => favoriteFolderFor($this->user, $this->workspace, 'Q4 renewals', 2),
+        };
+
+        expect($favorite->fresh()->kind)->toBe($kind);
+    }
 });

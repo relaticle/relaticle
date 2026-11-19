@@ -7,11 +7,13 @@ namespace App\Observers;
 use App\Actions\Onboarding\ScheduleAssistantArrivalTurn;
 use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
+use App\Observers\Concerns\ForgetsFavorites;
 use App\Observers\Concerns\TagsFirstCrmData;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final readonly class CompanyObserver
 {
+    use ForgetsFavorites;
     use TagsFirstCrmData;
 
     public function __construct(private ScheduleAssistantArrivalTurn $scheduleAssistantArrival) {}

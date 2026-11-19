@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Enums\CrmEntity;
 use App\Filament\Pages\Dashboard;
+use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Livewire\App\FavoritesSidebarNav;
 use App\Models\Company;
 use App\Models\Favorite;
@@ -154,4 +155,33 @@ it('renders the favorites group in the app sidebar above the chats', function ()
 
     expect(strpos($html, 'fi-sidebar-favorites'))->not->toBeFalse()
         ->toBeLessThan(strpos($html, 'fi-sidebar-chats'));
+});
+
+it('hides a favorite once the member may no longer view its record', function (): void {
+    $member = User::factory()->create(['current_workspace_id' => $this->workspace->getKey()]);
+    $this->workspace->users()->attach($member, ['role' => 'member']);
+    $this->actingAs($member);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']);
+    favoriteFor($member, $this->workspace, $company, 1);
+
+    Livewire::test(FavoritesSidebarNav::class)->assertSee('Acme Corp');
+
+    $this->workspace->users()->detach($member);
+    $member->unsetRelation('workspaces');
+
+    Livewire::test(FavoritesSidebarNav::class)->assertDontSee('Acme Corp');
+});
+
+it('forgets a favorite when its record is deleted for good', function (): void {
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+    $favorite = favoriteFor($this->user, $this->workspace, $company, 1);
+    $company->delete();
+
+    livewire(ListCompanies::class)
+        ->filterTable('trashed', false)
+        ->selectTableRecords([$company])
+        ->callAction([['name' => 'forceDelete', 'context' => ['table' => true, 'bulk' => true]]]);
+
+    expect(Company::withTrashed()->whereKey($company->getKey())->exists())->toBeFalse()
+        ->and(Favorite::query()->withoutGlobalScopes()->whereKey($favorite->getKey())->exists())->toBeFalse();
 });

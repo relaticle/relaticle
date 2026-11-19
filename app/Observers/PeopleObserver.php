@@ -6,10 +6,12 @@ namespace App\Observers;
 
 use App\Actions\Onboarding\ScheduleAssistantArrivalTurn;
 use App\Models\People;
+use App\Observers\Concerns\ForgetsFavorites;
 use App\Observers\Concerns\TagsFirstCrmData;
 
 final readonly class PeopleObserver
 {
+    use ForgetsFavorites;
     use TagsFirstCrmData;
 
     public function __construct(private ScheduleAssistantArrivalTurn $scheduleAssistantArrival) {}

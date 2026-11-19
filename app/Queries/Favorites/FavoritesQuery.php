@@ -23,14 +23,14 @@ final readonly class FavoritesQuery
             ->get()
             ->each(fn (Favorite $favorite): Favorite => $favorite->setRelation(
                 'children',
-                $favorite->children->filter($this->hasRecord(...))->values(),
+                $favorite->children->filter(fn (Favorite $child): bool => $this->isVisible($user, $child))->values(),
             ))
-            ->filter(fn (Favorite $favorite): bool => $favorite->isFolder() || $this->hasRecord($favorite))
+            ->filter(fn (Favorite $favorite): bool => $favorite->isFolder() || $this->isVisible($user, $favorite))
             ->values();
     }
 
-    private function hasRecord(Favorite $favorite): bool
+    private function isVisible(User $user, Favorite $favorite): bool
     {
-        return $favorite->record !== null;
+        return $favorite->record !== null && $user->can('view', $favorite->record);
     }
 }
