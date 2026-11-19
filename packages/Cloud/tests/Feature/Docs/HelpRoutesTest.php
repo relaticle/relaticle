@@ -9,6 +9,7 @@ use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Docs\Support\DocsNavigation;
 use Relaticle\Documentation\Support\DocsRepository;
+use Relaticle\Ink\Models\Post;
 
 dataset('documentation shell pages', [
     '/help',
@@ -220,6 +221,16 @@ it('keeps llms.txt in English', function (): void {
 
     expect($body)->toContain('[Widgets]')
         ->and($body)->not->toContain('Widgets deutsch');
+});
+
+it('lists only English posts in llms.txt', function (): void {
+    Post::factory()->published()->create(['locale' => 'en', 'slug' => 'only-english']);
+    Post::factory()->published()->create(['locale' => 'de', 'slug' => 'nur-deutsch']);
+
+    $this->get('/llms.txt')
+        ->assertOk()
+        ->assertSee('/blog/only-english')
+        ->assertDontSee('/blog/nur-deutsch');
 });
 
 it('writes the updated date of a help page in its language', function (): void {

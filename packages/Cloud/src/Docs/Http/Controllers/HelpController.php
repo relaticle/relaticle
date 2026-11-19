@@ -251,6 +251,7 @@ final readonly class HelpController
 
         $posts = Post::query()
             ->published()
+            ->inLocale(LocalizedUrl::DEFAULT_LOCALE)
             ->latest('published_at')
             ->limit(self::LLMS_TXT_BLOG_LIMIT)
             ->toBase()
