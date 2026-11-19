@@ -74,6 +74,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
             ])
             ->recordActions([
                 Action::make('cancel')
+                    ->label(__('filament/pages/email-outbox.actions.cancel'))
                     ->icon('lucide-x')
                     ->color('danger')
                     ->requiresConfirmation()
@@ -84,6 +85,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                         Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
                     }),
                 Action::make('reschedule')
+                    ->label(__('filament/pages/email-outbox.actions.reschedule'))
                     ->icon('lucide-clock')
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
                     ->schema([
@@ -100,6 +102,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                         Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
                     }),
                 Action::make('retry')
+                    ->label(__('filament/pages/email-outbox.actions.retry'))
                     ->icon('lucide-refresh-cw')
                     ->color('warning')
                     ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)

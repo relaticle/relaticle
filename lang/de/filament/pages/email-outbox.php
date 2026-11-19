@@ -33,6 +33,9 @@ return [
     'actions' => [
         'reschedule_field' => 'Senden um',
         'bulk_cancel' => 'Ausgewählte abbrechen',
+        'cancel' => 'Abbrechen',
+        'reschedule' => 'Neu terminieren',
+        'retry' => 'Wiederholen',
     ],
     'notifications' => [
         'cancelled' => 'Abgebrochen',
