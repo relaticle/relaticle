@@ -214,7 +214,7 @@
                         type="button"
                         role="option"
                         :aria-selected="{{ $isSelected ? 'true' : 'false' }}"
-                        x-show="!search || {{ Js::from(strtolower($field->label)) }}.includes(search.toLowerCase())"
+                        x-show="!search || {{ Js::from(mb_strtolower($field->label)) }}.includes(search.toLowerCase())"
                         @click="selectField('{{ $field->key }}')"
                         {{ $isMapped ? 'disabled' : '' }}
                         class="w-full flex items-center gap-1.5 px-2 py-1.5 text-xs rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 focus-visible:bg-gray-50 dark:focus-visible:bg-gray-800
@@ -238,7 +238,7 @@
                         $isLinkFullyMapped = count($linkMappedMatchers) >= count($link->matchableFields) && !$isLinkSelected;
                     @endphp
                     <div
-                        x-show="!search || {{ Js::from(strtolower($link->label)) }}.includes(search.toLowerCase())"
+                        x-show="!search || {{ Js::from(mb_strtolower($link->label)) }}.includes(search.toLowerCase())"
                         @if (!$isLinkFullyMapped)
                             @mouseenter="showSubmenu('{{ $linkKey }}', $event)"
                             @mouseleave="hideSubmenu()"

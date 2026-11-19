@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Events\WorkspaceCreated;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -109,6 +111,20 @@ it('renders the upload and mapping steps in the user locale', function (): void 
         ->assertDontSee('Map to')
         ->assertDontSee('Start over')
         ->assertDontSee('Showing sample values');
+});
+
+it('searches the mapping options case-insensitively for accented labels', function (): void {
+    app()->setLocale('fr');
+    CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'linkedin')
+        ->update(['name' => 'Étape']);
+    createStoreWithHeaders($this, ['Name']);
+
+    mountMappingStep($this)
+        ->assertSeeHtml(Js::from('étape')->toHtml().'.includes(search.toLowerCase())');
 });
 
 it('auto-maps Name header to name field on mount', function (): void {
