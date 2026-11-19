@@ -42,4 +42,4 @@ it('prefixes a localized help url by its registered route, whatever the install 
     app()->setLocale('de');
 
     expect(DocUrl::area('help'))->toEndWith('/de/help');
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\Cloud\CloudServiceProvider'), 'Localized help routes come from the cloud package.');

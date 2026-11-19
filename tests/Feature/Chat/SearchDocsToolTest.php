@@ -229,7 +229,7 @@ it('searches the language index first and fills the rest from English', function
     expect(array_column($results, 'title'))->toBe(['Widgets deutsch', 'Gadgets'])
         ->and($results[0]['url'])->toContain('/de/help/guides/widgets')
         ->and($results[1]['url'])->not->toContain('/de/');
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\Cloud\CloudServiceProvider'), 'Localized help routes come from the cloud package.');
 
 it('adds no English results when the language index fills the limit', function (): void {
     $root = storage_path('framework/testing/search-docs-'.Str::random(8));
