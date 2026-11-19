@@ -514,6 +514,8 @@ describe('Page metadata', function () {
         ['/compare/relaticle-vs-espocrm', true],
         ['/alternatives/attio', true],
         ['/alternatives/hubspot', true],
+        ['/alternatives/salesforce', true],
+        ['/alternatives/pipedrive', true],
         ['/privacy-policy', true],
         ['/terms-of-service', true],
     ]);
@@ -550,6 +552,8 @@ describe('Page metadata', function () {
         '/compare/relaticle-vs-espocrm',
         '/alternatives/attio',
         '/alternatives/hubspot',
+        '/alternatives/salesforce',
+        '/alternatives/pipedrive',
         '/privacy-policy',
         '/terms-of-service',
     ]);
