@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\CustomFields\CompanyField;
+use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -10,6 +12,8 @@ use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Spatie\MediaLibrary\HasMedia;
@@ -99,6 +103,79 @@ test('company logo is null until one is uploaded', function () {
         ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
 
     expect($company->refresh()->logo)->toContain('logo.png');
+});
+
+test('company prefers a stored logo, then Brandfetch, then nothing', function () {
+    config()->set('services.brandfetch.client_id', 'test-client');
+    $company = Company::factory()->create(['custom_fields' => [CompanyField::DOMAINS->value => ['example.com']]]);
+
+    expect($company->fresh()->logo)->toBe('https://cdn.brandfetch.io/domain/example.com/w/128/h/128/fallback/404/icon?c=test-client');
+
+    $company->addMediaFromString(onePixelPng())
+        ->usingFileName('logo.png')
+        ->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+
+    expect($company->fresh()->logo)->toContain('logo.png');
+
+    config()->set('services.brandfetch.client_id', null);
+    $company->clearMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+
+    expect($company->fresh()->logo)->toBeNull()
+        ->and($company->fresh()->getFilamentAvatarUrl())->toBeNull();
+});
+
+test('company builds one clean Brandfetch url from messy domains', function (array $domains, ?string $expected) {
+    config()->set('services.brandfetch.client_id', 'test-client');
+    $company = Company::factory()->create(['custom_fields' => [CompanyField::DOMAINS->value => $domains]]);
+
+    expect($company->fresh()->brandfetchUrl())->toBe($expected === null
+        ? null
+        : "https://cdn.brandfetch.io/domain/{$expected}/w/128/h/128/fallback/404/icon?c=test-client");
+})->with([
+    'padded and capitalised' => [[' Example.COM '], 'example.com'],
+    'scheme, www and path' => [['https://www.example.com/path'], 'example.com'],
+    'port and trailing dot' => [['example.com.:8443'], 'example.com'],
+    'query string' => [['http://example.com?utm=1'], 'example.com'],
+    'multi-value field' => [['https://example.com', 'other.org'], 'example.com'],
+    'subdomain kept' => [['app.example.co.uk'], 'app.example.co.uk'],
+    'not a domain' => [['not a domain'], null],
+    'no dot' => [['localhost'], null],
+    'ip address' => [['192.168.0.1'], null],
+    'empty' => [[''], null],
+]);
+
+test('company asks Brandfetch for nothing without a client id', function () {
+    config()->set('services.brandfetch.client_id', null);
+    $company = Company::factory()->create(['custom_fields' => [CompanyField::DOMAINS->value => ['example.com']]]);
+
+    expect($company->fresh()->brandfetchUrl())->toBeNull();
+});
+
+test('company logos add no query per row on the companies list', function () {
+    config()->set('services.brandfetch.client_id', 'test-client');
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+
+    $createCompanies = fn (int $from, int $to) => collect(range($from, $to))->each(fn (int $index) => Company::factory()->recycle([$user, $user->currentWorkspace])->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ["company-{$index}.com"]],
+    ]));
+    $listQueryCount = function (): int {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $html = livewire(ListCompanies::class)->html();
+
+        expect($html)->toContain('cdn.brandfetch.io/domain/company-1.com/');
+
+        return count(DB::getQueryLog());
+    };
+
+    $createCompanies(1, 1);
+    $listQueryCount();
+    $withOneRow = $listQueryCount();
+    $createCompanies(2, 10);
+
+    expect($listQueryCount())->toBe($withOneRow);
 });
 
 test('company uses media library', function () {

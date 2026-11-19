@@ -58,7 +58,7 @@ it('names each service provider on a hosted install', function (string $provider
     withHostedBilling();
 
     $this->get('/security')->assertOk()->assertSee($provider);
-})->with(['Hetzner', 'Laravel Forge', 'Mailcoach', 'Postmark', 'Stripe', 'Sentry', 'Fathom Analytics', 'Anthropic, OpenAI', 'Google, DuckDuckGo', 'Maxforms', 'Oh Dear']);
+})->with(['Hetzner', 'Laravel Forge', 'Mailcoach', 'Postmark', 'Stripe', 'Sentry', 'Fathom Analytics', 'Anthropic, OpenAI', 'Cloudflare Workers', 'Brandfetch', 'Maxforms', 'Oh Dear']);
 
 it('says which country the hosted data lives in', function (): void {
     withHostedBilling();

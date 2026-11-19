@@ -51,19 +51,18 @@ and outbound email compose/template images on `EmailAttachment::DISK`.
   --force` moves those onto their records.
 - Never call `Media::move()`. It copies and deletes, changing `uuid` and path.
   Ownership changes are attribute writes on the existing row.
-- A company logo is replaced only on evidence. `HighQualityDriver::fetch()` returns null when a
-  site answers and no source has an icon, and throws the fetcher's `ConnectionException` when the
-  host does not resolve or the site is unreachable with no fallback icon. `FetchFaviconForCompany`
-  drops the logo of a previous domain on null and keeps it on a throw. Catching the exception
-  inside the driver turns a dead host into "no favicon" and wipes a working logo.
-  `tests/Feature/Services/Favicon/HighQualityDriverTest.php` and
-  `tests/Feature/Jobs/FetchFaviconForCompanyTest.php` fail when either half changes.
-- A favicon candidate counts only when its bytes are an image the `logo` collection stores.
-  `Company::logoExtensionFor()` sniffs them for both the driver's checks and the job's download.
-  A 2xx status or an image Content-Type proves nothing: many sites answer a missing
-  `/apple-touch-icon.png` with 200 and their own HTML page, and the waterfall must move on to the
-  next source. `tests/Feature/Services/Favicon/HighQualityDriverTest.php` fails when a check
-  trusts the status or the header.
+- The server never fetches a host a user supplied. `FetchFaviconForCompany` asks only the logo
+  Worker (`LogoFinderDriver`, behind `SsrfGuard`) for the company's bare domain. A company logo is
+  replaced only on evidence: the Worker's 204 drops the logo of a previous domain, and a refusal,
+  a 429 or a timeout keeps it. `tests/Feature/Jobs/FetchFaviconForCompanyTest.php` fails when either
+  half changes.
+- A logo counts only when its bytes are an image the `logo` collection stores.
+  `Company::logoExtensionFor()` sniffs them, and a Content-Type header proves nothing.
+  `tests/Feature/Jobs/FetchFaviconForCompanyTest.php` fails when the job trusts the header.
+- A company with no stored logo hotlinks Brandfetch from the browser (`Company::brandfetchUrl()`).
+  The server never requests `cdn.brandfetch.io`, because its terms require hotlinking. Every view
+  that draws the URL falls back to the entity icon when the image fails to load, as
+  `record-chip.blade.php` and `filter-mark.blade.php` do.
 - `logo` collections stay on the public disk. Everything else, `chat-attachments`
   included, follows `MEDIA_DISK`, default `local`, which must name a disk in
   `config/filesystems.php`. A row keeps the disk it was uploaded to.

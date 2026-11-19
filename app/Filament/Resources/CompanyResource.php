@@ -197,7 +197,7 @@ final class CompanyResource extends Resource
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return parent::getGlobalSearchEloquentQuery()->with('media');
+        return parent::getGlobalSearchEloquentQuery()->with(['media', 'customFieldValues.customField']);
     }
 
     public static function getEloquentQuery(): Builder

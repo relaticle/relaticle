@@ -210,7 +210,9 @@ trait HasBoardCards
             return [];
         }
 
-        return array_values(array_intersect_key(self::CARD_RELATIONS, array_flip($this->cardAttributeKeys())));
+        $relations = array_intersect_key(self::CARD_RELATIONS, array_flip($this->cardAttributeKeys()));
+
+        return array_values(array_merge($relations, isset($relations['company']) ? ['company.customFieldValues.customField'] : []));
     }
 
     protected function cardAttributeLabel(string $key): string

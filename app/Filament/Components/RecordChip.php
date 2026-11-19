@@ -14,7 +14,8 @@ use Illuminate\Support\Collection;
  * A record rendered as one avatar-and-name pill.
  *
  * The leading mark is the record's own image, or the shared entity icon when it
- * has none: a company with no logo, and every person.
+ * has none: a company with no logo, and every person. A logo that fails to load
+ * in the browser swaps back to the icon.
  */
 final readonly class RecordChip implements Htmlable
 {
@@ -34,7 +35,7 @@ final readonly class RecordChip implements Htmlable
         return new self(
             name: $name ?? (string) $record->getAttribute('name'),
             imageUrl: $image,
-            iconPath: $image === null ? $entity?->iconPath() : null,
+            iconPath: $entity?->iconPath(),
             circular: $entity !== CrmEntity::Company,
             size: $size,
         );

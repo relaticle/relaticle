@@ -14,11 +14,12 @@
 
     $shape = $chip->circular ? 'rounded-full' : 'rounded';
 @endphp
-<span class="fi-record-chip inline-flex min-w-0 max-w-full items-center gap-2 align-middle">@if (filled($chip->imageUrl))<img
+<span class="fi-record-chip inline-flex min-w-0 max-w-full items-center gap-2 align-middle" @if (filled($chip->imageUrl) && filled($chip->iconPath)) x-data="{ broken: false }" x-init="if ($refs.logo.complete && $refs.logo.naturalWidth === 0) broken = true" @endif>@if (filled($chip->imageUrl))<img
         src="{{ $chip->imageUrl }}"
         alt=""
+        @if (filled($chip->iconPath)) x-ref="logo" x-show="! broken" x-on:error="broken = true" @endif
         @class(['shrink-0 object-cover ring-1 ring-gray-950/5 dark:ring-white/10', $box, $shape])
-    />@elseif (filled($chip->iconPath))<span @class([
+    />@endif@if (filled($chip->iconPath))<span @if (filled($chip->imageUrl)) x-show="broken" style="display: none" @endif @class([
         'flex shrink-0 items-center justify-center bg-gray-100 text-gray-600 ring-1 ring-gray-950/5',
         'dark:bg-white/5 dark:text-gray-300 dark:ring-white/10',
         $box,

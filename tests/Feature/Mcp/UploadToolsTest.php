@@ -33,39 +33,6 @@ beforeEach(function (): void {
 });
 
 describe('StoreAgentUpload', function (): void {
-    it('fetches a public https url into pending uploads', function (): void {
-        resolveHostsTo(['93.184.216.34']);
-        Http::fake(['https://cdn.example.com/*' => Http::response(pdfBytes(), 200, ['Content-Type' => 'application/pdf'])]);
-
-        $media = resolve(StoreAgentUpload::class)->execute($this->user, $this->workspace, ['source_url' => 'https://cdn.example.com/brief.pdf']);
-
-        expect($media->collection_name)->toBe(MediaCollection::PendingUploads->value)
-            ->and($media->mime_type)->toBe('application/pdf')
-            ->and($media->getCustomProperty('source'))->toBe('url')
-            ->and($media->name)->toBe('brief.pdf');
-    });
-
-    it('reports an unreachable url', function (): void {
-        resolveHostsTo(['93.184.216.34']);
-        Http::fake(['https://cdn.example.com/*' => Http::response('', 404)]);
-
-        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->workspace, ['source_url' => 'https://cdn.example.com/missing.pdf']))
-            ->toThrow(UploadException::class, __('uploads.errors.unreachable'));
-    });
-
-    it('reports a url the guard refuses', function (): void {
-        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->workspace, ['source_url' => 'http://169.254.169.254/latest']))
-            ->toThrow(UploadException::class, __('uploads.errors.url_not_allowed'));
-    });
-
-    it('rejects a fetched body over 10 MB', function (): void {
-        resolveHostsTo(['93.184.216.34']);
-        Http::fake(['https://cdn.example.com/*' => Http::response(str_repeat('a', 10 * 1024 * 1024 + 1), 200)]);
-
-        expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->workspace, ['source_url' => 'https://cdn.example.com/huge.bin']))
-            ->toThrow(UploadException::class, __('uploads.errors.too_large', ['max' => 10]));
-    });
-
     it('decodes base64 into pending uploads', function (): void {
         $media = resolve(StoreAgentUpload::class)->execute($this->user, $this->workspace, [
             'base64' => base64_encode(onePixelPng()),
@@ -103,7 +70,7 @@ describe('StoreAgentUpload', function (): void {
             ->toThrow(UploadException::class, __('uploads.errors.invalid_base64'));
     });
 
-    it('reports no source when none of source_url, base64, or upload_id is given', function (): void {
+    it('reports no source when none of base64 or upload_id is given', function (): void {
         expect(fn (): Media => resolve(StoreAgentUpload::class)->execute($this->user, $this->workspace, ['base64' => '', 'filename' => 'x.pdf']))
             ->toThrow(UploadException::class, __('uploads.errors.no_source'));
     });
@@ -361,15 +328,15 @@ describe('upload-file', function (): void {
         expect(Media::query()->count())->toBe(1);
     });
 
-    it('bounds the display name of a file fetched from a long url', function (): void {
-        resolveHostsTo(['93.184.216.34']);
-        Http::fake(['https://cdn.example.com/*' => Http::response(pdfBytes(), 200, ['Content-Type' => 'application/pdf'])]);
+    it('refuses source_url', function (): void {
+        Http::fake();
 
         RelaticleServer::actingAs($this->user)
-            ->tool(UploadFileTool::class, ['source_url' => 'https://cdn.example.com/'.str_repeat('a', 256).'.pdf'])
-            ->assertOk();
+            ->tool(UploadFileTool::class, ['source_url' => 'https://cdn.example.com/brief.pdf'])
+            ->assertHasErrors();
 
-        expect(mb_strlen(Media::query()->latest('id')->firstOrFail()->name))->toBeLessThanOrEqual(255);
+        Http::assertNothingSent();
+        expect(Media::query()->count())->toBe(0);
     });
 
     it('stores a base64 file and returns its file_id and markdown', function (): void {

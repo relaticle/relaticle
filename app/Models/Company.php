@@ -6,6 +6,7 @@ namespace App\Models;
 
 use App\Enums\CreationSource;
 use App\Enums\MediaCollection;
+use App\Jobs\FetchFaviconForCompany;
 use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasActivityTimeline;
 use App\Models\Concerns\HasCreator;
@@ -82,6 +83,8 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
 
     public const string LOGO_MEDIA_COLLECTION = MediaCollection::Logo->value;
 
+    private const int BRANDFETCH_SIZE = 128;
+
     /** @var array<string, string> */
     public const array LOGO_MIME_TYPES = [
         'image/png' => 'png',
@@ -108,20 +111,31 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
     }
 
     /**
-     * Null when no logo has been uploaded. A company with no mark falls back to
-     * the shared entity icon (App\Enums\CrmEntity), not a generated initials
-     * tile: 57% of companies carry a real logo, so colour in a company column
-     * should only ever mean "this is the brand's own mark".
-     *
-     * @return Attribute<non-falsy-string|null, never>
+     * @return Attribute<string|null, never>
      */
     protected function logo(): Attribute
     {
+        // No mark at all shows the shared entity icon, never initials: colour means a real brand mark.
         return Attribute::get(function (): ?string {
             $logo = $this->getFirstMediaUrl(self::LOGO_MEDIA_COLLECTION);
 
-            return $logo === '' || $logo === '0' ? null : $logo;
+            return $logo === '' || $logo === '0' ? $this->brandfetchUrl() : $logo;
         });
+    }
+
+    public function brandfetchUrl(): ?string
+    {
+        $clientId = config('services.brandfetch.client_id');
+
+        if (blank($clientId)) {
+            return null;
+        }
+
+        $domain = FetchFaviconForCompany::domainOf($this);
+
+        return $domain === null
+            ? null
+            : sprintf('https://cdn.brandfetch.io/domain/%s/w/%d/h/%d/fallback/404/icon?c=%s', $domain, self::BRANDFETCH_SIZE, self::BRANDFETCH_SIZE, rawurlencode((string) $clientId));
     }
 
     public function getFilamentAvatarUrl(): ?string

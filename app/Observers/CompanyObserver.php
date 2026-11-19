@@ -29,9 +29,9 @@ final readonly class CompanyObserver
 
     private function dispatchFaviconFetchIfNeeded(Company $company): void
     {
-        $sourceUrl = FetchFaviconForCompany::sourceUrl($company);
+        $domain = FetchFaviconForCompany::domainOf($company);
 
-        if ($sourceUrl === null) {
+        if ($domain === null) {
             return;
         }
 
@@ -39,7 +39,7 @@ final readonly class CompanyObserver
 
         // Company saves are frequent and the fetch hits slow remote sites, so a logo
         // already fetched from the current domain is never fetched again.
-        if ($logo instanceof Media && FetchFaviconForCompany::fetchedFrom($logo, $sourceUrl)) {
+        if ($logo instanceof Media && FetchFaviconForCompany::fetchedFrom($logo, $domain)) {
             return;
         }
 

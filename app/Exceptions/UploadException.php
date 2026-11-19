@@ -23,16 +23,6 @@ final class UploadException extends RuntimeException
         return new self(__('uploads.errors.mime_not_allowed', ['mime' => $mime, 'allowed' => implode(', ', UploadAllowlist::extensions())]));
     }
 
-    public static function unreachable(): self
-    {
-        return new self(__('uploads.errors.unreachable'));
-    }
-
-    public static function urlNotAllowed(): self
-    {
-        return new self(__('uploads.errors.url_not_allowed'));
-    }
-
     public static function notFound(): self
     {
         return new self(__('uploads.errors.not_found'));

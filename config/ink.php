@@ -21,6 +21,7 @@ return [
         'tags' => true,
         'media_library' => false,
         'mcp' => false,
+        'url_uploads' => false,
     ],
 
     /*
