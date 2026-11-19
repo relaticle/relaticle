@@ -210,6 +210,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->app->bind(BasePreventRequestForgery::class, PreventRequestForgery::class);
+        $this->app->bind(BaseOAuthRegisterController::class, OAuthRegisterController::class);
     }
 
     private function registerNotificationBindings(): void
@@ -224,7 +225,6 @@ final class AppServiceProvider extends ServiceProvider
 
     private function registerSelfHostedDefaults(): void
     {
-        $this->app->bind(BaseOAuthRegisterController::class, OAuthRegisterController::class);
         $this->app->bind(Entitlements::class, SelfHostedEntitlements::class);
         $this->app->bind(Billing::class, NoBilling::class);
     }
