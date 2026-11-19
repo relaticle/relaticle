@@ -47,7 +47,7 @@ final readonly class UploadAllowlist
         'zip' => ['application/zip', 'application/x-zip-compressed'],
     ];
 
-    /** finfo reports plain text that looks like code (a leading `#include`) as text/x-*. */
+    // finfo reports plain text that looks like code (a leading `#include`) as text/x-*.
     private const array SOURCE_LIKE_TEXT_EXTENSIONS = ['txt', 'csv'];
 
     public static function maxBytes(): int

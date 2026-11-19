@@ -1670,20 +1670,20 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
      */
     private function storeAttachments(): array
     {
-        $paths = [];
-        $names = [];
+        $files = array_values(array_filter($this->attachments, static fn (mixed $file): bool => $file instanceof TemporaryUploadedFile));
 
-        foreach ($this->attachments as $file) {
-            if (! $file instanceof TemporaryUploadedFile) {
-                continue;
-            }
-
+        foreach ($files as $file) {
             if (! UploadAllowlist::isAllowedEmailAttachment($file)) {
                 throw ValidationException::withMessages([
                     'attachments' => __('filament/emails/composer.notifications.attachment_type_not_allowed.body', ['files' => $file->getClientOriginalName()]),
                 ]);
             }
+        }
 
+        $paths = [];
+        $names = [];
+
+        foreach ($files as $file) {
             $path = (string) $file->store('email-attachments', EmailAttachment::DISK);
             $paths[] = $path;
             $names[$path] = $file->getClientOriginalName();
