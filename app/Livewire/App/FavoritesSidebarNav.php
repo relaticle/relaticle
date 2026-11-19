@@ -52,6 +52,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
         $removeFavoriteRecord->execute($user, $record);
 
         $this->dispatch('refresh-sidebar');
+        $this->dispatch('favorites-updated');
     }
 
     /**
@@ -65,6 +66,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
         $arrangeFavorites->execute($this->authUser(), $workspace, $tree);
 
         $this->dispatch('refresh-sidebar');
+        $this->dispatch('favorites-updated');
     }
 
     public function createFolderAction(): Action
@@ -84,6 +86,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
                 $createFavoriteFolder->execute($this->authUser(), $workspace, $data['name']);
 
                 $this->dispatch('refresh-sidebar');
+                $this->dispatch('favorites-updated');
             });
     }
 
@@ -99,6 +102,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
                 $renameFavoriteFolder->execute($this->authUser(), $this->folderFromArguments($arguments), $data['name']);
 
                 $this->dispatch('refresh-sidebar');
+                $this->dispatch('favorites-updated');
             });
     }
 
@@ -114,6 +118,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
                 $deleteFavoriteFolder->execute($this->authUser(), $this->folderFromArguments($arguments));
 
                 $this->dispatch('refresh-sidebar');
+                $this->dispatch('favorites-updated');
             });
     }
 
@@ -150,10 +155,13 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
         $user = Filament::auth()->user();
         $workspace = Filament::getTenant();
 
+        $items = $user instanceof User && $workspace instanceof Workspace
+            ? new FavoritesQuery()->tree($user, $workspace->getKey())
+            : collect();
+
         return view('livewire.app.favorites-sidebar-nav', [
-            'items' => $user instanceof User && $workspace instanceof Workspace
-                ? new FavoritesQuery()->tree($user, $workspace->getKey())
-                : collect(),
+            'items' => $items,
+            'hasFavorites' => $items->isNotEmpty(),
             'workspace' => $workspace,
         ]);
     }

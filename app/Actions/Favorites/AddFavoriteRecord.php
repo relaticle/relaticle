@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Favorites;
 
 use App\Models\Company;
+use App\Models\FavoriteFolder;
 use App\Models\FavoriteRecord;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -13,9 +14,10 @@ use Illuminate\Database\UniqueConstraintViolationException;
 
 final readonly class AddFavoriteRecord
 {
-    public function execute(User $user, Company|People|Opportunity $record): FavoriteRecord
+    public function execute(User $user, Company|People|Opportunity $record, ?FavoriteFolder $folder = null): FavoriteRecord
     {
         abort_unless($user->can('view', $record), 403);
+        abort_if($folder instanceof FavoriteFolder && ! $folder->isOwnedBy($user, $record->workspace_id), 403);
 
         $keys = [
             'workspace_id' => $record->workspace_id,
@@ -26,7 +28,8 @@ final readonly class AddFavoriteRecord
 
         try {
             return FavoriteRecord::query()->withoutGlobalScopes()->firstOrCreate($keys, [
-                'position' => FavoriteRecord::nextTopLevelPosition($user, $record->workspace_id),
+                'favorite_folder_id' => $folder?->getKey(),
+                'position' => FavoriteRecord::nextPosition($user, $record->workspace_id, $folder),
             ]);
         } catch (UniqueConstraintViolationException) {
             return FavoriteRecord::query()->withoutGlobalScopes()->where($keys)->firstOrFail();

@@ -32,7 +32,7 @@ final class ToggleFavoriteAction extends Action
             ->color('gray')
             ->size(Size::Small)
             ->icon('lucide-star')
-            ->extraAttributes(fn (): array => $this->isStarred() ? ['class' => '[&_svg]:fill-current'] : [])
+            ->extraAttributes(fn (): array => $this->isStarred() ? ['class' => '[&_.fi-icon]:fill-warning-400 [&_.fi-icon]:text-warning-500'] : [])
             ->label(fn (): string => $this->isStarred() ? __('favorites.actions.remove') : __('favorites.actions.add'))
             ->tooltip(fn (): string => $this->isStarred() ? __('favorites.actions.remove') : __('favorites.actions.add'))
             ->action(function (Component $livewire): void {
@@ -40,8 +40,8 @@ final class ToggleFavoriteAction extends Action
                 $record = $this->crmRecord();
 
                 $this->isStarred()
-                    ? app(RemoveFavoriteRecord::class)->execute($user, $record)
-                    : app(AddFavoriteRecord::class)->execute($user, $record);
+                    ? resolve(RemoveFavoriteRecord::class)->execute($user, $record)
+                    : resolve(AddFavoriteRecord::class)->execute($user, $record);
 
                 $livewire->dispatch('refresh-sidebar');
             });
@@ -61,12 +61,6 @@ final class ToggleFavoriteAction extends Action
 
     private function isStarred(): bool
     {
-        $record = $this->crmRecord();
-
-        return FavoriteRecord::query()
-            ->ownedBy($this->member(), $record->workspace_id)
-            ->where('record_type', $record->getMorphClass())
-            ->where('record_id', $record->getKey())
-            ->exists();
+        return FavoriteRecord::ownedFor($this->member(), $this->crmRecord()) instanceof FavoriteRecord;
     }
 }

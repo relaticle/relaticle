@@ -15,8 +15,14 @@
 >
     <a
         href="{{ $url }}"
-        wire:navigate
-        x-on:click="$store.sidebar.isMobile && $store.sidebar.close()"
+        {{-- Not wire:navigate: it cancels mousedown, so the row could never be dragged, and it navigated on every drop. --}}
+        x-on:click="
+            $store.sidebar.isMobile && $store.sidebar.close()
+            if ($event.button === 0 && ! ($event.metaKey || $event.ctrlKey || $event.shiftKey || $event.altKey)) {
+                $event.preventDefault()
+                Livewire.navigate($el.href)
+            }
+        "
         x-bind:aria-label="$store.sidebar.isOpen ? null : @js($name)"
         x-data="filamentSidebarTooltip"
         x-tooltip="getTooltip({ content: @js($name) })"

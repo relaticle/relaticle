@@ -42,6 +42,11 @@ final class FavoriteFolder extends Model
         return $this->hasMany(FavoriteRecord::class)->orderBy('position');
     }
 
+    public function isOwnedBy(User $user, string $workspaceId): bool
+    {
+        return $this->user_id === $user->getKey() && $this->workspace_id === $workspaceId;
+    }
+
     /**
      * @return BelongsTo<User, $this>
      */

@@ -275,6 +275,9 @@ html.fi:has(body.fi-panel-app :is(.fi-app-layout, .fi-settings-layout)),
 /* Against the scrimmed page the drawer's white/10 hairline vanishes in dark mode. */
 .fi-sidebar.fi-sidebar-open {
     @apply max-sm:dark:border-white/20 max-sm:dark:ring-white/20;
+
+    /* Filament's translate-x-0 moves nothing but traps fixed children, so a sidebar modal opened inside it. */
+    translate: none;
 }
 
 /* Drag handle straddling a resizable edge (components/resize-handle). */
@@ -431,8 +434,18 @@ html.fi-chat-docked .fi-app-main-wrapper {
         @apply text-xs leading-5;
     }
 
-    .fi-sidebar-group-collapse-btn {
+    .fi-sidebar-group-collapse-btn,
+    .fi-sidebar-favorites-new-folder-btn {
         @apply -my-2;
+    }
+}
+
+/* While a favorite is dragged, its slot collapses to a dashed line where it will land. */
+.fi-sidebar-favorites .sortable-ghost {
+    @apply my-0.5 h-0 min-h-0 overflow-hidden border-t-2 border-dashed border-primary-500 p-0 dark:border-primary-400;
+
+    & > * {
+        @apply hidden;
     }
 }
 
@@ -1316,6 +1329,11 @@ html.fi-record-stacked .fi-record-layout {
 
 .fi-record-rail {
     @apply record-split:sticky record-split:top-0 record-split:max-h-[calc(100dvh-var(--topbar-height))] record-split:overflow-y-auto record-split:px-5 record-split:py-5;
+
+    /* Safari clips a fixed submenu to this scroller, so the "..." menu's folder submenu was cut at the rail's edge. */
+    &:has(.fi-record-rail-actions .fi-dropdown-panel[style*='display: block']) {
+        @apply overflow-visible;
+    }
 }
 
 .fi-record-pane {

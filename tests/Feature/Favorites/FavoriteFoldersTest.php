@@ -29,15 +29,18 @@ function folderCompany(string $name): Company
     return Company::factory()->recycle([test()->user, test()->workspace])->create(['name' => $name]);
 }
 
-it('creates an empty folder before any favorites exist', function (): void {
+it('creates an empty folder after the first favorite', function (): void {
+    favoriteFor($this->user, $this->workspace, folderCompany('Acme Corp'), 1);
+
     Livewire::test(FavoritesSidebarNav::class)
         ->callAction('createFolder', data: ['name' => '  Q4 renewals  '])
         ->assertHasNoFormErrors()
         ->assertDispatched('refresh-sidebar')
+        ->assertDispatched('favorites-updated')
         ->assertSee('Q4 renewals');
 
     $folder = FavoriteFolder::query()->sole();
-    expect($folder->name)->toBe('Q4 renewals')->and($folder->position)->toBe(1);
+    expect($folder->name)->toBe('Q4 renewals')->and($folder->position)->toBe(2);
 });
 
 it('refuses a blank or too long folder name', function (string $name): void {

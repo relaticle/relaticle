@@ -19,8 +19,9 @@
     data-group-label="{{ $groupLabel }}"
     x-bind:class="{ 'fi-collapsed': $store.sidebar.groupIsCollapsed(label) }"
     {{-- -ml-2 offsets this hook, a sibling of Filament's .fi-sidebar-nav-groups list (margin-left: -8px). --}}
-    class="fi-sidebar-group fi-sidebar-favorites fi-collapsible -ml-2"
+    @class(['fi-sidebar-group fi-sidebar-favorites fi-collapsible -ml-2', 'hidden' => ! $hasFavorites])
 >
+    @if ($hasFavorites)
     <div
         x-on:click="$store.sidebar.toggleCollapsedGroup(label)"
         x-show="$store.sidebar.isOpen"
@@ -37,6 +38,7 @@
         <x-filament::icon-button
             color="gray"
             icon="lucide-folder-plus"
+            size="xs"
             :label="__('favorites.actions.new_folder')"
             x-on:click.stop
             wire:click="mountAction('createFolder')"
@@ -57,27 +59,20 @@
         x-show="$store.sidebar.isOpen ? ! $store.sidebar.groupIsCollapsed(label) : true"
         x-collapse.duration.200ms
         x-ref="favorites"
-        x-sort="arrange"
+        x-sort.ghost="arrange"
         x-sort:group="favorites"
         x-sort:config="{ delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }"
         class="fi-sidebar-group-items"
     >
-        @forelse ($items as $item)
+        @foreach ($items as $item)
             @if ($item instanceof \App\Models\FavoriteFolder)
                 @include('livewire.app.favorites-sidebar-nav.folder', ['folder' => $item])
             @else
                 @include('livewire.app.favorites-sidebar-nav.favorite', ['favorite' => $item])
             @endif
-        @empty
-            <li
-                x-show="$store.sidebar.isOpen"
-                class="px-3 py-2 text-xs text-gray-500 dark:text-gray-400"
-                role="status"
-            >
-                {{ __('favorites.empty') }}
-            </li>
-        @endforelse
+        @endforeach
     </ul>
+    @endif
 
     <x-filament-actions::modals />
 </li>

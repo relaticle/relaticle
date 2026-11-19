@@ -8,6 +8,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\FavoriteMenuActions;
 use App\Filament\Actions\ToggleFavoriteAction;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Infolists\RecordDetails;
@@ -218,6 +219,12 @@ trait HasRecordPageLayout
         $this->forceRender();
     }
 
+    #[On('favorites-updated')]
+    public function refreshFavoriteActions(): void
+    {
+        $this->forceRender();
+    }
+
     private function quickActions(): Actions
     {
         return Actions::make([
@@ -320,6 +327,7 @@ trait HasRecordPageLayout
                     $this->forceRender();
                 }),
             ActionGroup::make([
+                FavoriteMenuActions::group($this->crmRecord()),
                 ActionGroup::make([
                     CopyToClipboardAction::make('copyPageUrl')
                         ->label(__('filament/record-page.actions.copy_page_url'))

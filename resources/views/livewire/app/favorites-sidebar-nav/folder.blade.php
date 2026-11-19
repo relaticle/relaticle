@@ -24,7 +24,7 @@
             <span title="{{ $folder->name }}" class="fi-sidebar-item-label truncate">{{ $folder->name }}</span>
         </button>
 
-        <x-filament::dropdown placement="bottom-end" teleport class="absolute end-1 top-1/2 -translate-y-1/2">
+        <x-filament::dropdown placement="bottom-end" teleport class="absolute inset-y-0 end-1 flex items-center">
             <x-slot name="trigger">
                 <x-filament::icon-button
                     color="gray"
@@ -37,14 +37,14 @@
             <x-filament::dropdown.list>
                 <x-filament::dropdown.list.item
                     icon="lucide-pencil"
-                    wire:click="mountAction('renameFolder', { folder: @js($folder->getKey()) })"
+                    wire:click="mountAction('renameFolder', { folder: '{{ $folder->getKey() }}' })"
                 >
                     {{ __('favorites.folders.rename') }}
                 </x-filament::dropdown.list.item>
                 <x-filament::dropdown.list.item
                     icon="lucide-trash-2"
                     color="danger"
-                    wire:click="mountAction('deleteFolder', { folder: @js($folder->getKey()) })"
+                    wire:click="mountAction('deleteFolder', { folder: '{{ $folder->getKey() }}' })"
                 >
                     {{ __('favorites.folders.delete') }}
                 </x-filament::dropdown.list.item>
@@ -55,15 +55,19 @@
     <ul
         x-show="! $store.sidebar.isOpen || ! $store.sidebar.groupIsCollapsed(@js($folderKey))"
         x-collapse.duration.200ms
-        x-sort="arrange"
+        x-sort.ghost="arrange"
         {{-- A folder may not hold a folder, so this list only accepts favorites. --}}
         x-sort:config="{ group: { name: 'favorites', put: (to, from, item) => item.dataset.favoriteKey?.startsWith('record:') ?? false }, delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }"
         data-favorite-folder="{{ $folder->getKey() }}"
         x-bind:class="{ 'ps-5': $store.sidebar.isOpen }"
         class="fi-sidebar-favorites-folder-items"
     >
-        @foreach ($folder->favoriteRecords as $favorite)
+        @forelse ($folder->favoriteRecords as $favorite)
             @include('livewire.app.favorites-sidebar-nav.favorite', ['favorite' => $favorite])
-        @endforeach
+        @empty
+            <li x-sort:ignore x-show="$store.sidebar.isOpen" data-favorite-folder-empty class="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {{ __('favorites.folders.empty') }}
+            </li>
+        @endforelse
     </ul>
 </li>

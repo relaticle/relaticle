@@ -36,14 +36,32 @@ it('lists favorites with their name and entity label', function (): void {
         ->assertSee(__('favorites.group'))
         ->assertSeeInOrder(['Acme Corp', __('favorites.entities.company'), 'Dana Whitfield', __('favorites.entities.people')])
         ->assertSee($urls->buildOrFail(CrmEntity::Company, $company->getKey(), $this->workspace))
-        ->assertSee($urls->buildOrFail(CrmEntity::People, $person->getKey(), $this->workspace))
-        ->assertDontSee(__('favorites.empty'));
+        ->assertSee($urls->buildOrFail(CrmEntity::People, $person->getKey(), $this->workspace));
 });
 
-it('shows the empty hint when nothing is starred', function (): void {
+it('hides the group while there is no favorite and no folder', function (): void {
     Livewire::test(FavoritesSidebarNav::class)
-        ->assertSee(__('favorites.empty'))
-        ->assertSee(__('favorites.actions.new_folder'));
+        ->assertDontSeeHtml('fi-sidebar-group-btn')
+        ->assertDontSee(__('favorites.actions.new_folder'));
+});
+
+it('shows the group with only an empty folder', function (): void {
+    FavoriteFolder::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey(), 'name' => 'Q4 renewals', 'position' => 1]);
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->assertSeeHtml('fi-sidebar-group-btn')
+        ->assertSee(__('favorites.actions.new_folder'))
+        ->assertSee('Q4 renewals')
+        ->assertSee(__('favorites.folders.empty'));
+});
+
+it('shows the group when the only favorite sits in a folder', function (): void {
+    $folder = FavoriteFolder::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey(), 'name' => 'Q4 renewals', 'position' => 1]);
+    favoriteFor($this->user, $this->workspace, Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']), 1, $folder);
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->assertSee(__('favorites.actions.new_folder'))
+        ->assertSeeInOrder(['Q4 renewals', 'Acme Corp']);
 });
 
 it('lists a folder with its favorites between top-level favorites', function (): void {
@@ -98,7 +116,7 @@ it("shows only the signed-in member's favorites in the current workspace", funct
     Livewire::test(FavoritesSidebarNav::class)
         ->assertDontSee('Acme Corp')
         ->assertDontSee('Globex Inc')
-        ->assertSee(__('favorites.empty'));
+        ->assertDontSeeHtml('fi-sidebar-group-btn');
 });
 
 it('removes a favorite from the sidebar', function (): void {

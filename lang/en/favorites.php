@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 return [
     'group' => 'Favorites',
-    'empty' => 'Star a company, person or opportunity from its page to keep it here.',
     'actions' => [
         'add' => 'Add to favorites',
         'remove' => 'Remove from favorites',
+        'move' => 'Move favorite to',
+        'no_folder' => 'No folder',
         'new_folder' => 'New folder',
     ],
     'folders' => [
@@ -16,6 +17,7 @@ return [
         'delete' => 'Delete folder',
         'delete_body' => 'The favorites in this folder move to the top of the list.',
         'menu' => 'Folder options',
+        'empty' => 'No items',
     ],
     'entities' => [
         'company' => 'Company',

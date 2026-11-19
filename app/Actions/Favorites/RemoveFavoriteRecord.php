@@ -18,8 +18,7 @@ final readonly class RemoveFavoriteRecord
 
         FavoriteRecord::query()
             ->ownedBy($user, $record->workspace_id)
-            ->where('record_type', $record->getMorphClass())
-            ->where('record_id', $record->getKey())
+            ->forRecord($record)
             ->delete();
     }
 }

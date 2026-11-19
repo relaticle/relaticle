@@ -50,6 +50,15 @@ final class FavoriteRecord extends Model
         return $this->belongsTo(FavoriteFolder::class, 'favorite_folder_id');
     }
 
+    public static function nextPosition(User $user, string $workspaceId, ?FavoriteFolder $folder): int
+    {
+        if (! $folder instanceof FavoriteFolder) {
+            return self::nextTopLevelPosition($user, $workspaceId);
+        }
+
+        return 1 + (int) self::query()->ownedBy($user, $workspaceId)->where('favorite_folder_id', $folder->getKey())->max('position');
+    }
+
     public static function nextTopLevelPosition(User $user, string $workspaceId): int
     {
         $folders = FavoriteFolder::query()->ownedBy($user, $workspaceId)->max('position');
@@ -75,5 +84,19 @@ final class FavoriteRecord extends Model
         $query->withoutGlobalScope(WorkspaceScope::class)
             ->where('workspace_id', $workspaceId)
             ->whereBelongsTo($user);
+    }
+
+    /**
+     * @param  Builder<self>  $query
+     */
+    #[Scope]
+    protected function forRecord(Builder $query, Model $record): void
+    {
+        $query->where('record_type', $record->getMorphClass())->where('record_id', $record->getKey());
+    }
+
+    public static function ownedFor(User $user, Company|People|Opportunity $record): ?self
+    {
+        return self::query()->ownedBy($user, $record->workspace_id)->forRecord($record)->first();
     }
 }
