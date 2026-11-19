@@ -58,6 +58,10 @@ it('resolves every internal link -- including anchored and query-qualified ones 
             $url = $match[1].$match[2];
             $fragment = $match[3] ?? '';
 
+            if ($match[2] === '/developers/api') {
+                return $match[1] === '' ? [] : ["{$page->path} -> {$url} (the API reference has one unprefixed URL)"];
+            }
+
             if ($match[1] !== $prefix) {
                 return ["{$page->path} -> {$url} (must start with ".($prefix === '' ? 'no language prefix' : "{$prefix}/").')'];
             }
@@ -66,7 +70,7 @@ it('resolves every internal link -- including anchored and query-qualified ones 
             $path = str_starts_with($path, 'developers/') ? 'docs/guides/'.substr($path, strlen('developers/')) : $path;
             $target = $repo->find($path, $locale);
 
-            if (! $target instanceof DocPage && $fragment === '' && ($match[2] === '/developers' || $match[2] === '/developers/api' || $match[2] === '/help' || $repo->findCategory($path, $locale) !== null)) {
+            if (! $target instanceof DocPage && $fragment === '' && ($match[2] === '/developers' || $match[2] === '/help' || $repo->findCategory($path, $locale) !== null)) {
                 return [];
             }
 

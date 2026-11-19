@@ -94,7 +94,7 @@ final readonly class LocalizedUrl
 
         return preg_replace_callback(
             '/href="(\/(?!\/)[^"]*)"/',
-            fn (array $match): string => self::servesLocalizedPath("/{$locale}{$match[1]}", $locale)
+            fn (array $match): string => self::servesLocalizedPath($match[1], $locale)
                 ? 'href="/'.$locale.$match[1].'"'
                 : $match[0],
             $html,
@@ -103,13 +103,22 @@ final readonly class LocalizedUrl
 
     private static function servesLocalizedPath(string $path, string $locale): bool
     {
+        $localized = self::routeNameOf("/{$locale}{$path}");
+
+        return $localized !== null
+            && str_starts_with($localized, "{$locale}.")
+            && self::baseName($localized) === self::routeNameOf($path);
+    }
+
+    private static function routeNameOf(string $path): ?string
+    {
         try {
             $route = Route::getRoutes()->match(Request::create((string) parse_url($path, PHP_URL_PATH)));
         } catch (HttpExceptionInterface) {
-            return false;
+            return null;
         }
 
-        return str_starts_with((string) $route->getName(), "{$locale}.");
+        return $route->getName();
     }
 
     /** @return array<string, int> */

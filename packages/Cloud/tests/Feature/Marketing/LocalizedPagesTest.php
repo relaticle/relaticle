@@ -142,7 +142,7 @@ it('sets html lang and og:locale from the prefix', function (): void {
 
 function nonLocalizedPublicPath(string $path): bool
 {
-    return in_array($path, ['/login', '/register', '/discord', '/llms.txt', '/openapi.json', '/openapi.yaml', '/.well-known/security.txt', '/security.txt'], true)
+    return in_array($path, ['/login', '/register', '/discord', '/llms.txt', '/openapi.json', '/openapi.yaml', '/developers/api', '/.well-known/security.txt', '/security.txt'], true)
         || Str::startsWith($path, ['/blog', '/brand/', '/images/', '/build/', '/storage/', '/app', '/auth']);
 }
 
@@ -181,6 +181,23 @@ it('keeps every link on every localized public page German', function (): void {
     }
 
     expect($offenders)->toBe([]);
+});
+
+it('links the API reference at its one English URL from every localized developer page', function (string $locale): void {
+    $html = (string) $this->get("/{$locale}/developers/mcp")->assertOk()->getContent();
+    $hrefs = (new Crawler($html))->filter('a[href]')->each(fn (Crawler $a): string => (string) $a->attr('href'));
+
+    expect($hrefs)->toContain(url('/developers/api'))
+        ->and($hrefs)->not->toContain(url("/{$locale}/developers/api"));
+
+    $this->get('/developers/api')->assertOk();
+})->with(['de', 'es', 'fr']);
+
+it('leaves a link to the unprefixed-only API reference English', function (): void {
+    app()->setLocale('de');
+
+    expect(LocalizedUrl::localizeLinks('<a href="/developers/api">x</a><a href="/developers/mcp">y</a>'))
+        ->toBe('<a href="/developers/api">x</a><a href="/de/developers/mcp">y</a>');
 });
 
 it('sets the locale cookie', function (): void {

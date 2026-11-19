@@ -5,7 +5,7 @@ order: 3
 updated: "2026-10-06"
 ---
 
-Relaticle propose une API REST pour les entreprises, les personnes, les opportunités, les tâches, les notes et les attributs personnalisés. Utilisez-la pour synchroniser des enregistrements avec un autre système ou pour créer votre propre intégration. La [référence de l'API](/fr/developers/api) liste chaque endpoint, chaque paramètre et chaque réponse, et la spécification OpenAPI se trouve à l'adresse [/openapi.json](/openapi.json).
+Relaticle propose une API REST pour les entreprises, les personnes, les opportunités, les tâches, les notes et les attributs personnalisés. Utilisez-la pour synchroniser des enregistrements avec un autre système ou pour créer votre propre intégration. La [référence de l'API](/developers/api) liste chaque endpoint, chaque paramètre et chaque réponse, et la spécification OpenAPI se trouve à l'adresse [/openapi.json](/openapi.json).
 
 ## URL de base
 
@@ -55,7 +55,7 @@ Un jeton d'accès peut aussi porter trois permissions d'e-mail : **Lire les e-ma
 | Notes | `/v1/notes` |
 | Attributs personnalisés (custom fields) | `/v1/custom-fields` (lecture seule) |
 
-Chaque ressource d'enregistrement prend en charge la liste, la création, la lecture, la mise à jour et la suppression. Les réponses suivent la norme [JSON:API](https://jsonapi.org/), et chaque enregistrement porte les valeurs de ses attributs personnalisés sous `custom_fields`. Les endpoints de liste acceptent des paramètres de filtrage, de tri et de pagination, que la [référence de l'API](/fr/developers/api) documente pour chaque endpoint.
+Chaque ressource d'enregistrement prend en charge la liste, la création, la lecture, la mise à jour et la suppression. Les réponses suivent la norme [JSON:API](https://jsonapi.org/), et chaque enregistrement porte les valeurs de ses attributs personnalisés sous `custom_fields`. Les endpoints de liste acceptent des paramètres de filtrage, de tri et de pagination, que la [référence de l'API](/developers/api) documente pour chaque endpoint.
 
 ## Filtrer une liste
 

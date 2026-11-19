@@ -5,7 +5,7 @@ order: 3
 updated: "2026-10-06"
 ---
 
-Relaticle hat eine REST-API für Unternehmen, Personen, Verkaufschancen, Aufgaben, Notizen und benutzerdefinierte Attribute. Nutzen Sie sie, um Einträge mit einem anderen System abzugleichen oder eine eigene Integration zu bauen. Die [API-Referenz](/de/developers/api) listet jeden Endpunkt, jeden Parameter und jede Antwort. Die OpenAPI-Spezifikation finden Sie unter [/openapi.json](/openapi.json).
+Relaticle hat eine REST-API für Unternehmen, Personen, Verkaufschancen, Aufgaben, Notizen und benutzerdefinierte Attribute. Nutzen Sie sie, um Einträge mit einem anderen System abzugleichen oder eine eigene Integration zu bauen. Die [API-Referenz](/developers/api) listet jeden Endpunkt, jeden Parameter und jede Antwort. Die OpenAPI-Spezifikation finden Sie unter [/openapi.json](/openapi.json).
 
 ## Basis-URL
 
@@ -55,7 +55,7 @@ Ein Zugriffstoken kann außerdem drei E-Mail-Berechtigungen haben: **E-Mails les
 | Notizen | `/v1/notes` |
 | Benutzerdefinierte Attribute (Custom Fields) | `/v1/custom-fields` (nur lesen) |
 
-Jede Eintragsressource unterstützt Auflisten, Erstellen, Lesen, Aktualisieren und Löschen. Die Antworten folgen [JSON:API](https://jsonapi.org/). Jeder Eintrag enthält die Werte seiner benutzerdefinierten Attribute unter `custom_fields`. Listenendpunkte nehmen Parameter für Filtern, Sortieren und Paginierung an. Die [API-Referenz](/de/developers/api) dokumentiert sie pro Endpunkt.
+Jede Eintragsressource unterstützt Auflisten, Erstellen, Lesen, Aktualisieren und Löschen. Die Antworten folgen [JSON:API](https://jsonapi.org/). Jeder Eintrag enthält die Werte seiner benutzerdefinierten Attribute unter `custom_fields`. Listenendpunkte nehmen Parameter für Filtern, Sortieren und Paginierung an. Die [API-Referenz](/developers/api) dokumentiert sie pro Endpunkt.
 
 ## Eine Liste filtern
 

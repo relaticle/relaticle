@@ -5,7 +5,7 @@ order: 3
 updated: "2026-10-06"
 ---
 
-Relaticle tiene una API REST para empresas, personas, oportunidades, tareas, notas y atributos personalizados. Úsela para sincronizar registros con otro sistema o para crear su propia integración. La [referencia de la API](/es/developers/api) enumera cada endpoint, parámetro y respuesta, y la especificación OpenAPI está en [/openapi.json](/openapi.json).
+Relaticle tiene una API REST para empresas, personas, oportunidades, tareas, notas y atributos personalizados. Úsela para sincronizar registros con otro sistema o para crear su propia integración. La [referencia de la API](/developers/api) enumera cada endpoint, parámetro y respuesta, y la especificación OpenAPI está en [/openapi.json](/openapi.json).
 
 ## URL base
 
@@ -55,7 +55,7 @@ Un token de acceso también puede tener tres permisos de correo: **Leer correo**
 | Notas | `/v1/notes` |
 | Atributos personalizados (custom fields) | `/v1/custom-fields` (solo lectura) |
 
-Cada recurso de registros admite listar, crear, leer, actualizar y eliminar. Las respuestas siguen [JSON:API](https://jsonapi.org/), y cada registro incluye los valores de sus atributos personalizados en `custom_fields`. Los endpoints de lista aceptan parámetros de filtrado, orden y paginación, que la [referencia de la API](/es/developers/api) documenta por endpoint.
+Cada recurso de registros admite listar, crear, leer, actualizar y eliminar. Las respuestas siguen [JSON:API](https://jsonapi.org/), y cada registro incluye los valores de sus atributos personalizados en `custom_fields`. Los endpoints de lista aceptan parámetros de filtrado, orden y paginación, que la [referencia de la API](/developers/api) documenta por endpoint.
 
 ## Filtrar una lista
 
