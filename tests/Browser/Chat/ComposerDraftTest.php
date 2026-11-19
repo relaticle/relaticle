@@ -287,6 +287,21 @@ it('clears stored drafts on sign out and keeps other preferences', function (): 
         ->assertScript("localStorage.getItem('chat.draft.new') === null && localStorage.getItem('chat:draft') === null && localStorage.getItem('theme') === 'dark'");
 });
 
+it('removes the dashboard handoff from session storage on sign-out', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $this->actingAs($user);
+
+    $page = $this->visit("/app/{$workspace->slug}/companies")->assertNoJavaScriptErrors();
+
+    $page->script("sessionStorage.setItem('chat:bootstrap', '{}')");
+
+    $page->script("document.querySelector('form[action$=\"/logout\"]').submit()");
+
+    $page->assertVisible('[id="form.email"]')
+        ->assertScript("sessionStorage.getItem('chat:bootstrap') === null");
+});
+
 it('keeps stored drafts on the sign-in page when the session ended without a sign out', function (): void {
     $page = $this->visit('/app/login')->assertVisible('[id="form.email"]');
 

@@ -26,6 +26,7 @@ use Filament\Support\Enums\Width;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Actions\LinkMeetingToRecordAction;
 use Relaticle\EmailIntegration\Actions\UnlinkMeetingFromRecordAction;
 use Relaticle\EmailIntegration\Enums\MeetingLinkedRecordType;
@@ -188,7 +189,7 @@ final class MeetingDetailInfolist
     private static function descriptionHtml(string $description): string
     {
         if ($description !== strip_tags($description)) {
-            return $description;
+            return Str::sanitizeHtml($description);
         }
 
         $lines = array_filter(

@@ -82,6 +82,14 @@ return [
             'title' => 'Certains fichiers étaient trop volumineux',
             'body' => 'Non joints : :files. Chaque fichier doit faire moins de :max, et l\'ensemble des pièces jointes moins de :total.',
         ],
+        'attachment_empty' => [
+            'title' => 'Certains fichiers étaient vides',
+            'body' => 'Non joints : :files. Un fichier vide n\'a rien à envoyer.',
+        ],
+        'attachment_type_not_allowed' => [
+            'title' => 'Certains fichiers n\'ont pas pu être joints',
+            'body' => 'Non joints : :files. Joignez un PDF, un fichier Office ou OpenDocument, un CSV, un texte, une invitation d\'agenda, une image ou un zip.',
+        ],
         'attachment_too_large_for_provider' => 'Chaque fichier doit faire moins de :max, et l\'ensemble des pièces jointes moins de :total après encodage.',
         'attachment_unavailable' => [
             'title' => 'Certaines pièces jointes n\'ont pas pu être incluses',

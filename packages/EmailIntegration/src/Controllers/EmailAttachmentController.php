@@ -61,7 +61,7 @@ final readonly class EmailAttachmentController
             'Content-Type' => self::INLINE_RASTER_TYPES[$mimeType],
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'; sandbox",
-            'Cache-Control' => 'private, max-age=3600',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 
