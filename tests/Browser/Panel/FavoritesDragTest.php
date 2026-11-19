@@ -60,3 +60,17 @@ it('opens a folder menu under its button', function (): void {
         ->assertSee(__('favorites.folders.name'))
         ->assertNoJavaScriptErrors();
 });
+
+it('marks the open record active in the sidebar once it is starred', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create(['name' => 'Acme Corp']);
+
+    $page = visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}", 1440, 900);
+    $page->click('.fi-record-rail-actions [aria-label="Add to favorites"]')
+        ->wait(1.5)
+        ->assertScript('document.querySelector(\'.fi-sidebar-favorites li[data-favorite-kind="record"]\')?.classList.contains("fi-active")', true)
+        ->assertNoJavaScriptErrors();
+});

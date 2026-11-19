@@ -11,7 +11,7 @@
     data-favorite-kind="record"
     @class([
         'fi-sidebar-item group/favorite-item relative',
-        'fi-active' => $url !== null && request()->url() === $url,
+        'fi-active' => $url !== null && \Livewire\Livewire::originalUrl() === $url,
     ])
 >
     <a
