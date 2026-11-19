@@ -108,6 +108,7 @@ return [
             'today' => 'hoy',
             'deleted_record' => ':name (eliminado)',
             'empty_heading' => 'Ningún resultado en :records para esta vista',
+            'empty_description' => 'Cambie los filtros o bórrelos para ver todos los resultados.',
             'periods' => [
                 'days' => '{1} :count día|[2,*] :count días',
                 'weeks' => '{1} :count semana|[2,*] :count semanas',
@@ -203,6 +204,9 @@ return [
             'move_down' => 'Bajar',
             'settings' => 'Configuración de la vista',
             'add_attribute' => 'Agregar atributo a la vista',
+            'add_column' => 'Agregar columna',
+            'add_column_attribute' => 'Agregar la columna :column',
+            'create_attribute_type' => 'Crear atributo de tipo :type',
             'search_attributes' => 'Buscar atributos de :entity…',
             'all_attributes_in_view' => 'Todos los atributos ya están en esta vista',
             'no_attribute_matches' => 'Ningún atributo coincide con su búsqueda',

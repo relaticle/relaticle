@@ -612,13 +612,13 @@ it('rejects a field name that differs from an existing one only by case', functi
 it('rejects a recased duplicate at approval time, not just at proposal time', function (): void {
     $tenantKey = config('custom-fields.database.column_names.tenant_foreign_key');
 
-    expect(fn () => app(CreateCustomField::class)->execute($this->owner, [
+    expect(fn () => resolve(CreateCustomField::class)->execute($this->owner, [
         'entity_type' => 'people',
         'name' => 'Renewal Date',
         'type' => 'date',
     ]))->not->toThrow(ValidationException::class);
 
-    expect(fn () => app(CreateCustomField::class)->execute($this->owner, [
+    expect(fn () => resolve(CreateCustomField::class)->execute($this->owner, [
         'entity_type' => 'people',
         'name' => 'RENEWAL DATE',
         'type' => 'date',

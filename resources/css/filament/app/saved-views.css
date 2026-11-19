@@ -93,7 +93,7 @@
 }
 
 /* The menu panel's own padding, which a phone sheet doubles. */
-:is(.fi-ta-views-panel, .fi-view-settings-panel) {
+:is(.fi-ta-views-panel, .fi-view-settings-panel, .fi-ta-add-column-menu) {
     --menu-inset: var(--spacing);
 
     @media (width < 40rem) {
@@ -102,7 +102,7 @@
 }
 
 /* Each part gives the panel padding back, so its rule reaches the panel's edges. A scroll box does too, or it would clip the rule. */
-:is(.fi-ta-views-panel, .fi-view-settings-panel) :is(.fi-board-main-view, .fi-ta-views-scroll, .fi-view-settings-scroll, .fi-view-settings-footer, .fi-board-section-heading),
+:is(.fi-ta-views-panel, .fi-view-settings-panel, .fi-ta-add-column-menu) :is(.fi-board-main-view, .fi-ta-views-scroll, .fi-view-settings-scroll, .fi-view-settings-footer, .fi-board-section-heading),
 .fi-ta-views-panel > .fi-dropdown-list {
     margin-inline: calc(var(--menu-inset) * -1);
     padding-inline: var(--menu-inset);
@@ -136,7 +136,7 @@
     }
 }
 
-.fi-view-settings-panel {
+:is(.fi-view-settings-panel, .fi-ta-add-column-menu) {
     @apply flex max-h-menu-max min-h-0 flex-col;
 
     & .fi-dropdown-list-item {
@@ -319,7 +319,7 @@
 .fi-board-section-heading {
     @apply mt-1 shrink-0 border-t border-gray-100 pb-1 pt-2 text-xs font-medium text-gray-500 dark:border-white/5 dark:text-gray-400;
 
-    :is(.fi-ta-views-panel, .fi-view-settings-panel) & {
+    :is(.fi-ta-views-panel, .fi-view-settings-panel, .fi-ta-add-column-menu) & {
         padding-inline: calc(var(--menu-inset) + var(--spacing) * 2);
     }
 }

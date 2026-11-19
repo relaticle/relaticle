@@ -108,6 +108,7 @@ return [
             'today' => 'today',
             'deleted_record' => ':name (deleted)',
             'empty_heading' => 'No :records match this view',
+            'empty_description' => 'Change the filters, or clear them to see every record.',
             'periods' => [
                 'days' => '{1} :count day|[2,*] :count days',
                 'weeks' => '{1} :count week|[2,*] :count weeks',
@@ -203,6 +204,9 @@ return [
             'move_down' => 'Move down',
             'settings' => 'View settings',
             'add_attribute' => 'Add attribute to view',
+            'add_column' => 'Add column',
+            'add_column_attribute' => 'Add :column column',
+            'create_attribute_type' => 'Create :type attribute',
             'search_attributes' => 'Search :entity attributes…',
             'all_attributes_in_view' => 'Every attribute is already in this view',
             'no_attribute_matches' => 'No attribute matches your search',

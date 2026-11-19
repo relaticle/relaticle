@@ -81,7 +81,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
             ->columns($this->boardColumns())
             ->collapsedColumns(fn (): array => $this->collapsedBoardColumnIds())
             ->collapseAllColumns(fn (): bool => $this->storedBoardState()->columnsCollapsed)
-            ->collapsibleColumns(fn (string $columnId, bool $collapsed, bool $alone) => $this->setBoardColumnCollapsed($columnId, $collapsed, $alone))
+            ->collapsibleColumns(fn (string $columnId, bool $collapsed) => $this->setBoardColumnCollapsed($columnId, $collapsed))
             ->columnActions($this->boardStageActions())
             ->columnHeaderMenu(fn (array $column): Htmlable => $this->boardStageMenu($column))
             ->addColumnUsing($this->addBoardStageUsing())

@@ -115,7 +115,7 @@ it('builds one search index per language', function (): void {
         ->and(array_column($english, 'url'))->each->not->toContain('/de/')
         ->and(Cache::has('documentation.search-index.de'))->toBeTrue()
         ->and(Cache::has('documentation.search-index.en'))->toBeTrue();
-});
+})->skip(fn (): bool => ! class_exists('Relaticle\Cloud\CloudServiceProvider'), 'Localized help routes come from the cloud package.');
 
 it('parses a content file into a page keyed by its path', function (): void {
     $page = app(DocsRepository::class)->find('help/getting-started/create-your-first-company');

@@ -22,6 +22,7 @@ use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\HtmlString;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 trait HasCustomFieldColumns
@@ -82,9 +83,44 @@ trait HasCustomFieldColumns
                 ->filtersLayout(FiltersLayout::Hidden)
                 ->columnManager(false)
                 ->groupingSettingsHidden()
+                ->recordActionsColumnLabel(fn (): ?Htmlable => $this->addColumnHeader())
+                ->emptyStateIcon($this->tableEntity()->icon())
                 ->pushColumns($columns)
                 ->filters([ConditionsFilter::make($this->healedFilterRules(...)), TrashedFilter::make()->indicateUsing(fn (): array => [])]),
         );
+    }
+
+    // The actions column takes the width the data columns leave, so its header carries the Add column button.
+    private function addColumnHeader(): ?Htmlable
+    {
+        return $this->addColumnMenu() === null ? null : new HtmlString(view('filament.app.tables.add-column')->render());
+    }
+
+    // Rendered beside the table, not in its header, because the table's sideways scroll would clip it.
+    public function getAddColumnMenu(): ?Htmlable
+    {
+        $menu = $this->addColumnMenu();
+
+        return $menu === null ? null : new HtmlString(view('filament.app.tables.add-column-menu', $menu)->render());
+    }
+
+    /**
+     * @return array{hidden: list<array{name: string, label: Htmlable, text: string, isShown: bool, isPinned: bool, isLocked: bool}>, types: array<string, array{label: string, icon: ?string}>, entityLabel: string}|null
+     */
+    private function addColumnMenu(): ?array
+    {
+        $canCreate = $this->canCreateTableAttribute();
+        $hidden = array_values(array_filter($this->viewSettingsColumns(), fn (array $column): bool => ! $column['isShown'] && ! $column['isLocked']));
+
+        if ($hidden === [] && ! $canCreate) {
+            return null;
+        }
+
+        return [
+            'hidden' => $hidden,
+            'types' => $canCreate ? $this->tableAttributeTypes() : [],
+            'entityLabel' => static::getResource()::getModelLabel(),
+        ];
     }
 
     private function columnHeaderLabel(string $columnName, string $original, string|BackedEnum|null $icon): Htmlable

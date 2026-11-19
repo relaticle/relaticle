@@ -388,7 +388,7 @@ it('keeps a dragged width after signing in again', function (): void {
 });
 
 it('keeps a dragged width on a column that sets its own width, and the actions column gives up the space', function (): void {
-    $actionsWidth = '(() => Math.round(document.querySelector("th.fi-ta-actions-header-cell").getBoundingClientRect().width))()';
+    $actionsWidth = '(() => Math.round(document.querySelector("thead th:is(.fi-ta-actions-header-cell, :has(> .fi-ta-add-column))").getBoundingClientRect().width))()';
 
     $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1920, 900)
         ->assertVisible(headerSelector('custom_fields.emails').' .column-resize-handle-bar');
