@@ -237,8 +237,8 @@ it('words a created, deleted or restored entry as a full sentence in the interfa
 
     $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->sole())->render();
 
-    expect($html)->toContain(str_replace(':subject', $this->company->name, $expected))
-        ->and($html)->not->toContain("{$event} {$this->company->name}");
+    expect($html)->toContain(str_replace(':subject', e($this->company->name), $expected))
+        ->and($html)->not->toContain($event.' '.e($this->company->name));
 })->with([
     'created' => ['created', 'hat :subject erstellt'],
     'deleted' => ['deleted', 'hat :subject gelöscht'],
@@ -251,6 +251,6 @@ it('words an entry of an unknown event as a full sentence in the interface langu
 
     $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->sole())->render();
 
-    expect($html)->toContain("hat eine Änderung an {$this->company->name} vorgenommen")
+    expect($html)->toContain('hat eine Änderung an '.e($this->company->name).' vorgenommen')
         ->and($html)->not->toContain('custom event');
 })->mutates(MergedActivityRenderer::class);
