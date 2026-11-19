@@ -31,11 +31,11 @@ final class FavoriteMenuActions
                 ->label(__('favorites.actions.add'))
                 ->icon('lucide-star')
                 ->visible(fn (): bool => $folders->isEmpty() && ! $isFavorite())
-                ->action(function (Component $livewire, AddFavoriteRecord $addFavoriteRecord) use ($record): void {
-                    self::add($livewire, $addFavoriteRecord, $record, null);
+                ->action(function (Component $livewire) use ($record): void {
+                    self::add($livewire, $record, null);
                 }),
             self::folderPicker($folders, 'addFavoriteTo', __('favorites.actions.add'), fn (): bool => ! $isFavorite(), null, function (Component $livewire, ?Favorite $folder) use ($record): void {
-                self::add($livewire, resolve(AddFavoriteRecord::class), $record, $folder);
+                self::add($livewire, $record, $folder);
             }),
             self::folderPicker($folders, 'moveFavoriteTo', __('favorites.actions.move'), $isFavorite, fn (): ?string => self::favorite($record)?->parent_id, function (Component $livewire, ?Favorite $folder) use ($record): void {
                 resolve(MoveFavorite::class)->execute(self::member(), self::favorite($record) ?? abort(404), $folder);
@@ -52,9 +52,9 @@ final class FavoriteMenuActions
         ])->dropdown(false);
     }
 
-    private static function add(Component $livewire, AddFavoriteRecord $addFavoriteRecord, Company|People|Opportunity $record, ?Favorite $folder): void
+    private static function add(Component $livewire, Company|People|Opportunity $record, ?Favorite $folder): void
     {
-        $addFavoriteRecord->execute(self::member(), $record, $folder);
+        resolve(AddFavoriteRecord::class)->execute(self::member(), $record, $folder);
         $livewire->dispatch('refresh-sidebar');
     }
 
