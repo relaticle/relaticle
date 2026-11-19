@@ -15,6 +15,7 @@ use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Tables\ResizableColumns;
+use App\Http\Controllers\Mcp\OAuthRegisterController;
 use App\Http\Middleware\PreventRequestForgery;
 use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
@@ -103,6 +104,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\ServiceProvider;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
+use Laravel\Mcp\Server\Http\Controllers\OAuthRegisterController as BaseOAuthRegisterController;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
 use Laravel\Passport\Passport;
@@ -222,6 +224,7 @@ final class AppServiceProvider extends ServiceProvider
 
     private function registerSelfHostedDefaults(): void
     {
+        $this->app->bind(BaseOAuthRegisterController::class, OAuthRegisterController::class);
         $this->app->bind(Entitlements::class, SelfHostedEntitlements::class);
         $this->app->bind(Billing::class, NoBilling::class);
     }
