@@ -28,9 +28,9 @@ enum CompanyField: string
     public function getDisplayName(): string
     {
         return match ($this) {
-            self::ICP => 'ICP',
-            self::DOMAINS => 'Domains',
-            self::LINKEDIN => 'LinkedIn',
+            self::ICP => __('enums/custom-fields.company.icp.name'),
+            self::DOMAINS => __('enums/custom-fields.company.domains.name'),
+            self::LINKEDIN => __('enums/custom-fields.company.linkedin.name'),
         };
     }
 

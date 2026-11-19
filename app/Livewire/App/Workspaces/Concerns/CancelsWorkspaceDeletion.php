@@ -24,7 +24,7 @@ trait CancelsWorkspaceDeletion
             return;
         }
 
-        $this->sendNotification('Workspace deletion cancelled');
+        $this->sendNotification(__('workspaces.notifications.workspace_deletion_cancelled.success'));
         $this->reloadPage();
     }
 

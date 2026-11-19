@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Relaticle\EmailIntegration\Enums\EmailAccessRequestStatus;
@@ -187,9 +188,19 @@ describe('Empty state', function (): void {
         livewire(AccessRequestsTable::class)
             ->filterTable('status', EmailAccessRequestStatus::APPROVED->value)
             ->assertCanNotSeeTableRecords([$request])
-            ->assertSee(__('filament/pages/email-access-requests.empty.filtered_heading', ['status' => 'approved']))
+            ->assertSee('No approved requests')
             ->callAction(TestAction::make('showAllRequests')->table())
             ->assertCanSeeTableRecords([$request]);
+    });
+
+    it('words the filtered empty heading with the status as the language spells it', function (): void {
+        $this->user->forceFill(['locale' => 'de'])->save();
+        Locales::apply('de');
+
+        livewire(AccessRequestsTable::class)
+            ->filterTable('status', EmailAccessRequestStatus::APPROVED->value)
+            ->assertSee('Keine genehmigten Anfragen')
+            ->assertDontSee('genehmigt Anfragen');
     });
 });
 

@@ -27,17 +27,17 @@
                             </svg>
                         </span>
                         <p class="min-w-0 truncate text-sm leading-6">
-                            <span class="text-gray-500 dark:text-gray-400">Update</span>
-                            <span class="font-semibold text-gray-900 dark:text-white">Schedule demo with Kovra Systems</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{ __('Update') }}</span>
+                            <span class="font-semibold text-gray-900 dark:text-white">{{ __('Schedule demo with Kovra Systems') }}</span>
                         </p>
                     </div>
                     <div class="pb-2 pe-3 ps-[3.125rem]">
                             <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">Status</span>
+                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Status') }}</span>
                                 <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
-                                    <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">To do</span>
+                                    <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ __('To do') }}</span>
                                     <x-lucide-arrow-right class="h-3 w-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-                                    <span class="text-gray-900 dark:text-white">Done</span>
+                                    <span class="text-gray-900 dark:text-white">{{ __('Done') }}</span>
                                 </span>
                                 <x-cloud::home.hero-dock-field/>
                             </div>
@@ -53,27 +53,27 @@
                             </svg>
                         </span>
                         <p class="min-w-0 truncate text-sm leading-6">
-                            <span class="text-gray-500 dark:text-gray-400">Create person</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{ __('Create person') }}</span>
                             <span class="font-semibold text-gray-900 dark:text-white">Sarah Chen</span>
                         </p>
                     </div>
                     <div class="pb-2 pe-3 ps-[3.125rem]">
                             <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">Name</span>
+                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Name') }}</span>
                                 <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
                                     <span class="text-gray-900 dark:text-white">Sarah Chen</span>
                                 </span>
                                 <x-cloud::home.hero-dock-field :locked="true"/>
                             </div>
                             <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">Job title</span>
+                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Job title') }}</span>
                                 <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
-                                    <span class="text-gray-900 dark:text-white">VP of Engineering</span>
+                                    <span class="text-gray-900 dark:text-white">{{ __('VP of Engineering') }}</span>
                                 </span>
                                 <x-cloud::home.hero-dock-field/>
                             </div>
                             <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">Company</span>
+                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Company') }}</span>
                                 <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
                                     <span class="text-gray-900 dark:text-white">Kovra Systems</span>
                                 </span>
@@ -84,9 +84,9 @@
 
                 <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5">
                     <button type="button" tabindex="-1" class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">
-                        Discard
+                        {{ __('Discard') }}
                     </button>
-                    <x-cloud::marketing.rela-approve id="hero-approve-btn" tabindex="-1" label="Approve"/>
+                    <x-cloud::marketing.rela-approve id="hero-approve-btn" tabindex="-1" :label="__('Approve')"/>
                 </div>
             </div>
         </div>
@@ -95,7 +95,7 @@
             <div class="relative rounded-2xl border border-[var(--surface-input-border)] bg-white transition focus-within:border-primary-400 dark:bg-gray-900 dark:focus-within:border-primary-500/60">
                 {{-- Editor row: placeholder anchored top-left, then the typed text. --}}
                 <div class="px-4 pt-3.5 pb-1.5 min-h-[60px] text-sm leading-snug">
-                    <span id="hero-composer-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-gray-500">Ask anything...</span>
+                    <span id="hero-composer-placeholder" class="hero-composer-placeholder text-gray-400 dark:text-gray-500">{{ __('Ask anything...') }}</span>
                     <span id="hero-composer-typed" class="hero-composer-typed text-gray-900 dark:text-gray-100"></span>
                     <span id="hero-composer-cursor" class="hero-composer-cursor inline-block w-px h-4 align-middle bg-primary/60 dark:bg-primary/80 ml-px" aria-hidden="true"></span>
                 </div>
@@ -109,7 +109,7 @@
 
                     <div class="ms-auto flex items-center gap-1.5">
                         <span class="inline-flex h-7 items-center gap-1 rounded-md border border-transparent px-2 text-xs font-medium text-gray-600 dark:text-gray-300">
-                            <span>Auto</span>
+                            <span>{{ __('Auto') }}</span>
                             <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true"/>
                         </span>
 

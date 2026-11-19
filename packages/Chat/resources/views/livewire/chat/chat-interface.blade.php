@@ -27,6 +27,16 @@
     @endif
 </div>
 
+@php
+    $includeColumnLabels = [
+        '_include_companies' => __('Companies'),
+        '_include_people' => __('People'),
+        '_include_opportunities' => __('Opportunities'),
+        '_include_tasks' => __('Tasks'),
+        '_include_notes' => __('Notes'),
+    ];
+@endphp
+
 @script
 <script>
 Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, initialMessages, userId, initialHasMoreMessages, initialModel, initialPrompt, turnInFlight) => ({
@@ -54,11 +64,11 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'activity' => __('Activity'),
         ]),
         blockColumnLabels: @js([
-            'company' => ['name' => __('Name')],
-            'people' => ['name' => __('Name')],
-            'opportunity' => ['name' => __('Name')],
-            'task' => ['title' => __('Title')],
-            'note' => ['title' => __('Title')],
+            'company' => ['name' => __('Name'), ...$includeColumnLabels],
+            'people' => ['name' => __('Name'), ...$includeColumnLabels],
+            'opportunity' => ['name' => __('Name'), ...$includeColumnLabels],
+            'task' => ['title' => __('Title'), ...$includeColumnLabels],
+            'note' => ['title' => __('Title'), ...$includeColumnLabels],
             'activity' => [
                 'when' => __('When'),
                 'record' => __('Record'),
@@ -110,6 +120,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'retrying' => __('Provider is busy, retrying (attempt :attempt of :max)…'),
             'searchingWebFor' => __('Searching the web for ":query"…'),
             'readingDomain' => __('Reading :domain…'),
+            'newChat' => __('New chat'),
         ]),
         {{-- The shimmer label for each tool the agent can call, keyed by the
              snake_case class basename laravel/ai broadcasts as `tool_name`.

@@ -1,6 +1,6 @@
 @props([
     'value' => '',
-    'placeholder' => 'Add value...',
+    'placeholder' => null,
     'disabled' => false,
     'inputType' => 'text',
     'borderless' => false,
@@ -9,6 +9,7 @@
 ])
 
 @php
+    $placeholder ??= __('Add value...');
     $inputmode = match($inputType) {
         'email' => 'email',
         'url' => 'url',
@@ -247,7 +248,7 @@
             x-transition:leave-start="opacity-100 scale-100"
             x-transition:leave-end="opacity-0 scale-95"
             role="dialog"
-            aria-label="Manage values"
+            aria-label="{{ __('Manage values') }}"
             class="fixed z-[9999] min-w-[240px] rounded-lg bg-white shadow-lg ring-1 ring-gray-200 dark:bg-gray-900 dark:ring-gray-700 overflow-hidden"
             :style="{ width: $refs.trigger?.offsetWidth + 'px' }"
         >
@@ -309,7 +310,7 @@
                         <button
                             type="button"
                             x-on:click.stop="deleteValue(value)"
-                            :aria-label="'Delete ' + value"
+                            :aria-label="@js(__('Delete :value')).replace(':value', value)"
                             class="shrink-0 text-gray-400 hover:text-danger-500"
                         >
                             <x-lucide-x class="size-4" aria-hidden="true" />
@@ -329,7 +330,7 @@
                 x-model="newValue"
                 x-ref="newInput"
                 x-on:keydown.enter="handleEnter($event)"
-                aria-label="Add new value"
+                aria-label="{{ __('Add new value') }}"
                 class="flex-1 bg-transparent border-0 p-0 text-sm text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:ring-0 focus:outline-none"
                 placeholder="{{ $placeholder }}"
             />
@@ -338,10 +339,10 @@
                 type="button"
                 x-on:click.stop="addValue()"
                 :disabled="!newValue.trim()"
-                aria-label="Add value"
+                aria-label="{{ __('Add value') }}"
                 class="shrink-0 rounded-md px-2 py-1 text-xs font-medium text-primary-600 hover:bg-primary-50 dark:text-primary-400 dark:hover:bg-primary-950/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-                Add
+                {{ __('Add') }}
             </button>
             </div>
         </div>

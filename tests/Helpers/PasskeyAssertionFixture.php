@@ -119,7 +119,6 @@ final class PasskeyAssertionFixture
                         'signature' => self::base64Url($signature),
                     ],
                 ],
-                'remember' => true,
             ],
         ];
     }

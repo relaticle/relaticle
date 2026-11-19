@@ -140,7 +140,7 @@ final readonly class FilterRuleDisplay
         }
 
         return $condition === FilterCondition::This->value
-            ? __("filament/panel.tables.filters.this_unit.{$unit->value}")
+            ? __("filament/panel.tables.filters.this_period.{$unit->value}")
             : trans_choice("filament/panel.tables.filters.periods.{$unit->value}", (int) ($value['amount'] ?? 0));
     }
 

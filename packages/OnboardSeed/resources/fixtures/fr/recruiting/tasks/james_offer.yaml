@@ -1,0 +1,8 @@
+title: Préparer la lettre d'offre pour James
+assigned_people:
+  - james
+custom_fields:
+  description: Rédigez la lettre d'offre pour James Park, avec la rémunération, les détails de l'equity (actionnariat) et la date de début. Respectez le modèle d'offre standard de Supabase pour les développeurs backend.
+  due_date: '{{ +1d }}'
+  status: To do
+  priority: High

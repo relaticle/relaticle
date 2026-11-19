@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager as CompanyMeetingsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager as CompanyNotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager as CompanyTasksRelationManager;
@@ -20,8 +21,10 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Tables\Columns\TextColumn;
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -341,4 +344,42 @@ it('does not search a task due date in the company tasks tab even when the store
         ->assertCanSeeTableRecords([$task])
         ->searchTable('2031-05-17')
         ->assertCanNotSeeTableRecords([$task]);
+});
+
+it('names the record page tabs and their empty states in the user language', function (string $locale, array $tabs, array $plurals): void {
+    $this->user->forceFill(['locale' => $locale])->save();
+    Locales::apply($locale);
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    $page = livewire(ViewCompany::class, ['record' => $company->getKey()]);
+    $titles = collect($page->instance()->getRelationManagers())
+        ->map(fn (string $manager): string => $manager::getTitle($company, ViewCompany::class))
+        ->all();
+
+    expect($titles)->toContain(...$tabs);
+
+    foreach ([
+        PeopleRelationManager::class => $plurals[0],
+        CompanyTasksRelationManager::class => $plurals[1],
+        CompanyNotesRelationManager::class => $plurals[2],
+    ] as $manager => $plural) {
+        livewire($manager, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+            ->assertSee(__('filament-tables::table.empty.heading', ['model' => $plural]));
+    }
+})->with([
+    'de' => ['de', ['Personen', 'Aufgaben', 'Notizen', 'E-Mails', 'Meetings'], ['Personen', 'Aufgaben', 'Notizen']],
+    'es' => ['es', ['Personas', 'Tareas', 'Notas', 'Correos electrónicos', 'Reuniones'], ['personas', 'tareas', 'notas']],
+    'fr' => ['fr', ['Personnes', 'Tâches', 'Notes', 'E-mails', 'Réunions'], ['personnes', 'tâches', 'notes']],
+]);
+
+it('labels the meetings title column and asks formally in an empty state in German', function (): void {
+    $this->user->forceFill(['locale' => 'de'])->save();
+    Locales::apply('de');
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(CompanyMeetingsRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->assertTableColumnExists('title', fn (TextColumn $column): bool => $column->getLabel() === 'Titel');
+
+    livewire(PeopleRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->assertSee('Erstellen Sie ein(e) Person, um zu beginnen.');
 });

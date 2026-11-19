@@ -1,0 +1,9 @@
+title: Relancer Dylan
+# Add people assignment directly in the YAML
+assigned_people:
+  - dylan
+custom_fields:
+  description: Discutez de la proposition de forfait Enterprise pour Figma et répondez à ses éventuelles questions.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

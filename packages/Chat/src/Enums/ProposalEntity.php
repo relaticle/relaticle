@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Enums;
 
 use App\Enums\CrmEntity;
-use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Lang;
 
 enum ProposalEntity: string
 {
@@ -26,22 +26,29 @@ enum ProposalEntity: string
     case SampleData = 'sample_data';
     case WebAccess = 'web_access';
 
-    public function singularName(): string
+    public function inlineName(): string
     {
-        return match ($this) {
-            self::Company => CrmEntity::Company->singularName(),
-            self::People => CrmEntity::People->singularName(),
-            self::Opportunity => CrmEntity::Opportunity->singularName(),
-            self::Task => CrmEntity::Task->singularName(),
-            self::Note => CrmEntity::Note->singularName(),
-            self::Email => 'Email',
-            self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete => 'Email Draft',
-            self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Email',
-            self::WorkspaceInvitation => 'Teammate',
-            self::CustomField => 'Custom Attribute',
-            self::SampleData => 'Sample Data',
-            self::WebAccess => 'Web Search',
-        };
+        return __("enums/proposal-entity.noun.{$this->value}");
+    }
+
+    public function createLabel(): string
+    {
+        return __("enums/proposal-entity.create_label.{$this->value}");
+    }
+
+    public function deleteTitle(): string
+    {
+        return __("enums/proposal-entity.delete_title.{$this->value}");
+    }
+
+    public function deleteSummary(string $name): string
+    {
+        return __("enums/proposal-entity.delete_summary.{$this->value}", ['name' => $name]);
+    }
+
+    public function plural(int $count): string
+    {
+        return trans_choice("enums/proposal-entity.plural.{$this->value}", $count);
     }
 
     public function titleKey(): string
@@ -61,12 +68,26 @@ enum ProposalEntity: string
 
     public function titleLabel(): string
     {
+        return __("enums/proposal-entity.title_label.{$this->titleLabelKey()}");
+    }
+
+    /** @return list<string> */
+    public function titleLabels(): array
+    {
+        return array_values(array_unique([
+            $this->titleLabel(),
+            __("enums/proposal-entity.title_label.{$this->titleLabelKey()}", [], 'en'),
+        ]));
+    }
+
+    private function titleLabelKey(): string
+    {
         return match ($this) {
-            self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => 'Name',
-            self::Task, self::Note => 'Title',
-            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'Subject',
-            self::WorkspaceInvitation => 'Email',
-            self::WebAccess => 'Search',
+            self::Company, self::People, self::Opportunity, self::CustomField, self::SampleData => 'name',
+            self::Task, self::Note => 'title',
+            self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry => 'subject',
+            self::WorkspaceInvitation => 'email',
+            self::WebAccess => 'search',
         };
     }
 
@@ -111,16 +132,22 @@ enum ProposalEntity: string
 
     public function createTitle(): string
     {
-        return Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.$this->singularName();
+        return __("enums/proposal-entity.create_title.{$this->value}");
+    }
+
+    public function batchTitle(PendingActionOperation $operation, int $count): string
+    {
+        return trans_choice("enums/proposal-entity.batch_title.{$operation->value}.{$this->value}", $count, ['count' => $count]);
+    }
+
+    public function batchSummary(PendingActionOperation $operation, int $count): string
+    {
+        return trans_choice("enums/proposal-entity.batch_summary.{$operation->value}.{$this->value}", $count, ['count' => $count]);
     }
 
     public function createSummary(string $title): string
     {
-        return match ($this) {
-            self::WorkspaceInvitation => "Invite \"{$title}\"",
-            self::WebAccess => "Search the web for \"{$title}\"",
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData => Str::ucfirst($this->verb(PendingActionOperation::Create)).' '.Str::lower($this->singularName())." \"{$title}\"",
-        };
+        return __("enums/proposal-entity.create_summary.{$this->value}", ['title' => $title]);
     }
 
     public function action(PendingActionOperation $operation, int $count = 1): string
@@ -154,7 +181,7 @@ enum ProposalEntity: string
             self::EmailDraftDelete => trans_choice('Delete draft|Delete :count drafts', $count, ['count' => $count]),
             self::SampleData => __('Remove sample data'),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField => $operation === PendingActionOperation::Delete
-                ? __('Delete :count :entities', ['count' => $count, 'entities' => Str::plural(Str::lower($this->singularName()), $count)])
+                ? __('Delete :count :entities', ['count' => $count, 'entities' => $this->plural($count)])
                 : __('Approve'),
             self::EmailDraft => __('Approve'),
             self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
@@ -267,10 +294,11 @@ enum ProposalEntity: string
         };
     }
 
-    public function receiptTarget(): ?string
+    /** @return ?list<string> */
+    public function receiptTarget(): ?array
     {
         return match ($this) {
-            self::Email => 'To',
+            self::Email => array_values(array_unique([__('To'), 'To'])),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
         };
     }
@@ -283,25 +311,24 @@ enum ProposalEntity: string
         };
     }
 
-    private function receiptBatch(PendingActionOperation $operation, int $count): string
+    private function receiptBatch(PendingActionOperation $operation, int $count): ?string
     {
-        return match ($this) {
-            self::WorkspaceInvitation => $count === 1
+        if ($this === self::WorkspaceInvitation) {
+            return $count === 1
                 ? __('Sent :count invitation', ['count' => ':count'])
-                : __('Sent :count invitations', ['count' => ':count']),
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::CustomField, self::SampleData, self::WebAccess => __(':verb :count :entities', [
-                'verb' => $operation->done(),
-                'count' => ':count',
-                'entities' => Str::plural(Str::lower($this->singularName()), $count),
-            ]),
-        };
+                : __('Sent :count invitations', ['count' => ':count']);
+        }
+
+        $key = "enums/proposal-entity.receipt_batch.{$operation->value}.{$this->value}";
+
+        return Lang::has($key) ? trans_choice($key, $count, ['count' => ':count']) : null;
     }
 
     private function receiptMoved(int $count): string
     {
         return __('Moved :count :entities to :value', [
             'count' => ':count',
-            'entities' => Str::plural(Str::lower($this->singularName()), $count),
+            'entities' => $this->plural($count),
             'value' => ':value',
         ]);
     }
@@ -311,8 +338,10 @@ enum ProposalEntity: string
      *     verbs: array<string, string>,
      *     batch: array<string, array{one: string, other: string}>,
      *     moved: array{one: string, other: string},
-     *     target: ?string,
+     *     target: ?list<string>,
      *     title: string,
+     *     titleKey: string,
+     *     titleLabels: list<string>,
      *     declined: string
      * }>
      */
@@ -330,6 +359,7 @@ enum ProposalEntity: string
                         'one' => $entity->receiptBatch($operation, 1),
                         'other' => $entity->receiptBatch($operation, 2),
                     ]])
+                    ->filter(fn (array $forms): bool => $forms['one'] !== null)
                     ->all(),
                 'moved' => [
                     'one' => $entity->receiptMoved(1),
@@ -337,6 +367,8 @@ enum ProposalEntity: string
                 ],
                 'target' => $entity->receiptTarget(),
                 'title' => $entity->titleLabel(),
+                'titleKey' => $entity->titleKey(),
+                'titleLabels' => $entity->titleLabels(),
                 'declined' => $entity->declinedOutcome()->value,
             ];
         }

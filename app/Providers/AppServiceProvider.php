@@ -15,8 +15,10 @@ use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Tables\ResizableColumns;
+use App\Http\Middleware\EnforceAbsoluteSessionLifetime;
 use App\Http\Middleware\PreventRequestForgery;
 use App\Http\Middleware\ReadAcrossWorkspaces;
+use App\Http\Middleware\SetUserLocale;
 use App\Http\Responses\LoginResponse;
 use App\Jobs\CompleteExport;
 use App\Livewire\FilamentNotifications;
@@ -68,6 +70,7 @@ use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Toggle;
 use Filament\Livewire\Notifications;
 use Filament\Notifications\Notification;
@@ -100,6 +103,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
@@ -294,6 +298,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureSessions();
         $this->configureModels();
         $this->configureFilament();
+        $this->configureFileUploads();
         $this->configureLivewire();
         $this->configureMacros();
         $this->configureRateLimiting();
@@ -518,7 +523,7 @@ final class AppServiceProvider extends ServiceProvider
         Livewire::component(Notifications::class, FilamentNotifications::class);
 
         // Livewire matches persistent middleware by class, so the panel's alias alone skips update requests.
-        Livewire::addPersistentMiddleware(ReadAcrossWorkspaces::class);
+        Livewire::addPersistentMiddleware([ReadAcrossWorkspaces::class, EnforceAbsoluteSessionLifetime::class, SetUserLocale::class]);
 
         ImportWizard::continueUrlUsing((new ContinueWithSetupChat)(...));
     }
@@ -757,6 +762,11 @@ final class AppServiceProvider extends ServiceProvider
     /**
      * Configure Filament.
      */
+    private function configureFileUploads(): void
+    {
+        FileUpload::configureUsing(fn (FileUpload $upload): FileUpload => $upload->placeholder(__('Drag & Drop your files or <span class="filepond--label-action">Browse</span>')));
+    }
+
     private function configureFilament(): void
     {
         ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());
@@ -845,6 +855,14 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
         ]);
 
+        View::composer(
+            ['filament-panels::components.layout.base', '*::filament-standalone'],
+            fn () => $this->registerTranslatedScriptData(),
+        );
+    }
+
+    private function registerTranslatedScriptData(): void
+    {
         FilamentAsset::registerScriptData([
             'payloadTooLarge' => __('filament/panel.payload_too_large'),
             'boardStageOrderFailed' => __('filament/pages/boards.stage_order_failed'),

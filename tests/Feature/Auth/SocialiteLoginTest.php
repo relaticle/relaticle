@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use App\Support\Locales;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Foundation\Bootstrap\LoadConfiguration;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider;
@@ -97,6 +98,30 @@ test('callback from socialite provider creates new user when user does not exist
     $response->assertRedirect(url()->getAppUrl());
 });
 
+test('a provider signup stores the guest language', function (): void {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('lang-1', 'Lang User', 'lang@example.com'),
+    );
+
+    $this->withUnencryptedCookies([Locales::COOKIE => 'de'])
+        ->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    expect(User::where('email', 'lang@example.com')->sole()->locale)->toBe('de');
+});
+
+test('a provider signup stores no language when the guest sent no listed one', function (): void {
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('lang-2', 'Lang User', 'nolang@example.com'),
+    );
+
+    $this->withHeaders(['Accept-Language' => 'ja-JP,ja;q=0.9'])
+        ->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    expect(User::where('email', 'nolang@example.com')->sole()->locale)->toBeNull();
+});
+
 test('a provider signup records which provider it used', function (): void {
     config(['relaticle.features.signup_challenge' => true]);
     Feature::flushCache();
@@ -139,6 +164,26 @@ test('callback from socialite provider logs in existing user when social account
     $response->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
 });
 
+test('sets no remember-me cookie after a Google sign-in', function (): void {
+    $user = User::factory()->withWorkspace()->create(['email' => 'cookie@example.com']);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => '555',
+    ]);
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('555', 'Cookie User', 'cookie@example.com'),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    $this->assertAuthenticatedAs($user);
+    expect(collect($response->headers->getCookies())->map->getName()->filter(fn (string $name): bool => str_starts_with($name, 'remember_web_')))->toBeEmpty();
+});
+
 test('linked Google login cannot bypass enrolled MFA', function (): void {
     $user = User::factory()->withConfirmedMfa()->create();
 
@@ -163,7 +208,7 @@ test('unlinking a social account while its MFA challenge is pending cannot compl
         'provider_name' => SocialiteProvider::GOOGLE->value,
     ]);
 
-    AuthenticationSession::begin($user, AuthMethod::GOOGLE, (string) $account->getKey(), true);
+    AuthenticationSession::begin($user, AuthMethod::GOOGLE, (string) $account->getKey());
 
     $account->delete();
 

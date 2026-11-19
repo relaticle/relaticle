@@ -79,28 +79,28 @@ enum StripeSubscriptionStatus: string implements HasColor, HasDescription, HasLa
     public function getLabel(): string
     {
         return match ($this) {
-            self::Active => 'Active',
-            self::Trialing => 'Trialing',
-            self::PastDue => 'Past due',
-            self::Unpaid => 'Unpaid',
-            self::Canceled => 'Canceled',
-            self::Incomplete => 'Incomplete',
-            self::IncompleteExpired => 'Incomplete expired',
-            self::Paused => 'Paused',
+            self::Active => __('enums/stripe-subscription-status.active'),
+            self::Trialing => __('enums/stripe-subscription-status.trialing'),
+            self::PastDue => __('enums/stripe-subscription-status.past_due'),
+            self::Unpaid => __('enums/stripe-subscription-status.unpaid'),
+            self::Canceled => __('enums/stripe-subscription-status.canceled'),
+            self::Incomplete => __('enums/stripe-subscription-status.incomplete'),
+            self::IncompleteExpired => __('enums/stripe-subscription-status.incomplete_expired'),
+            self::Paused => __('enums/stripe-subscription-status.paused'),
         };
     }
 
     public function getDescription(): string
     {
         return match ($this) {
-            self::Active => 'Paid and current. The latest invoice was charged successfully.',
-            self::Trialing => 'Inside a Stripe trial. Nothing has been charged yet.',
-            self::PastDue => 'The latest invoice failed. Stripe is retrying, and access stays open until it gives up.',
-            self::Unpaid => 'Stripe exhausted its retries and stopped trying. Access is gone.',
-            self::Canceled => 'Ended. No further invoices will be raised.',
-            self::Incomplete => 'The first payment never completed, so the subscription never started.',
-            self::IncompleteExpired => 'The first payment was abandoned and Stripe expired the attempt.',
-            self::Paused => 'Paused at the end of a trial that collected no payment method.',
+            self::Active => __('enums/stripe-subscription-status.descriptions.active'),
+            self::Trialing => __('enums/stripe-subscription-status.descriptions.trialing'),
+            self::PastDue => __('enums/stripe-subscription-status.descriptions.past_due'),
+            self::Unpaid => __('enums/stripe-subscription-status.descriptions.unpaid'),
+            self::Canceled => __('enums/stripe-subscription-status.descriptions.canceled'),
+            self::Incomplete => __('enums/stripe-subscription-status.descriptions.incomplete'),
+            self::IncompleteExpired => __('enums/stripe-subscription-status.descriptions.incomplete_expired'),
+            self::Paused => __('enums/stripe-subscription-status.descriptions.paused'),
         };
     }
 

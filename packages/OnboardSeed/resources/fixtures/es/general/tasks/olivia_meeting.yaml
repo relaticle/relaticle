@@ -1,0 +1,8 @@
+title: 'Programar la reunión de inicio con Olivia'
+assigned_people:
+  - olivia
+custom_fields:
+  description: 'Coordinar una reunión de inicio con Olivia para alinear los objetivos y los plazos del servicio de consultoría.'
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

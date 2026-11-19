@@ -14,6 +14,7 @@ use App\Models\CustomFieldOption;
 use App\Models\CustomFieldValue;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Number;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -221,7 +222,7 @@ final readonly class CustomFieldOptionPlan
         $errors = [...$errors, ...array_filter([self::moveCapError($moves, $cleared)])];
 
         if (self::isTaskStatus($field) && ! self::keepsDone($current, $targets)) {
-            $errors[] = __('The task Status option "Done" marks a task complete, so it cannot be renamed or removed.');
+            $errors[] = __('The task Status option ":name" marks a task complete, so it cannot be renamed or removed.', ['name' => TaskField::doneOption($current)?->name]);
         }
 
         if ($removals === [] && self::sameList($field, $current, $targets)) {
@@ -266,7 +267,7 @@ final readonly class CustomFieldOptionPlan
             return null;
         }
 
-        $params = ['count' => number_format($moveTotal), 'max' => number_format($moveCap)];
+        $params = ['count' => Number::format($moveTotal), 'max' => Number::format($moveCap)];
 
         return match (true) {
             $cleared !== [] && count($moves) + count($cleared) === 1 => __('":option" would be cleared on :count records. This assistant clears or moves at most :max records in one approval.', ['option' => array_key_first($cleared), ...$params]),
@@ -547,9 +548,9 @@ final readonly class CustomFieldOptionPlan
         return null;
     }
 
-    public static function locksOption(CustomField $field, string $name): bool
+    public static function locksOption(CustomField $field, string $optionId): bool
     {
-        return self::isTaskStatus($field) && $name === TaskField::DONE_STATUS;
+        return self::isTaskStatus($field) && TaskField::doneOption($field->options)?->getKey() === $optionId;
     }
 
     private static function isTaskStatus(CustomField $field): bool
@@ -568,7 +569,7 @@ final readonly class CustomFieldOptionPlan
      */
     private static function keepsDone(Collection $current, array $targets): bool
     {
-        $done = $current->first(fn (CustomFieldOption $option): bool => $option->name === TaskField::DONE_STATUS);
+        $done = TaskField::doneOption($current);
 
         if (! $done instanceof CustomFieldOption) {
             return true;
@@ -576,7 +577,7 @@ final readonly class CustomFieldOptionPlan
 
         foreach ($targets as $target) {
             if ($target['option'] instanceof CustomFieldOption && $target['option']->is($done)) {
-                return $target['name'] === TaskField::DONE_STATUS;
+                return TaskField::isDone($target['name']);
             }
         }
 

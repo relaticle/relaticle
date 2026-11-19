@@ -1,0 +1,8 @@
+title: Bei Reid zur Marktanalyse nachfassen
+assigned_people:
+  - reid
+custom_fields:
+  description: Senden Sie Reid die aktualisierte Marktanalyse und die Übersicht zum Wettbewerbsumfeld, um die er gebeten hat.
+  due_date: '{{ +4d }}'
+  status: To do
+  priority: Medium

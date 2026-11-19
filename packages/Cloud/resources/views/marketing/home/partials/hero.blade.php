@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <section x-data="heroTabs()" x-init="init()" class="bg-surface relative overflow-hidden">
     <div class="absolute inset-0 bg-[linear-gradient(to_right,rgba(0,0,0,0.015)_1px,transparent_1px),linear-gradient(to_bottom,rgba(0,0,0,0.015)_1px,transparent_1px)] dark:bg-[linear-gradient(to_right,rgba(255,255,255,0.025)_1px,transparent_1px),linear-gradient(to_bottom,rgba(255,255,255,0.025)_1px,transparent_1px)] bg-[size:3rem_3rem] [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,black_30%,transparent_100%)]" aria-hidden="true"></div>
 
@@ -27,7 +28,7 @@
                                 @endif
                             @endforeach
                         </span>
-                    </span>+ stars
+                    </span>{{ __('+ stars') }}
                 </span>
                 <x-lucide-arrow-up-right class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
             </a>
@@ -50,7 +51,7 @@
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
 
-                <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+                <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}">
                     {{ __('Get in touch') }}
                 </x-cloud::marketing.button>
             </div>

@@ -14,6 +14,9 @@
 
 <x-cloud::marketing.frame>
     <div class="px-6 py-12 md:px-10 md:py-16">
+        @if (app()->getLocale() !== 'en')
+            <p class="mb-8 max-w-3xl rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-300" data-legal-notice>{{ __('This document is available in English only. The English text governs.') }}</p>
+        @endif
         <div class="prose max-w-3xl dark:prose-invert prose-headings:font-medium prose-headings:text-gray-950 dark:prose-headings:text-white prose-a:text-primary dark:prose-a:text-primary-400 prose-img:rounded-xl">
             {!! $content !!}
         </div>

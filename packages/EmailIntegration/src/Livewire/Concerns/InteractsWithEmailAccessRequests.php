@@ -104,9 +104,7 @@ trait InteractsWithEmailAccessRequests
         $status = $this->filteredStatus();
 
         if ($status instanceof EmailAccessRequestStatus) {
-            return __('filament/pages/email-access-requests.empty.filtered_heading', [
-                'status' => mb_strtolower($status->getLabel()),
-            ]);
+            return __("filament/pages/email-access-requests.empty.filtered_heading.{$status->value}");
         }
 
         return $this->tab === 'incoming'

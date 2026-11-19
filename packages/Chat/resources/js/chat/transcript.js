@@ -134,7 +134,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories = null, proposalTexts = {} }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories, proposalTexts }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -345,7 +345,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const yesterday = new Date(now);
         yesterday.setDate(yesterday.getDate() - 1);
         if (this.sameCalendarDay(iso, yesterday)) return yesterdayLabel;
-        return new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric' });
+        return new Date(iso).toLocaleDateString(document.documentElement.lang || undefined, { month: 'long', day: 'numeric', year: 'numeric' });
     },
 
     // Per-message render decorations, keyed by position in `messages`.
@@ -1252,28 +1252,21 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         } catch (_) { /* clipboard blocked, silently ignore */ }
     },
 
-    // Injected translated labels (chat-interface.blade.php); defaults keep the
-    // module standalone.
-    feedbackCategories: feedbackCategories || [
-        { value: 'inaccurate', label: 'Inaccurate' },
-        { value: 'did_not_follow', label: "Didn't do what I asked" },
-        { value: 'too_slow', label: 'Too slow' },
-        { value: 'other', label: 'Other' },
-    ],
+    feedbackCategories,
 
     // Injected copy for decided proposals: outcome icons and words come from
     // ProposalOutcome, the per-entity verbs from ProposalEntity::receipts().
     proposalTexts: {
         outcomes: {},
-        head: { one: ':count change', other: ':count changes' },
-        justNow: 'just now',
-        leftOut: '(:fields left out)',
+        head: { one: '', other: '' },
+        justNow: '',
+        leftOut: '',
         localOutcomes: {},
         settleOrder: [],
-        changes: { one: ':count change', other: ':count changes' },
+        changes: { one: '', other: '' },
         receipts: {},
-        proposeAgain: 'Propose again',
-        proposeAgainPrompt: 'Propose again: :summary',
+        proposeAgain: '',
+        proposeAgainPrompt: '',
         ...proposalTexts,
     },
 
@@ -1477,8 +1470,9 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return this.proposalTexts.outcomes[key]?.label ?? '';
     },
 
-    fieldValue(fields, label) {
-        const field = (Array.isArray(fields) ? fields : []).find((f) => f.label === label);
+    fieldValue(fields, label, code = null) {
+        const labels = Array.isArray(label) ? label : [label];
+        const field = (Array.isArray(fields) ? fields : []).find((f) => (code && f.code === code) || labels.includes(f.label));
         return field ? String(field.new ?? field.value ?? '') : '';
     },
 
@@ -1635,7 +1629,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         return [
             this.batchLine(action, items),
             ...items.flatMap((item, index) => this.isSkipped(action, index)
-                ? [this.offLine(`${action.pending_action_id}:${index}`, action.itemResults[index].outcome, this.proposalItemLabel(item) || item.summary || '', null)]
+                ? [this.offLine(`${action.pending_action_id}:${index}`, action.itemResults[index].outcome, this.proposalItemLabel(item, action) || item.summary || '', null)]
                 : []),
         ];
     },
@@ -1643,7 +1637,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     offLine(key, outcome, label, action) {
         const leads = !!this.proposalTexts.outcomes[outcome]?.leads;
         const receipt = this.proposalTexts.receipts[action?.entity_type] ?? {};
-        const text = leads && action ? (this.fieldValue(action.display?.fields, receipt.title) || label) : label;
+        const text = leads && action ? (this.fieldValue(action.display?.fields, receipt.titleLabels, receipt.titleKey) || label) : label;
 
         return {
             key,
@@ -1662,12 +1656,12 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const fields = action.display?.fields;
         const record = action.record?.url ? action.record : null;
         const target = receipt.target ? this.fieldValue(fields, receipt.target) : '';
-        const label = target || record?.label || this.proposalRecordLabel(action) || this.fieldValue(fields, receipt.title) || action.display?.summary || '';
+        const label = target || record?.label || this.proposalRecordLabel(action) || this.fieldValue(fields, receipt.titleLabels, receipt.titleKey) || action.display?.summary || '';
         const showChip = !!record && !!label && !!window.ChatModules.recordChipIcon(action.entity_type);
         const kept = (Array.isArray(fields) ? fields : []).filter((f) => !this.isExcluded(action.excluded, f));
         const meta = [
             receipt.target
-                ? this.fieldValue(fields, receipt.title)
+                ? this.fieldValue(fields, receipt.titleLabels, receipt.titleKey)
                 : (action.operation === 'update' ? kept.map((f) => f.label).join(', ') : ''),
             this.leftOutNote(action.excluded, fields),
         ].filter(Boolean).join(' ');
@@ -1695,7 +1689,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         }
 
         const names = operation === 'delete'
-            ? done.map((item) => this.proposalItemLabel(item) || item.summary).filter(Boolean).join(', ')
+            ? done.map((item) => this.proposalItemLabel(item, action) || item.summary).filter(Boolean).join(', ')
             : (action.moved_total ?? '');
 
         return {
@@ -1732,20 +1726,18 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         const resolvedLabel = action?.record?.label;
         if (typeof resolvedLabel === 'string' && resolvedLabel !== '') return resolvedLabel;
 
-        return this.quotedSummaryTitle(action?.display?.summary);
+        return action?.display?.name || this.proposalTitleValue(action?.entity_type, action?.display?.fields);
     },
 
-    // A batch item's record identity: its display title holds the operation
-    // ("Create Task"), so the record name only exists inside the quoted summary.
-    proposalItemLabel(item) {
-        return this.quotedSummaryTitle(item?.summary);
+    // A batch item's display title holds the operation ("Create Task"), so the
+    // record name is the value of its title row.
+    proposalItemLabel(item, action) {
+        return item?.name || this.proposalTitleValue(action?.entity_type, item?.fields);
     },
 
-    quotedSummaryTitle(summary) {
-        if (typeof summary !== 'string') return '';
-
-        const match = summary.match(/"(.*)"/u);
-        return match?.[1] || '';
+    proposalTitleValue(entityType, fields) {
+        const receipt = this.proposalTexts.receipts[entityType] ?? {};
+        return this.fieldValue(fields, receipt.titleLabels ?? [], receipt.titleKey);
     },
 
     // Proposals from one assistant turn are ONE decision, so the transcript shows

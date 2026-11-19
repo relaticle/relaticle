@@ -31,10 +31,10 @@ enum PeopleField: string
     public function getDisplayName(): string
     {
         return match ($this) {
-            self::EMAILS => 'Emails',
-            self::PHONE_NUMBER => 'Phone Number',
-            self::JOB_TITLE => 'Job Title',
-            self::LINKEDIN => 'LinkedIn',
+            self::EMAILS => __('enums/custom-fields.people.emails.name'),
+            self::PHONE_NUMBER => __('enums/custom-fields.people.phone_number.name'),
+            self::JOB_TITLE => __('enums/custom-fields.people.job_title.name'),
+            self::LINKEDIN => __('enums/custom-fields.people.linkedin.name'),
         };
     }
 

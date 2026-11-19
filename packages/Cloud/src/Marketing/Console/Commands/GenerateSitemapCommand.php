@@ -6,14 +6,15 @@ namespace Relaticle\Cloud\Marketing\Console\Commands;
 
 use App\Features\Blog;
 use App\Features\EmailIntegration;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
-use Relaticle\Documentation\Support\DocCategory;
-use Relaticle\Documentation\Support\DocPage;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Ink\BlogSitemapGenerator;
@@ -32,6 +33,7 @@ final class GenerateSitemapCommand extends Command
     {
         $sitemap = $this->crawlMarketingSitemap();
 
+        $this->addMarketingUrls($sitemap);
         $this->addDocumentationUrls($sitemap, $docsRepository);
 
         if (Feature::active(Blog::class)) {
@@ -57,6 +59,12 @@ final class GenerateSitemapCommand extends Command
                     return false;
                 }
 
+                $name = LocalizedUrl::baseRouteNameOf($path);
+
+                if ($name !== null && Str::startsWith($name, ['help.', 'documentation.', 'blog.'])) {
+                    return false;
+                }
+
                 if (parse_url($url, PHP_URL_QUERY) !== null) {
                     return false;
                 }
@@ -66,40 +74,83 @@ final class GenerateSitemapCommand extends Command
             ->getSitemap();
     }
 
-    /**
-     * The crawler usually discovers the documentation pages itself (they're
-     * linked from the marketing nav), but a crawl-found entry carries no
-     * <lastmod> -- and Sitemap::add() keeps the first tag per URL, so adding
-     * again would be silently ignored. Merge instead: stamp lastmod onto the
-     * existing tag, or add the URL when the crawl missed it. Only a page's
-     * own front-matter `updated:` produces a <lastmod>; a missing one is
-     * left out entirely rather than falling back to a file timestamp.
-     */
-    private function addDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
+    private function addMarketingUrls(Sitemap $sitemap): void
     {
-        $this->ensureUrl($sitemap, route('help.index'));
-        $this->ensureUrl($sitemap, route('documentation.index'));
-        $this->ensureUrl($sitemap, route('aiNativeCrm'));
-        $this->ensureUrl($sitemap, route('security'));
-
-        if (Feature::active(EmailIntegration::class)) {
-            $this->ensureUrl($sitemap, route('emailAndCalendar'));
-        }
+        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
 
         foreach (ConnectableAssistant::cases() as $assistant) {
-            $this->ensureUrl($sitemap, route($assistant->routeName()));
+            $names[] = $assistant->routeName();
         }
 
-        $docsRepository->categories()
-            ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
-            ->each(fn (DocCategory $category) => $this->ensureUrl($sitemap, DocUrl::category($category)));
+        if (Feature::active(EmailIntegration::class)) {
+            $names[] = 'emailAndCalendar';
+        }
 
-        $docsRepository->pages()->each(function (DocPage $page) use ($sitemap): void {
-            $this->ensureUrl($sitemap, DocUrl::page($page), $page->updated);
-        });
+        $pages = array_map(fn (string $name): array => [$name, []], $names);
+
+        foreach (config('comparisons.compare', []) as $competitor) {
+            $pages[] = ['compare.show', ['competitor' => $competitor]];
+        }
+
+        foreach (config('comparisons.alternatives', []) as $competitor) {
+            $pages[] = ['alternatives.show', ['competitor' => $competitor]];
+        }
+
+        foreach ($pages as [$name, $parameters]) {
+            $this->addLocalizedPage($sitemap, $name, $parameters);
+        }
     }
 
-    private function ensureUrl(Sitemap $sitemap, string $location, ?CarbonImmutable $lastModified = null): void
+    /** @param  array<string, string>  $parameters */
+    private function addLocalizedPage(Sitemap $sitemap, string $name, array $parameters): void
+    {
+        $alternates = array_diff_key(LocalizedUrl::alternatesOf($name, $parameters), ['x-default' => true]);
+
+        $this->addAlternateSet($sitemap, array_map(fn (string $url): array => [$url, null], $alternates));
+    }
+
+    private function addDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
+    {
+        $versions = [];
+
+        foreach (config('app.available_locales') as $locale) {
+            Locales::within($locale, function () use ($docsRepository, $locale, &$versions): void {
+                foreach ($docsRepository->categories($locale) as $category) {
+                    if ($category->area === DocUrl::HELP) {
+                        $versions[$category->path][$locale] = [DocUrl::category($category), null];
+                    }
+                }
+
+                foreach ($docsRepository->pages($locale) as $page) {
+                    $versions[$page->path][$locale] = [DocUrl::page($page), $page->updated];
+                }
+            });
+        }
+
+        foreach ($versions as $pageVersions) {
+            $this->addAlternateSet($sitemap, $pageVersions);
+        }
+    }
+
+    /** @param  array<string, array{0: string, 1: ?CarbonImmutable}>  $versions */
+    private function addAlternateSet(Sitemap $sitemap, array $versions): void
+    {
+        $alternates = array_map(fn (array $version): string => $version[0], $versions);
+
+        if (isset($alternates[LocalizedUrl::DEFAULT_LOCALE])) {
+            $alternates['x-default'] = $alternates[LocalizedUrl::DEFAULT_LOCALE];
+        }
+
+        foreach ($versions as [$location, $lastModified]) {
+            $tag = $this->ensureUrl($sitemap, $location, $lastModified);
+
+            foreach ($alternates as $hreflang => $href) {
+                $tag->addAlternate($href, $hreflang);
+            }
+        }
+    }
+
+    private function ensureUrl(Sitemap $sitemap, string $location, ?CarbonImmutable $lastModified = null): Url
     {
         $url = $sitemap->getUrl($location);
 
@@ -111,5 +162,7 @@ final class GenerateSitemapCommand extends Command
         if ($lastModified instanceof CarbonImmutable) {
             $url->setLastModificationDate($lastModified);
         }
+
+        return $url;
     }
 }

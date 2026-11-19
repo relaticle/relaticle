@@ -1,0 +1,6 @@
+name: Plateforme d'analyse pour les hôtes Airbnb
+company: airbnb
+custom_fields:
+  amount: 20000
+  close_date: '{{ +4w }}'
+  stage: Prospecting

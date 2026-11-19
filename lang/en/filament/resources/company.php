@@ -34,7 +34,7 @@ return [
             'label' => 'Last Update',
         ],
         'deleted_at' => [
-            'label' => 'Deleted At',
+            'label' => 'Deleted at',
         ],
     ],
 
@@ -51,6 +51,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Export companies',
+                    'heading' => 'Export Companies',
+                ],
             ],
         ],
         'view' => [
@@ -64,12 +68,6 @@ return [
             'activity_log' => [
                 'description' => 'All activity for this company, grouped by week.',
             ],
-        ],
-    ],
-
-    'relation_managers' => [
-        'people' => [
-            'model_label' => 'person',
         ],
     ],
 ];

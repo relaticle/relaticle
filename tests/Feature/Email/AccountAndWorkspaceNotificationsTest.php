@@ -12,6 +12,7 @@ use App\Notifications\WorkspaceDeletionReminderNotification;
 use App\Notifications\WorkspaceDeletionScheduledNotification;
 use App\Notifications\WorkspaceMemberRemovedNotification;
 use Illuminate\Mail\Markdown;
+use Illuminate\Support\Facades\Mail;
 
 mutates(
     WorkspaceDeletionScheduledNotification::class,
@@ -43,6 +44,19 @@ it('renders the workspace deletion scheduled mail', function (): void {
         ->and($html)->toContain(__('mail.workspace_deletion_scheduled.cta'))
         ->and($html)->toContain(__('mail.footer.reason.owner', ['workspace' => 'Acme']))
         ->and($html)->not->toContain('mail.');
+});
+
+it('writes the deletion date of the workspace mails in the language of the recipient', function (): void {
+    $this->owner->forceFill(['locale' => 'de'])->save();
+
+    $this->owner->notify(new WorkspaceDeletionScheduledNotification($this->workspace));
+    $this->owner->notify(new WorkspaceDeletionReminderNotification($this->workspace));
+
+    $messages = Mail::mailer('array')->getSymfonyTransport()->messages();
+
+    expect(app()->getLocale())->toBe('en')
+        ->and($messages)->toHaveCount(2)
+        ->and($messages->every(fn ($message): bool => str_contains($message->getOriginalMessage()->getHtmlBody(), '6. Okt 2026')))->toBeTrue();
 });
 
 it('renders the workspace deletion reminder with a pluralised subject', function (): void {

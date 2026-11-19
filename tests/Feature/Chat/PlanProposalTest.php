@@ -6,6 +6,7 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Bus;
@@ -280,6 +281,30 @@ it('saves the assignees of a batch task proposal approved from the card', functi
 
     expect($first->assignees)->toHaveCount(0)
         ->and($second->assignees->modelKeys())->toBe([$member->getKey()]);
+});
+
+it('approves a German plan with an owner and a linked person from the card', function (): void {
+    $this->user->forceFill(['locale' => 'de'])->save();
+    Locales::apply('de');
+
+    ($this->tool)(CreateCompanyTool::class)->handle(new Request([
+        'records' => [['name' => 'Nordwind GmbH', 'account_owner_id' => (string) $this->user->getKey()]],
+    ]));
+    $company = ($this->proposalFor)('company');
+    ($this->tool)(CreatePersonTool::class)->handle(new Request([
+        'records' => [['name' => 'Anna Weber', 'company_id' => PlanReference::to((string) $company->getKey())]],
+    ]));
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $company->getKey(), context: 'conversation')
+        ->assertSee('Verantwortlicher')
+        ->call('approveAll')
+        ->assertNotDispatched('proposal:resolve-failed');
+
+    $created = Company::query()->where('name', 'Nordwind GmbH')->firstOrFail();
+
+    expect($created->account_owner_id)->toBe($this->user->getKey())
+        ->and(People::query()->where('name', 'Anna Weber')->firstOrFail()->company_id)->toBe($created->getKey());
 });
 
 describe('reference validation', function (): void {

@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\DB;
 use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
+use Relaticle\Chat\Exceptions\ProposalNotResolvable;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Services\Tools\CustomFieldsRequestValidator;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
@@ -263,9 +264,9 @@ final readonly class ProposalEditor
                 'status' => PendingActionStatus::Expired,
                 'resolved_at' => now(),
             ]);
-            throw new RuntimeException('This action has expired');
+            throw ProposalNotResolvable::expired();
         }
 
-        throw_unless($pendingAction->isPending(), RuntimeException::class, 'This action has already been resolved');
+        throw_unless($pendingAction->isPending(), ProposalNotResolvable::alreadyResolved());
     }
 }

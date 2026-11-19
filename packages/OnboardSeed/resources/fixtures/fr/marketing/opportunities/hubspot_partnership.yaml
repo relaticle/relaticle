@@ -1,0 +1,6 @@
+name: Partenariat de co-marketing HubSpot
+company: hubspot
+custom_fields:
+  amount: 25000
+  close_date: '{{ +6w }}'
+  stage: Proposal/Price Quote

@@ -18,6 +18,7 @@ use App\Models\Opportunity;
 use App\Models\User;
 use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
+use App\Support\Locales;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Navigation\NavigationItem;
@@ -25,6 +26,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Livewire\Features\SupportTesting\Testable;
+use Livewire\Livewire;
 use Relaticle\Cloud\Billing\StripeBilling;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Livewire\ManageFieldsTable;
@@ -449,4 +451,18 @@ test('the legacy team urls redirect permanently to their workspace pages', funct
 
 test('the legacy team url only redirects known pages', function (): void {
     $this->get("/app/{$this->workspace->slug}/team/billing")->assertNotFound();
+});
+
+test('custom attribute tabs name each record type in the user language', function (): void {
+    Locales::apply('de');
+
+    $tabs = Livewire::test(CustomFields::class)->instance()->entityTypes();
+
+    expect($tabs->all())->toBe([
+        'opportunity' => 'Verkaufschancen',
+        'people' => 'Personen',
+        'company' => 'Unternehmen',
+        'note' => 'Notizen',
+        'task' => 'Aufgaben',
+    ]);
 });

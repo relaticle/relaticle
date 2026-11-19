@@ -1,0 +1,8 @@
+title: Angebot an Tim senden
+assigned_people:
+  - tim
+custom_fields:
+  description: Erstellen Sie das endgültige Angebot für die Apple-Entwicklerpartnerschaft und senden Sie es ab.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: Medium

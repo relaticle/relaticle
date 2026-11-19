@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models\Concerns;
 
+use App\ActivityLog\AppEventPalette;
 use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
 use Relaticle\ActivityLog\Concerns\InteractsWithTimeline;
@@ -22,12 +23,12 @@ trait HasActivityTimeline
             ->fromRelation('notes', fn (RelatedModelSource $source): RelatedModelSource => $source
                 ->event('created_at', 'note_created')
                 ->with(['creator'])
-                ->title(fn ($note): string => $note->title ?? 'Note')
+                ->title(fn ($note): string => $note->title ?? AppEventPalette::NoteCreated->getLabel())
                 ->causer('creator'))
             ->fromRelation('tasks', fn (RelatedModelSource $source): RelatedModelSource => $source
                 ->event('created_at', 'task_created')
                 ->with(['creator'])
-                ->title(fn ($task): string => $task->title ?? 'Task')
+                ->title(fn ($task): string => $task->title ?? AppEventPalette::TaskCreated->getLabel())
                 ->causer('creator'));
 
         if (Feature::active(EmailIntegration::class)) {

@@ -1,0 +1,8 @@
+title: 'Agendar una llamada de retención con Intercom'
+assigned_people:
+  - tomas
+custom_fields:
+  description: 'El uso bajó un 40%. Entender la herramienta de la competencia y qué los haría quedarse.'
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

@@ -1,0 +1,8 @@
+title: Co-Marketing-Vereinbarung mit Rachel abschließen
+assigned_people:
+  - rachel
+custom_fields:
+  description: Klären Sie die Konditionen der Co-Marketing-Partnerschaft mit HubSpot und senden Sie Rachel die finale Vereinbarung zur Freigabe.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

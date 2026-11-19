@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Documentation\Support;
 
+use App\Support\Locales;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 
@@ -26,32 +27,35 @@ final readonly class BuildSearchIndex
     public function __construct(private DocsRepository $repository) {}
 
     /** @return array{v: int, records: list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>} */
-    public function __invoke(): array
+    public function __invoke(?string $locale = null): array
     {
-        return ['v' => self::VERSION, 'records' => $this->records()];
+        $locale ??= app()->getLocale();
+
+        return ['v' => self::VERSION, 'records' => Locales::within($locale, fn (): array => $this->records($locale))];
     }
 
     /** @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}> */
-    private function records(): array
+    private function records(string $locale): array
     {
-        $pages = $this->repository->pages();
+        $pages = $this->repository->pages($locale);
 
         if (! $this->cachingEnabled()) {
-            return $this->build($pages);
+            return $this->build($pages, $locale);
         }
 
-        $signature = $this->signature($pages);
+        $signature = $this->signature($pages, $locale);
+        $cacheKey = self::CACHE_KEY.".{$locale}";
 
         /** @var array{signature: string, records: list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>}|null $cached */
-        $cached = Cache::get(self::CACHE_KEY);
+        $cached = Cache::get($cacheKey);
 
         if (is_array($cached) && $cached['signature'] === $signature) {
             return $cached['records'];
         }
 
-        $records = $this->build($pages);
+        $records = $this->build($pages, $locale);
 
-        Cache::forever(self::CACHE_KEY, ['signature' => $signature, 'records' => $records]);
+        Cache::forever($cacheKey, ['signature' => $signature, 'records' => $records]);
 
         return $records;
     }
@@ -70,33 +74,33 @@ final readonly class BuildSearchIndex
     }
 
     /** @param Collection<string, DocPage> $pages */
-    private function signature(Collection $pages): string
+    private function signature(Collection $pages, string $locale): string
     {
-        $categories = $this->repository->categories()
+        $categories = $this->repository->categories($locale)
             ->map(fn (DocCategory $category): string => "{$category->path}:{$category->title}")
             ->implode('|');
 
         return hash('sha256', $pages
             ->map(fn (DocPage $page): string => "{$page->path}:{$page->title}:{$page->body}")
-            ->implode('|').'||'.$categories.'||'.DocUrl::root());
+            ->implode('|').'||'.$categories.'||'.DocUrl::root().'||'.DocUrl::localePrefix());
     }
 
     /**
      * @param  Collection<string, DocPage>  $pages
      * @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}>
      */
-    private function build(Collection $pages): array
+    private function build(Collection $pages, string $locale): array
     {
         return array_values($pages
-            ->flatMap(fn (DocPage $page): array => $this->sections($page))
+            ->flatMap(fn (DocPage $page): array => $this->sections($page, $locale))
             ->all());
     }
 
     /** @return list<array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}> */
-    private function sections(DocPage $page): array
+    private function sections(DocPage $page, string $locale): array
     {
         $records = array_map(
-            fn (array $section): array => $this->record($page, $section['section'] === '' ? $page->title : $section['section'], $section['anchor'], $section['markdown']),
+            fn (array $section): array => $this->record($page, $locale, $section['section'] === '' ? $page->title : $section['section'], $section['anchor'], $section['markdown']),
             (new PageSections)($page->body),
         );
 
@@ -107,7 +111,7 @@ final readonly class BuildSearchIndex
     }
 
     /** @return array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string} */
-    private function record(DocPage $page, string $section, string $anchor, string $raw): array
+    private function record(DocPage $page, string $locale, string $section, string $anchor, string $raw): array
     {
         $url = DocUrl::page($page);
 
@@ -118,7 +122,7 @@ final readonly class BuildSearchIndex
             'anchor' => $anchor,
             'content' => $this->plainText($raw),
             'url' => $anchor === '' ? $url : "{$url}#{$anchor}",
-            'crumb' => $this->crumb($page),
+            'crumb' => $this->crumb($page, $locale),
         ];
     }
 
@@ -127,13 +131,13 @@ final readonly class BuildSearchIndex
      * title for help, the area name for the developer guides, whose single
      * "Guides" category is collapsed out of the URL anyway.
      */
-    private function crumb(DocPage $page): string
+    private function crumb(DocPage $page, string $locale): string
     {
         if ($page->area !== DocUrl::HELP) {
             return DocUrl::areaTitle($page->area);
         }
 
-        $category = $this->repository->findCategory("{$page->area}/{$page->category}");
+        $category = $this->repository->findCategory("{$page->area}/{$page->category}", $locale);
 
         return $category instanceof DocCategory ? $category->title : DocUrl::areaTitle($page->area);
     }

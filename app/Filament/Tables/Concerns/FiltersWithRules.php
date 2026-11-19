@@ -75,7 +75,7 @@ trait FiltersWithRules
     }
 
     /**
-     * @return array{view: ?string, viewerId: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sorts: list<array{column: string, direction: string, label: string}>, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, max: int}>}
+     * @return array{view: ?string, viewerId: ?string, fields: list<array{key: string, label: string, icon: string, kind: string, limit: ?int, options: list<array{id: string, label: string, color: ?string, image?: ?string, icon?: ?string, circular?: bool}>, conditions: list<array{value: string, label: string, takesValue: bool, shape: string}>}>, rules: list<array<string, mixed>>, deleted: ?string, deletable: bool, sorts: list<array{column: string, direction: string, label: string}>, sortable: list<array{key: string, label: string, icon: string}>, groups: list<array{id: string, label: string, icon: ?string}>, grouping: ?array{id: string, direction: string, label: string}, periodUnits: list<array{value: string, label: string, singular: string, thisPeriod: string, max: int}>}
      */
     #[Unexposed]
     public function getFilterBarData(): array
@@ -120,6 +120,7 @@ trait FiltersWithRules
                 'value' => $unit->value,
                 'label' => __("filament/panel.tables.filters.units.{$unit->value}"),
                 'singular' => __("filament/panel.tables.filters.this_unit.{$unit->value}"),
+                'thisPeriod' => __("filament/panel.tables.filters.this_period.{$unit->value}"),
                 'max' => $unit->maxAmount(),
             ], PeriodUnit::cases()),
         ];

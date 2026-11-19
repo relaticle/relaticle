@@ -107,7 +107,8 @@ final class NoteResource extends Resource
     private static function columns(): array
     {
         return [
-            TextColumn::make('title'),
+            TextColumn::make('title')
+                ->label(__('filament/resources/note.fields.title.label')),
             LinkedRecordsColumn::make('relations')
                 ->toggleable(),
             TextColumn::make('creator.name')
@@ -117,6 +118,7 @@ final class NoteResource extends Resource
                 ->visibleFrom('sm')
                 ->getStateUsing(fn (Note $record): string => $record->created_by),
             TextColumn::make('deleted_at')
+                ->label(__('filament/resources/note.fields.deleted_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->toggleable()
