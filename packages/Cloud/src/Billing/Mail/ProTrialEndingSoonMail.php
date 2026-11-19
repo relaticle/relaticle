@@ -42,7 +42,7 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'cloud::mail.pro-trial-ending-soon',
             with: [
-                'credits' => Number::format(Plan::Pro->credits(), locale: app()->getLocale()),
+                'credits' => Number::format(Plan::Pro->credits()),
                 'endsOnLong' => $this->endsOn(__('formats.iso.date_at_time')),
                 'endsOnShort' => $this->endsOn(__('formats.iso.date_without_year')),
                 'zone' => $this->zoneLabel(),

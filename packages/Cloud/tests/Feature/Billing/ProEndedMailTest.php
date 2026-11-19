@@ -192,6 +192,12 @@ it('offers to restart the managed plan that ended instead of selling Pro', funct
     'grandfathered enterprise' => [Plan::Enterprise, 'Enterprise', ['hosted_free_grandfathered_at' => now()->subYear()]],
 ]);
 
+it('groups the credit count the way the owner language does', function (): void {
+    $mail = ProEndedMail::afterTrial(proEndedWorkspace(['paused_at' => now()]))->locale('de');
+
+    $mail->assertSeeInHtml('2.000 Credits pro Monat');
+});
+
 it('links the managed plan mail to the contact page in the owner language', function (): void {
     $mail = ProEndedMail::afterManagedPlan(proEndedWorkspace(), Plan::Enterprise)->locale('de');
 

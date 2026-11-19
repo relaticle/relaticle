@@ -73,7 +73,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
                 'preheader' => $this->preheader(),
                 'isTrial' => $this->isTrial(),
                 'usage' => $this->isTrial() ? resolve(TrialUsageQuery::class)->forWorkspace($this->workspace) : null,
-                'credits' => Number::format(Plan::Pro->credits(), locale: app()->getLocale()),
+                'credits' => Number::format(Plan::Pro->credits()),
                 'offersExtension' => $this->offersExtension(),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'ctaUrl' => $this->ctaUrl(),

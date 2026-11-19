@@ -16,6 +16,7 @@ use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Laravel\Pennant\Feature;
@@ -38,7 +39,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(PreviewStep::class, MatchResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);

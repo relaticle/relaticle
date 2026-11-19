@@ -8,7 +8,6 @@ use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Number;
 
 final readonly class Locales
 {
@@ -20,7 +19,6 @@ final readonly class Locales
     {
         app()->setLocale($locale);
         Date::setLocale($locale);
-        Number::useLocale($locale);
     }
 
     public static function isListed(?string $locale): bool

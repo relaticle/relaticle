@@ -6,6 +6,7 @@ use App\Events\WorkspaceCreated;
 use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Js;
@@ -26,7 +27,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(MappingStep::class, ColumnData::class, ImportField::class, ImportFieldCollection::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);

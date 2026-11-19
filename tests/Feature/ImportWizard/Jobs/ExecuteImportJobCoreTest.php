@@ -19,6 +19,7 @@ use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Queue\Middleware\FailOnException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -44,7 +45,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class, ImportFinishedNotification::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);

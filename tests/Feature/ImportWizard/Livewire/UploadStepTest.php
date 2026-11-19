@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
@@ -30,7 +31,7 @@ function makeCsvFile(string $content, string $name = 'test.csv'): UploadedFile
 }
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
