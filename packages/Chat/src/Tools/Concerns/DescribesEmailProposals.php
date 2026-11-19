@@ -127,11 +127,11 @@ trait DescribesEmailProposals
         $account = $this->mailbox((string) ($data['connected_account_id'] ?? ''));
 
         $rows = [
-            ['label' => 'Subject', 'value' => (string) ($data['subject'] ?? '')],
-            ['label' => 'From', 'value' => (string) $account?->email_address],
+            ['label' => __('Subject'), 'value' => (string) ($data['subject'] ?? '')],
+            ['label' => __('From'), 'value' => (string) $account?->email_address],
         ];
 
-        foreach (['to' => 'To', 'cc' => 'CC', 'bcc' => 'BCC'] as $key => $label) {
+        foreach (['to' => __('To'), 'cc' => __('CC'), 'bcc' => __('BCC')] as $key => $label) {
             $addresses = array_values(array_filter((array) ($data[$key] ?? []), is_string(...)));
 
             if ($addresses !== []) {
@@ -142,16 +142,16 @@ trait DescribesEmailProposals
         $repliesTo = $this->repliedToEmail((string) ($data['in_reply_to_email_id'] ?? ''));
 
         if ($repliesTo !== null) {
-            $rows[] = ['label' => 'In reply to', 'value' => $repliesTo];
+            $rows[] = ['label' => __('In reply to'), 'value' => $repliesTo];
         }
 
         $body = (string) ($data['body'] ?? '');
 
         if (trim($body) !== '') {
-            $rows[] = ['label' => 'Message', 'value' => $body];
+            $rows[] = ['label' => __('Message'), 'value' => $body];
         }
 
-        $rows[] = ['label' => 'Signature', 'value' => $this->signatureText($account, $data)];
+        $rows[] = ['label' => __('Signature'), 'value' => $this->signatureText($account, $data)];
 
         return $rows;
     }

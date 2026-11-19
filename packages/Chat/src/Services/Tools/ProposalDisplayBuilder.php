@@ -67,7 +67,7 @@ final readonly class ProposalDisplayBuilder
 
             if (is_string($ownerId) && $ownerId !== '') {
                 $rows[] = [
-                    'label' => 'Account Owner',
+                    'label' => __('Account Owner'),
                     'code' => 'account_owner_id',
                     'value' => WorkspaceMembersContext::nameOf($ownerId) ?? $ownerId,
                 ];

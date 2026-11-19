@@ -118,8 +118,8 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
             'title' => $this->proposalEntity()->createTitle(),
             'summary' => "Invite {$email} as {$roleLabel}",
             'fields' => [
-                ['label' => 'Email', 'value' => $email],
-                ['label' => 'Role', 'value' => $roleLabel],
+                ['label' => __('Email'), 'value' => $email],
+                ['label' => __('Role'), 'value' => $roleLabel],
             ],
         ];
     }

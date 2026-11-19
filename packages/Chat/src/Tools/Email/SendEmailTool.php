@@ -131,6 +131,6 @@ final class SendEmailTool extends BaseWriteCreateTool
         /** @var User $user */
         $user = auth()->user();
 
-        return [...$this->emailRows($record), ['label' => 'Send at', 'value' => $this->sendTimeLabel($sendAt, $user)]];
+        return [...$this->emailRows($record), ['label' => __('Send at'), 'value' => $this->sendTimeLabel($sendAt, $user)]];
     }
 }

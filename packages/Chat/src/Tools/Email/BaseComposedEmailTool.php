@@ -118,19 +118,19 @@ abstract class BaseComposedEmailTool extends BaseWriteCreateTool
         $data = $this->extractRecordData($record);
         $entity = $this->proposalEntity();
 
-        $rows = [['label' => 'Subject', 'value' => $data['subject']]];
+        $rows = [['label' => __('Subject'), 'value' => $data['subject']]];
 
         if ($email instanceof Email) {
-            $rows[] = ['label' => 'From', 'value' => (string) $email->connectedAccount?->email_address];
-            $rows[] = ['label' => 'To', 'value' => $this->recipients($email)];
+            $rows[] = ['label' => __('From'), 'value' => (string) $email->connectedAccount?->email_address];
+            $rows[] = ['label' => __('To'), 'value' => $this->recipients($email)];
         }
 
         if ($email?->status === EmailStatus::QUEUED && $email->scheduled_for !== null) {
-            $rows[] = ['label' => 'Scheduled for', 'value' => $this->sendTimeLabel($email->scheduled_for->toIso8601String(), $this->user())];
+            $rows[] = ['label' => __('Scheduled for'), 'value' => $this->sendTimeLabel($email->scheduled_for->toIso8601String(), $this->user())];
         }
 
         if (isset($data['scheduled_for'])) {
-            $rows[] = ['label' => 'Send at', 'value' => $this->sendTimeLabel($data['scheduled_for'], $this->user())];
+            $rows[] = ['label' => __('Send at'), 'value' => $this->sendTimeLabel($data['scheduled_for'], $this->user())];
         }
 
         return [

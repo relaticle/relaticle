@@ -294,10 +294,11 @@ enum ProposalEntity: string
         };
     }
 
-    public function receiptTarget(): ?string
+    /** @return ?list<string> */
+    public function receiptTarget(): ?array
     {
         return match ($this) {
-            self::Email => 'To',
+            self::Email => array_values(array_unique([__('To'), 'To'])),
             self::Company, self::People, self::Opportunity, self::Task, self::Note, self::EmailDraft, self::EmailDraftSend, self::EmailDraftDelete, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => null,
         };
     }
@@ -337,7 +338,7 @@ enum ProposalEntity: string
      *     verbs: array<string, string>,
      *     batch: array<string, array{one: string, other: string}>,
      *     moved: array{one: string, other: string},
-     *     target: ?string,
+     *     target: ?list<string>,
      *     title: string,
      *     titleKey: string,
      *     titleLabels: list<string>,

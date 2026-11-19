@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\Locales;
@@ -20,6 +21,9 @@ use Relaticle\Chat\Livewire\Chat\ChatInterface;
 use Relaticle\Chat\Livewire\Chat\ProposalCard;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Support\ProposalConflictNotice;
+use Relaticle\Chat\Tools\Company\CreateCompanyTool;
+use Relaticle\Chat\Tools\Opportunity\CreateOpportunityTool;
+use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
 
@@ -205,3 +209,39 @@ it('words a proposal conflict in the viewer language with the viewer as subject'
     'de you' => ['de', 'you', 'Sie haben Amount auf 20 gesetzt (um 14:32)', 'Sie haben Amount auf 20 gesetzt (am 12. Nov 2026 09:05)'],
     'en other' => ['en', 'other', 'Maya Chen set Amount to 20 at 2:32 PM', 'Maya Chen set Amount to 20 on Nov 12, 2026 9:05 AM'],
 ]);
+
+it('labels the rows of a create proposal in the user language', function (): void {
+    $conversationId = '019df900-4444-7000-8000-0000000000bb';
+    DB::table('agent_conversations')->insert([
+        'id' => $conversationId,
+        'participant_type' => 'user',
+        'participant_id' => (string) $this->user->getKey(),
+        'workspace_id' => $this->user->currentWorkspace->getKey(),
+        'title' => '',
+        'created_at' => now(),
+        'updated_at' => now(),
+    ]);
+    $company = Company::factory()->for($this->user->currentWorkspace)->create(['name' => 'Acme']);
+
+    $labels = Locales::within('de', function () use ($conversationId, $company): array {
+        $propose = function (string $tool, array $record) use ($conversationId): void {
+            $instance = resolve($tool);
+            $instance->setConversationId($conversationId);
+            $instance->handle(new Request(['records' => [$record]]));
+        };
+
+        $propose(CreateCompanyTool::class, ['name' => 'Globex', 'account_owner_id' => (string) $this->user->getKey()]);
+        $propose(CreatePersonTool::class, ['name' => 'Priya', 'company_id' => (string) $company->getKey()]);
+        $propose(CreateOpportunityTool::class, ['name' => 'Renewal', 'company_id' => (string) $company->getKey()]);
+
+        return PendingAction::query()->where('conversation_id', $conversationId)->orderBy('id')->get()
+            ->map(fn (PendingAction $action): array => array_column($action->display_data['fields'], 'label'))
+            ->all();
+    });
+
+    expect($labels)->toBe([
+        ['Name', 'Verantwortlicher'],
+        ['Name', 'Unternehmen'],
+        ['Name', 'Unternehmen'],
+    ]);
+});

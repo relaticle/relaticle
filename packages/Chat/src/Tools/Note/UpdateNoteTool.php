@@ -85,13 +85,13 @@ final class UpdateNoteTool extends BaseWriteUpdateTool
 
         $fields = [];
         if (array_key_exists('title', $request->all())) {
-            $fields[] = ['label' => 'Title', 'old' => $model->getAttribute('title'), 'new' => $request['title']];
+            $fields[] = ['label' => __('Title'), 'old' => $model->getAttribute('title'), 'new' => $request['title']];
         }
 
         foreach ([
-            ['people_ids', 'Linked people', 'people', People::class],
-            ['company_ids', 'Linked companies', 'companies', Company::class],
-            ['opportunity_ids', 'Linked opportunities', 'opportunities', Opportunity::class],
+            ['people_ids', __('Linked people'), 'people', People::class],
+            ['company_ids', __('Linked companies'), 'companies', Company::class],
+            ['opportunity_ids', __('Linked opportunities'), 'opportunities', Opportunity::class],
         ] as [$key, $label, $relation, $modelClass]) {
             $ids = $this->idListOrNull($request, $key);
 
