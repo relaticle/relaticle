@@ -26,6 +26,8 @@ final class ToggleFavoriteAction extends Action
     {
         parent::setUp();
 
+        $label = fn (): string => $this->isStarred() ? __('favorites.actions.remove') : __('favorites.actions.add');
+
         $this
             ->button()
             ->hiddenLabel()
@@ -33,8 +35,8 @@ final class ToggleFavoriteAction extends Action
             ->size(Size::Small)
             ->icon('lucide-star')
             ->extraAttributes(fn (): array => $this->isStarred() ? ['class' => '[&_.fi-icon]:fill-warning-400 [&_.fi-icon]:text-warning-500'] : [])
-            ->label(fn (): string => $this->isStarred() ? __('favorites.actions.remove') : __('favorites.actions.add'))
-            ->tooltip(fn (): string => $this->isStarred() ? __('favorites.actions.remove') : __('favorites.actions.add'))
+            ->label($label)
+            ->tooltip($label)
             ->action(function (Component $livewire): void {
                 $user = $this->member();
                 $record = $this->crmRecord();

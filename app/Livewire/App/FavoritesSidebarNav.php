@@ -37,8 +37,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
 
         $removeFavoriteRecord->execute($this->authUser(), $record);
 
-        $this->dispatch('refresh-sidebar');
-        $this->dispatch('favorites-updated');
+        $this->changed();
     }
 
     public function move(string $favoriteId, ?string $folderId, ?string $afterId, ?string $beforeId, MoveFavorite $moveFavorite): void
@@ -47,8 +46,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
 
         $moveFavorite->execute($this->authUser(), $this->ownedFavorites()->findOrFail($favoriteId), $find($folderId), $find($afterId), $find($beforeId));
 
-        $this->dispatch('refresh-sidebar');
-        $this->dispatch('favorites-updated');
+        $this->changed();
     }
 
     public function createFolderAction(): Action
@@ -67,8 +65,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
 
                 $createFavoriteFolder->execute($this->authUser(), $workspace, $data['name']);
 
-                $this->dispatch('refresh-sidebar');
-                $this->dispatch('favorites-updated');
+                $this->changed();
             });
     }
 
@@ -83,8 +80,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
             ->action(function (array $arguments, array $data, RenameFavoriteFolder $renameFavoriteFolder): void {
                 $renameFavoriteFolder->execute($this->authUser(), $this->folderFromArguments($arguments), $data['name']);
 
-                $this->dispatch('refresh-sidebar');
-                $this->dispatch('favorites-updated');
+                $this->changed();
             });
     }
 
@@ -99,9 +95,14 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
             ->action(function (array $arguments, DeleteFavoriteFolder $deleteFavoriteFolder): void {
                 $deleteFavoriteFolder->execute($this->authUser(), $this->folderFromArguments($arguments));
 
-                $this->dispatch('refresh-sidebar');
-                $this->dispatch('favorites-updated');
+                $this->changed();
             });
+    }
+
+    private function changed(): void
+    {
+        $this->dispatch('refresh-sidebar');
+        $this->dispatch('favorites-updated');
     }
 
     /**
