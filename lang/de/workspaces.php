@@ -49,7 +49,7 @@ return [
         ],
         'add_workspace_member' => [
             'title' => 'Mitglieder einladen',
-            'description' => 'Laden Sie Personen per E-Mail ein. Jede Person erhält ihre eigene Einladung.',
+            'description' => 'Laden Sie Menschen per E-Mail ein. Jede eingeladene Person erhält ihre eigene Einladung.',
         ],
         'workspace_members' => [
             'title' => 'Mitglieder',
