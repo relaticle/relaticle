@@ -11,6 +11,7 @@ return [
     'expected_date_format' => 'Format de date invalide. Attendu : :format',
     'expected_number_format' => 'Format de nombre invalide. Attendu : :format',
     'not_a_valid_option' => 'Option invalide',
+    'invalid_choice_list' => 'Choix invalide. Valeurs possibles : :options',
     'invalid_boolean' => 'La valeur doit être vrai ou faux (acceptés : true, false, 1, 0, yes, no).',
     'invalid_date_format' => 'Format de date invalide',
 ];

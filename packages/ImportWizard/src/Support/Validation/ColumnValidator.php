@@ -159,7 +159,7 @@ final class ColumnValidator
         $preview = collect($validValues)->take(5)->implode(', ');
         $suffix = count($validValues) > 5 ? '...' : '';
 
-        return "Invalid choice. Must be one of: {$preview}{$suffix}";
+        return __('import-wizard-new::validation.invalid_choice_list', ['options' => $preview.$suffix]);
     }
 
     /** @return array<int, string> */
