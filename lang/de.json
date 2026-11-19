@@ -19,7 +19,7 @@
     ":count row": ":count Zeile",
     ":count rows": ":count Zeilen",
     ":count row|:count rows": ":count Zeile|:count Zeilen",
-    ":count unique values": ":count eindeutige Werte",
+    ":count unique value|:count unique values": ":count eindeutiger Wert|:count eindeutige Werte",
     ":field to :value": ":field auf :value",
     ":fields changed, last :when, after :assistant proposed this.": ":fields geändert (zuletzt :when), nachdem :assistant dies vorgeschlagen hat.",
     ":from–:to of :total": ":from–:to von :total",

@@ -109,7 +109,7 @@
                         <p class="text-[10px] text-gray-500 dark:text-gray-400">
                             {{ __('Mapped to') }} <span class="font-medium">{{ $selectedColumn->getLabel() }}</span>
                             @if (!$this->isSelectedColumnValidating)
-                                · {{ __(':count unique values', ['count' => Number::format($this->selectedColumnRows->total())]) }}
+                                · {{ trans_choice(':count unique value|:count unique values', $this->selectedColumnRows->total(), ['count' => Number::format($this->selectedColumnRows->total())]) }}
                             @endif
                         </p>
                     </div>

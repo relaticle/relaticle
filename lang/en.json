@@ -19,7 +19,7 @@
     ":count row": ":count row",
     ":count rows": ":count rows",
     ":count row|:count rows": ":count row|:count rows",
-    ":count unique values": ":count unique values",
+    ":count unique value|:count unique values": ":count unique value|:count unique values",
     ":field to :value": ":field to :value",
     ":fields changed, last :when, after :assistant proposed this.": ":fields changed, last :when, after :assistant proposed this.",
     ":from–:to of :total": ":from–:to of :total",
