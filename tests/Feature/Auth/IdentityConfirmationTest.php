@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Auth\CancelIdentityConfirmation;
 use App\Actions\Auth\CompleteIdentityMfa;
+use App\Actions\Auth\VerifyTotpCode;
 use App\Enums\SocialiteProvider;
 use App\Filament\Pages\Security;
 use App\Http\Controllers\Auth\IdentityConfirmationController;
@@ -28,6 +29,7 @@ mutates(
     IdentityConfirmationRedirectController::class,
     CompleteIdentityMfa::class,
     IdentityConfirmation::class,
+    VerifyTotpCode::class,
 );
 
 test('the confirm-identity page renders for a user with a password', function () {
@@ -185,6 +187,23 @@ test('the mfa follow-up completes a pending password confirmation with the corre
 
     expect(session('auth.password_confirmed_at'))->not->toBeNull();
     expect(IdentityConfirmation::mfaPendingFor($user))->toBeFalse();
+});
+
+test('the mfa follow-up refuses an authenticator code already used to sign in', function (): void {
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
+    $secret = Fortify::currentEncrypter()->decrypt($user->two_factor_secret);
+    $google2fa = resolve(Google2FA::class);
+    $code = $google2fa->oathTotp($secret, $google2fa->getTimestamp() + 1);
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+    $this->post(route('two-factor.login.store'), ['code' => $code])->assertSessionHasNoErrors();
+    $this->post(route('password.confirm.store'), ['password' => 'password'])
+        ->assertRedirect(route('identity.confirm.mfa'));
+
+    $this->post(route('identity.confirm.mfa.store'), ['code' => $code])
+        ->assertSessionHasErrors('code');
+
+    expect(IdentityConfirmation::mfaPendingFor($user))->toBeTrue();
 });
 
 test('the mfa follow-up accepts a recovery code for a pending password confirmation', function (): void {

@@ -5,6 +5,11 @@ declare(strict_types=1);
 return [
     'title' => 'Notifications',
 
+    'throttled' => [
+        'title' => 'Too Many Requests',
+        'body' => 'Please wait :seconds seconds before trying again.',
+    ],
+
     'digest' => [
         'heading' => 'Daily digest',
         'title' => 'Enable daily digest',

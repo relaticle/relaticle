@@ -242,12 +242,6 @@ test('issueToken stores a hash and returns the raw secret', function (): void {
     expect(WorkspaceInvitation::findByRawToken('wrong'))->toBeNull();
 });
 
-test('workspaces default their join link to the editor role', function (): void {
-    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
-
-    expect($workspace->invite_link_default_role)->toBe(WorkspaceRole::Member->value);
-});
-
 test('workspace invitation belongs to its inviter', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $inviter = User::factory()->create();

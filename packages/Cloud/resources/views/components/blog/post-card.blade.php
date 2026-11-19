@@ -8,7 +8,7 @@
         <div class="flex flex-wrap items-center gap-x-3 gap-y-1 md:col-span-3 md:flex-col md:items-start">
             @if($post->published_at)
                 <time datetime="{{ $post->published_at->toIso8601String() }}" class="type-label text-gray-500 dark:text-gray-400">
-                    {{ $post->published_at->format('M j, Y') }}
+                    {{ $post->published_at->isoFormat('ll') }}
                 </time>
             @endif
             @if($post->category)

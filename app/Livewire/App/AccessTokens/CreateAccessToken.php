@@ -91,14 +91,14 @@ final class CreateAccessToken extends BaseLivewireComponent
                             ->required()
                             ->placeholder(__('access-tokens.form.expiration_placeholder'))
                             ->options([
-                                '1' => '1 Day',
-                                '7' => '7 Days',
-                                '30' => '30 Days',
-                                '60' => '60 Days',
-                                '90' => '90 Days',
-                                '180' => '180 Days',
-                                '365' => '1 Year',
-                                '0' => 'No Expiration',
+                                '1' => __('access-tokens.expirations.1'),
+                                '7' => __('access-tokens.expirations.7'),
+                                '30' => __('access-tokens.expirations.30'),
+                                '60' => __('access-tokens.expirations.60'),
+                                '90' => __('access-tokens.expirations.90'),
+                                '180' => __('access-tokens.expirations.180'),
+                                '365' => __('access-tokens.expirations.365'),
+                                '0' => __('access-tokens.expirations.0'),
                             ]),
                         self::permissionsCheckboxList(),
                         Actions::make([
@@ -155,7 +155,7 @@ final class CreateAccessToken extends BaseLivewireComponent
         $workspaceId = $state['workspace_id'];
 
         if ($user->allWorkspaces()->doesntContain('id', $workspaceId)) {
-            $this->sendNotification(title: 'You do not belong to this workspace.', type: 'danger');
+            $this->sendNotification(title: __('access-tokens.notifications.workspace_not_member'), type: 'danger');
 
             return;
         }
@@ -190,7 +190,13 @@ final class CreateAccessToken extends BaseLivewireComponent
 
     public static function permissionLabel(string $permission): string
     {
-        return EmailGrant::tryFrom($permission)?->label() ?? ucfirst($permission);
+        return EmailGrant::tryFrom($permission)?->label() ?? match ($permission) {
+            'read' => __('access-tokens.permissions.read'),
+            'create' => __('access-tokens.permissions.create'),
+            'update' => __('access-tokens.permissions.update'),
+            'delete' => __('access-tokens.permissions.delete'),
+            default => ucfirst($permission),
+        };
     }
 
     public static function permissionsCheckboxList(): CheckboxList

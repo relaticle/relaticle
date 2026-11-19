@@ -26,7 +26,7 @@
     <div class="flex items-center gap-1.5 px-2 pt-2.5 pb-1.5">
         <div class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-lg bg-white px-2 shadow-xs ring-1 ring-zinc-950/10 dark:bg-white/5 dark:ring-white/10">
             <x-lucide-search class="w-3.5 h-3.5 shrink-0 text-zinc-500 dark:text-zinc-400"/>
-            <span class="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">Search</span>
+            <span class="min-w-0 flex-1 truncate text-xs text-zinc-500 dark:text-zinc-400">{{ __('Search') }}</span>
             <kbd class="rounded-md bg-zinc-50 px-1 font-sans text-pico font-medium text-zinc-500 ring-1 ring-zinc-950/[0.06] dark:bg-white/10 dark:text-zinc-400 dark:ring-white/10">&#8984;K</kbd>
         </div>
         <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-white text-zinc-500 shadow-xs ring-1 ring-zinc-950/10 dark:bg-white/5 dark:text-zinc-400 dark:ring-white/10">
@@ -39,45 +39,45 @@
     <nav class="flex-1 overflow-hidden px-2 py-1 space-y-px text-sm">
         <div id="hero-shell-nav-home" data-active class="{{ $navRow }}">
             <x-lucide-house class="{{ $navIcon }}"/>
-            <span>Home</span>
+            <span>{{ __('Home') }}</span>
         </div>
         <div class="{{ $navRow }}">
             <x-lucide-user class="{{ $navIcon }}"/>
-            <span>People</span>
+            <span>{{ __('People') }}</span>
         </div>
         <div class="{{ $navRow }}">
             <x-lucide-building class="{{ $navIcon }}"/>
-            <span>Companies</span>
+            <span>{{ __('Companies') }}</span>
         </div>
         <div class="{{ $navRow }}">
             <x-lucide-circle-dollar-sign class="{{ $navIcon }}"/>
-            <span>Opportunities</span>
+            <span>{{ __('Opportunities') }}</span>
         </div>
         <div class="{{ $navRow }}">
             <x-lucide-clipboard-check class="{{ $navIcon }}"/>
-            <span>Tasks</span>
+            <span>{{ __('Tasks') }}</span>
         </div>
         <div class="{{ $navRow }}">
             <x-lucide-file-text class="{{ $navIcon }}"/>
-            <span>Notes</span>
+            <span>{{ __('Notes') }}</span>
         </div>
 
         {{-- Chats group: recent conversations, mirroring chat-sidebar-nav.blade.php. --}}
         <div class="pt-3">
             <div class="flex items-center justify-between px-2 pb-1">
-                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">Chats</span>
+                <span class="text-xs font-medium text-zinc-500 dark:text-zinc-400">{{ __('Chats') }}</span>
                 <x-lucide-chevron-up class="w-3 h-3 text-zinc-400 dark:text-zinc-500"/>
             </div>
 
             <div id="hero-shell-nav-chat" class="{{ $chatRow }}">
                 <x-lucide-message-square class="{{ $chatIcon }}"/>
-                <span class="truncate">Overdue tasks this week</span>
+                <span class="truncate">{{ __('Overdue tasks this week') }}</span>
             </div>
 
             @foreach ([
-                "This week's pipeline review",
-                'Follow up with Priya Nair',
-                'Renewal prep: Daniel Okafor',
+                __("This week's pipeline review"),
+                __('Follow up with :person', ['person' => 'Priya Nair']),
+                __('Renewal prep: :person', ['person' => 'Daniel Okafor']),
             ] as $heroChatTitle)
                 <div class="{{ $chatRow }}">
                     <x-lucide-message-square class="{{ $chatIcon }}"/>
@@ -87,7 +87,7 @@
 
             <div class="{{ $chatRow }}">
                 <x-lucide-ellipsis class="{{ $chatIcon }}"/>
-                <span>All chats</span>
+                <span>{{ __('All chats') }}</span>
             </div>
         </div>
     </nav>

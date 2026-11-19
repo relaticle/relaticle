@@ -1,0 +1,8 @@
+title: Planifier l'entretien technique avec Sarah
+assigned_people:
+  - sarah
+custom_fields:
+  description: Coordonnez-vous avec l'équipe d'ingénierie de Stripe pour organiser l'entretien technique de Sarah Chen. Prévoyez un tour de conception de systèmes et une session de code en direct.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

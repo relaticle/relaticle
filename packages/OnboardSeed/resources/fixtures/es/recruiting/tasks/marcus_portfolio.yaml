@@ -1,0 +1,8 @@
+title: 'Revisar el portafolio de Marcus'
+assigned_people:
+  - marcus
+custom_fields:
+  description: 'Revisar el portafolio de diseño y los casos de estudio de Marcus Rivera. Evaluar su visión de producto y sus habilidades de diseño visual frente a los estándares del equipo de diseño de Linear.'
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium

@@ -17,11 +17,11 @@ enum EmailFolder: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::All => 'All',
-            self::Inbox => 'Inbox',
-            self::Sent => 'Sent',
-            self::Drafts => 'Drafts',
-            self::Archive => 'Archive',
+            self::All => __('enums/email-folder.all'),
+            self::Inbox => __('enums/email-folder.inbox'),
+            self::Sent => __('enums/email-folder.sent'),
+            self::Drafts => __('enums/email-folder.drafts'),
+            self::Archive => __('enums/email-folder.archive'),
         };
     }
 }

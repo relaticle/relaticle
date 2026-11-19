@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Docs\Http\Controllers;
 
+use App\Support\Locales;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
@@ -13,6 +14,7 @@ use Relaticle\Cloud\Docs\Support\DocsNavigation;
 use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Cloud\Marketing\Support\CompetitorFacts;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\BuildSearchIndex;
 use Relaticle\Documentation\Support\DocCategory;
 use Relaticle\Documentation\Support\DocPage;
@@ -95,7 +97,7 @@ final readonly class HelpController
      */
     public function llmsTxt(): Response
     {
-        return response($this->llmsTxtBody(), 200, [
+        return response(Locales::within(LocalizedUrl::DEFAULT_LOCALE, fn (): string => $this->llmsTxtBody()), 200, [
             'Content-Type' => 'text/plain; charset=UTF-8',
         ]);
     }
@@ -121,7 +123,7 @@ final readonly class HelpController
         $lines = [
             '# '.config('app.name'),
             '',
-            '> '.__('Open-source, self-hosted CRM with a built-in AI chat and an MCP server for external AI agents.'),
+            '> '.__('Open-source, self-hosted CRM with Rela, the built-in AI assistant, and an MCP server for external AI agents.'),
         ];
 
         array_push($lines, '', '## '.__('When to use Relaticle'), '', ...$this->llmsTxtWhenToUseEntries());
@@ -249,6 +251,7 @@ final readonly class HelpController
 
         $posts = Post::query()
             ->published()
+            ->inLocale(LocalizedUrl::DEFAULT_LOCALE)
             ->latest('published_at')
             ->limit(self::LLMS_TXT_BLOG_LIMIT)
             ->toBase()
@@ -299,10 +302,9 @@ final readonly class HelpController
             );
         }
 
-        /** @var array{title: string, url: string, description: string} $apiReference */
-        $apiReference = config('documentation.api_reference');
+        $apiReference = $this->navigation->apiReference();
 
-        $entries[] = sprintf('- [%s](%s): %s', $apiReference['title'], url($apiReference['url']), $apiReference['description']);
+        $entries[] = sprintf('- [%s](%s): %s', $apiReference['title'], $apiReference['url'], $apiReference['description']);
         $entries[] = sprintf('- [%s](%s): %s', __('OpenAPI Specification'), route('openapi.json'), __('Machine-readable OpenAPI 3.1 spec for the REST API, also available as YAML at /openapi.yaml.'));
         $entries[] = sprintf('- [%s](%s): %s', __('MCP Endpoint'), url()->getMcpUrl(), __('Streamable HTTP MCP server with OAuth; connect it from Claude, ChatGPT, or any MCP client.'));
 

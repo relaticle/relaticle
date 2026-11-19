@@ -75,7 +75,7 @@ final class UploadStep extends Component implements HasForms
 
     public function render(): View
     {
-        return view('import-wizard-new::livewire.steps.upload-step');
+        return view('import-wizard-new::livewire.steps.upload-step', ['maxRows' => resolve(ImportFileLoader::class)->maxRows()]);
     }
 
     public function updatedUploadedFile(): void
@@ -103,14 +103,14 @@ final class UploadStep extends Component implements HasForms
             $this->addError('uploadedFile', $e->getMessage());
         } catch (Exception $e) {
             report($e);
-            $this->addError('uploadedFile', 'Unable to process this file. Please check the format and try again.');
+            $this->addError('uploadedFile', __('Unable to process this file. Please check the format and try again.'));
         }
     }
 
     public function continueToMapping(): void
     {
         if (! $this->isParsed || ! $this->uploadedFile instanceof TemporaryUploadedFile) {
-            $this->addError('uploadedFile', 'File no longer available. Please re-upload.');
+            $this->addError('uploadedFile', __('File no longer available. Please re-upload.'));
             $this->reset(['headers', 'rowCount', 'isParsed']);
 
             return;
@@ -119,7 +119,7 @@ final class UploadStep extends Component implements HasForms
         $workspaceId = $this->getCurrentWorkspaceId();
 
         if (blank($workspaceId)) {
-            $this->addError('uploadedFile', 'Unable to determine your workspace. Please refresh and try again.');
+            $this->addError('uploadedFile', __('Unable to determine your workspace. Please refresh and try again.'));
 
             return;
         }
@@ -142,7 +142,7 @@ final class UploadStep extends Component implements HasForms
             $this->reset(['headers', 'rowCount', 'isParsed']);
         } catch (Exception $e) {
             report($e);
-            $this->addError('uploadedFile', 'Unable to process this file. Please try again or use a different file.');
+            $this->addError('uploadedFile', __('Unable to process this file. Please try again or use a different file.'));
         }
     }
 

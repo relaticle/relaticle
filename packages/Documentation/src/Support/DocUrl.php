@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Documentation\Support;
 
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Str;
 
 /**
@@ -66,7 +67,14 @@ final readonly class DocUrl
 
     public static function area(string $area): string
     {
-        return self::root().($area === self::HELP ? '/help' : '/developers');
+        return self::root().self::localePrefix().($area === self::HELP ? '/help' : '/developers');
+    }
+
+    public static function localePrefix(): string
+    {
+        $locale = app()->getLocale();
+
+        return Route::has("{$locale}.help.index") ? "/{$locale}" : '';
     }
 
     public static function areaTitle(string $area): string

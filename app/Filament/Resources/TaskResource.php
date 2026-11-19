@@ -107,7 +107,11 @@ final class TaskResource extends Resource
                     ->icon('lucide-upload')
                     ->url(ImportTasks::getUrl())
                     ->visible(ImportTasks::canAccess(...)),
-                ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
+                ExportAction::make()
+                    ->label(__('filament/resources/task.pages.list.actions.export.label'))
+                    ->modalHeading(__('filament/resources/task.pages.list.actions.export.heading'))
+                    ->exporter(TaskExporter::class)
+                    ->authorize('exportAny', Task::class),
             ])->label(__('filament/resources/task.pages.list.actions.import_export.label')),
             CreateTaskAction::make()
                 ->icon('lucide-plus')
@@ -160,6 +164,7 @@ final class TaskResource extends Resource
     {
         return [
             TextColumn::make('title')
+                ->label(__('filament/resources/task.fields.title.label'))
                 ->limit(50)
                 ->weight('medium'),
             LinkedRecordsColumn::make('relations')
@@ -175,15 +180,18 @@ final class TaskResource extends Resource
                 ->visibleFrom('sm')
                 ->getStateUsing(fn (Task $record): string => $record->createdBy),
             TextColumn::make('created_at')
+                ->label(__('filament/resources/task.fields.created_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->visibleFrom('sm')
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('updated_at')
+                ->label(__('filament/resources/task.fields.updated_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('deleted_at')
+                ->label(__('filament/resources/task.fields.deleted_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->toggleable()

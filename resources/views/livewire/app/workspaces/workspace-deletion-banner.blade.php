@@ -4,7 +4,7 @@
             <x-filament::icon icon="lucide-trash" class="size-4 shrink-0 text-danger-500 dark:text-danger-400" />
 
             <p class="text-xs font-medium text-danger-800 dark:text-danger-300">
-                {{ __('workspaces.deletion_banner.message', ['date' => $workspace->scheduled_deletion_at->format('F j, Y')]) }}
+                {{ __('workspaces.deletion_banner.message', ['date' => $workspace->scheduled_deletion_at->isoFormat('LL')]) }}
             </p>
         </div>
 

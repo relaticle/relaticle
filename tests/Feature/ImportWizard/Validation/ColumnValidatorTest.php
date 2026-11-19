@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\Locales;
 use Relaticle\CustomFields\Enums\FieldDataType;
 use Relaticle\ImportWizard\Data\ColumnData;
 use Relaticle\ImportWizard\Data\ImportField;
@@ -175,6 +176,20 @@ it('rejects invalid option in single-choice predefined field', function (): void
     expect($error)
         ->toBeInstanceOf(ValidationError::class)
         ->getMessage()->toContain('Invalid choice');
+});
+
+it('lists the valid choices in the user language', function (): void {
+    $column = makeColumnData(
+        FieldDataType::SINGLE_CHOICE,
+        options: [
+            ['label' => 'Active', 'value' => 'active'],
+            ['label' => 'Inactive', 'value' => 'inactive'],
+        ],
+    );
+
+    $error = Locales::within('de', fn (): ?ValidationError => (new ColumnValidator)->validate($column, 'unknown'));
+
+    expect($error->getMessage())->toBe('Ungültige Auswahl. Erlaubt sind: active, inactive');
 });
 
 // ─── Date Validation ────────────────────────────────────────────────────────

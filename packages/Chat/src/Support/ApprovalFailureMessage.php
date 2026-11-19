@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use Illuminate\Validation\ValidationException;
+use Relaticle\Chat\Exceptions\ProposalNotResolvable;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
@@ -22,6 +23,11 @@ final readonly class ApprovalFailureMessage
         }
 
         return $exception->getMessage();
+    }
+
+    public static function shown(Throwable $exception): string
+    {
+        return $exception instanceof ProposalNotResolvable ? $exception->userMessage : self::for($exception);
     }
 
     public static function forDelivery(): string

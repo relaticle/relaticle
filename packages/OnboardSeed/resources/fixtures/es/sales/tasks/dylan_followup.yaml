@@ -1,0 +1,9 @@
+title: 'Dar seguimiento a Dylan'
+# Add people assignment directly in the YAML
+assigned_people:
+  - dylan
+custom_fields:
+  description: 'Tratar la propuesta del plan empresarial de Figma y resolver las preguntas que pueda tener.'
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

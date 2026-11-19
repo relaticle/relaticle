@@ -422,3 +422,15 @@ it('queues no logo fetch when no logo service is configured', function (): void 
 
     Bus::assertNotDispatched(FetchFaviconForCompany::class);
 });
+
+it('resets a demo account whose language was changed', function (): void {
+    $this->artisan('demo:reset', ['--password' => 'established-secret'])->assertSuccessful();
+    User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail()->forceFill(['locale' => 'de'])->save();
+
+    $this->artisan('demo:reset')->assertSuccessful();
+
+    $reviewer = User::query()->where('email', ResetDemoAccountCommand::EMAIL)->firstOrFail();
+
+    expect($reviewer->locale)->toBeNull()
+        ->and(Company::query()->where('workspace_id', $reviewer->personalWorkspace()->getKey())->where('name', 'Notion')->exists())->toBeTrue();
+});

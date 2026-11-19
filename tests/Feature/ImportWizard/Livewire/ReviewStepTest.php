@@ -6,6 +6,7 @@ use App\Events\WorkspaceCreated;
 use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
@@ -675,3 +676,31 @@ describe('on a remote store disk', function (): void {
         expect(fn () => $component->call('skipValue', 'John'))->toThrow(ImportStoreException::class);
     });
 });
+
+it('counts the unique values of a column with the right plural in each language', function (string $locale, int $rows, string $expected): void {
+    $this->store->query()->where('row_number', '>', $rows + 1)->delete();
+    Locales::apply($locale);
+
+    mountReviewStep($this)->set('batchIds', [])->assertSee($expected);
+})->with([
+    'de one' => ['de', 1, '1 eindeutiger Wert'],
+    'de many' => ['de', 2, '2 eindeutige Werte'],
+    'es one' => ['es', 1, '1 valor único'],
+    'es many' => ['es', 2, '2 valores únicos'],
+    'fr one' => ['fr', 1, '1 valeur unique'],
+    'fr many' => ['fr', 2, '2 valeurs uniques'],
+    'en one' => ['en', 1, '1 unique value'],
+    'en many' => ['en', 2, '2 unique values'],
+]);
+
+it('names the column in a format error instead of the word value', function (string $locale): void {
+    Locales::apply($locale);
+    $component = mountReviewStep($this);
+    $component->call('selectColumn', 'Emails');
+    $label = $component->get('selectedColumn')->getLabel();
+
+    $component
+        ->call('updateMappedValue', 'john@test.com', 'valid@test.com, not-an-email')
+        ->assertReturned(fn (array $errors): bool => str_contains(mb_strtolower($errors['not-an-email']), mb_strtolower($label))
+            && ! str_contains($errors['not-an-email'], 'alue'));
+})->with(['en', 'de', 'es', 'fr']);

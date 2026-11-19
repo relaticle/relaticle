@@ -76,6 +76,19 @@ it('names the operator instead of a provider table where hosted billing is off',
         ->assertDontSee('Laravel Forge');
 });
 
+it('joins the AI provider names with the conjunction of the page language', function (): void {
+    withHostedBilling();
+    config()->set('chat.models', [
+        ChatCatalog::entry(),
+        ChatCatalog::entry(['label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash']),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+
+    foreach (['de' => 'Anthropic oder Google', 'es' => 'Anthropic o Google', 'fr' => 'Anthropic ou Google'] as $locale => $joined) {
+        expect(securityPageText($this->get("/{$locale}/security")->assertOk()->getContent()))->toContain($joined);
+    }
+});
+
 it('names the AI providers of the models the product offers', function (): void {
     withHostedBilling();
     config()->set('chat.models', [

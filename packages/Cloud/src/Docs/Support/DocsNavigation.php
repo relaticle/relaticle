@@ -62,8 +62,7 @@ final readonly class DocsNavigation
             return [];
         }
 
-        /** @var array{title: string, url: string, description: string} $apiReference */
-        $apiReference = config('documentation.api_reference');
+        $apiReference = $this->apiReference();
 
         return [[
             'title' => __('Developer guides'),
@@ -77,11 +76,21 @@ final readonly class DocsNavigation
                 [
                     'title' => $apiReference['title'],
                     'description' => $apiReference['description'],
-                    'url' => url($apiReference['url']),
+                    'url' => $apiReference['url'],
                     'path' => null,
                 ],
             ],
         ]];
+    }
+
+    /** @return array{title: string, url: string, description: string} */
+    public function apiReference(): array
+    {
+        return [
+            'title' => __('API Reference'),
+            'url' => url()->to(config()->string('documentation.api_reference.url')),
+            'description' => __('REST API documentation for managing CRM entities.'),
+        ];
     }
 
     /** @return list<NavLink> */

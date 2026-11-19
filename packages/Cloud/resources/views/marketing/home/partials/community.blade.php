@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $stats = array_values(array_filter([
         $githubStars > 0 ? [__(':count+', ['count' => $formattedGithubStars]), __('GitHub stars'), 'https://github.com/relaticle/relaticle'] : null,
@@ -8,11 +9,11 @@
     $links = [
         ['https://github.com/relaticle/relaticle', 'ri-github-fill', 'text-gray-900 dark:text-white', __('GitHub'), __('Star the repo, report issues, and read every line of code.'), true],
         [route('discord'), 'ri-discord-fill', 'text-[#5865F2]', __('Discord'), __('Talk with the team and other builders, and share ideas.'), true],
-        [route('selfHosted'), 'lucide-server', 'text-gray-900 dark:text-white', __('Self-host'), __('Deploy with Docker Compose on your own server. Your CRM database stays there.'), false],
+        [LocalizedUrl::route('selfHosted'), 'lucide-server', 'text-gray-900 dark:text-white', __('Self-host'), __('Deploy with Docker Compose on your own server. Your CRM database stays there.'), false],
     ];
 
     if (\Laravel\Pennant\Feature::active(\App\Features\Documentation::class)) {
-        $links[] = [route('documentation.index'), 'lucide-book-open', 'text-primary dark:text-primary-400', __('Developer docs'), __('Self-host with Docker, use the REST API, and connect agents over MCP.'), false];
+        $links[] = [LocalizedUrl::route('documentation.index'), 'lucide-book-open', 'text-primary dark:text-primary-400', __('Developer docs'), __('Self-host with Docker, use the REST API, and connect agents over MCP.'), false];
     }
 @endphp
 

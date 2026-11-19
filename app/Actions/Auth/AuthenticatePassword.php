@@ -21,7 +21,7 @@ final readonly class AuthenticatePassword
 {
     public function __construct(private BeginAuthentication $beginAuthentication) {}
 
-    public function execute(string $email, #[SensitiveParameter] string $password, bool $remember): string
+    public function execute(string $email, #[SensitiveParameter] string $password): string
     {
         $provider = $this->provider();
         $credentials = [
@@ -30,8 +30,8 @@ final readonly class AuthenticatePassword
         ];
         $guardName = (string) config('fortify.guard', 'web');
 
-        $user = resolve(Timebox::class)->call(function (Timebox $timebox) use ($provider, $credentials, $guardName, $remember): User {
-            event(new Attempting($guardName, $credentials, $remember));
+        $user = resolve(Timebox::class)->call(function (Timebox $timebox) use ($provider, $credentials, $guardName): User {
+            event(new Attempting($guardName, $credentials, false));
 
             $user = $provider->retrieveByCredentials($credentials);
 
@@ -56,7 +56,7 @@ final readonly class AuthenticatePassword
             $provider->rehashPasswordIfRequired($user, $credentials);
         }
 
-        return $this->beginAuthentication->execute($user, AuthMethod::PASSWORD, null, $remember);
+        return $this->beginAuthentication->execute($user, AuthMethod::PASSWORD, null);
     }
 
     private function provider(): UserProvider

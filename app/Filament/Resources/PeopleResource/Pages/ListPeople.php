@@ -36,7 +36,11 @@ final class ListPeople extends ListRecords
                     ->icon('lucide-upload')
                     ->url(ImportPeople::getUrl())
                     ->visible(ImportPeople::canAccess(...)),
-                ExportAction::make()->exporter(PeopleExporter::class)->authorize('exportAny', People::class),
+                ExportAction::make()
+                    ->label(__('filament/resources/person.pages.list.actions.export.label'))
+                    ->modalHeading(__('filament/resources/person.pages.list.actions.export.heading'))
+                    ->exporter(PeopleExporter::class)
+                    ->authorize('exportAny', People::class),
             ])->label(__('filament/resources/person.pages.list.actions.import_export.label')),
             CreateAction::make()->icon('lucide-plus')->size(Size::Small),
         ];

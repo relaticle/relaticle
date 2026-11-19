@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Enums\CustomFields;
 
+use App\Onboarding\OptionLabels;
 use Illuminate\Support\Str;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
 
@@ -23,6 +24,24 @@ trait CustomFieldTrait
     public function getDisplayName(): string
     {
         return Str::title($this->name);
+    }
+
+    /**
+     * Option lang keys in sort order, each with its colour. The key is the stable identity of an option.
+     *
+     * @return array<string, string>|null
+     */
+    public function optionKeyColors(): ?array
+    {
+        return null;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function optionLabelsFor(string $english): array
+    {
+        return OptionLabels::inEveryLocale(array_keys($this->optionKeyColors() ?? []), $english);
     }
 
     /**
@@ -73,7 +92,9 @@ trait CustomFieldTrait
      */
     public function getOptions(): ?array
     {
-        return null;
+        $keys = $this->optionKeyColors();
+
+        return $keys === null ? null : array_map(fn (string $key): string => __($key), array_keys($keys));
     }
 
     /**
@@ -93,7 +114,19 @@ trait CustomFieldTrait
      */
     public function getOptionColors(): ?array
     {
-        return null;
+        $keys = $this->optionKeyColors();
+
+        if ($keys === null) {
+            return null;
+        }
+
+        $colors = [];
+
+        foreach ($keys as $key => $color) {
+            $colors[__($key)] = $color;
+        }
+
+        return $colors;
     }
 
     /**

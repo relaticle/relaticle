@@ -115,6 +115,7 @@ final class CompanyResource extends Resource
                 ->visibleFrom('sm')
                 ->getStateUsing(fn (Company $record): string => $record->created_by),
             TextColumn::make('deleted_at')
+                ->label(__('filament/resources/company.fields.deleted_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->toggleable()

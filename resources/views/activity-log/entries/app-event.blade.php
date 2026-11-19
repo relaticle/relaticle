@@ -4,7 +4,7 @@
     $title = $entry->title ?? $fallbackTitle;
     $description = $entry->description
         ?? ($causerName
-            ? sprintf('%s %s', $causerName, Str::lower($fallbackTitle))
+            ? sprintf('%s %s', $causerName, $palette->inlineLabel())
             : $fallbackTitle);
     $badge = $palette->badge();
 @endphp
@@ -44,7 +44,7 @@
         <time
             class="text-[11px] text-gray-500 dark:text-gray-400 tabular-nums"
             datetime="{{ $entry->occurredAt->toIso8601String() }}"
-            title="{{ $entry->occurredAt->toDayDateTimeString() }}"
+            title="{{ $entry->occurredAt->isoFormat('lll') }}"
         >
             {{ $entry->occurredAt->diffForHumans(syntax: null, short: true) }}
         </time>

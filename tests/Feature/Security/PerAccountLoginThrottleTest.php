@@ -8,7 +8,6 @@ use App\Filament\Pages\Auth\ResetPassword;
 use App\Listeners\Auth\PasswordGuessLimitListener;
 use App\Models\User;
 use App\Models\UserSocialAccount;
-use Filament\Auth\Pages\Login as SysadminLogin;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Password;
@@ -17,6 +16,7 @@ use Laravel\Passkeys\Passkey;
 use Laravel\Socialite\Facades\Socialite;
 use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Features\SupportTesting\Testable;
+use Relaticle\SystemAdmin\Filament\Pages\Auth\Login as SysadminLogin;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 use Tests\Helpers\PasskeyAssertionFixture;
 

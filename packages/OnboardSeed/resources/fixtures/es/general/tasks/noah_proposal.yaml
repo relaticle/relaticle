@@ -1,0 +1,8 @@
+title: 'Enviar la propuesta del proyecto a Noah'
+assigned_people:
+  - noah
+custom_fields:
+  description: 'Preparar y enviar a Noah, para su revisión, la propuesta de rediseño de marca con alcance, cronograma y precios.'
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: Medium

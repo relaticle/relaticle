@@ -6,6 +6,7 @@ use App\Enums\WorkspaceRole;
 use App\Livewire\App\AccessTokens\CreateAccessToken;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Locales;
 use Filament\Forms\Components\CheckboxList;
 use Illuminate\Support\Str;
 use Laravel\Jetstream\Features;
@@ -208,4 +209,13 @@ test('a token not pinned to a workspace is offered no email ability', function (
         ->fillForm(['workspace_id' => null])
         ->assertFormFieldExists('permissions', fn (CheckboxList $field): bool => $field->getOptions() !== []
             && array_filter(array_keys($field->getOptions()), fn (int|string $key): bool => str_starts_with((string) $key, 'email:')) === []);
+})->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');
+
+test('the token permission labels follow the user language', function () {
+    $this->actingAs(User::factory()->withWorkspace()->create());
+    Locales::apply('de');
+
+    livewire(CreateAccessToken::class)
+        ->fillForm(['workspace_id' => null])
+        ->assertFormFieldExists('permissions', fn (CheckboxList $field): bool => collect($field->getOptions())->only(['read', 'create', 'update', 'delete'])->sortKeys()->all() === ['create' => 'Erstellen', 'delete' => 'Löschen', 'read' => 'Lesen', 'update' => 'Aktualisieren']);
 })->skip(fn () => ! Features::hasApiFeatures(), 'API support is not enabled.');

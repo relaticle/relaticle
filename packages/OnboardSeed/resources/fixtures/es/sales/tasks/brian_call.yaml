@@ -1,0 +1,8 @@
+title: 'Llamada de descubrimiento con Brian'
+assigned_people:
+  - brian
+custom_fields:
+  description: 'Programar una llamada para tratar posibles oportunidades de alianza con Airbnb.'
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: High

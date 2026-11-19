@@ -34,6 +34,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
+use App\Support\Locales;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Events\QueryExecuted;
@@ -962,6 +963,28 @@ it('does not walk a close date back a day for a viewer west of utc', function ()
 
     livewire(OpportunitiesBoard::class)
         ->assertSee('Closes Today')
+        ->assertDontSee('Overdue');
+});
+
+it('words the close-date badge in the language of the user', function (): void {
+    $this->travelTo(Date::parse('2026-11-18 12:00:00', 'UTC'));
+
+    $this->user->forceFill(['locale' => 'de', 'timezone' => 'UTC'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    $closeField = CustomField::query()
+        ->forEntity(Opportunity::class)
+        ->where('code', OpportunityField::CLOSE_DATE)
+        ->first();
+
+    $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create();
+    $opportunity->saveCustomFieldValue($this->stageField, $this->stageField->options->firstWhere('name', 'Prospecting')->getKey());
+    $opportunity->saveCustomFieldValue($closeField, Date::parse('2026-11-17 00:00:00', 'UTC'));
+
+    Locales::apply('de');
+
+    livewire(OpportunitiesBoard::class)
+        ->assertSee('17. Nov (überfällig)')
         ->assertDontSee('Overdue');
 });
 

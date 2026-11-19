@@ -149,15 +149,18 @@ final class PeopleResource extends Resource
                 ->visibleFrom('sm')
                 ->getStateUsing(fn (People $record): string => $record->created_by),
             TextColumn::make('created_at')
+                ->label(__('filament/resources/person.fields.created_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->visibleFrom('sm')
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('updated_at')
+                ->label(__('filament/resources/person.fields.updated_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->toggleable(isToggledHiddenByDefault: true),
             TextColumn::make('deleted_at')
+                ->label(__('filament/resources/person.fields.deleted_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->toggleable()

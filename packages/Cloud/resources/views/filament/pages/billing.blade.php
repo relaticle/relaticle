@@ -1,3 +1,6 @@
+@use(Illuminate\Support\Number)
+@use(Relaticle\Cloud\Marketing\Enums\ContactInquiry)
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-filament-panels::page>
     @php
         $purchased = (int) ($balance?->purchased_credits ?? 0);
@@ -87,12 +90,12 @@
                                     {{ __('cloud::billing.trial.active_title') }} ({{ trans_choice('cloud::billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }})
                                 @elseif($onGrace)
                                     {{ $isGrandfathered
-                                        ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])
-                                        : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()]) }}
+                                        ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])
+                                        : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')]) }}
                                 @elseif($pastDue)
                                     {{ __('cloud::billing.manage.past_due_tagline') }}
                                 @elseif($onStripeTrial)
-                                    {{ __('cloud::billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->toFormattedDateString()]) }}
+                                    {{ __('cloud::billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->isoFormat('ll')]) }}
                                 @elseif($isSubscribed)
                                     {{ __('cloud::billing.manage.auto_renews') }}
                                 @elseif($onLegacyFree)
@@ -112,8 +115,8 @@
                     </div>
 
                     <div class="mt-2.5 flex items-baseline gap-1.5">
-                        <span class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ number_format($monthlyUsed) }}</span>
-                        <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ number_format($allowance) }}</span>
+                        <span class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ Number::format($monthlyUsed) }}</span>
+                        <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ Number::format($allowance) }}</span>
                     </div>
 
                     <div role="progressbar" aria-label="{{ __('cloud::billing.usage.title') }}" aria-valuenow="{{ $usedPercent }}" aria-valuemin="0" aria-valuemax="100" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
@@ -121,27 +124,27 @@
                     </div>
 
                     @if($balance)
-                        <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ __('cloud::billing.usage.available', ['credits' => number_format($remaining)]) }}</p>
+                        <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ __('cloud::billing.usage.available', ['credits' => Number::format($remaining)]) }}</p>
                         @if($used > $allowance)
-                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.total_used', ['credits' => number_format($used)]) }}</p>
+                            <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.total_used', ['credits' => Number::format($used)]) }}</p>
                         @endif
                     @else
                         <p class="mt-3 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.empty') }}</p>
                     @endif
 
                     @if($balance?->period_ends_at)
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.resets', ['date' => $balance->period_ends_at->isoFormat('ll')]) }}</p>
                     @endif
 
                     @if($purchased > 0)
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.packs.balance_split', ['purchased' => number_format($purchased)]) }}</p>
+                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.packs.balance_split', ['purchased' => Number::format($purchased)]) }}</p>
                     @endif
 
                     @if($canManageBilling && $availablePacks !== [])
                         <div class="mt-4 flex flex-wrap gap-2">
                             @foreach($availablePacks as $key => $pack)
                                 <x-filament::button size="xs" color="gray" wire:click="buyCredits('{{ $key }}')">
-                                    {{ __('cloud::billing.packs.buy', ['credits' => number_format($pack['credits'])]) }}
+                                    {{ __('cloud::billing.packs.buy', ['credits' => Number::format($pack['credits'])]) }}
                                 </x-filament::button>
                             @endforeach
                         </div>
@@ -190,10 +193,10 @@
                         <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('cloud::billing.manage.cancel_scheduled_title') }}</h3>
                         <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">
                             {{ $isManaged
-                                ? __('cloud::billing.managed.previous_subscription_canceling', ['date' => $subscription?->ends_at?->toFormattedDateString()])
+                                ? __('cloud::billing.managed.previous_subscription_canceling', ['date' => $subscription?->ends_at?->isoFormat('ll')])
                                 : ($isGrandfathered
-                                ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])
-                                : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])) }}
+                                ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])
+                                : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])) }}
                         </p>
                     </div>
                 </div>
@@ -215,7 +218,7 @@
                     <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ $renewalLabel }}</p>
                 @endif
                 <div class="mt-5 flex flex-wrap gap-3">
-                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', absolute: false))">{{ __('cloud::billing.enterprise.manage') }}</x-filament::button>
+                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(LocalizedUrl::route('contact', absolute: false))">{{ __('cloud::billing.enterprise.manage') }}</x-filament::button>
                     @if($managedSubscription || ($canManageSubscription && ! $pastDue))
                         <x-filament::button color="gray" wire:click="managePortal">{{ __('cloud::billing.manage.button') }}</x-filament::button>
                     @endif
@@ -285,8 +288,8 @@
                                 <span x-show="yearly" class="ms-1 rounded-full bg-primary/[0.1] px-1.5 py-0.5 text-[11px] font-semibold leading-none text-primary-700 dark:bg-primary/[0.25] dark:text-primary-300">{{ __('cloud::billing.yearly_save', ['percent' => $plan->yearlySavingPercent()]) }}</span>
                             </div>
                             <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400"
-                                x-text="yearly ? @js(__('cloud::billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())])) : @js(__('cloud::billing.billed_monthly'))">
-                                {{ __('cloud::billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())]) }}
+                                x-text="yearly ? @js(__('cloud::billing.billed_yearly', ['price' => Number::format($plan->yearlyPrice())])) : @js(__('cloud::billing.billed_monthly'))">
+                                {{ __('cloud::billing.billed_yearly', ['price' => Number::format($plan->yearlyPrice())]) }}
                             </p>
 
                             <div class="mt-5 h-px w-full bg-gray-100 dark:bg-white/[0.06]"></div>
@@ -325,9 +328,9 @@
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.enterprise') }}</h3>
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.starting_price', ['price' => number_format(config('relaticle.enterprise.starting_price_yearly'))]) }}</p>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ ContactInquiry::Enterprise->price() }}</p>
                     </div>
-                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(route('contact', ['plan' => 'enterprise'], absolute: false))">{{ __('cloud::billing.enterprise.contact') }}</x-filament::button>
+                    <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(LocalizedUrl::route('contact', ['plan' => 'enterprise'], absolute: false))">{{ __('cloud::billing.enterprise.contact') }}</x-filament::button>
                 </div>
                 <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.tagline') }} {{ __('cloud::billing.enterprise.terms') }}</p>
             </section>

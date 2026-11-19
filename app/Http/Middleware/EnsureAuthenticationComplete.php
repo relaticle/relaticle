@@ -15,7 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Enforces enrolled MFA for every session-authenticated application user, including
- * one restored from a remember-me cookie that never proved the second factor.
+ * one whose session never proved the second factor.
  */
 final readonly class EnsureAuthenticationComplete
 {
@@ -74,9 +74,9 @@ final readonly class EnsureAuthenticationComplete
             session()->put('url.intended', $request->fullUrl());
         }
 
-        $remembered = AuthenticationSession::suspendRemembered();
+        Auth::guard('web')->logoutCurrentDevice();
 
-        $challenge = $this->beginAuthentication->execute($user, AuthMethod::REMEMBERED, null, $remembered);
+        $challenge = $this->beginAuthentication->execute($user, AuthMethod::REMEMBERED, null);
 
         return redirect()->to($challenge);
     }

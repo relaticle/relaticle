@@ -104,10 +104,10 @@ enum Plan: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Free => 'Free',
-            self::Pro => 'Pro',
-            self::Scale => 'Scale',
-            self::Enterprise => 'Enterprise',
+            self::Free => __('enums/plan.free'),
+            self::Pro => __('enums/plan.pro'),
+            self::Scale => __('enums/plan.scale'),
+            self::Enterprise => __('enums/plan.enterprise'),
         };
     }
 

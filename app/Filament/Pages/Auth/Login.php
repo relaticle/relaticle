@@ -168,7 +168,6 @@ final class Login extends \Filament\Auth\Pages\Login
             $next = resolve(AuthenticatePassword::class)->execute(
                 (string) $data['email'],
                 (string) $data['password'],
-                (bool) ($data['remember'] ?? false),
             );
         } catch (ValidationException $exception) {
             throw ValidationException::withMessages([
@@ -244,7 +243,7 @@ final class Login extends \Filament\Auth\Pages\Login
             $user->sendEmailVerificationNotification();
         }
 
-        Filament::auth()->login($user, remember: true);
+        Filament::auth()->login($user);
 
         session()->regenerate();
 
@@ -535,18 +534,11 @@ final class Login extends \Filament\Auth\Pages\Login
             ->visible(fn (): bool => in_array($this->authMethod, ['password', 'signup'], true));
     }
 
-    protected function getRememberFormComponent(): Hidden
-    {
-        return Hidden::make('remember')
-            ->default(true);
-    }
-
     public function form(Schema $schema): Schema
     {
-        $schema = parent::form($schema);
-
         return $schema->components([
-            ...$schema->getComponents(withHidden: true),
+            $this->getEmailFormComponent(),
+            $this->getPasswordFormComponent(),
             Hidden::make('cf_turnstile_expanded')
                 ->default(false)
                 ->dehydrated(false),

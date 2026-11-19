@@ -46,7 +46,7 @@ final class UpdateEmailDraftTool extends BaseEmailDraftTool
     {
         return [
             ...parent::buildRecordDisplay($record),
-            'summary' => $this->emailSummary('Update email draft', $record),
+            'summary' => $this->emailSummary('update', $record),
         ];
     }
 }

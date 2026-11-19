@@ -31,7 +31,7 @@ final class UserDeletionReminderNotification extends Notification implements Sho
     public function toMail(object $notifiable): MailMessage
     {
         $days = (int) config('relaticle.deletion.reminder_days_before');
-        $date = $this->user->scheduled_deletion_at?->copy()->setTimezone($this->user->effectiveTimezone())->format('M j, Y') ?? '';
+        $date = $this->user->scheduled_deletion_at?->copy()->setTimezone($this->user->effectiveTimezone())->settings(['locale' => app()->getLocale()])->isoFormat('ll') ?? '';
 
         return (new MailMessage)
             ->subject(trans_choice('mail.account_deletion_reminder.subject', $days, ['days' => $days]))

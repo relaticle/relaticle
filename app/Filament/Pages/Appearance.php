@@ -31,6 +31,11 @@ final class Appearance extends Page
         return __('appearance.title');
     }
 
+    public function getTitle(): string
+    {
+        return __('appearance.title');
+    }
+
     public function getHeading(): string
     {
         return __('appearance.title');

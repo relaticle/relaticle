@@ -26,7 +26,6 @@ use Filament\Support\Enums\TextSize;
 use Filament\Support\Facades\FilamentTimezone;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
 use Relaticle\Flowforge\Components\CardFlex;
@@ -135,7 +134,7 @@ trait HasBoardCards
         return [
             'cardAttributes' => array_map($this->cardAttributeRow(...), $shown),
             'addableAttributes' => array_map($this->cardAttributeRow(...), array_values(array_diff($offered, $shown, [$columnKey]))),
-            'entityLabel' => Str::lower(static::getResource()::getModelLabel()),
+            'entityLabel' => static::getResource()::getModelLabel(),
             'showLabels' => $state->showLabels,
             'hideEmpty' => $state->hideEmpty,
             'canCreateAttribute' => $this->canCreateTableAttribute(),
@@ -395,7 +394,7 @@ trait HasBoardCards
                 ->badge()
                 ->color('gray')
                 ->icon($key === 'created_at' ? 'lucide-calendar' : 'lucide-clock')
-                ->dateTime('M j, Y', FilamentTimezone::get())
+                ->isoDateTime('ll', FilamentTimezone::get())
                 ->grow(false)
                 ->visible(fn (mixed $state): bool => filled($state)),
             default => null,

@@ -31,7 +31,7 @@ final class CompanyImporter extends BaseImporter
             ImportField::id(),
 
             ImportField::make('name')
-                ->label('Name')
+                ->label(__('import-wizard-new::fields.name'))
                 ->required()
                 ->rules(['required', 'string', 'max:255'])
                 ->guess([
@@ -56,7 +56,7 @@ final class CompanyImporter extends BaseImporter
                     MatchableField::email('email', MatchBehavior::MatchOnly),
                 ])
                 ->foreignKey('account_owner_id')
-                ->label('Account Owner')
+                ->label(__('import-wizard-new::fields.account_owner'))
                 ->guess([
                     'account_owner', 'owner_email', 'owner', 'assigned_to', 'account_manager',
                     'owner email', 'sales rep', 'sales_rep', 'rep', 'salesperson', 'sales_owner',

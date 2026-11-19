@@ -82,30 +82,27 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
         $workspace = $user->currentWorkspace;
 
         if (! Gate::forUser($user)->allows('addWorkspaceMember', $workspace)) {
-            return __('Only workspace owners and admins can invite teammates. Tell the user to ask one, and do not link to any page.');
+            return 'Only workspace owners and admins can invite teammates. Tell the user to ask one, and do not link to any page.';
         }
 
         if ($workspace->isScheduledForDeletion()) {
-            return __('This workspace is scheduled for deletion, so it cannot take invitations. Tell the user to cancel the deletion in the workspace settings first.');
+            return 'This workspace is scheduled for deletion, so it cannot take invitations. Tell the user to cancel the deletion in the workspace settings first.';
         }
 
         $email = (string) ($record['email'] ?? '');
 
         if (filter_var($email, FILTER_VALIDATE_EMAIL) === false) {
-            return __(':email is not a valid email address.', ['email' => "\"{$email}\""]);
+            return "\"{$email}\" is not a valid email address.";
         }
 
         $role = $record['role'] ?? WorkspaceRole::Member->value;
 
         if (! in_array($role, WorkspaceRole::values(), true)) {
-            return __('Role must be one of :roles, got :role.', [
-                'roles' => $this->quotedRoles(),
-                'role' => "\"{$role}\"",
-            ]);
+            return "Role must be one of {$this->quotedRoles()}, got \"{$role}\".";
         }
 
         if (WorkspaceRole::keyIsAdmin($role) && ! Gate::forUser($user)->allows('promoteToAdmin', $workspace)) {
-            return __('Only the workspace owner can grant the Admin role. Tell the user to ask the owner, and do not link to any page.');
+            return 'Only the workspace owner can grant the Admin role. Tell the user to ask the owner, and do not link to any page.';
         }
 
         return null;
@@ -121,8 +118,8 @@ final class InviteWorkspaceMemberTool extends BaseWriteCreateTool
             'title' => $this->proposalEntity()->createTitle(),
             'summary' => "Invite {$email} as {$roleLabel}",
             'fields' => [
-                ['label' => 'Email', 'value' => $email],
-                ['label' => 'Role', 'value' => $roleLabel],
+                ['label' => __('Email'), 'value' => $email],
+                ['label' => __('Role'), 'value' => $roleLabel],
             ],
         ];
     }
