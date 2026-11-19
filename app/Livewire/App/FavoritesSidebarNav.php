@@ -31,25 +31,13 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
 {
     public function removeFavorite(string $favoriteId, RemoveFavoriteRecord $removeFavoriteRecord): void
     {
-        $user = Filament::auth()->user();
-        $workspace = Filament::getTenant();
-
-        if (! $user instanceof User || ! $workspace instanceof Workspace) {
-            return;
-        }
-
-        $record = Favorite::query()
-            ->ownedBy($user, $workspace->getKey())
-            ->find($favoriteId)
-            ?->record()
-            ->withTrashed()
-            ->first();
+        $record = $this->ownedFavorites()->find($favoriteId)?->record()->withTrashed()->first();
 
         if (! $record instanceof Company && ! $record instanceof People && ! $record instanceof Opportunity) {
             return;
         }
 
-        $removeFavoriteRecord->execute($user, $record);
+        $removeFavoriteRecord->execute($this->authUser(), $record);
 
         $this->dispatch('refresh-sidebar');
         $this->dispatch('favorites-updated');
