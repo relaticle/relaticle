@@ -28,6 +28,21 @@ it('serves a compose image that belongs to the current workspace', function (): 
     expect($response->getContent())->toBe($bytes);
 });
 
+it('serves inline images with no-store', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+
+    $user = User::factory()->withWorkspace()->create();
+    $path = EmailAttachment::composeImagesDirectory((string) $user->current_workspace_id).'/logo.jpg';
+    Storage::disk(EmailAttachment::DISK)->put($path, UploadedFile::fake()->image('logo.jpg')->getContent());
+
+    $cacheControl = (string) $this->actingAs($user)
+        ->get(route('email-compose-images.show', ['path' => $path]))
+        ->assertSuccessful()
+        ->headers->get('Cache-Control');
+
+    expect($cacheControl)->toContain('no-store')->toContain('private');
+});
+
 it('redirects guests away from compose images', function (): void {
     $this->get(route('email-compose-images.show', ['path' => 'email-attachments/1/logo.jpg']))
         ->assertRedirect(route('login'));

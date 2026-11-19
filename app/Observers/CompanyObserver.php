@@ -8,6 +8,7 @@ use App\Actions\Onboarding\ScheduleAssistantArrivalTurn;
 use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
 use App\Observers\Concerns\TagsFirstCrmData;
+use App\Services\Favicon\Drivers\LogoFinderDriver;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final readonly class CompanyObserver
@@ -29,9 +30,13 @@ final readonly class CompanyObserver
 
     private function dispatchFaviconFetchIfNeeded(Company $company): void
     {
-        $sourceUrl = FetchFaviconForCompany::sourceUrl($company);
+        if (! resolve(LogoFinderDriver::class)->isConfigured()) {
+            return;
+        }
 
-        if ($sourceUrl === null) {
+        $domain = $company->load('domainValue.customField')->logoDomain();
+
+        if ($domain === null) {
             return;
         }
 
@@ -39,7 +44,7 @@ final readonly class CompanyObserver
 
         // Company saves are frequent and the fetch hits slow remote sites, so a logo
         // already fetched from the current domain is never fetched again.
-        if ($logo instanceof Media && FetchFaviconForCompany::fetchedFrom($logo, $sourceUrl)) {
+        if ($logo instanceof Media && FetchFaviconForCompany::fetchedFrom($logo, $domain)) {
             return;
         }
 

@@ -24,7 +24,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('upload-file')]
 #[Title('Upload File')]
-#[Description('Store a file in this workspace. Returns suggested_markdown to embed the file in a rich-editor field (note body, task description), and file_id to refer to the stored file. Pass exactly one of: source_url (public https), base64 with filename, or upload_id from create-upload-url. filename is optional with upload_id but recommended. Allowed types: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp; 10 MB max. Limited to 60 calls per hour per workspace, refused files included.')]
+#[Description('Store a file in this workspace. Returns suggested_markdown to embed the file in a rich-editor field (note body, task description), and file_id to refer to the stored file. Pass exactly one of: base64 with filename, or upload_id from create-upload-url. filename is optional with upload_id but recommended. Allowed types: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp; 10 MB max. Limited to 60 calls per hour per workspace, refused files included.')]
 final class UploadFileTool extends Tool
 {
     use ChecksTokenAbility;
@@ -37,15 +37,9 @@ final class UploadFileTool extends Tool
         return false;
     }
 
-    protected function openWorldHint(): bool
-    {
-        return true;
-    }
-
     public function schema(JsonSchema $schema): array
     {
         return [
-            'source_url' => $schema->string()->description('A public https URL to fetch. No redirects are followed.'),
             'base64' => $schema->string()->description('The file body, base64 encoded. Requires filename.'),
             'filename' => $schema->string()->description('The original file name. Required with base64. Optional with upload_id, where the name is otherwise rebuilt from the id, losing capitals and spaces.'),
             'upload_id' => $schema->string()->description('The upload_id from create-upload-url after the PUT succeeded.'),
@@ -81,13 +75,13 @@ final class UploadFileTool extends Tool
         }
 
         $validated = $request->validate([
-            'source_url' => ['nullable', 'string', 'url:https', 'max:2048', 'required_without_all:base64,upload_id', 'prohibits:base64,upload_id'],
+            'source_url' => ['prohibited'],
             'base64' => ['nullable', 'string', 'prohibits:upload_id'],
             'filename' => ['nullable', 'string', 'max:255', 'required_with:base64'],
             'upload_id' => ['nullable', 'string', 'max:'.TemporaryUploads::MAX_NAME_LENGTH],
         ]);
 
-        /** @var array{source_url?: ?string, base64?: ?string, filename?: ?string, upload_id?: ?string} $validated */
+        /** @var array{base64?: ?string, filename?: ?string, upload_id?: ?string} $validated */
         try {
             $media = resolve(StoreAgentUpload::class)->execute($user, $workspace, $validated);
         } catch (UploadException $exception) {

@@ -261,7 +261,7 @@ Un correo en cola sigue ligado a la conexión que lo puso en cola. No se envía 
 
 | Herramienta | Descripción |
 |------|-------------|
-| `upload-file` | Almacena un archivo en el espacio de trabajo desde una URL https pública, un cuerpo base64 con `filename` o un `upload_id`. Devuelve `suggested_markdown` para incrustar el archivo en un campo de editor de texto enriquecido, como el cuerpo de una nota, además de `file_id` para el archivo almacenado. Tipos permitidos: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, de hasta 10 MB. 60 llamadas por hora por espacio de trabajo. |
+| `upload-file` | Almacena un archivo en el espacio de trabajo desde un cuerpo base64 con `filename` o un `upload_id`. Devuelve `suggested_markdown` para incrustar el archivo en un campo de editor de texto enriquecido, como el cuerpo de una nota, además de `file_id` para el archivo almacenado. Tipos permitidos: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, de hasta 10 MB. 60 llamadas por hora por espacio de trabajo. |
 | `create-upload-url` | Obtiene una URL firmada, válida cinco minutos, a la que enviar un cuerpo de archivo con `PUT`. Luego se pasa el `upload_id` devuelto a `upload-file` dentro de una hora. Un cuerpo no almacenado para entonces se elimina. 60 llamadas por hora por espacio de trabajo. |
 
 Las subidas quedan pendientes durante 24 horas. Guardar un registro cuyo cuerpo de editor de texto enriquecido incrusta el archivo lo reclama. Los archivos no reclamados se purgan.

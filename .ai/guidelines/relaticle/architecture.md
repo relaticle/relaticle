@@ -49,7 +49,7 @@ anatomy mirrors a Laravel app: `src/`, `config/`, `routes/`, `resources/`,
 `packages/Cloud` is the hosted business behind relaticle.com: billing behaviour and UI, the
 business half of the sysadmin panel (Overview, revenue, subscriptions, AI credits, trial and
 managed-plan actions), the marketing site, the docs and help website, and the blog: its pages,
-its authoring in the sysadmin panel and its `/mcp/blog` endpoint. Its own `LICENSE` allows
+its authoring in the sysadmin panel and its `blog:mcp` command. Its own `LICENSE` allows
 development and testing use, and production use only under an agreement. The root `LICENSE` stays
 the verbatim AGPL text, so GitHub still detects the repository as AGPL-3.0, and the README names the
 split. Plausible keeps its proprietary directory the same way. The self-hosted build is this

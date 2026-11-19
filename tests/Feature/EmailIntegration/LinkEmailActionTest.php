@@ -874,6 +874,8 @@ it('auto-creates a person when contact_creation_mode is All', function (): void 
 
 it('queues a logo fetch for an auto-created company', function (): void {
     Bus::fake([FetchFaviconForCompany::class]);
+    config()->set('services.logo_finder.url', 'https://logos.example.test');
+    config()->set('services.logo_finder.key', 'worker-secret');
 
     $this->workspace->update([
         'contact_creation_mode' => ContactCreationMode::All,

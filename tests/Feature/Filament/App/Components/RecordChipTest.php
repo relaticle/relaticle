@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CrmEntity;
+use App\Enums\CustomFields\CompanyField;
 use App\Filament\Components\Forms\RecordSelect;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\RecordChip;
@@ -164,6 +165,30 @@ it('falls back to the shared entity icon for a company with no logo', function (
         ->and($chip->iconPath)->toBe(CrmEntity::Company->iconPath())
         ->and($chip->toHtml())->toContain('<svg')
         ->and($chip->toHtml())->not->toContain('<img');
+});
+
+it('falls back to the company icon when the logo image fails', function (): void {
+    config()->set('services.brandfetch.client_id', 'test-client');
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create([
+        'name' => 'Acme Corp',
+        'custom_fields' => [CompanyField::DOMAINS->value => ['acme.com']],
+    ]);
+
+    $html = RecordChip::forRecord($company->fresh())->toHtml();
+
+    expect($html)->toContain('src="https://cdn.brandfetch.io/domain/acme.com/')
+        ->and($html)->toContain('x-on:error="broken = true"')
+        ->and($html)->toContain('x-show="! broken"')
+        ->and($html)->toContain('x-show="broken"')
+        ->and($html)->toContain(CrmEntity::Company->iconPath());
+});
+
+it('renders a chip with a logo and no icon as a plain image', function (): void {
+    $html = (new RecordChip(name: 'Ada', imageUrl: 'https://example.test/ada.png'))->toHtml();
+
+    expect($html)->toContain('<img')
+        ->and($html)->not->toContain('x-data')
+        ->and($html)->not->toContain('<svg');
 });
 
 it('gives two logoless companies the same icon, so colour only ever means a real logo', function (): void {

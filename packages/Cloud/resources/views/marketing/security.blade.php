@@ -102,7 +102,8 @@
         ['Fathom Analytics', __('Counts page views and intentional events on the website and in the app'), __('Normalized page paths and events, without query strings, account identifiers or CRM content')],
         $aiProviders->isEmpty() ? null : [$aiProviders->join(', '), __('Run the AI models behind the assistant, voice input and email summaries'), __('The content of that request')],
         $signupChallenge ? ['Cloudflare', __('Checks that a new account is created by a person'), __('Signals from your browser on the create-account step')] : null,
-        ['Google, DuckDuckGo', __('Look up a company logo'), __('The company domain')],
+        ['Cloudflare Workers', __('Look up a company logo'), __('The company domain')],
+        ['Brandfetch', __('Serves company logos, which your browser loads from its CDN'), __('The company domains on screen, sent by your browser')],
         ['Maxforms', __('Hosts the support and feedback forms'), __('What you type into the form')],
         ['Oh Dear', __('Watches uptime and health checks'), __('No customer data')],
     ]));
@@ -200,7 +201,7 @@
         <x-cloud::marketing.frame-header :label="__('Service providers')" :lead="$hosted ? __('Who handles data for Relaticle Cloud.') : __('Run by its own operator.')">
             {{ $hosted
                 ? __('And what each one receives.')
-                : __('This install is run by its own operator. It uses only the company logo lookup, which sends a company domain to Google and DuckDuckGo, unless the operator configures other providers.') }}
+                : __('This install is run by its own operator. Logos stored before an upgrade stay. It finds new ones only if the operator sets LOGO_FINDER_URL, and shows a Brandfetch logo only with a Brandfetch client ID, which each browser then loads from Brandfetch.') }}
         </x-cloud::marketing.frame-header>
 
         @if($hosted)

@@ -306,7 +306,7 @@
                         <div class="flex items-center justify-between gap-3 max-sm:flex-wrap max-sm:gap-y-3">
                         <div class="flex items-center gap-1">
                             <x-email-integration::composer-icon-button icon="lucide-paperclip" :label="__('filament/emails/composer.actions.attach')" x-on:click="$refs.attachments.click()" />
-                            <input type="file" x-ref="attachments" wire:model="attachments" multiple class="hidden" />
+                            <input type="file" x-ref="attachments" wire:model="attachments" multiple accept="{{ \App\Support\Media\UploadAllowlist::emailAccept() }}" class="hidden" />
 
                             <x-email-integration::composer-picker-menu
                                 icon="lucide-square-pen"
