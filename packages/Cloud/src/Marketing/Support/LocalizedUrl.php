@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Marketing\Support;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Route as RoutingRoute;
 use Illuminate\Support\Arr;
@@ -99,11 +100,16 @@ final readonly class LocalizedUrl
 
     private static function servesLocalizedPath(string $path, string $locale): bool
     {
-        $localized = self::routeNameOf("/{$locale}{$path}");
+        $name = self::routeNameOf($path);
 
-        return $localized !== null
-            && str_starts_with($localized, "{$locale}.")
-            && self::baseName($localized) === self::routeNameOf($path);
+        return $name !== null && Route::has("{$locale}.{$name}");
+    }
+
+    public static function baseRouteNameOf(string $path): ?string
+    {
+        $name = self::routeNameOf($path);
+
+        return $name === null ? null : self::baseName($name);
     }
 
     private static function routeNameOf(string $path): ?string
@@ -131,20 +137,23 @@ final readonly class LocalizedUrl
     private static function siblingIn(string $locale, array $query = []): ?string
     {
         $route = Route::current();
-        $name = $route instanceof RoutingRoute ? $route->getName() : null;
+        $name = $route?->getName();
 
         if ($name !== null && self::baseName($name) === 'blog.show') {
             return self::currentPostUrls()[$locale] ?? null;
         }
+
         $localizedName = $name === null ? null : self::nameIn($name, $locale);
 
-        if ($route instanceof RoutingRoute && $locale !== app()->getLocale() && ! self::listingReaches($locale, $route, $query)) {
+        if ($route === null || $localizedName === null) {
             return null;
         }
 
-        return $route === null || $localizedName === null
-            ? null
-            : route($localizedName, [...$query, ...Arr::only($route->parameters(), $route->parameterNames())]);
+        if ($locale !== app()->getLocale() && ! self::listingReaches($locale, $route, $query)) {
+            return null;
+        }
+
+        return route($localizedName, [...$query, ...Arr::only($route->parameters(), $route->parameterNames())]);
     }
 
     /** @param  array<string, mixed>  $query */
@@ -165,21 +174,21 @@ final readonly class LocalizedUrl
     private static function listingPostCount(string $locale, string $baseName, ?string $slug): int
     {
         $attributes = request()->attributes;
-        $key = "blog.count.{$locale}.{$baseName}.{$slug}";
+        $key = "blog.counts.{$baseName}.{$slug}";
 
         if (! $attributes->has($key)) {
-            $posts = Post::query()->published()->inLocale($locale);
-
-            match ($baseName) {
-                'blog.category' => $posts->whereRelation('category', 'slug', $slug),
-                'blog.tag' => $posts->whereRelation('tags', 'slug', $slug),
-                default => null,
-            };
-
-            $attributes->set($key, $posts->count());
+            $attributes->set($key, Post::query()
+                ->published()
+                ->when($baseName === 'blog.category', fn (Builder $posts) => $posts->whereRelation('category', 'slug', $slug))
+                ->when($baseName === 'blog.tag', fn (Builder $posts) => $posts->whereRelation('tags', 'slug', $slug))
+                ->toBase()
+                ->selectRaw('locale, count(*) as aggregate')
+                ->groupBy('locale')
+                ->pluck('aggregate', 'locale')
+                ->all());
         }
 
-        return $attributes->get($key);
+        return (int) ($attributes->get($key)[$locale] ?? 0);
     }
 
     /** @return array<string, array{native: string, english: string}> */
