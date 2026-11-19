@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\WorkspaceRole;
 use App\Features\Billing;
 use App\Models\User;
+use App\Support\Locales;
 use Illuminate\JsonSchema\JsonSchemaTypeFactory;
 use Illuminate\JsonSchema\Serializer;
 use Laravel\Ai\Tools\Request;
@@ -92,6 +93,18 @@ it('names the access tokens and connect assistant destinations in its schema des
     expect($destination['description'])
         ->toContain('"access_tokens"')
         ->toContain('"connect_assistant"');
+});
+
+it('keeps the page refusal in English for a German member', function (): void {
+    $workspace = $this->user->ownedWorkspaces()->first();
+    $teammate = User::factory()->create();
+    $workspace->users()->attach($teammate, ['role' => WorkspaceRole::Member->value]);
+    $teammate->switchWorkspace($workspace);
+    $this->actingAs($teammate->fresh());
+
+    $payload = json_decode(Locales::within('de', fn (): string => app(GuideToPageTool::class)->handle(new Request(['destination' => 'custom_fields']))), true);
+
+    expect($payload['error'])->toBe('This user cannot open that page with their workspace role. Tell them a workspace owner or admin can do it for them. Do not link to any page.');
 });
 
 it('refuses a page the user cannot open instead of handing over a link that would 403', function (string $destination, WorkspaceRole $role): void {

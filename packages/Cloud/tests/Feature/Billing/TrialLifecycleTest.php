@@ -283,6 +283,39 @@ it('emails the owner when the trial ends within 72 hours', function (): void {
     Mail::assertQueued(ProTrialEndingSoonMail::class, 1);
 });
 
+it('sends the trial reminder in the language of the owner', function (): void {
+    Mail::fake();
+    $this->travelTo(Date::parse('2026-09-07 10:00:00', 'UTC'));
+
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    $owner->forceFill(['locale' => 'de', 'timezone' => 'UTC'])->save();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => Date::parse('2026-09-09 12:30:00', 'UTC')])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(ProTrialEndingSoonMail::class, function (ProTrialEndingSoonMail $mail) use ($owner): bool {
+        expect($mail->hasTo($owner->email))->toBeTrue()
+            ->and($mail->locale)->toBe('de');
+
+        $mail->assertHasSubject(__('mail.trial_ending.subject', ['date' => '9. Sep'], 'de'));
+        $mail->assertSeeInHtml('9. Sep 2026 um 12:30');
+
+        return true;
+    });
+});
+
+it('sends the trial-ended mail in the language of the owner', function (): void {
+    Mail::fake();
+
+    [$owner, $workspace] = trialOwnerAndWorkspace();
+    $owner->forceFill(['locale' => 'fr'])->save();
+    $workspace->forceFill(['plan' => Plan::Pro, 'trial_ends_at' => now()->subHour(), 'pro_trial_used_at' => now()->subDays(14)])->save();
+
+    $this->artisan('billing:process-trials')->assertSuccessful();
+
+    Mail::assertQueued(ProEndedMail::class, fn (ProEndedMail $mail): bool => $mail->hasTo($owner->email) && $mail->locale === 'fr');
+});
+
 it('still pauses expired trials when sending a reminder fails', function (): void {
     withHostedBilling();
     Mail::fake();

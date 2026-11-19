@@ -45,6 +45,11 @@ final class AssistantSettings extends Page
         return (string) config('chat.assistant_name');
     }
 
+    public function getTitle(): string
+    {
+        return __('Assistant Settings');
+    }
+
     public function getHeading(): string
     {
         return (string) config('chat.assistant_name');

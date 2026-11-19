@@ -7,7 +7,6 @@ namespace App\Filament\Exports;
 use App\Models\Note;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Models\Export;
-use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class NoteExporter extends BaseExporter
@@ -34,12 +33,6 @@ final class NoteExporter extends BaseExporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $body = 'Your note export has completed and '.Number::format($export->successful_rows).' '.str('row')->plural($export->successful_rows).' exported.';
-
-        if (($failedRowsCount = $export->getFailedRowsCount()) !== 0) {
-            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to export.';
-        }
-
-        return $body;
+        return self::completedBody($export, 'note');
     }
 }

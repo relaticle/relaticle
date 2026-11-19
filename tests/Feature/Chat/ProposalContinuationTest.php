@@ -258,6 +258,7 @@ it('names every record of the resumed decisions instead of leaving them unnamed'
         'display_data' => ['title' => 'Update People', 'summary' => 'Update 3 people', 'items' => array_map(
             static fn (string $name): array => [
                 'title' => 'Update Person',
+                'name' => $name,
                 'summary' => "Update person \"{$name}\"",
                 'fields' => [['label' => 'Tier', 'old' => 'Silver', 'new' => 'Gold']],
             ],

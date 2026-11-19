@@ -11,10 +11,12 @@ use App\Models\CustomField;
 use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Event;
 use Laravel\Pennant\Feature;
@@ -28,6 +30,7 @@ use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
+use Relaticle\ImportWizard\Models\FailedImportRow;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\MatchResolver;
@@ -36,7 +39,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(PreviewStep::class, MatchResolver::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -121,6 +124,24 @@ it('mounts and renders with summary data', function (): void {
     $component->assertOk()
         ->assertSee('People')
         ->assertSee('Start Import');
+});
+
+it('prints counts with the grouping of the user language', function (): void {
+    $rows = array_map(fn (int $n): array => makePreviewRow($n + 1, ['Name' => "Person {$n}"]), range(1, 1234));
+
+    $store = createPreviewReadyStore($this, ['Name'], [], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+    foreach (array_chunk($rows, 200) as $chunk) {
+        $store->query()->insert($chunk);
+    }
+    $this->import->update(['total_rows' => 1234]);
+
+    Locales::apply('de');
+
+    mountPreviewStep($this)
+        ->assertSee('1.234')
+        ->assertDontSee('1,234');
 });
 
 it('resolves all rows as Create when only name is mapped', function (): void {
@@ -768,6 +789,28 @@ it('downloadFailedRows action is hidden when there are no failed rows', function
     $component = mountPreviewStep($this);
 
     $component->assertDontSee('Download Failed Rows');
+});
+
+it('downloadFailedRows action links the signed download with the shared csv writer', function (): void {
+    createPreviewReadyStore($this, ['Name'], [
+        makePreviewRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $this->import->update(['status' => ImportStatus::Completed, 'failed_rows' => 1]);
+    FailedImportRow::query()->create([
+        'import_id' => $this->import->id,
+        'workspace_id' => $this->workspace->id,
+        'data' => ['Name' => 'John'],
+        'validation_error' => null,
+    ]);
+
+    $url = mountPreviewStep($this)->instance()->downloadFailedRowsAction()->getUrl();
+
+    $csv = $this->get($url)->assertOk()->streamedContent();
+
+    expect($csv)->toContain('John,"System error"');
 });
 
 function completePreviewImport(object $context): void

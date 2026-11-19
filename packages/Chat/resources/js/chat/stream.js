@@ -17,67 +17,13 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
     channelReady: null,
     channelSubscribed: false,
     streamTimeoutId: null,
-    // Injected UI copy (chat-interface.blade.php passes @js(__()) values, the
-    // same pattern voice.js uses); the defaults keep the module standalone.
-    streamTexts: {
-        runningTool: 'Running tool…',
-        runningName: 'Running :name…',
-        streamError: 'The assistant encountered an error. Please try again.',
-        timeout: 'The assistant took too long to respond.',
-        retrying: 'Provider is busy, retrying (attempt :attempt of :max)…',
-        searchingWebFor: 'Searching the web for ":query"…',
-        readingDomain: 'Reading :domain…',
-        ...texts,
-    },
+    streamTexts: texts,
     // One human label per tool the agent can call, keyed by the snake_case form
     // of its class basename (the wire name laravel/ai broadcasts). Explicit
     // rather than derived from the name: an unmapped tool used to fall through
     // to its raw identifier, so the shimmer read "Running add_custom_field_options…"
     // at the user. Ship a label with every new tool.
-    toolLabels: {
-        list_companies: 'Searching companies…',
-        get_company: 'Reading company details…',
-        list_people: 'Searching people…',
-        get_person: 'Reading person details…',
-        list_opportunities: 'Searching opportunities…',
-        get_opportunity: 'Reading opportunity details…',
-        list_tasks: 'Searching tasks…',
-        get_task: 'Reading task details…',
-        list_notes: 'Searching notes…',
-        get_note: 'Reading note details…',
-        search_crm: 'Searching your CRM…',
-        get_crm_summary: 'Reading CRM summary…',
-        aggregate_crm: 'Crunching the numbers…',
-        list_activity: 'Reading recent activity…',
-        list_workspace_members: 'Looking up workspace members…',
-        list_custom_fields: 'Reading custom attributes…',
-        search_docs: 'Searching the documentation…',
-        guide_to_page: 'Finding the right page…',
-        create_company: 'Drafting a company…',
-        update_company: 'Preparing company changes…',
-        delete_company: 'Preparing company deletion…',
-        create_person: 'Drafting a person…',
-        update_person: 'Preparing person changes…',
-        delete_person: 'Preparing person deletion…',
-        create_opportunity: 'Drafting an opportunity…',
-        update_opportunity: 'Preparing opportunity changes…',
-        delete_opportunity: 'Preparing opportunity deletion…',
-        create_task: 'Drafting a task…',
-        update_task: 'Preparing task changes…',
-        delete_task: 'Preparing task deletion…',
-        create_note: 'Drafting a note…',
-        update_note: 'Preparing note changes…',
-        delete_note: 'Preparing note deletion…',
-        invite_workspace_member: 'Preparing a workspace invitation…',
-        create_custom_field: 'Drafting a custom attribute…',
-        update_custom_field: 'Preparing custom attribute changes…',
-        set_custom_field_options: 'Preparing attribute option changes…',
-        delete_custom_field: 'Preparing custom attribute deletion…',
-        request_web_access: 'Asking to search the web…',
-        web_search: 'Searching the web…',
-        web_fetch: 'Reading a web page…',
-        ...toolLabels,
-    },
+    toolLabels,
     // Set as the FIRST line of destroy() in chat-interface.blade.php. unsubscribe()
     // (window.Echo.leave) stops NEW events from being delivered but cannot cancel a
     // handler already mid-execution. handleStreamEnd/handleStreamFailed/the watchdog
@@ -704,7 +650,7 @@ export const streamModule = ({ texts = {}, toolLabels = {} } = {}) => ({
     // pull here can never clobber a rename the user typed mid-turn.
     async maybeSyncTitle() {
         if (!this.conversationId) return;
-        if (!document.title.startsWith('New chat')) return;
+        if (!document.title.startsWith(this.streamTexts.newChat)) return;
         try {
             const title = await this.$wire.conversationTitle(this.conversationId);
             if (title) {

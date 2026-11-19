@@ -1,0 +1,8 @@
+title: 'Programar la reunión de socios con a16z'
+assigned_people:
+  - marc
+custom_fields:
+  description: 'Coordinar agendas y preparar la presentación para la reunión completa de socios en Andreessen Horowitz.'
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium

@@ -1,0 +1,8 @@
+title: Loom das Verlängerungsangebot senden
+assigned_people:
+  - priya
+custom_fields:
+  description: Nehmen Sie das Reporting-Modul und die Jahrespreise auf, um die Priya gebeten hat.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

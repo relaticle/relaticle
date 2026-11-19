@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @props([
     'title',
     'continuation' => null,
@@ -35,7 +36,7 @@
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
 
-                <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+                <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}">
                     {{ __('Get in touch') }}
                 </x-cloud::marketing.button>
             @else

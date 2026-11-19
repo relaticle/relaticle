@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Marketing\Enums;
 
+use Illuminate\Support\Number;
+
 enum ContactInquiry: string
 {
     case Enterprise = 'enterprise';
@@ -18,7 +20,7 @@ enum ContactInquiry: string
     public function price(): string
     {
         return match ($this) {
-            self::Enterprise => __('cloud::billing.enterprise.starting_price', ['price' => number_format(config()->integer('relaticle.enterprise.starting_price_yearly'))]),
+            self::Enterprise => __('cloud::billing.enterprise.starting_price', ['price' => Number::format(config()->integer('relaticle.enterprise.starting_price_yearly'))]),
         };
     }
 

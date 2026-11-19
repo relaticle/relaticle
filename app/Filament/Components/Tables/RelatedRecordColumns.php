@@ -29,6 +29,7 @@ final class RelatedRecordColumns
     {
         return [
             RecordChipColumn::make('name')
+                ->label(__('Name'))
                 ->searchable(),
             ...self::customFields(People::class, [PeopleField::JOB_TITLE, PeopleField::EMAILS]),
         ];
@@ -41,6 +42,7 @@ final class RelatedRecordColumns
     {
         return [
             TextColumn::make('title')
+                ->label(__('filament/resources/task.fields.title.label'))
                 ->searchable(),
             ...self::customFields(Task::class, [TaskField::STATUS, TaskField::DUE_DATE]),
             RecordChipColumn::make('assignees.name')
@@ -57,6 +59,7 @@ final class RelatedRecordColumns
     {
         return [
             TextColumn::make('title')
+                ->label(__('filament/resources/note.fields.title.label'))
                 ->searchable(),
             TextColumn::make('created_at')
                 ->label(__('filament/resources/note.fields.created_at.label'))

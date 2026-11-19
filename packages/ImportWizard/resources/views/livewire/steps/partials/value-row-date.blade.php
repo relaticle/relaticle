@@ -48,7 +48,7 @@
         @else
             {{-- Invalid: Show warning and raw value --}}
             <span
-                x-tooltip="{ content: @js($validationError . ' Click the edit button or select a different format.'), theme: $store.theme }"
+                x-tooltip="{ content: @js($validationError.' '.__('Click the edit button or select a different format.')), theme: $store.theme }"
                 class="relative z-10 ml-2 cursor-help shrink-0"
             >
                 <x-filament::icon icon="lucide-triangle-exclamation-point" class="w-4 h-4 text-warning-500"/>
@@ -65,7 +65,7 @@
                     type="button"
                     @click="$refs.picker.showPicker()"
                     class="p-1.5 text-gray-400 hover:text-primary-600 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-950/50 transition-colors"
-                    title="Fix this value"
+                    title="{{ __('Fix this value') }}"
                 >
                     <x-filament::icon icon="lucide-square-pen" class="w-4 h-4"/>
                 </button>
@@ -73,7 +73,7 @@
                 <button
                     wire:click.stop.preserve-scroll="skipValue({{ Js::from($rawValue) }})"
                     class="p-1.5 text-gray-400 hover:text-warning-600 hover:bg-warning-50 dark:hover:text-warning-400 dark:hover:bg-warning-950/50 transition-colors"
-                    title="Skip this value"
+                    title="{{ __('Skip this value') }}"
                 >
                     <x-filament::icon icon="lucide-ban" class="w-4 h-4"/>
                 </button>

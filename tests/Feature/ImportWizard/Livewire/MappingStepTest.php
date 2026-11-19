@@ -3,10 +3,13 @@
 declare(strict_types=1);
 
 use App\Events\WorkspaceCreated;
+use App\Models\CustomField;
 use App\Models\User;
 use Filament\Facades\Filament;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Js;
 use Illuminate\Support\Str;
 use Livewire\Features\SupportTesting\Testable;
 use Livewire\Livewire;
@@ -16,6 +19,7 @@ use Relaticle\ImportWizard\Data\ImportFieldCollection;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Livewire\Steps\MappingStep;
+use Relaticle\ImportWizard\Livewire\Steps\UploadStep;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Tests\Helpers\ImportExecutionFixture;
@@ -23,7 +27,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(MappingStep::class, ColumnData::class, ImportField::class, ImportFieldCollection::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -90,6 +94,48 @@ it('renders with correct headers from store', function (): void {
     $component = mountMappingStep($this);
 
     $component->assertOk();
+});
+
+it('renders the upload and mapping steps in the user locale', function (): void {
+    app()->setLocale('de');
+    createStoreWithHeaders($this, ['Name', 'Phone']);
+
+    Livewire::test(UploadStep::class, ['entityType' => ImportEntityType::People, 'storeId' => null])
+        ->assertSee('CSV-Datei auswählen')
+        ->assertDontSee('Choose a .CSV file')
+        ->assertDontSee('Drop your .CSV file');
+
+    mountMappingStep($this)
+        ->assertSee('Zuordnen zu')
+        ->assertSee('Neu beginnen')
+        ->assertSee('Beispielwerte werden angezeigt')
+        ->assertDontSee('Map to')
+        ->assertDontSee('Start over')
+        ->assertDontSee('Showing sample values');
+});
+
+it('searches the mapping options case-insensitively for accented labels', function (): void {
+    app()->setLocale('fr');
+    CustomField::query()
+        ->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->id)
+        ->where('entity_type', 'people')
+        ->where('code', 'linkedin')
+        ->update(['name' => 'Étape']);
+    createStoreWithHeaders($this, ['Name']);
+
+    mountMappingStep($this)
+        ->assertSeeHtml(Js::from('étape')->toHtml().'.includes(search.toLowerCase())');
+});
+
+it('calls every mapping target an attribute', function (): void {
+    app()->setLocale('de');
+    createStoreWithHeaders($this, ['Name']);
+
+    mountMappingStep($this)
+        ->assertSeeHtml('aria-label="Spalte Name einem Attribut zuordnen"')
+        ->assertSeeHtml('aria-label="Verfügbare Attribute"')
+        ->assertSeeHtml('aria-label="Attribute durchsuchen"');
 });
 
 it('auto-maps Name header to name field on mount', function (): void {

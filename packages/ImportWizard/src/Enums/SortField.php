@@ -15,8 +15,8 @@ enum SortField: string implements HasIcon, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Count => 'Row count',
-            self::Value => 'Value',
+            self::Count => __('enums/sort-field.count'),
+            self::Value => __('enums/sort-field.raw_value'),
         };
     }
 

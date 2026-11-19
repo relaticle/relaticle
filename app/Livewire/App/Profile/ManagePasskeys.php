@@ -42,6 +42,7 @@ final class ManagePasskeys extends BaseLivewireComponent
                     ->description(__('profile.sections.passkeys.description'))
                     ->schema([
                         ViewField::make('passkeys')
+                            ->label(__('profile.sections.passkeys.title'))
                             ->hiddenLabel()
                             ->view('components.passkeys-section'),
                     ]),

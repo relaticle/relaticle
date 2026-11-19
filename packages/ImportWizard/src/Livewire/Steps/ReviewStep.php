@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
@@ -77,7 +78,7 @@ final class ReviewStep extends Component
         if ($isCorrection && $column->getType()->isDateOrDateTime()) {
             return DateFormat::ISO->parse($value, $column->getType()->isTimestamp()) instanceof CarbonImmutable
                 ? null
-                : 'Invalid date format';
+                : Lang::string('import-wizard-new::validation.invalid_date_format');
         }
 
         return (new ColumnValidator)->validate($column, $value)?->toStorageFormat();

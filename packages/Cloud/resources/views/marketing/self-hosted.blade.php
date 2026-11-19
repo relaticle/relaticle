@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
@@ -117,7 +118,7 @@
 
             <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
                 @if($documentationActive)
-                    <x-cloud::marketing.button href="{{ route('documentation.show', ['type' => 'self-hosting']) }}">
+                    <x-cloud::marketing.button href="{{ LocalizedUrl::route('documentation.show', ['type' => 'self-hosting']) }}">
                         {{ __('Read the guide') }}
                     </x-cloud::marketing.button>
                     <x-cloud::marketing.button variant="secondary" href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
@@ -187,7 +188,7 @@
             <p class="type-prose text-gray-700 dark:text-gray-300">
                 {{ __('The guide also covers Dokploy, Coolify, Laravel Cloud, reverse proxies, backups, and a Docker-free manual install.') }}
                 @if($documentationActive)
-                    <a href="{{ route('documentation.show', ['type' => 'self-hosting']) }}" class="{{ $linkClass }}">{{ __('Read the full self-hosting guide') }}</a>
+                    <a href="{{ LocalizedUrl::route('documentation.show', ['type' => 'self-hosting']) }}" class="{{ $linkClass }}">{{ __('Read the full self-hosting guide') }}</a>
                 @endif
             </p>
         </div>
@@ -208,7 +209,7 @@
                     __('Ollama, vLLM, or any OpenAI-compatible endpoint for a local model'),
                 ]"
                 :link-label="__('Choosing a model that calls tools')"
-                :link-href="$documentationActive ? route('documentation.show', ['type' => 'self-hosting']).'#ai-assistant' : null"
+                :link-href="$documentationActive ? LocalizedUrl::route('documentation.show', ['type' => 'self-hosting']).'#ai-assistant' : null"
             >
                 {{ __('You decide what it calls.') }}
 
@@ -276,7 +277,7 @@
                         {{ __('or') }}
                         <a href="https://github.com/relaticle/relaticle/issues" target="_blank" rel="noopener noreferrer" class="{{ $linkClass }}">{{ __('open an issue') }}</a>.
                         @if($documentationActive)
-                            <a href="{{ route('documentation.show', ['type' => 'contributing']) }}" class="{{ $linkClass }}">{{ __('The contributing guide') }}</a>
+                            <a href="{{ LocalizedUrl::route('documentation.show', ['type' => 'contributing']) }}" class="{{ $linkClass }}">{{ __('The contributing guide') }}</a>
                             {{ __('covers local setup.') }}
                         @endif
                     </p>
@@ -310,8 +311,8 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
-                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Self-hosted'))->item(route('selfHosted')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Self-hosted'))->item(LocalizedUrl::route('selfHosted')),
                 ]));
     @endphp
 

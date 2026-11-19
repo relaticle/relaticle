@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     /**
      * @var array<string, mixed> $relaticle
@@ -24,10 +25,10 @@
                 [
                     'heading' => __('Who has the bigger community and ecosystem?'),
                     'body' => __('Twenty CRM has the bigger open-source footprint: :twentyStars GitHub stars and :twentyContributors contributors on the twentyhq/twenty repository, against Relaticle\'s :relaticleStars stars and :relaticleContributors. Twenty also ships :twentyExtensibility. Relaticle\'s extensibility is :relaticleExtensibility. If community size, third-party extensions, or the confidence of a large existing user base decides it for you, that point goes to Twenty; if you want a smaller codebase you can read end to end and extend directly, that favors Relaticle.', [
-                        'twentyStars' => number_format($competitor['stars']),
+                        'twentyStars' => \Illuminate\Support\Number::format($competitor['stars']),
                         'twentyContributors' => $competitor['contributors'],
-                        'relaticleStars' => number_format($relaticle['stars']),
-                        'relaticleContributors' => $relaticle['contributors'].' contributors',
+                        'relaticleStars' => \Illuminate\Support\Number::format($relaticle['stars']),
+                        'relaticleContributors' => __(':count contributors', ['count' => $relaticle['contributors']]),
                         'twentyExtensibility' => $competitor['extensibility'],
                         'relaticleExtensibility' => $relaticle['extensibility'],
                     ]),
@@ -53,10 +54,10 @@
                 [
                     'heading' => __('Who has the bigger community and ecosystem?'),
                     'body' => __('EspoCRM has the longer track record: :espocrmStars GitHub stars and :espocrmContributors contributors, against Relaticle\'s :relaticleStars stars and :relaticleContributors. EspoCRM\'s extensibility is :espocrmExtensibility. Relaticle\'s is :relaticleExtensibility.', [
-                        'espocrmStars' => number_format($competitor['stars']),
+                        'espocrmStars' => \Illuminate\Support\Number::format($competitor['stars']),
                         'espocrmContributors' => $competitor['contributors'],
-                        'relaticleStars' => number_format($relaticle['stars']),
-                        'relaticleContributors' => $relaticle['contributors'].' contributors',
+                        'relaticleStars' => \Illuminate\Support\Number::format($relaticle['stars']),
+                        'relaticleContributors' => __(':count contributors', ['count' => $relaticle['contributors']]),
                         'espocrmExtensibility' => $competitor['extensibility'],
                         'relaticleExtensibility' => $relaticle['extensibility'],
                     ]),
@@ -97,7 +98,7 @@
     $metaTitle = $metaTitles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
     $factsVerifiedDate = \Carbon\CarbonImmutable::parse($relaticle['verified']);
-    $factsVerifiedAt = $factsVerifiedDate->format('F j, Y');
+    $factsVerifiedAt = $factsVerifiedDate->isoFormat('LL');
 
     $assistantName = (string) config('chat.assistant_name');
     $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
@@ -132,7 +133,7 @@
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('selfHosted') }}">
+                <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('selfHosted') }}">
                     {{ __('Self-host it') }}
                 </x-cloud::marketing.button>
             </div>
@@ -168,8 +169,8 @@
                 @endforeach
             </p>
             <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <a href="{{ route('selfHosted') }}" class="{{ $linkClass }}">{{ __('See self-hosting options') }}</a>
-                <a href="{{ route('ai') }}" class="{{ $linkClass }}">{{ __('Meet :name, the built-in AI assistant', ['name' => $assistantName]) }}</a>
+                <a href="{{ LocalizedUrl::route('selfHosted') }}" class="{{ $linkClass }}">{{ __('See self-hosting options') }}</a>
+                <a href="{{ LocalizedUrl::route('ai') }}" class="{{ $linkClass }}">{{ __('Meet :name, the built-in AI assistant', ['name' => $assistantName]) }}</a>
             </p>
         </div>
     </x-cloud::marketing.frame>
@@ -178,7 +179,7 @@
         <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
             {{ __('Start for free') }}
         </x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+        <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}">
             {{ __('Get in touch') }}
         </x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
@@ -206,7 +207,7 @@
                 ->about([$aboutEntity($relaticle), $aboutEntity($competitor)]))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
                     \Spatie\SchemaOrg\Schema::listItem()->position(2)->name($title)->item(url()->current()),
                 ]));
     @endphp

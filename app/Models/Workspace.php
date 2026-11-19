@@ -160,6 +160,9 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'api-tokens', 'import-history', 'profile', 'scheduled-deletion',
         'opportunities-board', 'tasks-board', 'chat', 'r',
 
+        // Public site language prefixes, one per entry in config('app.available_locales') but English
+        'de', 'es', 'fr',
+
         // Content & info pages
         'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
         'privacy-policy', 'terms-of-service', 'legal', 'security', 'changelog',

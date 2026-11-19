@@ -13,9 +13,9 @@ final readonly class BeginAuthentication
 {
     public function __construct(private CompleteAuthentication $completeAuthentication) {}
 
-    public function execute(User $user, AuthMethod $method, ?string $credentialId, bool $remember): string
+    public function execute(User $user, AuthMethod $method, ?string $credentialId): string
     {
-        AuthenticationSession::begin($user, $method, $credentialId, $remember);
+        AuthenticationSession::begin($user, $method, $credentialId);
 
         if ($method !== AuthMethod::PASSKEY && $user->hasEnabledTwoFactorAuthentication()) {
             event(new TwoFactorAuthenticationChallenged($user));

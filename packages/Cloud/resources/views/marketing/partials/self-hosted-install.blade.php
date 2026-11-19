@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $defaultHost = 'crm.example.com';
 
@@ -130,7 +131,7 @@
                 <p>
                     {{ __('The stack serves HTTP on port 80. For HTTPS, put a TLS reverse proxy in front.') }}
                     @if($documentationActive)
-                        <a href="{{ route('documentation.show', ['type' => 'self-hosting']) }}#reverse-proxy-and-ssl" class="{{ $linkClass }} whitespace-nowrap">{{ __('Reverse proxy guide') }}</a>
+                        <a href="{{ LocalizedUrl::route('documentation.show', ['type' => 'self-hosting']) }}#reverse-proxy-and-ssl" class="{{ $linkClass }} whitespace-nowrap">{{ __('Reverse proxy guide') }}</a>
                     @endif
                 </p>
             </div>

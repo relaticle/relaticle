@@ -1,10 +1,11 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     /** @var array<string, mixed> $relaticle */
     /** @var array<string, mixed> $competitor */
     $title = __('An open-source Attio alternative.');
     $metaTitle = __('Open Source Attio Alternative, Self-Hosted | Relaticle');
     $description = __('Compare Relaticle and Attio on hosting, pricing, AI and migration. Get an open-source CRM with unlimited users, or self-host it on your own infrastructure.');
-    $verifiedAt = \Illuminate\Support\Facades\Date::parse($competitor['verified'])->format('F j, Y');
+    $verifiedAt = \Illuminate\Support\Facades\Date::parse($competitor['verified'])->isoFormat('LL');
     $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 
     $rows = [
@@ -56,7 +57,7 @@
                 <x-cloud::marketing.button :href="route('login')" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" :href="route('selfHosted')">
+                <x-cloud::marketing.button variant="secondary" :href="LocalizedUrl::route('selfHosted')">
                     {{ __('Explore self-hosting') }}
                 </x-cloud::marketing.button>
             </div>
@@ -114,7 +115,7 @@
 
         <div class="bg-surface border-rail flex flex-col gap-2 border-t px-6 py-5 text-sm text-gray-500 sm:flex-row sm:justify-between md:px-8 dark:text-gray-400">
             <p>{{ __('Compare AI allowances and usage charges too. Self-hosting requires infrastructure and maintenance.') }}</p>
-            <a href="{{ route('pricing') }}" class="{{ $linkClass }} shrink-0">{{ __('See Relaticle pricing') }}</a>
+            <a href="{{ LocalizedUrl::route('pricing') }}" class="{{ $linkClass }} shrink-0">{{ __('See Relaticle pricing') }}</a>
         </div>
     </x-cloud::marketing.frame>
 
@@ -131,7 +132,7 @@
                     <li class="py-2.5">{{ __('You manage people, companies and sales opportunities, with tasks and notes alongside them.') }}</li>
                     <li class="py-2.5">{{ __('You want unlimited teammates on a flat cloud subscription, or a self-hosted install with no license fee.') }}</li>
                 </ul>
-                <a href="{{ route('ai') }}" class="{{ $linkClass }} mt-auto w-fit text-sm">{{ __('Explore Relaticle AI') }}</a>
+                <a href="{{ LocalizedUrl::route('ai') }}" class="{{ $linkClass }} mt-auto w-fit text-sm">{{ __('Explore Relaticle AI') }}</a>
             </div>
             <div class="bg-surface flex flex-col gap-6 p-6 md:p-10">
                 <h3 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('Attio may fit better when...') }}</h3>
@@ -161,7 +162,7 @@
                         </div>
                     @endforeach
                 </dl>
-                <a href="{{ url('/help/import') }}" class="{{ $linkClass }} mt-6 inline-block text-sm">{{ __('Read the import guide') }}</a>
+                <a href="{{ LocalizedUrl::route('help.category', ['category' => 'import']) }}" class="{{ $linkClass }} mt-6 inline-block text-sm">{{ __('Read the import guide') }}</a>
             </div>
 
             <ol class="bg-rail grid grid-cols-1 gap-px sm:grid-cols-2 lg:col-span-8">
@@ -231,7 +232,7 @@
 
     <x-cloud::marketing.closing-band :title="__('Make your next CRM an informed choice.')" :continuation="__('Start a workspace, bring a few records, and try your actual sales workflow.')">
         <x-cloud::marketing.button :href="route('login')" data-analytics-intent="signup" data-analytics-placement="footer">{{ __('Start for free') }}</x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" :href="route('contact')">{{ __('Talk through your migration') }}</x-cloud::marketing.button>
+        <x-cloud::marketing.button variant="secondary" :href="LocalizedUrl::route('contact')">{{ __('Talk through your migration') }}</x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
 
     @php
@@ -251,7 +252,7 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn (\Spatie\SchemaOrg\BreadcrumbList $list): \Spatie\SchemaOrg\BreadcrumbList => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
                     \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Attio alternative'))->item(url()->current()),
                 ]));
     @endphp

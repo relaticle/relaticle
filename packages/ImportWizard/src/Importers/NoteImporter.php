@@ -35,7 +35,7 @@ final class NoteImporter extends BaseImporter
             ImportField::id(),
 
             ImportField::make('title')
-                ->label('Title')
+                ->label(__('import-wizard-new::fields.title'))
                 ->required()
                 ->rules(['required', 'string', 'max:255'])
                 ->guess([

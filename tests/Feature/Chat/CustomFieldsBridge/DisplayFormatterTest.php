@@ -9,6 +9,7 @@ use App\Models\CustomFieldSection;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\ChecklistHtml;
+use App\Support\Locales;
 use App\Support\PlainText;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\Tools\CustomFieldsDisplayFormatter;
@@ -311,4 +312,14 @@ it('leaves a deleted record out of a record custom field instead of printing its
     } finally {
         TenantContextService::setTenantId(null);
     }
+});
+
+it('writes a boolean value in the app language', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    Locales::apply('de');
+
+    $rows = resolve(CustomFieldsDisplayFormatter::class)
+        ->format($user, 'company', cleanFields: ['icp' => true], oldModel: null);
+
+    expect($rows[0]['new'])->toBe('Ja');
 });

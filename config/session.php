@@ -38,6 +38,8 @@ return [
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
+    'absolute_lifetime' => (int) env('SESSION_ABSOLUTE_LIFETIME', 129600),
+
     /*
     |--------------------------------------------------------------------------
     | Session Encryption

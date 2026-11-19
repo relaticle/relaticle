@@ -8,12 +8,15 @@ use App\Actions\Fortify\UpdateUserProfileInformation as UpdateUserProfileInforma
 use App\Actions\Profile\RemoveUserProfilePhoto;
 use App\Actions\Profile\RequestEmailChange;
 use App\Filament\Actions\ConfirmIdentityAction;
+use App\Filament\Pages\EditProfile;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\User;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\EmailProbeLimiter;
 use App\Support\EmailAddress;
+use App\Support\Locales;
 use App\Support\SameOriginUrl;
+use Closure;
 use DanHarrin\LivewireRateLimiting\Exceptions\TooManyRequestsException;
 use DateTimeZone;
 use Filament\Actions\Action;
@@ -32,6 +35,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 use League\Flysystem\UnableToCheckFileExistence;
+use Locale;
 use Throwable;
 
 final class UpdateProfileInformation extends BaseLivewireComponent
@@ -41,10 +45,23 @@ final class UpdateProfileInformation extends BaseLivewireComponent
 
     public function mount(): void
     {
-        $data = $this->authUser()->only(['name', 'email', 'timezone']);
+        $data = $this->profileState();
         $data['email'] = $this->confirmedEmailTarget() ?? $data['email'];
 
         $this->form->fill($data);
+    }
+
+    /**
+     * @return array<string, string|null>
+     */
+    private function profileState(): array
+    {
+        $user = $this->authUser();
+
+        return [
+            ...$user->only(['name', 'email', 'timezone']),
+            'locale' => Locales::isListed($user->locale) ? $user->locale : null,
+        ];
     }
 
     /**
@@ -61,6 +78,20 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             $offset = Date::now($identifier)->format('P');
 
             $options[$identifier] = "{$identifier} (UTC{$offset})";
+        }
+
+        return $options;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function localeOptions(): array
+    {
+        $options = [];
+
+        foreach (config('app.available_locales') as $code) {
+            $options[$code] = mb_ucfirst(Locale::getDisplayLanguage($code, $code));
         }
 
         return $options;
@@ -111,6 +142,12 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                             ->options($this->timezoneOptions())
                             ->searchable()
                             ->native(false),
+                        Select::make('locale')
+                            ->label(__('profile.form.locale.label'))
+                            ->helperText(__('profile.form.locale.helper_text'))
+                            ->placeholder(__('profile.form.locale.placeholder'))
+                            ->options($this->localeOptions())
+                            ->native(false),
                         Actions::make([
                             Action::make('save')
                                 ->label(__('profile.actions.save'))
@@ -147,7 +184,32 @@ final class UpdateProfileInformation extends BaseLivewireComponent
             return;
         }
 
-        $this->sendNotification();
+        $this->inUserLocale(fn () => $this->sendNotification());
+        $this->reloadWhenLanguageChanged();
+    }
+
+    /**
+     * @param  Closure(): void  $callback
+     */
+    private function inUserLocale(Closure $callback): void
+    {
+        Locales::within($this->authUser()->effectiveLocale(), $callback);
+    }
+
+    private function reloadWhenLanguageChanged(): void
+    {
+        if ($this->authUser()->effectiveLocale() !== app()->getLocale()) {
+            $this->redirect(EditProfile::getUrl(tenant: Filament::getTenant()), navigate: false);
+        }
+    }
+
+    public function unmountAction(bool|string|null $cancelParentActions = null): void
+    {
+        parent::unmountAction($cancelParentActions);
+
+        if (blank($this->mountedActions)) {
+            $this->reloadWhenLanguageChanged();
+        }
     }
 
     public function confirmEmailChangeAction(): ConfirmIdentityAction
@@ -167,7 +229,8 @@ final class UpdateProfileInformation extends BaseLivewireComponent
                 $this->form->validate();
             })
             ->confirmedUsing(function (?string $operationTarget): void {
-                $this->sendEmailChangeVerification((string) $operationTarget);
+                $this->inUserLocale(fn () => $this->sendEmailChangeVerification((string) $operationTarget));
+                $this->reloadWhenLanguageChanged();
             });
     }
 
@@ -208,7 +271,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
         }
 
         $this->form->fill([
-            ...$this->authUser()->only(['name', 'email', 'timezone']),
+            ...$this->profileState(),
             'profile_photo_path' => null,
         ]);
 

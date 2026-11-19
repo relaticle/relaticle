@@ -62,8 +62,8 @@ final readonly class MeetingTimePresenter
 
         return [
             'start_date' => $this->dateLabel($start, $crossDay ? $end : null),
-            'start_time' => $start->format('g:i A'),
-            'end_time' => $zeroLength ? null : $end->format('g:i A'),
+            'start_time' => $start->isoFormat('LT'),
+            'end_time' => $zeroLength ? null : $end->isoFormat('LT'),
             'end_date' => $crossDay ? $this->dateLabel($end, $start) : null,
             'duration' => $zeroLength ? null : $this->compactDuration($start, $end),
             'all_day' => false,
@@ -102,10 +102,10 @@ final readonly class MeetingTimePresenter
     private function dateLabel(CarbonInterface $date, ?CarbonInterface $other): string
     {
         if ($other instanceof CarbonInterface && $date->year !== $other->year) {
-            return $date->format('D, M j, Y');
+            return $date->isoFormat('ddd, ll');
         }
 
-        return $date->format('D, M j');
+        return $date->isoFormat('ddd, '.__('formats.iso.date_without_year'));
     }
 
     private function compactDuration(CarbonInterface $start, CarbonInterface $end): string

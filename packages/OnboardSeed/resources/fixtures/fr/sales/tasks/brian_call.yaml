@@ -1,0 +1,8 @@
+title: Appel de découverte avec Brian
+assigned_people:
+  - brian
+custom_fields:
+  description: Planifiez un appel pour discuter des possibilités de partenariat avec Airbnb.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: High

@@ -1,6 +1,6 @@
 {{-- The values of one plan line or batch row, as compact `label value` pairs.
 
-     Expects: $fields (display rows), $stepId, $titleKey / $titleLabel (the identity row the line header already shows), $editableCodes,
+     Expects: $fields (display rows), $stepId, $titleKey / $titleLabels (the identity row the line header already shows), $editableCodes,
      $index (the batch row, or null for a whole step), $skipTitle, $refLinks.
 
      Short values flow on one wrapped row. Text over 48 characters gets its own row, clamped to two lines with "more". --}}
@@ -16,7 +16,7 @@
     foreach ($fields as $row) {
         $code = $row['code'] ?? null;
 
-        if ($skipTitle && ($code === null ? ($row['label'] ?? null) === $titleLabel : $code === $titleKey)) {
+        if ($skipTitle && ($code === null ? in_array($row['label'] ?? null, $titleLabels, true) : $code === $titleKey)) {
             continue;
         }
 

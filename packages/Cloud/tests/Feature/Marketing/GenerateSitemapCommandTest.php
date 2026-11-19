@@ -75,7 +75,7 @@ it('adds help urls to the sitemap with lastmod from front matter', function (): 
     expect($xml)->toContain('<loc>'.route('help.index').'</loc>')
         ->and($xml)->toContain('<loc>'.route('help.category', ['category' => 'getting-started']).'</loc>')
         ->and($xml)->toContain('<loc>'.route('help.show', ['category' => 'getting-started', 'slug' => 'create-your-first-company']).'</loc>')
-        ->and($xml)->toMatch('#getting-started/create-your-first-company</loc>\s*<lastmod>2026-08-12#');
+        ->and($xml)->toMatch('#getting-started/create-your-first-company</loc>(?:(?!</url>).)*?<lastmod>2026-08-12#s');
 });
 
 it('stamps lastmod onto urls the crawler already found', function (): void {
@@ -94,7 +94,7 @@ it('stamps lastmod onto urls the crawler already found', function (): void {
     $this->artisan('app:generate-sitemap')->assertSuccessful();
 
     expect(Storage::disk('public')->get('sitemap.xml'))
-        ->toMatch('#getting-started/create-your-first-company</loc>\s*<lastmod>2026-08-12#');
+        ->toMatch('#getting-started/create-your-first-company</loc>(?:(?!</url>).)*?<lastmod>2026-08-12#s');
 });
 
 it('adds developer guide urls with lastmod from front matter', function (): void {
@@ -107,8 +107,8 @@ it('adds developer guide urls with lastmod from front matter', function (): void
         ->and($xml)->toContain('<loc>'.route('assistants.claude').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.chatgpt').'</loc>')
         ->and($xml)->toContain('<loc>'.route('security').'</loc>')
-        ->and($xml)->toMatch('#developers/self-hosting</loc>\s*<lastmod>2026-10-31#')
-        ->and($xml)->toMatch('#developers/mcp</loc>\s*<lastmod>2026-11-09#');
+        ->and($xml)->toMatch('#developers/self-hosting</loc>(?:(?!</url>).)*?<lastmod>2026-10-31#s')
+        ->and($xml)->toMatch('#developers/mcp</loc>(?:(?!</url>).)*?<lastmod>2026-11-09#s');
 });
 
 it('omits lastmod for a help page with no updated front matter', function (): void {
@@ -133,7 +133,28 @@ it('omits lastmod for a help page with no updated front matter', function (): vo
     $xml = Storage::disk('public')->get('sitemap.xml');
 
     expect($xml)->toContain('<loc>'.route('help.show', ['category' => 'no-date', 'slug' => 'undated-page']).'</loc>')
-        ->and($xml)->not->toMatch('#no-date/undated-page</loc>\s*<lastmod>#');
+        ->and($xml)->not->toMatch('#no-date/undated-page</loc>(?:(?!</url>).)*?<lastmod>#s');
+});
+
+it('lists the help pages of each language under its own prefix', function (): void {
+    $fixturePath = storage_path('framework/testing/sitemap-help-'.Str::random(8));
+
+    File::ensureDirectoryExists("{$fixturePath}/de/help/guides");
+    File::put("{$fixturePath}/de/help/guides/_index.md", "---\ntitle: Anleitungen\ndescription: Deutsche Anleitungen.\norder: 1\n---\n\nInhalt.\n");
+    File::put("{$fixturePath}/de/help/guides/widgets.md", "---\ntitle: Widgets\ndescription: Deutsche Widgets.\norder: 1\nupdated: 2026-11-01\n---\n\nInhalt.\n");
+
+    Config::set('documentation.content_path', $fixturePath);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    File::deleteDirectory($fixturePath);
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+
+    expect($xml)->toContain('<loc>'.route('de.help.index').'</loc>')
+        ->and($xml)->toContain('<loc>'.route('de.help.category', ['category' => 'guides']).'</loc>')
+        ->and($xml)->toMatch('#/de/help/guides/widgets</loc>(?:(?!</url>).)*?<lastmod>2026-11-01#s')
+        ->and($xml)->not->toContain('/es/help/');
 });
 
 it('excludes query string variants of a page already in the sitemap', function (): void {
@@ -194,4 +215,84 @@ it('serves the generated sitemap from the public disk', function (): void {
 
 it('returns not found before the sitemap is generated', function (): void {
     $this->get('/sitemap.xml')->assertNotFound();
+});
+
+it('lists every public page in every language with xhtml:link alternates', function (): void {
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+
+    foreach (['/pricing', '/crm-for-claude', '/compare/relaticle-vs-twenty', '/alternatives/attio'] as $path) {
+        foreach (['', '/de', '/es', '/fr'] as $prefix) {
+            expect($xml)->toContain('<loc>'.url($prefix.$path).'</loc>');
+        }
+    }
+
+    preg_match('#<url>\s*<loc>'.preg_quote(url('/de/pricing'), '#').'</loc>.*?</url>#s', $xml, $entry);
+
+    foreach (['en' => '/pricing', 'de' => '/de/pricing', 'es' => '/es/pricing', 'fr' => '/fr/pricing', 'x-default' => '/pricing'] as $hreflang => $path) {
+        expect($entry[0])->toContain('hreflang="'.$hreflang.'" href="'.url($path).'"');
+    }
+});
+
+it('gives every help page and category its language alternates and x-default', function (): void {
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+    $page = 'help/getting-started/create-your-first-company';
+
+    preg_match('#<url>\s*<loc>'.preg_quote(url('/de/'.$page), '#').'</loc>.*?</url>#s', $xml, $entry);
+
+    foreach (['en' => '', 'de' => '/de', 'es' => '/es', 'fr' => '/fr', 'x-default' => ''] as $hreflang => $prefix) {
+        expect($entry[0])->toContain('hreflang="'.$hreflang.'" href="'.url($prefix.'/'.$page).'"');
+    }
+
+    preg_match('#<url>\s*<loc>'.preg_quote(url('/fr/help/getting-started'), '#').'</loc>.*?</url>#s', $xml, $category);
+
+    expect($category[0])->toContain('hreflang="de" href="'.url('/de/help/getting-started').'"')
+        ->and($category[0])->toContain('hreflang="x-default" href="'.url('/help/getting-started').'"');
+});
+
+it('keeps the blog entry of a post the crawl also found', function (): void {
+    $post = Post::factory()->published()->create();
+    $url = route('blog.show', $post->slug);
+
+    fakeSitemapCrawl([
+        config('app.url') => '<html><body><a href="'.route('blog.index').'">Blog</a></body></html>',
+        route('blog.index') => '<html><body><a href="'.$url.'">Post</a></body></html>',
+        $url => '<html><body></body></html>',
+    ]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+
+    expect(substr_count($xml, '<loc>'.$url.'</loc>'))->toBe(1)
+        ->and($xml)->toMatch('#<loc>'.preg_quote($url, '#').'</loc>(?:(?!</url>).)*?<priority>0.7#s');
+});
+
+it('keeps the api reference in the crawl', function (): void {
+    fakeSitemapCrawl([
+        config('app.url') => '<html><body><a href="'.url('/developers/api').'">API</a></body></html>',
+        url('/developers/api') => '<html><body></body></html>',
+    ]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    expect(Storage::disk('public')->get('sitemap.xml'))->toContain('<loc>'.url('/developers/api').'</loc>');
+});
+
+it('lists a translated post with its alternates and leaves out a language with no post', function (): void {
+    $group = (string) Str::uuid();
+    $english = Post::factory()->published()->create(['locale' => 'en', 'translation_group' => $group]);
+    $german = Post::factory()->published()->create(['locale' => 'de', 'translation_group' => $group]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = Storage::disk('public')->get('sitemap.xml');
+
+    expect($xml)->toContain('<loc>'.route('blog.de.show', $german->slug).'</loc>')
+        ->and($xml)->toContain('hreflang="en" href="'.route('blog.show', $english->slug).'"')
+        ->and($xml)->toContain('<loc>'.route('blog.de.index').'</loc>')
+        ->and($xml)->not->toContain('/es/blog');
 });

@@ -80,6 +80,12 @@ return [
     ],
 
     'notifications' => [
+        'workspace_deletion_cancelled' => [
+            'success' => 'Workspace deletion cancelled',
+        ],
+        'workspace_deletion_scheduled' => [
+            'success' => 'Workspace scheduled for deletion on :date',
+        ],
         'workspace_invitation_sent' => [
             'success' => 'Invitation sent.',
             'success_many' => ':count invitations sent.',
@@ -171,6 +177,19 @@ return [
         'record_destroyed' => 'This record has been permanently deleted.',
         'yes' => 'Yes',
         'no' => 'No',
+        'outcome' => [
+            'created' => 'created :subject',
+            'deleted' => 'deleted :subject',
+            'restored' => 'restored :subject',
+            'other' => 'made a change to :subject',
+        ],
+        'subjects' => [
+            'company' => 'a company',
+            'people' => 'a person',
+            'opportunity' => 'an opportunity',
+            'task' => 'a task',
+            'note' => 'a note',
+        ],
         'columns' => [
             'created_at' => 'When',
             'causer' => 'Who',
@@ -237,6 +256,7 @@ return [
     ],
 
     'roles' => [
+        'unknown' => 'Unknown',
         'owner' => [
             'label' => 'Owner',
         ],

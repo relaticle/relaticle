@@ -71,7 +71,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
         $fields = [];
 
         if (($request['name'] ?? null) !== null) {
-            $fields[] = ['label' => 'Name', 'old' => $model->getAttribute('name'), 'new' => $request['name']];
+            $fields[] = ['label' => __('Name'), 'old' => $model->getAttribute('name'), 'new' => $request['name']];
         }
 
         $owner = $this->requestedOwner($request);
@@ -81,7 +81,7 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
             $company = $model;
 
             $fields[] = [
-                'label' => 'Account Owner',
+                'label' => __('Account Owner'),
                 'old' => $company->accountOwner->name ?? __('(none)'),
                 'new' => $owner === null ? __('(none)') : (WorkspaceMembersContext::nameOf($owner) ?? $owner),
                 '_oldValue' => $company->getAttribute('account_owner_id'),
@@ -90,8 +90,8 @@ final class UpdateCompanyTool extends BaseWriteUpdateTool
         }
 
         return [
-            'title' => 'Update Company',
-            'summary' => "Update company \"{$model->getAttribute('name')}\"",
+            'title' => __('Update Company'),
+            'summary' => __('Update company ":name"', ['name' => $model->getAttribute('name')]),
             'fields' => $fields,
         ];
     }

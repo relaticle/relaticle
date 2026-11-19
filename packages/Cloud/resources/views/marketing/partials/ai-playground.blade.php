@@ -26,13 +26,13 @@
 
     $opportunityRows = [
         ['deal' => 0],
-        ['name' => 'Trellis Labs pilot', 'company' => 'Trellis Labs', 'stage' => __('Negotiation/Review'), 'amount' => '$12,000'],
+        ['name' => __('Trellis Labs pilot'), 'company' => 'Trellis Labs', 'stage' => __('Negotiation/Review'), 'amount' => '$12,000'],
         ['deal' => 1],
-        ['name' => 'Lumen Health onboarding', 'company' => 'Lumen Health', 'stage' => __('Proposal/Price Quote'), 'amount' => '$18,000'],
+        ['name' => __('Lumen Health onboarding'), 'company' => 'Lumen Health', 'stage' => __('Proposal/Price Quote'), 'amount' => '$18,000'],
         ['deal' => 2],
-        ['name' => 'Northwind renewal', 'company' => 'Northwind', 'stage' => __('Closed Won'), 'amount' => '$48,000'],
-        ['name' => 'Halcyon Freight rollout', 'company' => 'Halcyon Freight', 'stage' => __('Qualification'), 'amount' => '$31,000'],
-        ['name' => 'Brightline analytics seats', 'company' => 'Brightline', 'stage' => __('Proposal/Price Quote'), 'amount' => '$9,600'],
+        ['name' => __('Northwind renewal'), 'company' => 'Northwind', 'stage' => __('Closed Won'), 'amount' => '$48,000'],
+        ['name' => __('Halcyon Freight rollout'), 'company' => 'Halcyon Freight', 'stage' => __('Qualification'), 'amount' => '$31,000'],
+        ['name' => __('Brightline analytics seats'), 'company' => 'Brightline', 'stage' => __('Proposal/Price Quote'), 'amount' => '$9,600'],
     ];
 
     $people = [
@@ -272,7 +272,7 @@
                                     @foreach($tasks as $index => [$taskTitle, $due, $company])
                                         <div class="{{ $row }} {{ $index >= 4 ? 'max-sm:hidden' : '' }} grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] sm:grid-cols-[minmax(0,1.8fr)_minmax(0,1fr)_minmax(0,1fr)]">
                                             <span class="truncate font-medium text-gray-900 dark:text-white">{{ $taskTitle }}</span>
-                                            <span @class(['truncate tabular-nums', 'text-red-600 dark:text-red-400' => $due->isPast(), 'text-gray-600 dark:text-gray-300' => ! $due->isPast()])>{{ $due->isoFormat('MMM D, YYYY') }}</span>
+                                            <span @class(['truncate tabular-nums', 'text-red-600 dark:text-red-400' => $due->isPast(), 'text-gray-600 dark:text-gray-300' => ! $due->isPast()])>{{ $due->isoFormat('ll') }}</span>
                                             <span class="hidden truncate text-gray-600 sm:block dark:text-gray-300">{{ $company }}</span>
                                         </div>
                                     @endforeach
@@ -491,7 +491,7 @@
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
                                                 <span class="chat-chip-label">{{ $taskTitle }}</span>
                                             </span>
-                                            <span class="ms-auto text-xs tabular-nums text-red-600 dark:text-red-400">{{ $due->isoFormat('MMM D') }}</span>
+                                            <span class="ms-auto text-xs tabular-nums text-red-600 dark:text-red-400">{{ $due->isoFormat(__('formats.iso.date_without_year')) }}</span>
                                         </li>
                                     @endforeach
                                 </ul>

@@ -1,0 +1,8 @@
+title: Animer la formation RevOps pour Zapier
+assigned_people:
+  - elena
+custom_fields:
+  description: Première de deux sessions d'intégration. La finance suit une fois RevOps en service.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High
