@@ -30,9 +30,11 @@ final readonly class CompanyObserver
 
     private function dispatchFaviconFetchIfNeeded(Company $company): void
     {
-        $company->unsetRelation('domainValue');
+        if (! resolve(LogoFinderDriver::class)->isConfigured()) {
+            return;
+        }
 
-        $domain = resolve(LogoFinderDriver::class)->isConfigured() ? $company->logoDomain() : null;
+        $domain = $company->load('domainValue.customField')->logoDomain();
 
         if ($domain === null) {
             return;

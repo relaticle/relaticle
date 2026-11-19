@@ -122,3 +122,25 @@ test('observer does not dispatch favicon job when the stored logo matches the do
 
     Bus::assertNotDispatched(FetchFaviconForCompany::class);
 });
+
+test('observer handles saving several companies loaded together', function (): void {
+    Bus::fake([FetchFaviconForCompany::class]);
+
+    $domainsField = CustomField::query()
+        ->where('code', CompanyField::DOMAINS->value)
+        ->forEntity(Company::class)
+        ->firstOrFail();
+
+    Company::factory()->count(2)->for($this->user->currentWorkspace)->create()
+        ->each(fn (Company $company): CustomFieldValue => CustomFieldValue::forceCreate([
+            'tenant_id' => $this->user->currentWorkspace->getKey(),
+            'entity_type' => 'company',
+            'entity_id' => $company->getKey(),
+            'custom_field_id' => $domainsField->getKey(),
+            'json_value' => ["{$company->getKey()}.example.com"],
+        ]));
+
+    Company::query()->whereKey(Company::query()->pluck('id'))->get()->each->touch();
+
+    Bus::assertDispatchedTimes(FetchFaviconForCompany::class, 2);
+});
