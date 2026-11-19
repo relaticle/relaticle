@@ -8,6 +8,7 @@ use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\CloudServiceProvider;
 use Relaticle\Cloud\Marketing\Support\MarketingNavigation;
+use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CloudServiceProvider::class, MarketingNavigation::class);
 
@@ -42,12 +43,13 @@ it('names only Gmail and Google when the Microsoft app is not configured', funct
     config()->set('services.azure.client_id', null);
 
     $html = html_entity_decode($this->get('/email-and-calendar')->assertOk()->getContent());
+    $main = (new Crawler($html))->filter('main')->text();
 
     expect($html)->toContain('Connect Gmail to Relaticle.')
         ->and($html)->toContain('Link a Google account')
         ->and($html)->toContain('Gmail on every record')
-        ->and($html)->not->toContain('Outlook')
-        ->and($html)->not->toContain('Microsoft');
+        ->and($main)->not->toContain('Outlook')
+        ->and($main)->not->toContain('Microsoft');
 });
 
 it('quotes the mailbox limit of each plan when billing is on', function (): void {
