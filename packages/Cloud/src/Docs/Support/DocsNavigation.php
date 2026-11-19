@@ -88,7 +88,7 @@ final readonly class DocsNavigation
     {
         return [
             'title' => __('API Reference'),
-            'url' => url(config('documentation.api_reference.url')),
+            'url' => url()->to(config()->string('documentation.api_reference.url')),
             'description' => __('REST API documentation for managing CRM entities.'),
         ];
     }
