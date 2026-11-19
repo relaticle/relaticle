@@ -181,7 +181,7 @@ it('restores the previous locale when the callback throws', function (): void {
     }
 
     expect(app()->getLocale())->toBe('es')
-        ->and(Number::format(1234.5))->toBe(Number::withLocale('es', fn () => Number::format(1234.5)));
+        ->and(Number::format(1234.5))->toBe(Number::withLocale(Locales::numberLocale('es'), fn () => Number::format(1234.5)));
 });
 
 it('labels the panel navigation group in the user language', function (): void {
