@@ -23,13 +23,13 @@ return [
             'label' => 'Created By',
         ],
         'created_at' => [
-            'label' => 'Created At',
+            'label' => 'Created at',
         ],
         'updated_at' => [
-            'label' => 'Updated At',
+            'label' => 'Updated at',
         ],
         'deleted_at' => [
-            'label' => 'Deleted At',
+            'label' => 'Deleted at',
         ],
     ],
 

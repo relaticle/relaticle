@@ -8,6 +8,9 @@ return [
     'navigation_label' => 'Aufgaben',
 
     'fields' => [
+        'title' => [
+            'label' => 'Titel',
+        ],
         'assignees' => [
             'label' => 'Zuständige',
             'placeholder' => 'Mitglied zuweisen',

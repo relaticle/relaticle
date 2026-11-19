@@ -89,6 +89,7 @@ final class OpportunityResource extends Resource
             ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns([
                 RecordChipColumn::make('name')
+                    ->label(__('Name'))
                     ->previewable(),
                 TextColumn::make('creator.name')
                     ->label(__('filament/resources/opportunity.fields.creator.label'))
@@ -97,15 +98,18 @@ final class OpportunityResource extends Resource
                     ->visibleFrom('sm')
                     ->getStateUsing(fn (Opportunity $record): string => $record->created_by),
                 TextColumn::make('deleted_at')
+                    ->label(__('filament/resources/opportunity.fields.deleted_at.label'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
+                    ->label(__('filament/resources/opportunity.fields.created_at.label'))
                     ->dateTime()
                     ->sortable()
                     ->visibleFrom('sm')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
+                    ->label(__('filament/resources/opportunity.fields.updated_at.label'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

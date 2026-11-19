@@ -34,7 +34,7 @@ return [
             'label' => 'Last Update',
         ],
         'deleted_at' => [
-            'label' => 'Deleted At',
+            'label' => 'Deleted at',
         ],
     ],
 

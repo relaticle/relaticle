@@ -29,6 +29,9 @@ return [
         'updated_at' => [
             'label' => 'Mis à jour le',
         ],
+        'deleted_at' => [
+            'label' => 'Supprimée le',
+        ],
     ],
 
     'filters' => [

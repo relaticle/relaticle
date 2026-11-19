@@ -8,6 +8,9 @@ return [
     'navigation_label' => 'Tâches',
 
     'fields' => [
+        'title' => [
+            'label' => 'Titre',
+        ],
         'assignees' => [
             'label' => 'Assignés',
             'placeholder' => 'Assigner un membre',
