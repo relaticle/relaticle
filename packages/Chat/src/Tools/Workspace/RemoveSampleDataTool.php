@@ -9,7 +9,6 @@ use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -21,6 +20,8 @@ use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 final class RemoveSampleDataTool implements Tool
 {
+    private const array RESOURCE_LANG_FILES = ['companies' => 'company', 'people' => 'person', 'tasks' => 'task', 'notes' => 'note', 'opportunities' => 'opportunity'];
+
     use LimitsPlanSteps;
     use WithConversationContext;
 
@@ -71,7 +72,7 @@ final class RemoveSampleDataTool implements Tool
                 'title' => __('Remove sample data'),
                 'summary' => trans_choice('Delete :count sample record|Delete :count sample records', $total, ['count' => $total]),
                 'fields' => array_map(
-                    static fn (string $table, int $count): array => ['label' => Str::headline($table), 'value' => (string) $count],
+                    static fn (string $table, int $count): array => ['label' => __('filament/resources/'.self::RESOURCE_LANG_FILES[$table].'.navigation_label'), 'value' => (string) $count],
                     array_keys($counts),
                     array_values($counts),
                 ),
