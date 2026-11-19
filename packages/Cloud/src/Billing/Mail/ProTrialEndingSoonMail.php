@@ -15,6 +15,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
@@ -41,7 +42,7 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'cloud::mail.pro-trial-ending-soon',
             with: [
-                'credits' => number_format(Plan::Pro->credits()),
+                'credits' => Number::format(Plan::Pro->credits(), locale: app()->getLocale()),
                 'endsOnLong' => $this->endsOn(__('formats.iso.date_at_time')),
                 'endsOnShort' => $this->endsOn(__('formats.iso.date_without_year')),
                 'zone' => $this->zoneLabel(),

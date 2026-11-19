@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Enums\Plan;
+use App\Features\Billing;
 use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Support\Locales;
@@ -10,6 +12,7 @@ use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Middleware\SetPublicLocale;
@@ -198,6 +201,20 @@ it('leaves a link to the unprefixed-only API reference English', function (): vo
 
     expect(LocalizedUrl::localizeLinks('<a href="/developers/api">x</a><a href="/developers/mcp">y</a>'))
         ->toBe('<a href="/developers/api">x</a><a href="/de/developers/mcp">y</a>');
+});
+
+it('groups the credits on a localized pricing page the way that language does', function (string $locale): void {
+    Feature::for(null)->activate(Billing::class);
+
+    $each = Locales::within($locale, fn (): string => __(':credits credits each month', ['credits' => Number::format(Plan::Pro->credits(), locale: $locale)]));
+
+    $this->get("/{$locale}/pricing")->assertOk()->assertSee($each, false);
+})->with(['de', 'fr']);
+
+it('keeps English grouping on the English pricing page', function (): void {
+    Feature::for(null)->activate(Billing::class);
+
+    $this->get('/pricing')->assertOk()->assertSee('2,000 credits each month', false);
 });
 
 it('sets the locale cookie', function (): void {

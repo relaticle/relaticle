@@ -33,7 +33,7 @@
                             <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.per_month') }}</span>
                             <span x-show="yearly" class="ms-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/[0.08] dark:text-gray-200">{{ __('cloud::billing.yearly_save', ['percent' => $plan->yearlySavingPercent()]) }}</span>
                         </p>
-                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('cloud::billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())])) : @js(__('cloud::billing.billed_monthly'))">{{ __('cloud::billing.billed_yearly', ['price' => number_format($plan->yearlyPrice())]) }}</p>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('cloud::billing.billed_yearly', ['price' => \Illuminate\Support\Number::format($plan->yearlyPrice())])) : @js(__('cloud::billing.billed_monthly'))">{{ __('cloud::billing.billed_yearly', ['price' => \Illuminate\Support\Number::format($plan->yearlyPrice())]) }}</p>
                     </div>
 
                     <x-cloud::marketing.button :variant="$isScale ? 'primary' : 'secondary'" :href="route('login')" class="mt-8 w-full" data-analytics-intent="signup" data-analytics-placement="pricing">
@@ -66,7 +66,7 @@
                 <h2 class="text-lg font-medium text-gray-950 dark:text-white">{{ __('billing.plans.enterprise') }}</h2>
                 <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.pricing_tagline') }}</p>
 
-                @php($enterprisePriceShort = '$'.rtrim(rtrim(number_format(config('relaticle.enterprise.starting_price_yearly') / 1000, 1), '0'), '.').'K')
+                @php($enterprisePriceShort = '$'.\Illuminate\Support\Number::format(config('relaticle.enterprise.starting_price_yearly') / 1000, maxPrecision: 1).'K')
                 <div class="mt-8" aria-label="{{ __('cloud::billing.enterprise.starting_price', ['price' => $enterprisePrice]) }}">
                     <p class="{{ $priceLabel }}">{{ __('Starting at') }}</p>
                     <p class="mt-3 flex flex-wrap items-baseline gap-x-1.5">

@@ -6,11 +6,11 @@
             'tagline' => __("cloud::billing.{$plan->value}_plan.tagline"),
             'rateYearly' => __('cloud::billing.upgrade.review.rate', ['price' => $plan->yearlyPricePerMonth()]),
             'rateMonthly' => __('cloud::billing.upgrade.review.rate', ['price' => $plan->monthlyPrice()]),
-            'amountYearly' => __('cloud::billing.upgrade.review.amount', ['amount' => number_format($plan->yearlyPrice())]),
-            'amountMonthly' => __('cloud::billing.upgrade.review.amount', ['amount' => number_format($plan->monthlyPrice())]),
+            'amountYearly' => __('cloud::billing.upgrade.review.amount', ['amount' => \Illuminate\Support\Number::format($plan->yearlyPrice())]),
+            'amountMonthly' => __('cloud::billing.upgrade.review.amount', ['amount' => \Illuminate\Support\Number::format($plan->monthlyPrice())]),
             'save' => __('cloud::billing.yearly_save', ['percent' => $plan->yearlySavingPercent()]),
             'lineItem' => __('cloud::billing.upgrade.review.line_item', ['plan' => $plan->marketingLabel(), 'workspace' => $workspace?->name]),
-            'credits' => __('cloud::billing.upgrade.review.credits', ['credits' => number_format($plan->credits())]),
+            'credits' => __('cloud::billing.upgrade.review.credits', ['credits' => \Illuminate\Support\Number::format($plan->credits())]),
         ]]);
     $default = $plans->get('pro');
 @endphp

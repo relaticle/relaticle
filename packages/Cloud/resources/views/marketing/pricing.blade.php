@@ -3,8 +3,8 @@
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $proPlan = \App\Enums\Plan::Pro;
     $scalePlan = \App\Enums\Plan::Scale;
-    $scaleCredits = number_format($scalePlan->credits());
-    $enterprisePrice = number_format(config('relaticle.enterprise.starting_price_yearly'));
+    $scaleCredits = \Illuminate\Support\Number::format($scalePlan->credits());
+    $enterprisePrice = \Illuminate\Support\Number::format(config('relaticle.enterprise.starting_price_yearly'));
     $pageTitle = __('Pricing - from $:price/mo per workspace - Relaticle', ['price' => $proPlan->yearlyPricePerMonth()]);
 @endphp
 
@@ -16,7 +16,7 @@
     :ogTitle="$pageTitle"
 >
     @php
-        $proCredits = number_format(\App\Enums\Plan::Pro->credits());
+        $proCredits = \Illuminate\Support\Number::format(\App\Enums\Plan::Pro->credits());
         $freeRateLimit = \App\Enums\Plan::Free->rateLimit();
         $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
         $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
@@ -78,7 +78,7 @@
         if ($billingActive) {
             $selfHostedCreditAnswer .= ' '.__(
                 'On Relaticle Cloud, new workspaces start a :days-day Cloud Pro trial with :trialCredits credits. Hosted access pauses when the trial ends without a subscription.',
-                ['days' => $trialDays, 'trialCredits' => number_format(\App\Enums\Plan::trialCredits())]
+                ['days' => $trialDays, 'trialCredits' => \Illuminate\Support\Number::format(\App\Enums\Plan::trialCredits())]
             );
 
             $hostedPriceCell = __('$:yearlyPerMonth/mo per workspace ($:yearly billed yearly, or $:monthly/mo billed monthly)', [
@@ -98,7 +98,7 @@
                     'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' and '),
                     'cheapestModel' => $cheapestModel,
                     'dearestModel' => $dearestEntry['label'],
-                    'dearestReplies' => number_format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
+                    'dearestReplies' => \Illuminate\Support\Number::format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
                     'days' => $trialDays,
                 ]
             );

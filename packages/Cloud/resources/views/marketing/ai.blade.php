@@ -21,7 +21,7 @@
     // runtime, and a tier with no model rendered " is free on every plan".
     $selfHostedNote = __('A self-hosted install supplies its own provider key, so you choose the model and pay the provider directly, or run a local one.');
 
-    $proCredits = number_format(\App\Enums\Plan::Pro->credits());
+    $proCredits = \Illuminate\Support\Number::format(\App\Enums\Plan::Pro->credits());
     $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
     $maxBatchSize = (int) config('chat.max_batch_size');
     $maxPlanSteps = (int) config('chat.max_plan_steps');

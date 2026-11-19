@@ -3,8 +3,8 @@
     $assistantName = (string) config('chat.assistant_name');
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
-    $freeCredits = number_format(\App\Enums\Plan::Free->credits());
-    $proCredits = number_format(\App\Enums\Plan::Pro->credits());
+    $freeCredits = \Illuminate\Support\Number::format(\App\Enums\Plan::Free->credits());
+    $proCredits = \Illuminate\Support\Number::format(\App\Enums\Plan::Pro->credits());
     $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
 
     $title = __('AI-native CRM: MCP, chat and self-hosting').' - Relaticle';
@@ -15,7 +15,7 @@
     $costAnswer = $billingActive
         ? __(
             'Relaticle Cloud meters AI by credits, never by seat. New workspaces get a :days-day Cloud Pro trial with :trialCredits credits. The paid plan includes a :credits-credit monthly allowance for unlimited users. A self-hosted install brings its own provider key or a local model and pays that provider directly.',
-            ['days' => $trialDays, 'trialCredits' => number_format(\App\Enums\Plan::trialCredits()), 'credits' => $proCredits]
+            ['days' => $trialDays, 'trialCredits' => \Illuminate\Support\Number::format(\App\Enums\Plan::trialCredits()), 'credits' => $proCredits]
         )
         : __(
             'Relaticle Cloud meters AI by credits, never by seat: every workspace gets a :credits-credit monthly allowance. A self-hosted install brings its own provider key or a local model and pays that provider directly.',

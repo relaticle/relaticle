@@ -25,9 +25,9 @@
                 [
                     'heading' => __('Who has the bigger community and ecosystem?'),
                     'body' => __('Twenty CRM has the bigger open-source footprint: :twentyStars GitHub stars and :twentyContributors contributors on the twentyhq/twenty repository, against Relaticle\'s :relaticleStars stars and :relaticleContributors. Twenty also ships :twentyExtensibility. Relaticle\'s extensibility is :relaticleExtensibility. If community size, third-party extensions, or the confidence of a large existing user base decides it for you, that point goes to Twenty; if you want a smaller codebase you can read end to end and extend directly, that favors Relaticle.', [
-                        'twentyStars' => number_format($competitor['stars']),
+                        'twentyStars' => \Illuminate\Support\Number::format($competitor['stars']),
                         'twentyContributors' => $competitor['contributors'],
-                        'relaticleStars' => number_format($relaticle['stars']),
+                        'relaticleStars' => \Illuminate\Support\Number::format($relaticle['stars']),
                         'relaticleContributors' => __(':count contributors', ['count' => $relaticle['contributors']]),
                         'twentyExtensibility' => $competitor['extensibility'],
                         'relaticleExtensibility' => $relaticle['extensibility'],
@@ -54,9 +54,9 @@
                 [
                     'heading' => __('Who has the bigger community and ecosystem?'),
                     'body' => __('EspoCRM has the longer track record: :espocrmStars GitHub stars and :espocrmContributors contributors, against Relaticle\'s :relaticleStars stars and :relaticleContributors. EspoCRM\'s extensibility is :espocrmExtensibility. Relaticle\'s is :relaticleExtensibility.', [
-                        'espocrmStars' => number_format($competitor['stars']),
+                        'espocrmStars' => \Illuminate\Support\Number::format($competitor['stars']),
                         'espocrmContributors' => $competitor['contributors'],
-                        'relaticleStars' => number_format($relaticle['stars']),
+                        'relaticleStars' => \Illuminate\Support\Number::format($relaticle['stars']),
                         'relaticleContributors' => __(':count contributors', ['count' => $relaticle['contributors']]),
                         'espocrmExtensibility' => $competitor['extensibility'],
                         'relaticleExtensibility' => $relaticle['extensibility'],

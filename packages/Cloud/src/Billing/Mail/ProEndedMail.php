@@ -16,6 +16,7 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
@@ -72,7 +73,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
                 'preheader' => $this->preheader(),
                 'isTrial' => $this->isTrial(),
                 'usage' => $this->isTrial() ? resolve(TrialUsageQuery::class)->forWorkspace($this->workspace) : null,
-                'credits' => number_format(Plan::Pro->credits()),
+                'credits' => Number::format(Plan::Pro->credits(), locale: app()->getLocale()),
                 'offersExtension' => $this->offersExtension(),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'ctaUrl' => $this->ctaUrl(),

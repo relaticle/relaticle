@@ -5,7 +5,7 @@
         }
 
         return __(':stars stars (as of :date)', [
-            'stars' => number_format($facts['stars']),
+            'stars' => \Illuminate\Support\Number::format($facts['stars']),
             'date' => \Carbon\CarbonImmutable::parse($facts['stars_verified'])->isoFormat('ll'),
         ]);
     };
@@ -16,7 +16,7 @@
         }
 
         return __(':count contributors (as of :date)', [
-            'count' => number_format($facts['contributors']),
+            'count' => \Illuminate\Support\Number::format($facts['contributors']),
             'date' => \Carbon\CarbonImmutable::parse($facts['contributors_verified'])->isoFormat('ll'),
         ]);
     };
