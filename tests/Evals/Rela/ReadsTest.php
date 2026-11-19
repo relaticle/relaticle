@@ -120,7 +120,7 @@ it('may say contact when the user said contact', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt($prompt)
         ->repeat(3)
-        ->toPassScorer(new CalledAnyOf(['ListPeopleTool', 'GetCompanyTool']))
+        ->toPassScorer(new CalledAnyOf(['ListPeopleTool', 'GetCompanyTool', 'ListCompaniesTool']))
         ->toPassScorer(new NoContactWord);
 })->group('test');
 
