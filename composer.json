@@ -16,7 +16,6 @@
         "php": "^8.5",
         "ext-intl": "*",
         "andreiio/blade-remix-icon": "^3.9",
-        "ashallendesign/favicon-fetcher": "^3.8",
         "blade-ui-kit/blade-heroicons": "^2.6",
         "blade-ui-kit/blade-icons": "^1.8",
         "doctrine/dbal": "^4.4",

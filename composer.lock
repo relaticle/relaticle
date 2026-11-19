@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "d5b9cf55787b3c993afac6bafe2c0918",
+    "content-hash": "30269d964472d8f435e84ee1ee791d7e",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -130,79 +130,6 @@
             },
             "time": "2026-09-13T06:25:37+00:00",
             "published-time": "2026-09-13T06:26:57+00:00"
-        },
-        {
-            "name": "ashallendesign/favicon-fetcher",
-            "version": "v3.12.0",
-            "source": {
-                "type": "git",
-                "url": "https://github.com/ash-jc-allen/favicon-fetcher.git",
-                "reference": "b60dffc7f82ed534126e5aed3fa571a7a3270373"
-            },
-            "dist": {
-                "type": "zip",
-                "url": "https://api.github.com/repos/ash-jc-allen/favicon-fetcher/zipball/b60dffc7f82ed534126e5aed3fa571a7a3270373",
-                "reference": "b60dffc7f82ed534126e5aed3fa571a7a3270373",
-                "shasum": ""
-            },
-            "require": {
-                "guzzlehttp/guzzle": "^7.4 || ^8.0",
-                "illuminate/cache": "^9.0|^10.0|^11.0|^12.0|^13.0",
-                "illuminate/filesystem": "^9.0|^10.0|^11.0|^12.0|^13.0",
-                "illuminate/http": "^9.0|^10.0|^11.0|^12.0|^13.0",
-                "nesbot/carbon": "^2.0|^3.0",
-                "php": "^8.1",
-                "symfony/dom-crawler": "^6.3 || ^7.0"
-            },
-            "require-dev": {
-                "larastan/larastan": "^2.0|^3.0",
-                "mockery/mockery": "^1.0",
-                "orchestra/testbench": "^7.0|^8.0|^9.0|^10.0|^11.0",
-                "phpunit/phpunit": "^9.0|^10.0|^11.0"
-            },
-            "type": "library",
-            "extra": {
-                "laravel": {
-                    "providers": [
-                        "AshAllenDesign\\FaviconFetcher\\FaviconFetcherProvider"
-                    ]
-                }
-            },
-            "autoload": {
-                "psr-4": {
-                    "AshAllenDesign\\FaviconFetcher\\": "src/"
-                }
-            },
-            "notification-url": "https://packagist.org/downloads/",
-            "license": [
-                "MIT"
-            ],
-            "authors": [
-                {
-                    "name": "Ash Allen",
-                    "email": "mail@ashallendesign.co.uk"
-                }
-            ],
-            "description": "A Laravel package for fetching website's favicons.",
-            "homepage": "https://github.com/ash-jc-allen/favicon-fetcher",
-            "keywords": [
-                "ashallendesign",
-                "favicon",
-                "favicon-fetcher",
-                "icon"
-            ],
-            "support": {
-                "issues": "https://github.com/ash-jc-allen/favicon-fetcher/issues",
-                "source": "https://github.com/ash-jc-allen/favicon-fetcher/tree/v3.12.0"
-            },
-            "funding": [
-                {
-                    "url": "https://github.com/ash-jc-allen",
-                    "type": "github"
-                }
-            ],
-            "time": "2026-07-23T09:07:33+00:00",
-            "published-time": "2026-07-23T09:07:58+00:00"
         },
         {
             "name": "aws/aws-crt-php",
