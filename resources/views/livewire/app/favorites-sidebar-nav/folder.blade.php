@@ -17,7 +17,7 @@
         <button
             type="button"
             x-on:click="$store.sidebar.toggleCollapsedGroup(@js($folderKey))"
-            x-bind:aria-expanded="! $store.sidebar.groupIsCollapsed(@js($folderKey))"
+            x-bind:aria-expanded="! {{ $isClosed }}"
             class="fi-sidebar-item-btn w-full pe-8 text-start group-hover/favorite-folder:bg-(--surface-sidebar-hover-bg)"
         >
             <x-lucide-folder-open :x-show="'! '.$isClosed" class="fi-icon fi-size-lg fi-sidebar-item-icon" />
@@ -54,7 +54,7 @@
     </div>
 
     <ul
-        x-show="! $store.sidebar.isOpen || ! $store.sidebar.groupIsCollapsed(@js($folderKey))"
+        x-show="! $store.sidebar.isOpen || ! {{ $isClosed }}"
         x-collapse.duration.200ms
         x-sort.ghost="move"
         {{-- A folder may not hold a folder, so this list only accepts favorites. --}}
