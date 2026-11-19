@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+use App\ActivityLog\AppEventRenderer;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
+use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\MergedActivityRenderer;
+use App\Support\Locales;
 use Filament\Facades\Filament;
+use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -254,3 +258,15 @@ it('words an entry of an unknown event as a full sentence in the interface langu
     expect($html)->toContain('hat eine Änderung an '.e($this->company->name).' vorgenommen')
         ->and($html)->not->toContain('custom event');
 })->mutates(MergedActivityRenderer::class);
+
+it('names a task in the timeline in the interface language', function (): void {
+    $task = Task::factory()->for($this->workspace)->create(['creator_id' => $this->user->getKey()]);
+    $this->company->tasks()->attach($task);
+    Locales::apply('de');
+
+    $entry = $this->company->timeline()->get()->first(fn (TimelineEntry $entry): bool => $entry->event === 'task_created');
+    $html = resolve(AppEventRenderer::class)->render($entry)->render();
+
+    expect($html)->toContain(e($this->user->name).' Aufgabe')
+        ->and($html)->not->toContain(e($this->user->name).' aufgabe');
+});

@@ -4,7 +4,7 @@
     $title = $entry->title ?? $fallbackTitle;
     $description = $entry->description
         ?? ($causerName
-            ? sprintf('%s %s', $causerName, Str::lower($fallbackTitle))
+            ? sprintf('%s %s', $causerName, $palette->inlineLabel())
             : $fallbackTitle);
     $badge = $palette->badge();
 @endphp
