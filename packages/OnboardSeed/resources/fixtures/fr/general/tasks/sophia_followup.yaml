@@ -1,0 +1,8 @@
+title: Relancer Sophia sur les conditions du contrat
+assigned_people:
+  - sophia
+custom_fields:
+  description: Contactez Sophia pour discuter de la structure du contrat, des livrables et des conditions de facturation de la mission de conseil.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

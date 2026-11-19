@@ -15,8 +15,8 @@ enum SortDirection: string implements HasIcon, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Desc => 'Descending',
-            self::Asc => 'Ascending',
+            self::Desc => __('enums/sort-direction.desc'),
+            self::Asc => __('enums/sort-direction.asc'),
         };
     }
 

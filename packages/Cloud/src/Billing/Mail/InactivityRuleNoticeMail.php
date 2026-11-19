@@ -39,7 +39,7 @@ final class InactivityRuleNoticeMail extends Mailable implements ShouldQueue
         return new Content(
             markdown: 'cloud::mail.inactivity-rule-notice',
             with: [
-                'date' => $this->deletesAt->setTimezone($this->workspace->ownerTimezone())->format('M j, Y'),
+                'date' => $this->deletesAt->setTimezone($this->workspace->ownerTimezone())->settings(['locale' => app()->getLocale()])->isoFormat('ll'),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
             ],
         );

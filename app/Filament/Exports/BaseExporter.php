@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Number;
 use Relaticle\CustomFields\Enums\FieldDataType;
 
 abstract class BaseExporter extends Exporter
@@ -154,5 +155,20 @@ abstract class BaseExporter extends Exporter
         }
 
         return $query;
+    }
+
+    protected static function completedBody(Export $export, string $entity): string
+    {
+        $body = __("filament/exports.notifications.completed.{$entity}.body", [
+            'rows' => trans_choice(':count row|:count rows', $export->successful_rows ?? 0, ['count' => Number::format($export->successful_rows ?? 0)]),
+        ]);
+
+        if (($failed = $export->getFailedRowsCount()) !== 0) {
+            $body .= ' '.__("filament/exports.notifications.completed.{$entity}.failed", [
+                'rows' => trans_choice(':count row|:count rows', $failed, ['count' => Number::format($failed)]),
+            ]);
+        }
+
+        return $body;
     }
 }

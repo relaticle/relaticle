@@ -1,3 +1,4 @@
+@use(Illuminate\Support\Number)
 @php
     $trialEndsAt = $workspace?->onGenericTrial() ? $workspace->trial_ends_at : null;
     $plans = collect([\App\Enums\Plan::Pro, \App\Enums\Plan::Scale])
@@ -6,11 +7,11 @@
             'tagline' => __("cloud::billing.{$plan->value}_plan.tagline"),
             'rateYearly' => __('cloud::billing.upgrade.review.rate', ['price' => $plan->yearlyPricePerMonth()]),
             'rateMonthly' => __('cloud::billing.upgrade.review.rate', ['price' => $plan->monthlyPrice()]),
-            'amountYearly' => __('cloud::billing.upgrade.review.amount', ['amount' => number_format($plan->yearlyPrice())]),
-            'amountMonthly' => __('cloud::billing.upgrade.review.amount', ['amount' => number_format($plan->monthlyPrice())]),
+            'amountYearly' => __('cloud::billing.upgrade.review.amount', ['amount' => Number::format($plan->yearlyPrice())]),
+            'amountMonthly' => __('cloud::billing.upgrade.review.amount', ['amount' => Number::format($plan->monthlyPrice())]),
             'save' => __('cloud::billing.yearly_save', ['percent' => $plan->yearlySavingPercent()]),
             'lineItem' => __('cloud::billing.upgrade.review.line_item', ['plan' => $plan->marketingLabel(), 'workspace' => $workspace?->name]),
-            'credits' => __('cloud::billing.upgrade.review.credits', ['credits' => number_format($plan->credits())]),
+            'credits' => __('cloud::billing.upgrade.review.credits', ['credits' => Number::format($plan->credits())]),
         ]]);
     $default = $plans->get('pro');
 @endphp
@@ -129,7 +130,7 @@
 
                     @if($trialEndsAt !== null)
                         <p class="mt-4 rounded-lg bg-primary/[0.06] p-3 text-xs text-primary-700 dark:text-primary-300">
-                            {{ __('cloud::billing.upgrade.trial_notice', ['date' => $trialEndsAt->toFormattedDateString()]) }}
+                            {{ __('cloud::billing.upgrade.trial_notice', ['date' => $trialEndsAt->isoFormat('ll')]) }}
                         </p>
                     @endif
 

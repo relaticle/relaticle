@@ -26,7 +26,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 use Livewire\Mechanisms\HandleRequests\HandleRequests;
 use LogicException;
 use Relaticle\Flowforge\Contracts\HasBoard;
@@ -255,7 +254,7 @@ trait HasViewSwitcher
         return new HtmlString(view('filament.app.tables.view-settings', [
             'shown' => array_values(array_filter($columns, fn (array $column): bool => $column['isShown'])),
             'hidden' => array_values(array_filter($columns, fn (array $column): bool => ! $column['isShown'] && ! $column['isLocked'])),
-            'entityLabel' => Str::lower(static::getResource()::getModelLabel()),
+            'entityLabel' => static::getResource()::getModelLabel(),
             'canCreateAttribute' => is_callable([$this, 'canCreateTableAttribute']) && call_user_func([$this, 'canCreateTableAttribute']),
         ])->render());
     }
@@ -335,7 +334,7 @@ trait HasViewSwitcher
 
     private function viewSwitcherLabel(string $kind): string
     {
-        $records = str(static::getResource()::getPluralModelLabel())->lower()->toString();
+        $records = static::getResource()::getPluralModelLabel();
         $entityKey = "filament/pages/boards.view_switcher.{$this->viewSwitcherEntity()->value}_board";
 
         return match (true) {
@@ -374,7 +373,7 @@ trait HasViewSwitcher
         $zone = FilamentTimezone::get();
 
         foreach ($views as $view) {
-            $date = $view->created_at?->setTimezone($zone)->translatedFormat('M j, Y');
+            $date = $view->created_at?->setTimezone($zone)->isoFormat('ll');
 
             $isBoard = $view->type === SavedViewType::Board;
             $layout = $isBoard ? 'board' : 'list';

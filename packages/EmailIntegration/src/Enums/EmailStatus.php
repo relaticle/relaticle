@@ -20,13 +20,13 @@ enum EmailStatus: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::SYNCED => 'Synced',
-            self::DRAFT => 'Draft',
-            self::QUEUED => 'Queued',
-            self::SENDING => 'Sending',
-            self::SENT => 'Sent',
-            self::FAILED => 'Failed',
-            self::CANCELLED => 'Cancelled',
+            self::SYNCED => __('enums/email-status.synced'),
+            self::DRAFT => __('enums/email-status.draft'),
+            self::QUEUED => __('enums/email-status.queued'),
+            self::SENDING => __('enums/email-status.sending'),
+            self::SENT => __('enums/email-status.sent'),
+            self::FAILED => __('enums/email-status.failed'),
+            self::CANCELLED => __('enums/email-status.cancelled'),
         };
     }
 

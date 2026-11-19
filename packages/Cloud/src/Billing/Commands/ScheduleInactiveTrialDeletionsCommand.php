@@ -85,7 +85,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
                     return false;
                 }
 
-                Mail::to($owner->email)->queue(new InactiveWorkspaceDeletionWarningMail($workspace, $deletesAt, $lastActiveAt));
+                Mail::to($owner)->queue(new InactiveWorkspaceDeletionWarningMail($workspace, $deletesAt, $lastActiveAt));
 
                 return true;
             });
@@ -160,7 +160,7 @@ final class ScheduleInactiveTrialDeletionsCommand extends Command
 
             $this->info("Reminding the owner of {$workspace->name}...");
 
-            Mail::to($owner->email)->queue(new InactiveWorkspaceDeletionReminderMail($workspace, $deletesAt));
+            Mail::to($owner)->queue(new InactiveWorkspaceDeletionReminderMail($workspace, $deletesAt));
 
             return true;
         });

@@ -1,0 +1,8 @@
+title: Planifier un appel de rétention avec Intercom
+assigned_people:
+  - tomas
+custom_fields:
+  description: L'usage est en baisse de 40 %. Identifiez l'outil concurrent et ce qui les retiendrait.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

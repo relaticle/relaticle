@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
@@ -198,6 +199,20 @@ it('cancel row action is hidden for non-queued emails', function (): void {
     livewire(OutboxTable::class)
         ->filterTable('status_tab', 'failed')
         ->assertActionHidden(TestAction::make('cancel')->table($failed));
+});
+
+it('labels the retry row action in the language of the user', function (): void {
+    Locales::apply('de');
+    $failed = makeOutboxEmail($this->user, $this->account, EmailStatus::FAILED);
+
+    livewire(OutboxTable::class)
+        ->filterTable('status_tab', 'failed')
+        ->assertActionHasLabel(TestAction::make('retry')->table($failed), 'Wiederholen');
+
+    $queued = makeOutboxEmail($this->user, $this->account, EmailStatus::QUEUED);
+    livewire(OutboxTable::class)
+        ->assertActionHasLabel(TestAction::make('cancel')->table($queued), 'Abbrechen')
+        ->assertActionHasLabel(TestAction::make('reschedule')->table($queued), 'Neu terminieren');
 });
 
 it('reschedule row action updates scheduled_for', function (): void {

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\AuthMethod;
 use App\Enums\SocialiteProvider;
 use App\Filament\Actions\ConfirmIdentityAction;
 use App\Filament\Pages\Dashboard;
@@ -13,11 +14,12 @@ use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use App\Support\Locales;
+use Filament\Facades\Filament;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Session;
-use Illuminate\Support\Str;
 use Laravel\Fortify\Events\TwoFactorAuthenticationChallenged;
 use Laravel\Passkeys\Passkey;
 use Laravel\Socialite\Facades\Socialite;
@@ -221,23 +223,6 @@ test('a confirmation inside the confirmation window still satisfies the gate', f
         ->assertNotified(__('profile.notifications.logged_out_other_sessions.success'));
 });
 
-test('a genuine remember-me cookie with enrolled MFA is suspended and its recaller cookie cleared', function (): void {
-    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
-    $rememberToken = Str::random(60);
-    $user->forceFill(['remember_token' => $rememberToken])->save();
-
-    $recallerName = 'remember_web_'.sha1(SessionGuard::class);
-    $recallerValue = "{$user->getAuthIdentifier()}|{$rememberToken}|{$user->password}";
-
-    $this->withCookie($recallerName, $recallerValue)
-        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
-        ->assertRedirect(route('two-factor.login'))
-        ->assertCookieExpired($recallerName);
-
-    $this->assertGuest('web');
-    expect($user->fresh()->remember_token)->toBe($rememberToken);
-});
-
 test('a restored session with enrolled MFA is suspended before reaching a protected page', function (): void {
     $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
     $user->forceFill(['remember_token' => 'original-remember-token'])->save();
@@ -250,6 +235,32 @@ test('a restored session with enrolled MFA is suspended before reaching a protec
     $this->assertGuest('web');
     expect(session('auth.pending.method'))->toBe('remembered');
     expect($user->fresh()->remember_token)->toBe('original-remember-token');
+});
+
+test('completes a sign-in that was pending with the old remember flag', function (): void {
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create();
+    AuthenticationSession::begin($user, AuthMethod::PASSWORD, null);
+    session()->put('auth.pending.remember', true);
+
+    $response = $this->post(route('two-factor.login.store'), [
+        'recovery_code' => 'recovery-code-one',
+    ]);
+
+    $response->assertRedirect();
+    $this->assertAuthenticatedAs($user);
+    $response->assertCookieMissing('remember_web_'.sha1(SessionGuard::class));
+});
+
+test('the recaller cookie of an incomplete session restores nothing', function (): void {
+    $user = User::factory()->withWorkspace()->withConfirmedMfa()->create(['remember_token' => 'issued-before-the-change']);
+    $recaller = 'remember_web_'.sha1(SessionGuard::class);
+    $hash = $user->password;
+
+    $this->withCookie($recaller, "{$user->getKey()}|issued-before-the-change|{$hash}")
+        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
+        ->assertRedirect(Filament::getPanel('app')->getLoginUrl());
+
+    $this->assertGuest('web');
 });
 
 test('a restored session stays challenged across repeated requests until MFA completes', function (): void {
@@ -392,4 +403,14 @@ test('rotates the remember token and does not claim other sessions ended when th
         ->assertNotified(__('profile.notifications.logged_out_other_sessions.remembered_only', ['minutes' => config('session.lifetime')]));
 
     expect($user->refresh()->remember_token)->not->toBe('other-device-token');
+});
+
+it('labels the security sections in the user language for screen readers', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+    Locales::apply('de');
+
+    Livewire::test(Security::class)
+        ->assertDontSee('Browser sessions');
 });

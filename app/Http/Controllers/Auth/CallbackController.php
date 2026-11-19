@@ -236,7 +236,6 @@ final readonly class CallbackController
             $user,
             AuthMethod::from($provider->value),
             (string) $account->getKey(),
-            remember: true,
         );
 
         return redirect()->to($next);

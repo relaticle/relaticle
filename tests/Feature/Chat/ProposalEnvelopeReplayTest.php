@@ -121,11 +121,11 @@ it('names each custom field a record changes in the replayed echo', function ():
     expect($replayed['summary']['records'][0])->toBe(['label' => 'Acme', 'fields' => ['name', 'tier', 'region']]);
 });
 
-it('labels an update by the record name, not by its card summary, when the data carries no name', function (): void {
+it('labels an update by the record name the display carries when the data carries no name', function (): void {
     $action = ProposalCardFixture::proposal(
         $this->user,
         ['_record_id' => '01ABC', '_model_class' => 'company', 'custom_fields' => ['tier' => 'gold']],
-        ['title' => 'Update Company', 'summary' => 'Update company "Acme"'],
+        ['title' => 'Update Company', 'name' => 'Acme', 'summary' => 'Update company "Acme"'],
     );
     $action->forceFill(['operation' => 'update'])->save();
 

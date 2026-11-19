@@ -199,3 +199,22 @@ function honeypotFields(): array
         'valid_from' => (string) EncryptedTime::create(now()->subMinute()),
     ];
 }
+
+it('names the empty contact fields in the page language', function (string $path, string $name, string $message): void {
+    $errors = $this->post($path, honeypotFields())->assertSessionHasErrors(['name', 'message'])->baseResponse->getSession()->get('errors');
+
+    expect($errors->first('name'))->toContain($name)->and($errors->first('message'))->toContain($message);
+})->with([
+    ['/de/contact', 'Name', 'Nachricht'],
+    ['/es/contact', 'nombre', 'mensaje'],
+    ['/fr/contact', 'nom', 'message'],
+]);
+
+it('shows the email placeholder in the page language', function (string $path, string $placeholder): void {
+    $this->get($path)->assertOk()->assertSee('placeholder="'.$placeholder.'"', false);
+})->with([
+    ['/contact', 'you@company.com'],
+    ['/de/contact', 'sie@firma.de'],
+    ['/es/contact', 'usted@empresa.com'],
+    ['/fr/contact', 'vous@entreprise.fr'],
+]);

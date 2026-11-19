@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Mail;
 
+use App\Enums\WorkspaceRole;
 use App\Mail\Contracts\EssentialMail;
 use App\Models\WorkspaceInvitation;
 use Illuminate\Bus\Queueable;
@@ -16,7 +17,6 @@ use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
-use Laravel\Jetstream\Jetstream;
 
 /**
  * Encrypted on the queue: the accept token is a bearer credential and is stored
@@ -54,7 +54,7 @@ final class WorkspaceInvitationMail extends Mailable implements EssentialMail, S
                 'acceptUrl' => route('workspace-invitations.token.accept', ['token' => $this->rawToken]),
                 'inviterName' => $this->invitation->inviter === null ? null : Str::squish($this->invitation->inviter->name),
                 'workspaceName' => Str::squish($this->invitation->workspace->name),
-                'roleName' => Jetstream::findRole($this->invitation->role)?->name,
+                'roleName' => WorkspaceRole::labelFor($this->invitation->role),
             ],
         );
     }

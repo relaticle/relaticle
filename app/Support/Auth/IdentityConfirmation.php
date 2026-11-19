@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Support\Auth;
 
+use App\Actions\Auth\VerifyTotpCode;
 use App\Models\User;
 use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
@@ -12,7 +13,6 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\ValidationException;
-use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Laravel\Fortify\Fortify;
 use Throwable;
 
@@ -191,7 +191,7 @@ final readonly class IdentityConfirmation
                 try {
                     $secret = Fortify::currentEncrypter()->decrypt((string) $currentUser->two_factor_secret);
 
-                    return resolve(TwoFactorAuthenticationProvider::class)->verify($secret, $code);
+                    return resolve(VerifyTotpCode::class)->execute($currentUser, $secret, $code);
                 } catch (Throwable) {
                     return false;
                 }

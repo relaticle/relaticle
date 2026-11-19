@@ -165,16 +165,16 @@
                         <template x-for="(item, itemIdx) in action.display.items" :key="itemIdx">
                             <div class="py-3">
                                 <div class="flex items-center justify-between gap-2">
-                                    <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalItemLabel(item)">
+                                    <template x-if="window.ChatModules.recordChipIcon(action.entity_type) && proposalItemLabel(item, action)">
                                         <span
                                             class="min-w-0 truncate text-sm font-semibold leading-5 text-gray-900 dark:text-white"
                                             data-proposal-record-chip
                                             :data-record-type="action.entity_type"
-                                            x-text="proposalItemLabel(item)"
+                                            x-text="proposalItemLabel(item, action)"
                                         ></span>
                                     </template>
 
-                                    <template x-if="!window.ChatModules.recordChipIcon(action.entity_type) || !proposalItemLabel(item)">
+                                    <template x-if="!window.ChatModules.recordChipIcon(action.entity_type) || !proposalItemLabel(item, action)">
                                         <div class="min-w-0 truncate text-sm font-medium text-gray-900 dark:text-white" x-text="item.summary"></div>
                                     </template>
 

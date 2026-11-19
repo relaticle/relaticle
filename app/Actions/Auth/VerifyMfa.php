@@ -10,7 +10,6 @@ use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Laravel\Fortify\Contracts\TwoFactorAuthenticationProvider;
 use Laravel\Fortify\Events\TwoFactorAuthenticationFailed;
 use Laravel\Fortify\Events\ValidTwoFactorAuthenticationCodeProvided;
 use Laravel\Fortify\Fortify;
@@ -18,7 +17,10 @@ use Throwable;
 
 final readonly class VerifyMfa
 {
-    public function __construct(private CompleteAuthentication $completeAuthentication) {}
+    public function __construct(
+        private CompleteAuthentication $completeAuthentication,
+        private VerifyTotpCode $verifyTotpCode,
+    ) {}
 
     public function execute(?string $code, ?string $recoveryCode): string
     {
@@ -72,7 +74,7 @@ final readonly class VerifyMfa
                 try {
                     $secret = Fortify::currentEncrypter()->decrypt((string) $currentUser->two_factor_secret);
 
-                    return resolve(TwoFactorAuthenticationProvider::class)->verify($secret, $code);
+                    return $this->verifyTotpCode->execute($currentUser, $secret, $code);
                 } catch (Throwable) {
                     return false;
                 }

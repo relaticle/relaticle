@@ -1,0 +1,8 @@
+title: Passer en revue le calendrier de contenus avec David
+assigned_people:
+  - david
+custom_fields:
+  description: Passez en revue le calendrier de contenus du T2 avec David et mettez-vous d'accord sur les thèmes des campagnes e-mail et le rythme de publication.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium

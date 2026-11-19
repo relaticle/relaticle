@@ -12,6 +12,7 @@ use App\Models\CustomFieldValue;
 use App\Models\User;
 use App\Support\CustomFieldDefinitionValidator;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Support\Number;
 use Illuminate\Validation\ValidationException;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -177,7 +178,7 @@ final class DeleteCustomFieldTool implements Tool
             ['label' => __('Record type'), 'value' => CrmEntity::from((string) $field->entity_type)->singularName()],
             ['label' => __('Values deleted'), 'value' => $holders === 0
                 ? __('None. No record holds a value for it.')
-                : trans_choice('{1} The value on :count record|[2,*] The values on :count records', $holders, ['count' => number_format($holders)])],
+                : trans_choice('{1} The value on :count record|[2,*] The values on :count records', $holders, ['count' => Number::format($holders)])],
         ];
 
         if ($options !== []) {

@@ -3,7 +3,7 @@
      Expects: $step. The line opens to the full message, read-only; the step gets its own card once nothing else is left to approve. --}}
 @php
     $entityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath($step['entity_type']);
-    $recipient = collect($step['fields'])->firstWhere('label', 'To')['value'] ?? null;
+    $recipient = collect($step['fields'])->whereIn('label', [__('To'), 'To'])->first()['value'] ?? null;
     $lineName = $step['recordLabel'] !== '' ? $step['recordLabel'] : $step['summary'];
 @endphp
 

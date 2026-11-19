@@ -10,6 +10,7 @@ use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use App\Support\Locales;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -151,7 +152,7 @@ final class ProcessChatMessage implements ShouldQueue
 
     public function handle(CreditService $creditService): void
     {
-        resolve(CurrentWorkspace::class)->within($this->workspace, fn () => $this->process($creditService));
+        Locales::within($this->user->effectiveLocale(), fn () => resolve(CurrentWorkspace::class)->within($this->workspace, fn () => $this->process($creditService)));
     }
 
     private function process(CreditService $creditService): void
@@ -224,10 +225,10 @@ final class ProcessChatMessage implements ShouldQueue
             $agent->withConversationId($this->conversationId);
             $agent->withTurnId($this->turnId);
             $agent->continue($this->conversationId, as: $this->user);
-            $agent->withUserTimezone($this->user->timezone);
+            $agent->withUserTimezone($this->user->timezone)->withLanguage($this->user->effectiveLocale());
             $agent->withWorkspace($this->workspace);
             $agent->withSetupMode($this->isSetupConversation())->withOpeningTurn($this->opensConversation());
-            $agent->withTurnOrigin($this->origin);
+            $agent->withTurnOrigin($this->origin)->withTypedText($this->typedText());
             $agent->withCurrentUser([
                 'name' => $this->user->name,
                 'id' => (string) $this->user->getKey(),
@@ -535,6 +536,11 @@ final class ProcessChatMessage implements ShouldQueue
     }
 
     public function failed(?Throwable $exception): void
+    {
+        Locales::within($this->user->effectiveLocale(), fn () => $this->settleFailedTurn($exception));
+    }
+
+    private function settleFailedTurn(?Throwable $exception): void
     {
         $this->reportTimeout($exception);
 
@@ -1123,6 +1129,14 @@ final class ProcessChatMessage implements ShouldQueue
                 'document' => json_encode($document, JSON_THROW_ON_ERROR),
                 'steps' => StoredSteps::text($acknowledgement),
             ]);
+    }
+
+    private function typedText(): string
+    {
+        // An attachment turn's message holds the file's contents, so only the document says what the user typed.
+        return $this->attachment === null
+            ? $this->message
+            : $this->getParser()->parse($this->document, $this->workspace)['text'];
     }
 
     private function getParser(): TipTapDocumentParser

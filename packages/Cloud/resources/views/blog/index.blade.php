@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $title = match (true) {
         isset($category) => __(':name: CRM Blog', ['name' => $category->name]),
@@ -46,10 +47,10 @@
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 @if(isset($category))
                     {{ __('Posts in') }} <span class="font-medium text-gray-950 dark:text-white">{{ $category->name }}</span>
-                    &middot; <a href="{{ route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
+                    &middot; <a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @elseif(isset($tag))
                     {{ __('Posts tagged') }} <span class="font-medium text-gray-950 dark:text-white">#{{ $tag->name }}</span>
-                    &middot; <a href="{{ route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
+                    &middot; <a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @else
                     {{ __('Deep dives into self-hosting, MCP, custom attributes and the code behind Relaticle.') }}
                 @endif
@@ -67,7 +68,7 @@
                     {{-- total() counts the filtered set, so "no posts yet" would be a
                          lie here: the archive has posts, this filter just matched none. --}}
                     <p class="type-prose text-gray-700 dark:text-gray-200">{{ __('Nothing matched. Try another search or browse everything.') }}</p>
-                    <a href="{{ route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
+                    <a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @else
                     <p class="type-prose text-gray-700 dark:text-gray-200">{{ __('No posts yet. Check back soon.') }}</p>
                 @endif

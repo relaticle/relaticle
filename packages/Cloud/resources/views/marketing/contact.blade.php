@@ -1,7 +1,8 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-cloud::guest-layout
-    title="Contact: Deployments and integrations - Relaticle"
-    description="Get in touch with the Relaticle team. Questions about enterprise deployments, custom integrations, or partnerships."
-    ogTitle="Contact: Deployments and integrations - Relaticle"
+    :title="__('Contact: Deployments and integrations - Relaticle')"
+    :description="__('Get in touch with the Relaticle team. Questions about enterprise deployments, custom integrations, or partnerships.')"
+    :ogTitle="__('Contact: Deployments and integrations - Relaticle')"
 >
     @php
         $inquiryKey = $inquiry?->value;
@@ -18,7 +19,7 @@
                 {{ $inquiry ? __("cloud::billing.inquiry.{$inquiryKey}.body") : __('Questions about deployments, integrations, or partnerships? Get in touch with our team.') }}
             </p>
             @if($inquiry)
-                <a href="{{ route('pricing') }}" class="mt-5 inline-flex items-center gap-2 text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">
+                <a href="{{ LocalizedUrl::route('pricing') }}" class="mt-5 inline-flex items-center gap-2 text-sm font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">
                     <x-lucide-arrow-left class="size-4" />
                     {{ __('Back to pricing') }}
                 </a>
@@ -37,11 +38,11 @@
                     <x-cloud::marketing.eyebrow class="mb-4">{{ __('Other ways in') }}</x-cloud::marketing.eyebrow>
                     <ul class="divide-rail border-rail divide-y border-y">
                         @feature(App\Features\Documentation::class)
-                            <li><a href="{{ route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-life-buoy class="size-4 text-gray-400"/>Help center</a></li>
-                            <li><a href="{{ route('documentation.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-book-open class="size-4 text-gray-400"/>Developer Docs</a></li>
+                            <li><a href="{{ LocalizedUrl::route('help.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-life-buoy class="size-4 text-gray-400"/>{{ __('Help center') }}</a></li>
+                            <li><a href="{{ LocalizedUrl::route('documentation.index') }}" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-lucide-book-open class="size-4 text-gray-400"/>{{ __('Developer Docs') }}</a></li>
                         @endfeature
-                        <li><a href="{{ route('discord') }}" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-discord-fill class="size-4 text-gray-400"/>Join Discord community</a></li>
-                        <li><a href="https://github.com/relaticle/relaticle" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-github-fill class="size-4 text-gray-400"/>GitHub repository</a></li>
+                        <li><a href="{{ route('discord') }}" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-discord-fill class="size-4 text-gray-400"/>{{ __('Join Discord community') }}</a></li>
+                        <li><a href="https://github.com/relaticle/relaticle" target="_blank" class="flex items-center gap-3 py-3 text-sm font-medium text-gray-700 transition-colors hover:text-gray-950 dark:text-gray-300 dark:hover:text-white"><x-ri-github-fill class="size-4 text-gray-400"/>{{ __('GitHub repository') }}</a></li>
                     </ul>
                 @endif
             </div>
@@ -52,21 +53,21 @@
                         <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
                             <x-lucide-check class="w-6 h-6 text-primary"/>
                         </div>
-                        <h3 class="text-lg font-semibold text-gray-950 dark:text-white">Message sent</h3>
+                        <h3 class="text-lg font-semibold text-gray-950 dark:text-white">{{ __('Message sent') }}</h3>
                         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">{{ session('success') }}</p>
                     </div>
                 @else
-                    <form method="POST" action="{{ route('contact', $inquiry ? ['plan' => $inquiryKey] : []) }}" class="max-w-2xl space-y-6">
+                    <form method="POST" action="{{ LocalizedUrl::route('contact.store', $inquiry ? ['plan' => $inquiryKey] : []) }}" class="max-w-2xl space-y-6">
                         @csrf
                         <x-honeypot />
 
-                        <x-cloud::marketing.input label="Name" :required="true" type="text" name="name" id="name" autocomplete="name" required :value="old('name')" placeholder="Your name"/>
+                        <x-cloud::marketing.input :label="__('Name')" :required="true" type="text" name="name" id="name" autocomplete="name" required :value="old('name')" :placeholder="__('Your name')"/>
 
-                        <x-cloud::marketing.input label="Work email" :required="true" type="email" name="email" id="email" autocomplete="email" required :value="old('email')" placeholder="you@company.com"/>
+                        <x-cloud::marketing.input :label="__('Work email')" :required="true" type="email" name="email" id="email" autocomplete="email" required :value="old('email')" :placeholder="__('you@company.com')"/>
 
-                        <x-cloud::marketing.input label="Company" type="text" name="company" id="company" autocomplete="organization" :value="old('company')" placeholder="Your company"/>
+                        <x-cloud::marketing.input :label="__('Company')" type="text" name="company" id="company" autocomplete="organization" :value="old('company')" :placeholder="__('Your company')"/>
 
-                        <x-cloud::marketing.textarea :label="$inquiry ? __('cloud::billing.inquiry.'.$inquiryKey.'.message_label') : __('How can we help?')" :required="true" name="message" id="message" :rows="$inquiry ? 8 : 5" required placeholder="Tell us about your project, team size, and any specific requirements...">{{ old('message', $inquiry ? __("cloud::billing.inquiry.{$inquiryKey}.message") : '') }}</x-cloud::marketing.textarea>
+                        <x-cloud::marketing.textarea :label="$inquiry ? __('cloud::billing.inquiry.'.$inquiryKey.'.message_label') : __('How can we help?')" :required="true" name="message" id="message" :rows="$inquiry ? 8 : 5" required :placeholder="__('Tell us about your project, team size, and any specific requirements...')">{{ old('message', $inquiry ? __("cloud::billing.inquiry.{$inquiryKey}.message") : '') }}</x-cloud::marketing.textarea>
 
                         <x-cloud::marketing.button type="submit" class="w-full sm:w-auto focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-primary">
                             {{ $inquiry ? __("cloud::billing.inquiry.{$inquiryKey}.submit") : __('Send message') }}

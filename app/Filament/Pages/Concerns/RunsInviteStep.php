@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Concerns;
 
 use App\Actions\Jetstream\InviteWorkspaceMember;
-use App\Actions\Jetstream\UpdateInviteLinkSettings;
 use App\Actions\Onboarding\MoveWorkspaceSetup;
 use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
@@ -21,7 +20,6 @@ use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Schema;
 use Filament\Support\Enums\VerticalAlignment;
-use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Throwable;
 
@@ -49,28 +47,6 @@ trait RunsInviteStep
 
         // Full page load: the panel's sidebar store initialises only on a page's first load.
         $this->redirect($this->landingUrl($this->workspace));
-    }
-
-    public function createInviteLink(): void
-    {
-        if ($this->step() !== WorkspaceSetupStep::Invite || $this->inviteLinkUrl() !== null) {
-            return;
-        }
-
-        resolve(UpdateInviteLinkSettings::class)->rotate($this->authUser(), $this->workspace);
-    }
-
-    public function inviteLinkUrl(): ?string
-    {
-        if (! Gate::forUser($this->authUser())->allows('addWorkspaceMember', $this->workspace)) {
-            return null;
-        }
-
-        if (! $this->workspace->hasInviteLink() || $this->workspace->isInviteLinkTokenExpired()) {
-            return null;
-        }
-
-        return route('workspaces.join', ['token' => $this->workspace->invite_link_token]);
     }
 
     /**

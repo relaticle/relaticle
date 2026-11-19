@@ -28,7 +28,11 @@ trait HasNoteHeaderActions
                     ->icon('lucide-upload')
                     ->url(ImportNotes::getUrl())
                     ->visible(ImportNotes::canAccess(...)),
-                ExportAction::make()->exporter(NoteExporter::class)->authorize('exportAny', Note::class),
+                ExportAction::make()
+                    ->label(__('filament/resources/note.pages.list.actions.export.label'))
+                    ->modalHeading(__('filament/resources/note.pages.list.actions.export.heading'))
+                    ->exporter(NoteExporter::class)
+                    ->authorize('exportAny', Note::class),
             ])->label(__('filament/resources/note.pages.list.actions.import_export.label')),
             CreateAction::make()->icon('lucide-plus')->size(Size::Small),
         ];

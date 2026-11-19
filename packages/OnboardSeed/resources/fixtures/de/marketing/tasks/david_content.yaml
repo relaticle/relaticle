@@ -1,0 +1,8 @@
+title: Content-Kalender mit David durchgehen
+assigned_people:
+  - david
+custom_fields:
+  description: Gehen Sie den Content-Kalender für Q2 mit David durch und stimmen Sie Themen und Veröffentlichungsrhythmus der E-Mail-Kampagnen ab.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium

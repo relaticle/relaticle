@@ -19,7 +19,6 @@ use App\Http\Controllers\Auth\VerifyEmailChallengeController;
 use App\Http\Controllers\Dev\MailPreviewController;
 use App\Http\Controllers\Impersonation\StartImpersonationController;
 use App\Http\Controllers\Impersonation\StopImpersonationController;
-use App\Http\Controllers\JoinWorkspaceViaLinkController;
 use App\Http\Controllers\Mail\UnsubscribeController;
 use App\Http\Controllers\Media\ShowMediaController;
 use App\Http\Controllers\SwitchInvitationAccountController;
@@ -178,19 +177,6 @@ Route::middleware(['auth', 'verified', 'no-referrer'])->group(function (): void 
         ->middleware(ThrottleBeforeAuthentication::class.':10,1,invitation-switch')
         ->name('workspace-invitations.token.switch');
 });
-
-Route::middleware(['auth', 'verified', 'no-referrer'])
-    ->group(function (): void {
-        Route::get('/join/{token}', [JoinWorkspaceViaLinkController::class, 'show'])
-            ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware([ThrottleBeforeAuthentication::class.':10,1,workspace-join-show', CheckScheduledDeletion::class])
-            ->name('workspaces.join');
-
-        Route::post('/join/{token}', [JoinWorkspaceViaLinkController::class, 'store'])
-            ->where('token', '[A-Za-z0-9]{40}')
-            ->middleware([ThrottleBeforeAuthentication::class.':10,1,workspace-join-confirm', CheckScheduledDeletion::class])
-            ->name('workspaces.join.confirm');
-    });
 
 if (app()->environment('local')) {
     Route::get('/dev/mail', [MailPreviewController::class, 'index'])->name('dev.mail.index');

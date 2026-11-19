@@ -22,11 +22,11 @@
     $sentAt = $email->sentAtForViewer();
     $timestamp = match (true) {
         $sentAt === null          => null,
-        $sentAt->isToday()        => $sentAt->format('g:i A'),
-        $sentAt->isYesterday()    => __('filament/pages/email-inbox.list_row.timestamp_yesterday', ['time' => $sentAt->format('g:i A')]),
-        $sentAt->diffInDays() < 7 => $sentAt->format('D'),
-        $sentAt->isCurrentYear()  => $sentAt->format('M j'),
-        default                   => $sentAt->format('M j, Y'),
+        $sentAt->isToday()        => $sentAt->isoFormat('LT'),
+        $sentAt->isYesterday()    => __('filament/pages/email-inbox.list_row.timestamp_yesterday', ['time' => $sentAt->isoFormat('LT')]),
+        $sentAt->diffInDays() < 7 => $sentAt->isoFormat('ddd'),
+        $sentAt->isCurrentYear()  => $sentAt->isoFormat(__('formats.iso.date_without_year')),
+        default                   => $sentAt->isoFormat('ll'),
     };
 
     $participantLine = collect([EmailParticipantRole::FROM, EmailParticipantRole::TO])
@@ -127,7 +127,7 @@
                     @endif
                     <time
                         class="tabular-nums"
-                        title="{{ $sentAt?->format('M j, Y · g:i A') }}"
+                        title="{{ $sentAt?->isoFormat('ll · LT') }}"
                     >{{ $timestamp }}</time>
                 </span>
             </span>

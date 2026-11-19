@@ -1,0 +1,8 @@
+title: Vérifier les références d'Emma
+assigned_people:
+  - emma
+custom_fields:
+  description: Contactez les références d'Emma Thompson issues de ses précédents postes de management en ingénierie. Concentrez-vous sur son style de leadership, sa capacité à faire grandir une équipe et ses décisions techniques.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

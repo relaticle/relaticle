@@ -8,6 +8,7 @@ use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
+use App\Filament\Concerns\LabelsRelationFromResource;
 use App\Filament\Resources\TaskResource;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
 use Filament\Actions\ActionGroup;
@@ -22,10 +23,16 @@ use Filament\Tables\Table;
 final class TasksRelationManager extends RelationManager
 {
     use CountsRelatedRecords;
+    use LabelsRelationFromResource;
 
     protected static string $relationship = 'tasks';
 
     protected static string|\BackedEnum|null $icon = 'lucide-clipboard-check';
+
+    protected static function labelResource(): string
+    {
+        return TaskResource::class;
+    }
 
     public function form(Schema $schema): Schema
     {

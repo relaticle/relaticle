@@ -30,6 +30,9 @@ return [
         'updated_at' => [
             'label' => 'Updated At',
         ],
+        'deleted_at' => [
+            'label' => 'Deleted at',
+        ],
     ],
 
     'filters' => [
@@ -66,6 +69,10 @@ return [
                 ],
                 'import_export' => [
                     'label' => 'Import / Export',
+                ],
+                'export' => [
+                    'label' => 'Export notes',
+                    'heading' => 'Export Notes',
                 ],
             ],
         ],

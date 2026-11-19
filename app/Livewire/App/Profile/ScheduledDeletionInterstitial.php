@@ -44,7 +44,7 @@ final class ScheduledDeletionInterstitial extends BaseLivewireComponent
 
         resolve(CancelUserDeletion::class)->cancel($user);
 
-        $this->sendNotification('Account deletion cancelled');
+        $this->sendNotification(__('profile.notifications.account_deletion_cancelled'));
 
         $tenant = Filament::getTenant() ?? $user->currentWorkspace;
 

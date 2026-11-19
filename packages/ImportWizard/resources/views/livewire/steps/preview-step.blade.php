@@ -1,3 +1,5 @@
+@use('Illuminate\Support\Number')
+
 <div
     class="flex flex-col h-full overflow-hidden"
     x-data="{
@@ -26,21 +28,21 @@
         @if($this->isCompleted)
             <div class="flex items-center gap-3 px-4 py-3 mb-3 shrink-0 bg-gray-50 dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-xl">
                 <x-lucide-circle-check class="h-5 w-5 text-success-600 dark:text-success-400 shrink-0" />
-                <p class="text-sm font-medium text-gray-900 dark:text-white">Import Complete</p>
+                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ __('Import Complete') }}</p>
 
                 @if($this->results)
                     <div class="flex items-center gap-4 text-xs ml-auto shrink-0">
                         <span class="flex items-center gap-1.5">
-                            <span class="font-semibold text-success-700 dark:text-success-300">{{ number_format($this->results['created'] ?? 0) }}</span>
-                            <span class="text-gray-500 dark:text-gray-400">created</span>
+                            <span class="font-semibold text-success-700 dark:text-success-300">{{ Number::format($this->results['created'] ?? 0) }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{ __('created') }}</span>
                         </span>
                         <span class="flex items-center gap-1.5">
-                            <span class="font-semibold text-primary-700 dark:text-primary-300">{{ number_format($this->results['updated'] ?? 0) }}</span>
-                            <span class="text-gray-500 dark:text-gray-400">updated</span>
+                            <span class="font-semibold text-primary-700 dark:text-primary-300">{{ Number::format($this->results['updated'] ?? 0) }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{ __('updated') }}</span>
                         </span>
                         <span class="flex items-center gap-1.5">
-                            <span class="font-semibold text-danger-700 dark:text-danger-300">{{ number_format($this->results['failed'] ?? 0) }}</span>
-                            <span class="text-gray-500 dark:text-gray-400">failed</span>
+                            <span class="font-semibold text-danger-700 dark:text-danger-300">{{ Number::format($this->results['failed'] ?? 0) }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{ __('failed') }}</span>
                         </span>
                     </div>
 
@@ -62,9 +64,9 @@
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center justify-between mb-1.5">
                         <p class="text-sm font-medium text-gray-900 dark:text-white">
-                            Importing...
+                            {{ __('Importing...') }}
                             <span class="text-xs font-normal text-gray-500 dark:text-gray-400">
-                                {{ number_format($this->processedCount) }} of {{ number_format($this->totalRowCount) }} rows
+                                {{ __(':processed of :total rows', ['processed' => Number::format($this->processedCount), 'total' => Number::format($this->totalRowCount)]) }}
                             </span>
                         </p>
                         <span class="text-xs font-medium text-gray-700 dark:text-gray-300">{{ $this->progressPercent }}%</span>
@@ -92,7 +94,7 @@
                     >
                         <x-filament::icon :icon="$entityType->icon()" class="w-3.5 h-3.5"/>
                         {{ $entityType->label() }}
-                        <span class="text-gray-400 dark:text-gray-500">{{ number_format($this->totalRowCount) }}</span>
+                        <span class="text-gray-400 dark:text-gray-500">{{ Number::format($this->totalRowCount) }}</span>
                     </button>
 
                     @foreach($this->relationshipTabs as $tab)
@@ -107,7 +109,7 @@
                         >
                             <x-filament::icon :icon="$tab['icon']" class="w-3.5 h-3.5"/>
                             {{ $tab['label'] }}
-                            <span class="text-gray-400 dark:text-gray-500">{{ number_format($tab['count']) }}</span>
+                            <span class="text-gray-400 dark:text-gray-500">{{ Number::format($tab['count']) }}</span>
                         </button>
                     @endforeach
                 </div>
@@ -118,13 +120,13 @@
                     <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-plus" class="w-3.5 h-3.5 text-success-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->createCount) }}</span>
-                            will be created
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->createCount) }}</span>
+                            {{ __('will be created') }}
                         </span>
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-refresh-cw" class="w-3.5 h-3.5 text-primary-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->updateCount) }}</span>
-                            will be updated
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->updateCount) }}</span>
+                            {{ __('will be updated') }}
                         </span>
                     </div>
                 </div>
@@ -182,7 +184,7 @@
                             </div>
                         @empty
                             <div class="flex items-center justify-center py-8 text-sm text-gray-500 dark:text-gray-400">
-                                No rows to display
+                                {{ __('No rows to display') }}
                             </div>
                         @endforelse
                     </div>
@@ -195,17 +197,17 @@
                             @disabled($this->previewRows->onFirstPage())
                             class="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            Previous
+                            {{ __('Previous') }}
                         </button>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ number_format($this->previewRows->firstItem()) }}–{{ number_format($this->previewRows->lastItem()) }} of {{ number_format($this->previewRows->total()) }}
+                            {{ __(':from–:to of :total', ['from' => Number::format($this->previewRows->firstItem()), 'to' => Number::format($this->previewRows->lastItem()), 'total' => Number::format($this->previewRows->total())]) }}
                         </span>
                         <button
                             wire:click="nextPage"
                             @disabled(!$this->previewRows->hasMorePages())
                             class="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            Next
+                            {{ __('Next') }}
                         </button>
                     </div>
                 @endif
@@ -214,13 +216,13 @@
                     <div class="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-link" class="w-3.5 h-3.5 text-primary-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->relationshipStats['link']) }}</span>
-                            will be linked
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->relationshipStats['link']) }}</span>
+                            {{ __('will be linked') }}
                         </span>
                         <span class="flex items-center gap-1">
                             <x-filament::icon icon="lucide-plus" class="w-3.5 h-3.5 text-success-500"/>
-                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ number_format($this->relationshipStats['create']) }}</span>
-                            will be created
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ Number::format($this->relationshipStats['create']) }}</span>
+                            {{ __('will be created') }}
                         </span>
                     </div>
                 </div>
@@ -229,15 +231,15 @@
                     <div class="w-8 shrink-0 border-r border-gray-200 dark:border-gray-700 py-1.5"></div>
                     <div class="w-2/5 px-2 py-1.5 border-r border-gray-200 dark:border-gray-700 flex items-center gap-1">
                         <x-filament::icon icon="lucide-tag" class="w-3 h-3 shrink-0"/>
-                        Value
+                        {{ __('Value') }}
                     </div>
                     <div class="w-2/5 px-2 py-1.5 border-r border-gray-200 dark:border-gray-700 flex items-center gap-1">
                         <x-filament::icon icon="lucide-repeat" class="w-3 h-3 shrink-0"/>
-                        Resolution
+                        {{ __('Resolution') }}
                     </div>
                     <div class="flex-1 px-2 py-1.5 flex items-center justify-end gap-1">
                         <x-filament::icon icon="lucide-list-ordered" class="w-3 h-3 shrink-0"/>
-                        Rows
+                        {{ __('Rows') }}
                     </div>
                 </div>
 
@@ -258,12 +260,12 @@
                                 @if($entry['action'] === 'link')
                                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300">
                                         <x-filament::icon icon="lucide-link" class="w-3 h-3"/>
-                                        Link existing
+                                        {{ __('Link existing') }}
                                     </span>
                                 @else
                                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium bg-success-50 dark:bg-success-900/30 text-success-700 dark:text-success-300">
                                         <x-filament::icon icon="lucide-plus" class="w-3 h-3"/>
-                                        Create new
+                                        {{ __('Create new') }}
                                     </span>
                                 @endif
                             </div>
@@ -273,7 +275,7 @@
                         </div>
                     @empty
                         <div class="flex items-center justify-center py-8 text-sm text-gray-500 dark:text-gray-400">
-                            No relationships to display
+                            {{ __('No relationships to display') }}
                         </div>
                     @endforelse
                 </div>
@@ -285,17 +287,17 @@
                             @disabled($this->relationshipSummary->onFirstPage())
                             class="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            Previous
+                            {{ __('Previous') }}
                         </button>
                         <span class="text-xs text-gray-500 dark:text-gray-400">
-                            {{ number_format($this->relationshipSummary->firstItem()) }}–{{ number_format($this->relationshipSummary->lastItem()) }} of {{ number_format($this->relationshipSummary->total()) }}
+                            {{ __(':from–:to of :total', ['from' => Number::format($this->relationshipSummary->firstItem()), 'to' => Number::format($this->relationshipSummary->lastItem()), 'total' => Number::format($this->relationshipSummary->total())]) }}
                         </span>
                         <button
                             wire:click="nextPage"
                             @disabled(!$this->relationshipSummary->hasMorePages())
                             class="px-3 py-1 text-xs font-medium rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            Next
+                            {{ __('Next') }}
                         </button>
                     </div>
                 @endif
@@ -311,7 +313,7 @@
                 color="gray"
                 wire:click="$parent.goBack()"
             >
-                Back
+                {{ __('Back') }}
             </x-filament::button>
             {{ $this->startImportAction }}
         </div>

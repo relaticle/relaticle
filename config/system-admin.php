@@ -17,7 +17,8 @@ return [
         'domain' => null,
         'http_only' => true,
         'same_site' => 'strict',
-        'lifetime' => (int) env('SYSADMIN_SESSION_LIFETIME', 120),
+        'lifetime' => (int) env('SYSADMIN_SESSION_LIFETIME', 60),
+        'absolute_lifetime' => (int) env('SYSADMIN_SESSION_ABSOLUTE_LIFETIME', 1440),
         'expire_on_close' => (bool) env('SYSADMIN_SESSION_EXPIRE_ON_CLOSE', true),
     ],
 ];

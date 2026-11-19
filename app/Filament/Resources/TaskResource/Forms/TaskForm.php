@@ -27,6 +27,7 @@ final class TaskForm
         return $schema
             ->components([
                 TextInput::make('title')
+                    ->label(__('filament/resources/task.fields.title.label'))
                     ->required(),
                 self::customFieldRow(array_values(array_diff($propertyCodes, $excludeFields))),
                 Grid::make(['default' => 1, 'sm' => 3])

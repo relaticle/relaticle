@@ -109,7 +109,7 @@ it('downloads the failed rows for a user who can import', function (string $who)
     $response = $this->actingAs(importerOf($this, $who))->get($url);
 
     $response->assertOk();
-    expect($response->streamedContent())->toContain('Name is required');
+    expect($response->streamedContent())->toContain('Name is required')->toContain('Import Error')->not->toContain('import-wizard-new::');
 })->with(['owner', 'member']);
 
 it('refuses the failed rows download to a viewer', function (): void {

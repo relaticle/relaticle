@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Events\WorkspaceCreated;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Exceptions;
@@ -29,7 +31,7 @@ function makeCsvFile(string $content, string $name = 'test.csv'): UploadedFile
 }
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class]);
+    Event::fake()->except([WorkspaceCreated::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -64,6 +66,24 @@ it('renders upload form on mount', function (): void {
     expect($component->get('isParsed'))->toBeFalse()
         ->and($component->get('headers'))->toBe([])
         ->and($component->get('rowCount'))->toBe(0);
+});
+
+it('states the configured row limit with the grouping of the user language', function (): void {
+    Locales::apply('de');
+    config(['import-wizard.max_rows' => 12345]);
+
+    mountUploadStep($this)->assertSee('Max. 12.345 Zeilen');
+});
+
+it('words the row limit error with the grouping of the user language', function (): void {
+    Locales::apply('de');
+    config(['import-wizard.max_rows' => 1234]);
+
+    $csv = makeCsvFile("Name\n".implode("\n", array_fill(0, 1235, 'Ada'))."\n");
+
+    mountUploadStep($this)
+        ->set('uploadedFile', $csv)
+        ->assertHasErrors(['uploadedFile' => 'Maximal 1.234 Zeilen sind erlaubt.']);
 });
 
 // ─── File Parsing ───────────────────────────────────────────────────────────

@@ -16,18 +16,7 @@ export const sendModule = ({ sendUrl, createConversationUrl, texts = {} }) => ({
     streamAbortController: null,
     pendingAttachment: null,
 
-    // Injected UI copy (chat-interface.blade.php passes @js(__()) values, the
-    // same pattern voice.js uses); the defaults keep the module standalone.
-    sendTexts: {
-        sessionExpired: 'Your session expired. Please sign in again: your message is saved locally.',
-        paywallHeading: "You've used all your AI credits",
-        paywallReset: 'Your plan resets on :date.',
-        paywallTopUp: 'Add credits to keep chatting.',
-        requestError: 'Error :status: :text',
-        networkError: 'Network error. Please try again.',
-        cancelled: 'Cancelled.',
-        ...texts,
-    },
+    sendTexts: texts,
 
     // When the user types + sends during an active stream, we stash the
     // message here, clear the editor (so they see their intent was accepted),
