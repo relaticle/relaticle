@@ -131,7 +131,7 @@ trait HasBoardStageOrder
         });
     }
 
-    public function setBoardColumnCollapsed(mixed $optionId = null, mixed $collapsed = true, mixed $alone = false): void
+    public function setBoardColumnCollapsed(mixed $optionId = null, mixed $collapsed = true): void
     {
         $collapsed = filter_var($collapsed, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE);
 
@@ -140,7 +140,7 @@ trait HasBoardStageOrder
         }
 
         $fieldCode = $this->boardColumnField()->code;
-        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnCollapsed::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $collapsed, $view, $alone === true));
+        $saved = $this->writingBoardState(fn (?SavedView $view): BoardStateData => resolve(SetBoardColumnCollapsed::class)->execute($this->viewSwitcherUser(), $this->viewSwitcherWorkspace(), $this->viewSwitcherEntity(), $fieldCode, $optionId, $collapsed, $view));
 
         if ($saved instanceof BoardStateData) {
             $this->boardStateWritten($saved);

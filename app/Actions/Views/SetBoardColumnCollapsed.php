@@ -18,7 +18,7 @@ final readonly class SetBoardColumnCollapsed
         private BoardColumnFieldsQuery $columnFields,
     ) {}
 
-    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $fieldCode, string $optionId, bool $collapsed, ?SavedView $view = null, bool $alone = false): BoardStateData
+    public function execute(User $user, Workspace $workspace, CrmEntity $entity, string $fieldCode, string $optionId, bool $collapsed, ?SavedView $view = null): BoardStateData
     {
         abort_unless($user->belongsToWorkspaceId($workspace->getKey()), 403);
 
@@ -30,9 +30,9 @@ final readonly class SetBoardColumnCollapsed
             $user,
             $workspace,
             $entity,
-            function (BoardStateData $stored) use ($fieldCode, $optionIds, $optionId, $collapsed, $alone): array {
+            function (BoardStateData $stored) use ($fieldCode, $optionIds, $optionId, $collapsed): array {
                 if (! $collapsed && $stored->columnsCollapsed) {
-                    return $stored->expandingColumns($fieldCode, $optionIds, $alone ? $optionId : null);
+                    return $stored->expandingColumns($fieldCode, $optionIds, $optionId);
                 }
 
                 if ($optionId === BoardStateData::NO_VALUE_COLUMN) {

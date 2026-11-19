@@ -76,42 +76,20 @@ it('collapses a stage for the member and expands it again', function (): void {
         ->and($component->instance()->getBoard()->getCollapsedColumns())->toBe([]);
 });
 
-it('opens one stage out of collapse all and keeps the others collapsed', function (): void {
+it('opens only the clicked stage out of collapse all and keeps the others collapsed, on a click or a double-click', function (bool $doubleClick): void {
     $ids = stageIds($this->stageField);
 
     livewire(OpportunitiesBoard::class)
+        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
         ->call('setBoardColumnsCollapsed', true)
-        ->call('toggleBoardColumnCollapse', $ids[2], true);
+        ->call('toggleBoardColumnCollapse', $ids[2], $doubleClick);
 
     $state = TablePreference::query()->sole()->board_state;
 
     expect($state->columnsCollapsed)->toBeFalse()
         ->and($state->collapsedColumns)->toEqualCanonicalizing(array_values(array_diff($ids, [$ids[2]])))
         ->and($state->collapsedNoValueColumns)->toBe([$this->stageField->code]);
-});
-
-it('opens every stage on a single click out of collapse all, the ones collapsed alone too', function (): void {
-    $ids = stageIds($this->stageField);
-
-    $component = livewire(OpportunitiesBoard::class)
-        ->call('setBoardColumnVisible', BoardStateData::NO_VALUE_COLUMN, true)
-        ->call('toggleBoardColumnCollapse', $ids[0])
-        ->call('setBoardColumnCollapsed', BoardStateData::NO_VALUE_COLUMN, true)
-        ->call('setBoardColumnsCollapsed', true);
-
-    $before = TablePreference::query()->sole()->board_state;
-
-    expect($before->collapsedColumns)->toBe([$ids[0]])
-        ->and($before->collapsedNoValueColumns)->toBe([$this->stageField->code]);
-
-    $component->call('toggleBoardColumnCollapse', $ids[2]);
-
-    $state = TablePreference::query()->sole()->board_state;
-
-    expect($state->columnsCollapsed)->toBeFalse()
-        ->and($state->collapsedColumns)->toBe([])
-        ->and($state->collapsedNoValueColumns)->toBe([]);
-});
+})->with(['click' => false, 'double-click' => true]);
 
 it('toggles a stage through the rail collapse callback', function (): void {
     $ids = stageIds($this->stageField);
