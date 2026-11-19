@@ -63,7 +63,7 @@
 
                         <x-cloud::marketing.input :label="__('Name')" :required="true" type="text" name="name" id="name" autocomplete="name" required :value="old('name')" :placeholder="__('Your name')"/>
 
-                        <x-cloud::marketing.input :label="__('Work email')" :required="true" type="email" name="email" id="email" autocomplete="email" required :value="old('email')" placeholder="you@company.com"/>
+                        <x-cloud::marketing.input :label="__('Work email')" :required="true" type="email" name="email" id="email" autocomplete="email" required :value="old('email')" :placeholder="__('you@company.com')"/>
 
                         <x-cloud::marketing.input :label="__('Company')" type="text" name="company" id="company" autocomplete="organization" :value="old('company')" :placeholder="__('Your company')"/>
 

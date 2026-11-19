@@ -219,6 +219,8 @@ return [
     'attributes' => [
         'email' => 'email',
         'name' => 'name',
+        'message' => 'message',
+        'company' => 'company',
         'password' => 'password',
         'password_confirmation' => 'password confirmation',
         'current_password' => 'current password',
