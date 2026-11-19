@@ -399,6 +399,27 @@ describe('Blog languages', function () {
         $this->get('/de/blog/only-in-english')->assertNotFound();
     });
 
+    it('advertises a German category or tag listing only when it holds a German post', function () {
+        $germanCategory = Category::factory()->create();
+        $englishCategory = Category::factory()->create();
+        $tag = Tag::factory()->create();
+        $german = Post::factory()->published()->create(['locale' => 'de', 'category_id' => $germanCategory->id]);
+        Post::factory()->published()->create(['locale' => 'en', 'category_id' => $englishCategory->id])->tags()->attach($tag);
+        $german->tags()->attach(Tag::factory()->create());
+
+        expect(blogHreflangs($this->get("/blog/category/{$germanCategory->slug}")->getContent()))->toHaveKey('de')
+            ->and(blogHreflangs($this->get("/blog/category/{$englishCategory->slug}")->getContent()))->not->toHaveKey('de')
+            ->and(blogHreflangs($this->get("/blog/tag/{$tag->slug}")->getContent()))->not->toHaveKey('de');
+    });
+
+    it('advertises a German page only when the German listing reaches it', function () {
+        Post::factory()->published()->count(config('ink.per_page') + 1)->create(['locale' => 'en']);
+        Post::factory()->published()->create(['locale' => 'de']);
+
+        expect(blogHreflangs($this->get('/blog?page=2')->getContent()))->not->toHaveKey('de')
+            ->and(blogHreflangs($this->get('/blog')->getContent()))->toHaveKey('de');
+    });
+
     it('links the English blog index from a German page while no German post exists', function () {
         Post::factory()->published()->create(['locale' => 'en']);
 

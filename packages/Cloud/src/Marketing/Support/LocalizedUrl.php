@@ -142,9 +142,42 @@ final readonly class LocalizedUrl
         }
         $localizedName = $name === null ? null : self::nameIn($name, $locale);
 
+        if ($name !== null && $locale !== app()->getLocale() && ! self::listingReaches($locale, self::baseName($name), $route?->parameter('slug'), (int) ($query['page'] ?? 1))) {
+            return null;
+        }
+
         return $route === null || $localizedName === null
             ? null
             : route($localizedName, [...$query, ...Arr::only($route->parameters(), $route->parameterNames())]);
+    }
+
+    private static function listingReaches(string $locale, string $baseName, ?string $slug, int $page): bool
+    {
+        if (! in_array($baseName, self::PAGINATED_ROUTES, true) || ($baseName === 'blog.index' && $page <= 1)) {
+            return true;
+        }
+
+        return self::listingPostCount($locale, $baseName, $slug) > (max($page, 1) - 1) * (int) config('ink.per_page', 12);
+    }
+
+    private static function listingPostCount(string $locale, string $baseName, ?string $slug): int
+    {
+        $attributes = request()->attributes;
+        $key = "blog.count.{$locale}.{$baseName}.{$slug}";
+
+        if (! $attributes->has($key)) {
+            $posts = Post::query()->published()->inLocale($locale);
+
+            match ($baseName) {
+                'blog.category' => $posts->whereRelation('category', 'slug', $slug),
+                'blog.tag' => $posts->whereRelation('tags', 'slug', $slug),
+                default => null,
+            };
+
+            $attributes->set($key, $posts->count());
+        }
+
+        return $attributes->get($key);
     }
 
     /** @return array<string, array{native: string, english: string}> */
