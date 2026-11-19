@@ -70,7 +70,7 @@ return [
         'pricing_verified' => '2026-11-15',
         'stack' => 'Node/NestJS + Redis + Postgres + background workers',
         'self_host' => 'Self-hostable core; enterprise-tagged files are license-restricted',
-        'ai' => 'AI chatbot, workflow agents and a first-party MCP server, all available self-hosted with built-in model providers on every plan',
+        'ai' => 'AI chatbot, workflow agents and a first-party MCP server, all available self-hosted with built-in model providers on every plan. The MCP server finds, creates, updates, merges and deletes records and can change the data model, within the permissions of the connected user or the API key\'s role',
         'extensibility' => 'MIT-licensed apps SDK (twenty-sdk, create-twenty-app) for building custom objects, server logic, and UI components as TypeScript packages, per docs.twenty.com/developers; the core CRM repo itself stays AGPL-3.0 + Twenty Application Exception',
         'source_urls' => [
             'website' => 'https://twenty.com',
@@ -91,7 +91,7 @@ return [
         'pricing_verified' => '2026-08-13',
         'stack' => 'PHP',
         'self_host' => 'Free self-hosted core; paid extensions for self-hosters',
-        'ai' => 'Official MCP server extension, free under AGPLv3, plus a paid AI add-on (Intelligence: OpenAI, Gemini, Claude providers)',
+        'ai' => 'Official MCP server extension, free under AGPLv3, that works through the EspoCRM REST API with no separate server and ships create, read, update and delete tools and tools for accessing the Stream. The AI add-on (Intelligence: OpenAI, Gemini, Claude providers) is paid',
         'extensibility' => 'First-party extension store at espocrm.com/extensions: paid packs (Advanced Pack, Sales Pack, Intelligence) and the free MCP extension',
         'source_urls' => [
             'website' => 'https://www.espocrm.com',
@@ -112,7 +112,7 @@ return [
         'pricing_verified' => '2026-09-17',
         'stack' => 'Closed-source SaaS, proprietary stack',
         'self_host' => 'No self-hosting option',
-        'ai' => 'Ask Attio, AI research and enrichment, plus an official MCP server on every plan',
+        'ai' => 'Ask Attio, AI research and enrichment, plus an official Attio-hosted MCP server (mcp.attio.com) on every plan that searches, creates and updates records and notes, creates and updates lists, and creates, updates and deletes tasks',
         'extensibility' => 'REST API, App SDK, and an app marketplace with native and third-party integrations',
         'source_urls' => [
             'website' => 'https://attio.com',
@@ -215,7 +215,7 @@ return [
         'pricing_verified' => '2026-09-05',
         'stack' => 'Closed-source SaaS, proprietary stack',
         'self_host' => 'No self-hosting option',
-        'ai' => 'Chloe AI assistant on every plan with per-plan credit pools (500 credits per user a month on Solo, 2,000 on Scale); Chloe in workflows and auto-updates on Growth and Scale. A remote MCP server (mcp.close.com) for ChatGPT, Claude and other MCP clients',
+        'ai' => 'Chloe AI assistant on every plan with per-plan credit pools (500 credits per user a month on Solo, 2,000 on Scale); Chloe in workflows and auto-updates on Growth and Scale. A remote MCP server (mcp.close.com) for ChatGPT, Claude and other MCP clients, with a read-only scope, a read and write scope, and a scope that can also delete',
         'extensibility' => 'Public REST API (developer.close.com) plus Zapier and native integrations',
         'source_urls' => [
             'website' => 'https://www.close.com',
