@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Enums\ContactInquiry)
 @use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $planCell = 'bg-surface relative flex flex-col';
@@ -67,7 +68,7 @@
                 <p class="mt-1.5 text-base text-gray-500 dark:text-gray-400">{{ __('cloud::billing.enterprise.pricing_tagline') }}</p>
 
                 @php($enterprisePriceShort = '$'.\Illuminate\Support\Number::format(config('relaticle.enterprise.starting_price_yearly') / 1000, maxPrecision: 1).'K')
-                <div class="mt-8" aria-label="{{ __('cloud::billing.enterprise.starting_price', ['price' => $enterprisePrice]) }}">
+                <div class="mt-8" aria-label="{{ ContactInquiry::Enterprise->price() }}">
                     <p class="{{ $priceLabel }}">{{ __('Starting at') }}</p>
                     <p class="mt-3 flex flex-wrap items-baseline gap-x-1.5">
                         <span class="{{ $price }}">{{ $enterprisePriceShort }}</span>

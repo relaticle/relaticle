@@ -1,4 +1,5 @@
 @use(Illuminate\Support\Number)
+@use(Relaticle\Cloud\Marketing\Enums\ContactInquiry)
 @use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-filament-panels::page>
     @php
@@ -327,7 +328,7 @@
                 <div class="flex flex-wrap items-center justify-between gap-4">
                     <div>
                         <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ __('billing.plans.enterprise') }}</h3>
-                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.starting_price', ['price' => Number::format(config('relaticle.enterprise.starting_price_yearly'))]) }}</p>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ ContactInquiry::Enterprise->price() }}</p>
                     </div>
                     <x-filament::button tag="a" color="gray" :href="url()->getPublicUrl(LocalizedUrl::route('contact', ['plan' => 'enterprise'], absolute: false))">{{ __('cloud::billing.enterprise.contact') }}</x-filament::button>
                 </div>
