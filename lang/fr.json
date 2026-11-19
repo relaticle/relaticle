@@ -157,7 +157,6 @@
     "Create \":name\" (:type) on :entity": "Créer « :name » (:type) sur :entity",
     "Create \":name\" (:type) on :entity with options: :options": "Créer « :name » (:type) sur :entity avec les options : :options",
     "Create :count custom attributes": "Créer :count attributs personnalisés",
-    "Create Custom Attribute": "Créer un attribut personnalisé",
     "Create Custom Attributes": "Créer des attributs personnalisés",
     "Create a new workspace to collaborate with others on projects.": "Créez un nouvel espace de travail pour collaborer avec d'autres sur vos projets.",
     "Create new": "Créer un nouveau",

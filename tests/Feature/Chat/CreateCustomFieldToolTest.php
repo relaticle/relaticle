@@ -145,6 +145,18 @@ it('refuses a member with the role error and creates no proposal', function (): 
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
 });
 
+it('titles the card from the proposal entity in the user language', function (): void {
+    Locales::within('fr', fn (): array => proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Priority',
+        'type' => 'text',
+    ]));
+
+    $pending = PendingAction::query()->where('conversation_id', $this->convId)->firstOrFail();
+
+    expect($pending->display_data['title'])->toBe("Créer l'attribut personnalisé");
+});
+
 it('keeps the role error in English for a German member', function (): void {
     $member = User::factory()->create();
     $member->workspaces()->attach($this->workspace, ['role' => 'member']);
