@@ -121,7 +121,7 @@ final readonly class CrmSummaryQuery
         $row = DB::table('custom_fields as field')
             ->leftJoin('custom_field_options as option', function (JoinClause $join): void {
                 $join->on('option.custom_field_id', '=', 'field.id')
-                    ->where('option.name', TaskField::DONE_STATUS);
+                    ->whereIn('option.name', TaskField::doneNames());
             })
             ->where('field.tenant_id', $workspaceId)
             ->where('field.entity_type', 'task')
@@ -130,7 +130,7 @@ final readonly class CrmSummaryQuery
             ->selectRaw(implode(', ', [
                 'MAX(CASE WHEN field.code = ? THEN field.id END) AS due_field_id',
                 'MAX(CASE WHEN field.code = ? THEN field.id END) AS status_field_id',
-                'MAX(CASE WHEN field.code = ? THEN option.id END) AS done_option_id',
+                'MIN(CASE WHEN field.code = ? THEN option.id END) AS done_option_id',
             ]), [TaskField::DUE_DATE->value, TaskField::STATUS->value, TaskField::STATUS->value])
             ->first();
 

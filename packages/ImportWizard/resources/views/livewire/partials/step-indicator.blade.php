@@ -1,6 +1,6 @@
-<nav class="mb-8" aria-label="Progress">
+<nav class="mb-8" aria-label="{{ __('Progress') }}">
     <ol role="list" class="flex flex-wrap items-center gap-x-4 gap-y-2 sm:gap-x-2">
-        @foreach ([1 => 'Upload', 2 => 'Map', 3 => 'Review', 4 => 'Import'] as $step => $label)
+        @foreach ([1 => __('Upload'), 2 => __('Map'), 3 => __('Review'), 4 => __('Import')] as $step => $label)
             @php
                 $isCompleted = $step < $currentStep;
                 $isCurrent = $step === $currentStep;

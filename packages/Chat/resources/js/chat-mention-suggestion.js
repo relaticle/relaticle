@@ -1,17 +1,8 @@
 const SUGGESTION_DEBOUNCE_MS = 150;
 const MIN_QUERY_LENGTH = 2;
 
-// `texts` carries translated UI copy injected from Blade (same pattern as
-// voice.js); defaults keep the module standalone.
-export function createMentionSuggestion({ texts = {} } = {}) {
-    const t = {
-        listLabel: 'Mention suggestions',
-        searching: 'Searching…',
-        loadFailed: "Couldn't load suggestions.",
-        noMatches: 'No matches for ":query".',
-        typeLabels: { company: 'Company', people: 'Person', opportunity: 'Opportunity', task: 'Task', note: 'Note' },
-        ...texts,
-    };
+export function createMentionSuggestion({ texts }) {
+    const t = texts;
     // Token-based supersede: each fetchResults call increments fetchToken; only
     // the call whose token still matches at await-time renders. Avoids
     // AbortController pattern where aborted promises occasionally surface as

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
-use Illuminate\Support\Facades\Date;
+use App\Support\Locales;
+use Illuminate\Foundation\Events\LocaleUpdated;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Number;
 use Illuminate\Support\ServiceProvider;
 
@@ -12,9 +14,8 @@ final class LocaleServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        $locale = $this->app->getLocale();
+        Event::listen(LocaleUpdated::class, fn (LocaleUpdated $event) => Number::useLocale(Locales::numberLocale($event->locale)));
 
-        Date::setLocale($locale);
-        Number::useLocale($locale);
+        Locales::apply($this->app->getLocale());
     }
 }

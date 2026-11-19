@@ -46,7 +46,7 @@
     {{-- Show warning icon only for multi-select (single-select has badge inside) --}}
     @if (! $isValid)
         <span
-            x-tooltip="{ content: @js($validationError . ' Select a valid option from the dropdown.'), theme: $store.theme }"
+            x-tooltip="{ content: @js($validationError.' '.__('Select a valid option from the dropdown.')), theme: $store.theme }"
             class="ml-2 cursor-help"
         >
             <x-filament::icon icon="lucide-triangle-exclamation-point" class="w-4 h-4 text-warning-500 shrink-0"/>
@@ -60,7 +60,7 @@
             :searchable="count($options) > 5"
             :value="$selectedValue"
             :borderless="true"
-            :placeholder="$isValid ? 'Select...' : 'Select to fix...'"
+            :placeholder="$isValid ? __('Select...') : __('Select to fix...')"
             @input="selected = $event.detail; if (!isMulti) updateValue($event.detail)"
             @change="if (isMulti) updateValue($event.detail)"
         />

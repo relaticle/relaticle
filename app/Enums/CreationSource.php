@@ -101,14 +101,14 @@ enum CreationSource: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::WEB => 'Web Interface',
-            self::SAMPLE => 'Sample Data',
-            self::IMPORT => 'Data Import',
-            self::API => 'API',
-            self::MCP => 'MCP Agent',
-            self::CHAT => 'AI Chat',
-            self::MAILBOX => 'Mailbox Sync',
-            self::SYSTEM => 'System',
+            self::WEB => __('enums/creation-source.web'),
+            self::SAMPLE => __('enums/creation-source.sample'),
+            self::IMPORT => __('enums/creation-source.import'),
+            self::API => __('enums/creation-source.api'),
+            self::MCP => __('enums/creation-source.mcp'),
+            self::CHAT => __('enums/creation-source.chat', ['assistant' => config('chat.assistant_name')]),
+            self::MAILBOX => __('enums/creation-source.mailbox'),
+            self::SYSTEM => __('enums/creation-source.system'),
         };
     }
 }

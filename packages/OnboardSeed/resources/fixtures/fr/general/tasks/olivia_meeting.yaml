@@ -1,0 +1,8 @@
+title: Planifier la réunion de lancement avec Olivia
+assigned_people:
+  - olivia
+custom_fields:
+  description: Organisez une réunion de lancement avec Olivia pour s'aligner sur les objectifs et le calendrier de la mission de conseil.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

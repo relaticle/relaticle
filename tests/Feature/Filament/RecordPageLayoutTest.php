@@ -31,6 +31,7 @@ use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Filament\Resources\TaskResource\Pages\TasksBoard;
 use App\Models\Company;
 use App\Models\CustomField;
+use App\Models\CustomFieldOption;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -562,7 +563,7 @@ it('names the open task due soonest as the next due task and skips a done one', 
     $task('Send the contract', now()->addDays(5));
     $task('Book the demo', now()->addDay());
     $task('Kickoff call', now()->subDay())
-        ->saveCustomFieldValue($statusField, $statusField->options->firstWhere('name', TaskField::DONE_STATUS)->getKey());
+        ->saveCustomFieldValue($statusField, $statusField->options->first(fn (CustomFieldOption $option): bool => TaskField::isDone($option->name))->getKey());
 
     $html = livewire(ViewOpportunity::class, ['record' => $opportunity->getKey()])
         ->assertSeeInOrder([

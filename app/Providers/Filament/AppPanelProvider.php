@@ -38,6 +38,7 @@ use App\Http\Middleware\DenySearchIndexing;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
 use App\Http\Middleware\RedirectToWorkspaceSetup;
+use App\Http\Middleware\SetUserLocale;
 use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Http\Middleware\SuperviseImpersonation;
 use App\Livewire\App\AppDatabaseNotifications;
@@ -82,6 +83,7 @@ use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Routing\Middleware\SubstituteBindings;
@@ -89,6 +91,7 @@ use Illuminate\Session\Middleware\AuthenticateSession;
 use Illuminate\Session\Middleware\StartSession;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Blade;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Js;
 use Illuminate\Validation\ValidationException;
@@ -106,21 +109,6 @@ use Throwable;
 final class AppPanelProvider extends PanelProvider
 {
     public const string SIDEBAR_FOOTER_ACTIONS = 'app::sidebar.footer.actions';
-
-    /**
-     * Datetime format for this panel, and the only place it is decided. Columns and
-     * entries call `->dateTime()` with no argument so they resolve to this; a resource
-     * that passes its own literal instead is drift, not a local preference.
-     *
-     * No seconds. Nobody reading a CRM list cares which second a note was written, and
-     * DateTimePicker offers minutes anyway, so keeping them made every value read back
-     * one field longer than it was entered. Sysadmin keeps its seconds on purpose: that
-     * panel exists to line rows up against Horizon and server logs.
-     *
-     * No zone suffix either, unlike sysadmin: every timestamp here is already in the
-     * reader's own zone, so there is nothing for them to correlate against.
-     */
-    private const string DATE_TIME_FORMAT = 'M j, Y H:i';
 
     private const int DEFAULT_PAGINATION_PAGE_OPTION = 25;
 
@@ -191,7 +179,8 @@ final class AppPanelProvider extends PanelProvider
     {
         Table::configureUsing(fn (Table $table): Table => $this->isCurrentPanel()
             ? $table
-                ->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+                ->defaultDateDisplayFormat(fn (): string => __('formats.php.date'))
+                ->defaultDateTimeDisplayFormat(fn (): string => __('formats.php.date_time'))
                 ->reorderableColumns()
                 ->stackedOnMobile()
                 ->columnManager(! $table->getLivewire() instanceof RelationManager)
@@ -201,13 +190,20 @@ final class AppPanelProvider extends PanelProvider
             : $table);
     }
 
+    private function useCustomFieldDateFormats(string $locale): void
+    {
+        CustomFieldsConfig::useDateDisplayFormat(trans('formats.php.date', [], $locale));
+        CustomFieldsConfig::useDateTimeDisplayFormat(trans('formats.php.date_time', [], $locale));
+    }
+
     private function formatDateTimesInSchemas(): void
     {
         Schema::configureUsing(fn (Schema $schema): Schema => $this->isCurrentPanel()
-            ? $schema->defaultDateTimeDisplayFormat(self::DATE_TIME_FORMAT)
+            ? $schema->defaultDateDisplayFormat(fn (): string => __('formats.php.date'))->defaultDateTimeDisplayFormat(fn (): string => __('formats.php.date_time'))
             : $schema);
 
-        CustomFieldsConfig::useDateTimeDisplayFormat(self::DATE_TIME_FORMAT);
+        $this->useCustomFieldDateFormats(app()->getLocale());
+        Event::listen(LocaleUpdated::class, fn (LocaleUpdated $event) => $this->useCustomFieldDateFormats($event->locale));
     }
 
     /**
@@ -273,6 +269,28 @@ final class AppPanelProvider extends PanelProvider
     private function isCurrentPanel(): bool
     {
         return Filament::getCurrentPanel()?->getId() === 'app';
+    }
+
+    /**
+     * @return list<class-string|string>
+     */
+    private function middlewareStack(): array
+    {
+        return [
+            EncryptCookies::class,
+            AddQueuedCookiesToResponse::class,
+            StartSession::class,
+            'auth.context',
+            'auth.lifetime',
+            AuthenticateSession::class,
+            SetUserLocale::class,
+            ShareErrorsFromSession::class,
+            PreventRequestForgery::class,
+            SubstituteBindings::class,
+            DisableBladeIconComponents::class,
+            DispatchServingFilamentEvent::class,
+            DenySearchIndexing::class,
+        ];
     }
 
     /**
@@ -552,22 +570,10 @@ final class AppPanelProvider extends PanelProvider
             ->collapsedSidebarWidth('3rem')
             ->navigationGroups([
                 NavigationGroup::make()
-                    ->label(__('filament/panel.navigation_groups.tasks'))
+                    ->label(fn (): string => __('filament/panel.navigation_groups.tasks'))
                     ->icon('lucide-shopping-cart'),
             ])
-            ->middleware([
-                EncryptCookies::class,
-                AddQueuedCookiesToResponse::class,
-                StartSession::class,
-                'auth.context',
-                AuthenticateSession::class,
-                ShareErrorsFromSession::class,
-                PreventRequestForgery::class,
-                SubstituteBindings::class,
-                DisableBladeIconComponents::class,
-                DispatchServingFilamentEvent::class,
-                DenySearchIndexing::class,
-            ])
+            ->middleware($this->middlewareStack())
             ->authGuard('web')
             ->authPasswordBroker('users')
             ->authMiddleware($this->authMiddleware())
@@ -706,7 +712,7 @@ final class AppPanelProvider extends PanelProvider
             // of stranding it below the workspace list.
             ->tenantMenuItems([
                 Action::make('billing')
-                    ->label(__('billing.title'))
+                    ->label(fn (): string => __('billing.title'))
                     ->icon('lucide-credit-card')
                     ->sort(-1)
                     ->url(fn (): ?string => $this->billingUrl())
@@ -725,7 +731,7 @@ final class AppPanelProvider extends PanelProvider
         // to the dashboard, silently abandoning the create-workspace wizard.
         $items = [
             Action::make('settings')
-                ->label(__('filament/panel.user_menu.settings'))
+                ->label(fn (): string => __('filament/panel.user_menu.settings'))
                 ->icon('lucide-settings')
                 ->visible(fn (): bool => $this->shouldRegisterMenuItem())
                 ->url(fn (): string => url(Settings::getUrl())),
@@ -733,7 +739,7 @@ final class AppPanelProvider extends PanelProvider
 
         if (Features::hasApiFeatures()) {
             $items[] = Action::make('api_tokens')
-                ->label(__('access-tokens.user_menu'))
+                ->label(fn (): string => __('access-tokens.user_menu'))
                 ->icon('lucide-key')
                 ->visible(fn (): bool => $this->shouldRegisterMenuItem())
                 ->url(fn (): string => url(AccessTokens::getUrl()));

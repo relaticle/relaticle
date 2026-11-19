@@ -6,6 +6,7 @@ use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Filament\Resources\PeopleResource\RelationManagers\EmailsRelationManager;
 use App\Models\People;
 use App\Models\User;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -802,4 +803,27 @@ describe('sender avatar', function (): void {
             ->assertSee($this->viewer->profile_photo_url, escape: false)
             ->assertDontSee('person-silhouette', escape: false);
     });
+});
+
+it('writes the row timestamp in the language of the viewer', function (): void {
+    $this->travelTo(CarbonImmutable::parse('2026-11-25 12:00:00', 'UTC'));
+    $this->owner->forceFill(['locale' => 'fr', 'timezone' => 'UTC'])->save();
+
+    $email = Email::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'user_id' => $this->owner->id,
+        'connected_account_id' => $this->account->getKey(),
+        'privacy_tier' => EmailPrivacyTier::FULL,
+        'sent_at' => CarbonImmutable::parse('2026-11-02 12:00:00', 'UTC'),
+    ]);
+    $this->person->emails()->attach($email->getKey());
+
+    Locales::apply('fr');
+
+    livewire(EmailsRelationManager::class, [
+        'ownerRecord' => $this->person,
+        'pageClass' => ViewPeople::class,
+    ])
+        ->assertSee('2 nov.')
+        ->assertDontSee('Nov 2');
 });

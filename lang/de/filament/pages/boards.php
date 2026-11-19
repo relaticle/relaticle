@@ -1,0 +1,122 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'view_switcher' => [
+        'board' => 'Board',
+        'cards' => 'Karten',
+        'opportunity_board' => 'Pipeline',
+    ],
+    'stage_order_failed' => 'Die Reihenfolge der Phasen konnte nicht gespeichert werden.',
+    'view_settings' => [
+        'panel' => 'Board-Ansichtseinstellungen',
+        'stage_actions' => 'Aktionen für :stage',
+        'grouped_by' => 'Gruppiert nach',
+        'lanes' => 'Swimlanes',
+        'no_lanes' => 'Keine Swimlanes',
+        'no_lanes_short' => 'Keine',
+        'visible_columns' => 'Sichtbare Spalten',
+        'show_column' => ':column anzeigen',
+        'last_column' => 'Eine Spalte bleibt sichtbar.',
+        'no_value_column' => 'Ohne :attribute',
+        'show_labels' => 'Attributbezeichnungen anzeigen',
+        'hide_empty' => 'Leere Attribute ausblenden',
+        'visible_attributes' => 'Sichtbare Attribute',
+        'attribute_actions' => 'Aktionen für :attribute',
+        'remove_attribute' => 'Von der Karte entfernen',
+        'attribute_created_off_card' => ':name erstellt. Diese Art von Attribut erscheint nicht auf einer Karte.',
+        'columns_grouped_by_created' => ':name erstellt. Die Spalten sind jetzt danach gruppiert.',
+        'add_attribute' => 'Attribut zur Ansicht hinzufügen',
+        'search_attributes' => 'Attribute für :entity suchen…',
+        'all_attributes_shown' => 'Alle Attribute sind auf der Karte',
+        'no_attribute_matches' => 'Kein Attribut passt',
+    ],
+    'card_attributes' => [
+        'description' => 'Beschreibung',
+        'checklist' => 'Checkliste',
+        'empty' => 'Leer',
+    ],
+    'stage_menu' => [
+        'nouns' => [
+            'stage' => 'Phase',
+            'status' => 'Status',
+            'option' => 'Option',
+        ],
+        'add' => ':noun hinzufügen',
+        'add_placeholder' => 'Name der neuen Spalte (:noun)',
+        'name_taken' => '„:name“ existiert bereits als :noun.',
+        'collapse' => ':noun einklappen',
+        'hide' => ':noun ausblenden',
+        'name' => 'Name (:noun)',
+        'color' => 'Farbe ändern (:noun)',
+        'set_color' => 'Farbe auf :color setzen',
+        'confetti' => 'Konfetti',
+        'confetti_label' => 'Konfetti auslösen, wenn eine Karte hierher wechselt (:noun)',
+        'last_visible' => 'Mindestens eine Spalte (:noun) bleibt sichtbar. Zeigen Sie eine weitere an, bevor Sie diese ausblenden.',
+        'delete' => ':noun löschen',
+        'delete_heading' => '„:name“ löschen?',
+        'delete_body' => '{1} :count :records hat keinen Wert für :attribute. Sie erscheint in der Spalte :column, wenn diese in den Ansichtseinstellungen aktiviert ist.|[2,*] :count :records haben keinen Wert für :attribute. Sie erscheinen in der Spalte :column, wenn diese in den Ansichtseinstellungen aktiviert ist.',
+        'changed' => 'Die Liste (:noun) hat sich geändert, während Sie sie bearbeitet haben. Laden Sie das Board neu und versuchen Sie es erneut.',
+        'delete_confirm' => 'Löschen',
+        'delete_only' => 'Ein Board braucht mindestens eine Spalte (:noun). Fügen Sie eine weitere hinzu, bevor Sie diese löschen.',
+        'delete_last_visible' => 'Mindestens eine Spalte (:noun) bleibt sichtbar. Zeigen Sie eine weitere an, bevor Sie diese löschen.',
+        'records' => [
+            'opportunity' => 'Verkaufschance|Verkaufschancen',
+            'task' => 'Aufgabe|Aufgaben',
+        ],
+    ],
+    'layout' => [
+        'columns' => 'Spalten',
+        'card_size' => 'Kartengröße',
+        'columns_collapsed' => 'Eingeklappte Spalten',
+        'columns_expanded' => 'Ausgeklappte Spalten',
+        'compact' => 'Kompakte Karten',
+        'full' => 'Volle Karten',
+    ],
+    'move_denied' => 'Sie haben keine Berechtigung, diese Karte zu verschieben.',
+    'sorted_no_reorder' => 'Die Karten sind nach :field sortiert. Heben Sie die Sortierung auf, um sie von Hand anzuordnen.',
+    'move_to' => [
+        'label' => 'Verschieben nach',
+        'moved' => 'Nach :column verschoben',
+    ],
+    'opportunities' => [
+        'title' => 'Verkaufschancen',
+        'actions' => [
+            'add' => 'Verkaufschance hinzufügen',
+            'edit' => 'Bearbeiten',
+            'delete' => 'Löschen',
+        ],
+        'form' => [
+            'name_placeholder' => 'Titel der Verkaufschance eingeben',
+        ],
+        'badges' => [
+            'today' => 'Schließt heute',
+            'tomorrow' => 'Schließt morgen',
+            'overdue' => ':date (überfällig)',
+        ],
+        'groupings' => [
+            'company' => 'Unternehmen',
+            'no_company' => 'Kein Unternehmen',
+        ],
+    ],
+    'tasks' => [
+        'title' => 'Aufgaben',
+        'actions' => [
+            'add' => 'Aufgabe hinzufügen',
+            'edit' => 'Bearbeiten',
+            'delete' => 'Löschen',
+        ],
+        'badges' => [
+            'today' => 'Heute fällig',
+            'tomorrow' => 'Morgen fällig',
+            'overdue' => ':date (überfällig)',
+        ],
+        'groupings' => [
+            'assignee' => 'Zuständig',
+            'unassigned' => 'Nicht zugewiesen',
+        ],
+        'checklist_progress' => 'Checklistenfortschritt',
+        'checklist_progress_tooltip' => '{1} :checked von :total Punkt erledigt|[2,*] :checked von :total Punkten erledigt',
+    ],
+];

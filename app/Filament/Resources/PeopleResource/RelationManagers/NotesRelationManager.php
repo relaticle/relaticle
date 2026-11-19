@@ -6,6 +6,8 @@ namespace App\Filament\Resources\PeopleResource\RelationManagers;
 
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
+use App\Filament\Concerns\LabelsRelationFromResource;
+use App\Filament\Resources\NoteResource;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\BulkActionGroup;
@@ -21,10 +23,16 @@ use Filament\Tables\Table;
 final class NotesRelationManager extends RelationManager
 {
     use CountsRelatedRecords;
+    use LabelsRelationFromResource;
 
     protected static string $relationship = 'notes';
 
     protected static string|\BackedEnum|null $icon = 'lucide-file-text';
+
+    protected static function labelResource(): string
+    {
+        return NoteResource::class;
+    }
 
     public function form(Schema $schema): Schema
     {

@@ -46,6 +46,10 @@ return [
 
     'permissions' => [
         'all' => 'All',
+        'read' => 'Read',
+        'create' => 'Create',
+        'update' => 'Update',
+        'delete' => 'Delete',
         'email_read' => 'Read email',
         'email_draft' => 'Draft email',
         'email_send' => 'Send email',
@@ -62,6 +66,8 @@ return [
         'permissions' => [
             'title' => 'Access Token Permissions',
             'action_label' => 'Permissions',
+            'tooltip' => 'Edit Permissions',
+            'heading' => 'Permissions: :name',
         ],
         'delete' => [
             'title' => 'Delete Access Token',
@@ -69,7 +75,19 @@ return [
         ],
     ],
 
+    'expirations' => [
+        '1' => '1 Day',
+        '7' => '7 Days',
+        '30' => '30 Days',
+        '60' => '60 Days',
+        '90' => '90 Days',
+        '180' => '180 Days',
+        '365' => '1 Year',
+        '0' => 'No Expiration',
+    ],
+
     'notifications' => [
+        'workspace_not_member' => 'You do not belong to this workspace.',
         'permissions_updated' => 'Access token permissions updated.',
         'deleted' => 'Access token deleted.',
     ],

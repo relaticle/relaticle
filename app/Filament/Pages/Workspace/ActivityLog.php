@@ -373,7 +373,7 @@ final class ActivityLog extends Page implements HasTable
             $this->typeLabel($record->subject_type),
             $this->eventLabel($record->event),
             $record->causerLabel(),
-            $record->created_at?->copy()->setTimezone(FilamentTimezone::get())->toDayDateTimeString() ?? ActivityValue::EMPTY,
+            $record->created_at?->copy()->setTimezone(FilamentTimezone::get())->isoFormat('lll') ?? ActivityValue::EMPTY,
         ]);
     }
 

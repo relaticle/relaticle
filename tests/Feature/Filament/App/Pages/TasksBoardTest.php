@@ -39,6 +39,7 @@ use App\Queries\Views\BoardCardAttributesQuery;
 use App\Queries\Views\BoardColumnFieldsQuery;
 use App\Support\ChecklistHtml;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use App\Support\Locales;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Collection;
@@ -429,6 +430,28 @@ it('buckets the due-date badge against the user calendar, not the server clock',
     livewire(TasksBoard::class)
         ->assertSee('Due Tomorrow')
         ->assertDontSee('Due Today');
+});
+
+it('words the due-date badge in the language of the user', function (): void {
+    $this->travelTo(Date::parse('2026-11-18 12:00:00', 'UTC'));
+
+    $this->user->forceFill(['locale' => 'de', 'timezone' => 'UTC'])->save();
+    Filament::setCurrentPanel(Filament::getPanel('app'));
+
+    $dueField = CustomField::query()
+        ->forEntity(Task::class)
+        ->where('code', TaskField::DUE_DATE)
+        ->first();
+
+    $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
+    $task->saveCustomFieldValue($this->statusField, $this->statusField->options->firstWhere('name', 'To do')->getKey());
+    $task->saveCustomFieldValue($dueField, Date::parse('2026-11-17 10:00:00', 'UTC'));
+
+    Locales::apply('de');
+
+    livewire(TasksBoard::class)
+        ->assertSee('17. Nov 2026 (überfällig)')
+        ->assertDontSee('Overdue');
 });
 
 it('keeps a card\'s assignees and status when only its title is edited', function (): void {

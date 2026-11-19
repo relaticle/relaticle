@@ -1,0 +1,8 @@
+title: Marken-Assets bei Lisa anfragen
+assigned_people:
+  - lisa
+custom_fields:
+  description: Bitten Sie Lisa um aktualisierte Markenrichtlinien und Designmaterialien für die gemeinsamen Kampagnenmaterialien.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Low

@@ -32,3 +32,12 @@ it('localizes Number formatting when app locale is set', function (): void {
     // Assert behaviour rather than exact codepoint to stay portable across CI/runtime variants.
     expect(Number::format(1234.5))->toMatch('/^1[\x{0020}\x{00A0}\x{202F}]234,5$/u');
 });
+
+it('formats Spanish numbers the Latin American way', function (): void {
+    app()->setLocale('es');
+    (new LocaleServiceProvider(app()))->boot();
+
+    expect(Number::format(2000))->toBe('2,000')
+        ->and(Number::format(1234.5, precision: 1))->toBe('1,234.5')
+        ->and(Number::format(10000))->toBe('10,000');
+});

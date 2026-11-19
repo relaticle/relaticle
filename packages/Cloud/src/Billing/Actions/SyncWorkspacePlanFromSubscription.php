@@ -74,7 +74,7 @@ final readonly class SyncWorkspacePlanFromSubscription
         });
 
         if ($target === Plan::default() && $workspace->owner instanceof User && ! $workspace->isScheduledForDeletion()) {
-            Mail::to($workspace->owner->email)->queue($this->endedMail($workspace, $subscriptionPlan));
+            Mail::to($workspace->owner)->queue($this->endedMail($workspace, $subscriptionPlan));
         }
     }
 

@@ -51,7 +51,7 @@ trait WithImportStore
     {
         $store = $this->store ??= ImportStore::forRead($this->storeId);
 
-        abort_if(! $store instanceof ImportStore, 404, 'Import session not found or expired.');
+        abort_if(! $store instanceof ImportStore, 404, __('Import session not found or expired.'));
 
         return $store;
     }
@@ -65,7 +65,7 @@ trait WithImportStore
         try {
             ImportStore::withWriteLock($this->storeId, $mutator, (int) config('import-wizard.store.lock.wait.web'));
         } catch (ImportStoreException $e) {
-            abort_if($e->isNotFound(), 404, 'Import session not found or expired.');
+            abort_if($e->isNotFound(), 404, __('Import session not found or expired.'));
 
             throw_unless($e->isLockTimeout(), $e);
 

@@ -73,7 +73,7 @@ final readonly class GuideToPageTool implements Tool
 
         if ($capability instanceof WorkspaceCapability && ! $user->hasWorkspaceCapability($workspace?->getKey(), $capability)) {
             return (string) json_encode([
-                'error' => __('This user cannot open that page with their workspace role. Tell them a workspace owner or admin can do it for them. Do not link to any page.'),
+                'error' => 'This user cannot open that page with their workspace role. Tell them a workspace owner or admin can do it for them. Do not link to any page.',
             ], JSON_UNESCAPED_SLASHES);
         }
 

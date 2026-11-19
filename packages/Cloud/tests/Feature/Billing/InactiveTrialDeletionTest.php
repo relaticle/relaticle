@@ -522,6 +522,16 @@ it('confirms an inactivity deletion to the owner after the purge, from plain val
     });
 });
 
+it('confirms an inactivity deletion in the language of the owner', function (): void {
+    Mail::fake();
+    $workspace = inactivePausedWorkspace();
+    $workspace->owner->forceFill(['locale' => 'de'])->save();
+
+    purgeDueDeletion($workspace, DeletionReason::Inactivity);
+
+    Mail::assertQueued(InactiveWorkspaceDeletedMail::class, fn (InactiveWorkspaceDeletedMail $mail): bool => $mail->locale === 'de');
+});
+
 it('sends no confirmation after a deletion the owner requested', function (): void {
     Mail::fake();
     $workspace = inactivePausedWorkspace();

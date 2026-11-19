@@ -11,7 +11,7 @@
     $verb = match ($step['operation']) {
         'update' => __('Update'),
         'delete' => __('Delete'),
-        default => ($step['title'] ?? '') !== '' ? \Illuminate\Support\Str::ucfirst(\Illuminate\Support\Str::lower($step['title'])) : __('Create'),
+        default => $step['createLabel'],
     };
     $lineName = $step['isBatch'] || $step['recordLabel'] === '' ? $step['summary'] : $step['recordLabel'];
     $showVerb = ! $step['isBatch'] && $step['recordLabel'] !== '';
@@ -28,7 +28,7 @@
             default => $other['recordLabel'] !== '' ? $other['recordLabel'] : $other['summary'],
         };
 
-        return ['name' => $name, 'count' => $count, 'entities' => $other === null ? '' : \Illuminate\Support\Str::plural($other['entityNoun'], $count)];
+        return ['name' => $name, 'count' => $count, 'entities' => $other === null ? '' : \Relaticle\Chat\Enums\ProposalEntity::from($other['entity_type'])->plural($count)];
     };
     $joinNames = fn (array $ids): string => \Illuminate\Support\Arr::join(
         array_map(function (string $id) use ($steps, $describeStep): string {
@@ -232,7 +232,7 @@
                                     'fields' => $rowFields,
                                     'stepId' => $stepId,
                                     'titleKey' => $step['titleKey'],
-                                    'titleLabel' => $step['titleLabel'],
+                                    'titleLabels' => $step['titleLabels'],
                                     'editableCodes' => $step['editableCodes'],
                                     'index' => $rowIndex,
                                     'skipTitle' => $skipTitle,
@@ -248,7 +248,7 @@
                         'fields' => $isDelete ? [] : $step['fields'],
                         'stepId' => $stepId,
                         'titleKey' => $step['titleKey'],
-                        'titleLabel' => $step['titleLabel'],
+                        'titleLabels' => $step['titleLabels'],
                         'editableCodes' => $step['editableCodes'],
                         'index' => null,
                         'skipTitle' => $skipTitle,

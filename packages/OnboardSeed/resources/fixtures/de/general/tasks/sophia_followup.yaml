@@ -1,0 +1,8 @@
+title: Bei Sophia zu den Retainer-Konditionen nachfassen
+assigned_people:
+  - sophia
+custom_fields:
+  description: Sprechen Sie mit Sophia über Retainer-Struktur, Leistungen und Abrechnungskonditionen für das Beratungsmandat.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

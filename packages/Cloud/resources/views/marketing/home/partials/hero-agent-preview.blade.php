@@ -37,7 +37,7 @@
         {{-- Mirrors the real fi-topbar: a chat page carries its heading here and has no in-body title. --}}
         <div class="relative z-30 flex h-10 shrink-0 items-center justify-between border-b border-zinc-200/60 bg-white px-3 dark:border-white/10 dark:bg-zinc-900">
             <div class="hero-agent-title min-w-0 flex-1">
-                <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-white">Overdue tasks this week</h2>
+                <h2 class="truncate text-sm font-semibold text-gray-900 dark:text-white">{{ __('Overdue tasks this week') }}</h2>
             </div>
             <img src="{{ resolve(\App\Services\AvatarService::class)->generateAuto('Marcus Reid', 64) }}" alt="" class="h-6 w-6 shrink-0 rounded-full">
         </div>
@@ -72,9 +72,9 @@
 
         return {
             prompts: [
-                { text: "What's overdue this week?", charMs: 46 },
-                { text: 'Mark the Kovra demo as done.', charMs: 36 },
-                { text: "Add Sarah Chen at @Kovra Systems. She's VP of Engineering.", charMs: 26 },
+                { text: @js(__("What's overdue this week?")), charMs: 46 },
+                { text: @js(__('Mark the :company demo as done.', ['company' => 'Kovra'])), charMs: 36 },
+                { text: @js(__('Add :person at :company. She\'s VP of Engineering.', ['person' => 'Sarah Chen', 'company' => '@Kovra Systems'])), charMs: 26 },
             ],
 
             find(selector) {

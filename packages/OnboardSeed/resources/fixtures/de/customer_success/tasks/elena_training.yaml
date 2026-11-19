@@ -1,0 +1,8 @@
+title: RevOps-Schulung für Zapier durchführen
+assigned_people:
+  - elena
+custom_fields:
+  description: Erste von zwei Onboarding-Sitzungen. Die Finanzabteilung folgt, sobald RevOps live ist.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

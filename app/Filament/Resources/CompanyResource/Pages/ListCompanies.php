@@ -40,7 +40,11 @@ final class ListCompanies extends ListRecords
                     ->icon('lucide-upload')
                     ->url(ImportCompanies::getUrl())
                     ->visible(ImportCompanies::canAccess(...)),
-                ExportAction::make()->exporter(CompanyExporter::class)->authorize('exportAny', Company::class),
+                ExportAction::make()
+                    ->label(__('filament/resources/company.pages.list.actions.export.label'))
+                    ->modalHeading(__('filament/resources/company.pages.list.actions.export.heading'))
+                    ->exporter(CompanyExporter::class)
+                    ->authorize('exportAny', Company::class),
             ])->label(__('filament/resources/company.pages.list.actions.import_export.label')),
             CreateAction::make()->icon('lucide-plus')->size(Size::Small),
         ];

@@ -79,25 +79,25 @@ final class CreateTaskTool extends BaseWriteCreateTool
         $workspace = $user->currentWorkspace;
 
         $title = (string) ($record['title'] ?? '');
-        $fields = [['label' => 'Title', 'value' => $title]];
+        $fields = [['label' => __('Title'), 'value' => $title]];
 
         $peopleNames = $this->recordNames()->names($this->idListFromArray($record, 'people_ids'), People::class, $workspace);
         if ($peopleNames !== '') {
-            $fields[] = ['label' => 'Linked people', 'value' => $peopleNames];
+            $fields[] = ['label' => __('Linked people'), 'value' => $peopleNames];
         }
 
         $companyNames = $this->recordNames()->names($this->idListFromArray($record, 'company_ids'), Company::class, $workspace);
         if ($companyNames !== '') {
-            $fields[] = ['label' => 'Linked companies', 'value' => $companyNames];
+            $fields[] = ['label' => __('Linked companies'), 'value' => $companyNames];
         }
 
         $opportunityNames = $this->recordNames()->names($this->idListFromArray($record, 'opportunity_ids'), Opportunity::class, $workspace);
         if ($opportunityNames !== '') {
-            $fields[] = ['label' => 'Linked opportunities', 'value' => $opportunityNames];
+            $fields[] = ['label' => __('Linked opportunities'), 'value' => $opportunityNames];
         }
 
         $assigneeNames = $this->recordNames()->names($this->idListFromArray($record, 'assignee_ids'), User::class, null);
-        $fields[] = ['label' => 'Assignees', 'value' => $assigneeNames !== '' ? $assigneeNames : __('(none)')];
+        $fields[] = ['label' => __('Assignees'), 'value' => $assigneeNames !== '' ? $assigneeNames : __('(none)')];
 
         return [
             'title' => $this->proposalEntity()->createTitle(),

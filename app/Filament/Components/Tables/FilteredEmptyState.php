@@ -9,7 +9,6 @@ use Filament\Actions\Action;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Lang;
-use Illuminate\Support\Str;
 
 final class FilteredEmptyState
 {
@@ -19,7 +18,7 @@ final class FilteredEmptyState
     public static function heading(): Closure
     {
         return fn (HasTable $livewire, Table $table): ?string => self::isFilteredByBar($livewire)
-            ? Lang::string('filament/panel.tables.filters.empty_heading', ['records' => Str::lower($table->getPluralModelLabel())])
+            ? Lang::string('filament/panel.tables.filters.empty_heading', ['records' => $table->getPluralModelLabel()])
             : null;
     }
 

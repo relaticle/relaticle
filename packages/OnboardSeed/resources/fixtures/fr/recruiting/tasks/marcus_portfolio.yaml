@@ -1,0 +1,8 @@
+title: Examiner le portfolio de Marcus
+assigned_people:
+  - marcus
+custom_fields:
+  description: Examinez le portfolio et les études de cas de Marcus Rivera. Évaluez sa réflexion produit et ses compétences en design visuel au regard des standards de l'équipe design de Linear.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium
