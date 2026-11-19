@@ -26,6 +26,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Favicon\Drivers\LogoFinderDriver;
 use App\Support\CurrentSource;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
@@ -163,6 +164,10 @@ final class ResetDemoAccountCommand extends Command
     /** @param  EloquentCollection<int, Company>  $companies */
     private function fetchCompanyLogos(EloquentCollection $companies): void
     {
+        if (! resolve(LogoFinderDriver::class)->isConfigured()) {
+            return;
+        }
+
         $companies->each(function (Company $company): void {
             dispatch(new FetchFaviconForCompany($company));
         });

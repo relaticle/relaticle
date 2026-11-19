@@ -182,7 +182,6 @@ arch('avoid mutation')
         // Rebound over the framework's CSRF middleware to drop the readable XSRF-TOKEN cookie; PHP forbids a readonly class extending a non-readonly one.
         'App\Http\Middleware\PreventRequestForgery',
         'App\View',
-        'App\Services\Favicon\Drivers',
         'App\Providers\Filament',
         'App\Scribe',
         ArrayExistsForWorkspace::class,

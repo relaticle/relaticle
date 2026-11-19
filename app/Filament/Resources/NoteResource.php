@@ -158,7 +158,7 @@ final class NoteResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['companies.media', 'people', 'opportunities', 'customFieldValues.customField.options'])
+            ->with(['companies.media', 'companies.domainValue', 'people', 'opportunities', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

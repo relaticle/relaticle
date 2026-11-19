@@ -261,7 +261,7 @@ Eine eingeplante E-Mail bleibt an die Verbindung gebunden, die sie eingeplant ha
 
 | Tool | Beschreibung |
 |------|--------------|
-| `upload-file` | Speichert eine Datei im Arbeitsbereich aus einer öffentlichen https-URL, einem base64-Inhalt mit `filename` oder einer `upload_id`. Liefert `suggested_markdown`, um die Datei in ein Rich-Text-Attribut wie den Inhalt einer Notiz einzubetten, sowie `file_id` für die gespeicherte Datei. Erlaubte Typen: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, bis 10 MB. 60 Aufrufe pro Stunde und Arbeitsbereich. |
+| `upload-file` | Speichert eine Datei im Arbeitsbereich aus einem base64-Inhalt mit `filename` oder einer `upload_id`. Liefert `suggested_markdown`, um die Datei in ein Rich-Text-Attribut wie den Inhalt einer Notiz einzubetten, sowie `file_id` für die gespeicherte Datei. Erlaubte Typen: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, bis 10 MB. 60 Aufrufe pro Stunde und Arbeitsbereich. |
 | `create-upload-url` | Liefert eine fünf Minuten gültige signierte URL, an die Sie einen Dateiinhalt per `PUT` senden. Übergeben Sie die zurückgegebene `upload_id` dann innerhalb einer Stunde an `upload-file`. Ein bis dahin nicht gespeicherter Inhalt wird gelöscht. 60 Aufrufe pro Stunde und Arbeitsbereich. |
 
 Uploads bleiben 24 Stunden ausstehend. Speichern Sie einen Eintrag, dessen Rich-Text-Inhalt die Datei einbettet, wird die Datei zugeordnet. Nicht zugeordnete Dateien werden gelöscht.

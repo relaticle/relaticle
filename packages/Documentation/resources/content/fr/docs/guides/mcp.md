@@ -261,7 +261,7 @@ Un e-mail en file d'attente reste lié à la connexion qui l'y a mis. Il n'est p
 
 | Outil | Description |
 |------|-------------|
-| `upload-file` | Stocke un fichier dans l'espace de travail à partir d'une URL https publique, d'un corps en base64 avec `filename`, ou d'un `upload_id`. Renvoie `suggested_markdown` pour intégrer le fichier dans un champ d'éditeur enrichi comme le corps d'une note, ainsi que `file_id` pour le fichier stocké. Types autorisés : pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, jusqu'à 10 Mo. 60 appels par heure et par espace de travail. |
+| `upload-file` | Stocke un fichier dans l'espace de travail à partir d'un corps en base64 avec `filename`, ou d'un `upload_id`. Renvoie `suggested_markdown` pour intégrer le fichier dans un champ d'éditeur enrichi comme le corps d'une note, ainsi que `file_id` pour le fichier stocké. Types autorisés : pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, jusqu'à 10 Mo. 60 appels par heure et par espace de travail. |
 | `create-upload-url` | Obtient une URL signée valable cinq minutes vers laquelle faire un `PUT` du corps d'un fichier, puis transmettez l'`upload_id` renvoyé à `upload-file` dans l'heure. Un corps non stocké à ce moment-là est supprimé. 60 appels par heure et par espace de travail. |
 
 Les téléversements restent en attente pendant 24 heures. Le fichier est réclamé dès qu'un enregistrement dont le corps d'éditeur enrichi l'intègre est sauvegardé. Les fichiers non réclamés sont purgés.
