@@ -18,7 +18,9 @@ use App\Filament\Tables\ResizableColumns;
 use App\Http\Controllers\Mcp\OAuthRegisterController;
 use App\Http\Middleware\PreventRequestForgery;
 use App\Http\Middleware\ReadAcrossWorkspaces;
+use App\Http\Responses\FortifyLogoutResponse;
 use App\Http\Responses\LoginResponse;
+use App\Http\Responses\LogoutResponse;
 use App\Jobs\CompleteExport;
 use App\Livewire\FilamentNotifications;
 use App\Models\CustomField;
@@ -208,6 +210,8 @@ final class AppServiceProvider extends ServiceProvider
     private function registerVendorOverrides(): void
     {
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
+        $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LogoutResponse::class, LogoutResponse::class);
+        $this->app->bind(\Laravel\Fortify\Contracts\LogoutResponse::class, FortifyLogoutResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->app->bind(BasePreventRequestForgery::class, PreventRequestForgery::class);
         $this->app->bind(BaseOAuthRegisterController::class, OAuthRegisterController::class);

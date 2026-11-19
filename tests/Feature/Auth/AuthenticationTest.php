@@ -1425,3 +1425,12 @@ it('lists no local accounts on the login page outside the local environment', fu
         ->assertOk()
         ->assertDontSee('value="owner@relaticle.test"', false);
 });
+
+it('tells the browser to clear site storage on sign-out', function (string $route): void {
+    $user = User::factory()->withWorkspace()->create();
+
+    $this->actingAs($user)
+        ->post(route($route))
+        ->assertRedirect()
+        ->assertHeader('Clear-Site-Data', '"storage"');
+})->with(['customer logout' => 'logout', 'app panel logout' => 'filament.app.auth.logout']);
