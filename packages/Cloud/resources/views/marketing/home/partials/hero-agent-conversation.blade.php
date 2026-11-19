@@ -86,9 +86,9 @@
                 </thead>
                 <tbody class="divide-y divide-gray-100 dark:divide-white/5">
                     @foreach ([
-                        ['row' => 'mcp-task-1', 'title' => __('Call Sarah Chen'), 'due' => 'Aug 24, 2026', 'company' => 'Kovra Systems'],
-                        ['row' => 'mcp-task-2', 'title' => __('Send proposal to Trellis Labs'), 'due' => 'Aug 23, 2026', 'company' => 'Trellis Labs'],
-                        ['row' => 'mcp-task-3', 'title' => __('Schedule demo with Kovra Systems'), 'due' => 'Aug 22, 2026', 'company' => 'Kovra Systems'],
+                        ['row' => 'mcp-task-1', 'title' => __('Call Sarah Chen'), 'due' => \Illuminate\Support\Facades\Date::parse('2026-08-24')->isoFormat('ll'), 'company' => 'Kovra Systems'],
+                        ['row' => 'mcp-task-2', 'title' => __('Send proposal to Trellis Labs'), 'due' => \Illuminate\Support\Facades\Date::parse('2026-08-23')->isoFormat('ll'), 'company' => 'Trellis Labs'],
+                        ['row' => 'mcp-task-3', 'title' => __('Schedule demo with Kovra Systems'), 'due' => \Illuminate\Support\Facades\Date::parse('2026-08-22')->isoFormat('ll'), 'company' => 'Kovra Systems'],
                     ] as $heroTaskRow)
                         <tr class="mcp-el mcp-task-card {{ $heroTaskRow['row'] }}">
                             <td class="max-w-48 px-4 py-2.5 align-top text-sm text-gray-700 dark:text-gray-300">

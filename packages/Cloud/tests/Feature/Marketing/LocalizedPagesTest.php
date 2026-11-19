@@ -127,6 +127,16 @@ it('emits hreflang for all four languages plus x-default and a self canonical', 
     expect($canonical)->toBe(url('/de/pricing'));
 });
 
+it('formats the home page mock dates and amounts in the page language', function (): void {
+    $this->get('/')->assertOk()->assertSee('Aug 24, 2026')->assertSee('$18,000.00')->assertSee('$48,000');
+
+    $this->get('/de')->assertOk()
+        ->assertSee('24. Aug 2026')->assertSee('18.000,00')
+        ->assertDontSee('Aug 24, 2026')->assertDontSee('$18,000.00');
+
+    $this->get('/fr')->assertOk()->assertSee('24 août 2026')->assertDontSee('Aug 24, 2026');
+});
+
 it('points hreflang and the switcher at the same docs page the reader is on', function (string $path): void {
     $html = (string) $this->get("/de{$path}")->assertOk()->getContent();
     $switcher = (new Crawler($html))->filter('footer [data-language-switcher] a[hreflang]');

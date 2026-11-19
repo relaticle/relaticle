@@ -6,7 +6,7 @@
     $fields = [
         [__('Company'), 'company', 'Northwind', $mailboxWriter],
         [__('Point of Contact'), 'people', 'Lena Ortiz', $mailboxWriter],
-        [__('Amount'), null, '$48,000', null],
+        [__('Amount'), null, \Illuminate\Support\Number::currency(48000, 'USD', precision: 0), null],
         [__('Close Date'), null, __('Nov 6, 2026'), null],
     ];
 

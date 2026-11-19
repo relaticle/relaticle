@@ -65,9 +65,9 @@
 
             <ul class="divide-y divide-[var(--surface-block-border)] overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
                 @foreach ([
-                    ['title' => __('Call Sarah Chen'), 'due' => 'Aug 24, 2026', 'overdue' => true],
-                    ['title' => __('Send proposal to Trellis Labs'), 'due' => 'Aug 23, 2026', 'overdue' => true],
-                    ['title' => __('Renewal prep for :person', ['person' => 'Daniel Okafor']), 'due' => 'Sep 2, 2026', 'overdue' => false],
+                    ['title' => __('Call Sarah Chen'), 'due' => \Illuminate\Support\Facades\Date::parse('2026-08-24')->isoFormat('ll'), 'overdue' => true],
+                    ['title' => __('Send proposal to Trellis Labs'), 'due' => \Illuminate\Support\Facades\Date::parse('2026-08-23')->isoFormat('ll'), 'overdue' => true],
+                    ['title' => __('Renewal prep for :person', ['person' => 'Daniel Okafor']), 'due' => \Illuminate\Support\Facades\Date::parse('2026-09-02')->isoFormat('ll'), 'overdue' => false],
                 ] as $heroTask)
                     <li class="flex items-center gap-3 pl-4">
                         {{-- 1px ring, matching the real checkbox: a 2px border
