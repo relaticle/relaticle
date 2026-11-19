@@ -133,7 +133,7 @@
                         x-on:focus="warm()"
                         class="hidden w-60 cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] px-3 py-1.5 text-left text-[13px] text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 md:flex dark:text-gray-400 dark:hover:border-white/15 dark:hover:text-gray-200">
                     <x-lucide-search class="h-4 w-4 shrink-0" />
-                    <span class="flex-1">{{ __('Search the docs') }}</span>
+                    <span class="min-w-0 flex-1 truncate">{{ __('Search the docs') }}</span>
                     <kbd class="rounded border border-gray-200 bg-white px-1.5 font-sans text-pico font-medium text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">⌘K</kbd>
                 </button>
                 <button type="button"
