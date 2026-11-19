@@ -196,7 +196,7 @@ return [
         'stack' => 'Closed-source SaaS, proprietary stack',
         'self_host' => 'No self-hosting option',
         'ai' => 'AI can be added to Core and above; Agentforce for Sales as a paid add-on from $125/user/mo, included in the Max edition. Salesforce-hosted MCP servers, generally available for Enterprise Edition organizations and above',
-        'extensibility' => 'Partner ecosystem of apps and integrations (AppExchange) plus MuleSoft for integration and automation',
+        'extensibility' => 'Prebuilt agents, apps and consultant offerings on AgentExchange (formerly AppExchange) plus MuleSoft for integration, automation and API management',
         'source_urls' => [
             'website' => 'https://www.salesforce.com',
             'pricing' => 'https://www.salesforce.com/sales/pricing/',

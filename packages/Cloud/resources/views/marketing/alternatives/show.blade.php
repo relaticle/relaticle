@@ -29,7 +29,7 @@
         ],
         'salesforce' => [
             'badge' => __('Alternative'),
-            'opening' => __('Relaticle is an open-source CRM with built-in AI. Host it on your own server for free, or run it on a hosted plan priced per workspace with unlimited users. Salesforce Sales Cloud has no self-hosting option and prices each edition per user, from its Free Suite up to Max. If your team already builds on AppExchange and MuleSoft, weigh that work before you switch.'),
+            'opening' => __('Relaticle is an open-source CRM with built-in AI. Host it on your own server for free, or run it on a hosted plan priced per workspace with unlimited users. Salesforce Sales Cloud has no self-hosting option and prices each edition per user, from its Free Suite up to Max. If your team already depends on AgentExchange apps and MuleSoft, weigh that work before you switch.'),
             'sections' => [
                 [
                     'heading' => __('License & pricing'),
