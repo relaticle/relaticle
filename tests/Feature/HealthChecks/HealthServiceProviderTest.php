@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Health\ChatTurnFailureRateCheck;
+use App\Health\SecretFileAccessCheck;
 use App\Health\TorExitListCheck;
 use App\Providers\HealthServiceProvider;
 use Spatie\Health\Checks\Checks\DatabaseCheck;
@@ -12,7 +13,7 @@ use Spatie\Health\Facades\Health;
 
 mutates(HealthServiceProvider::class);
 
-it('does not register health checks when disabled', function () {
+it('does not register health checks when disabled', function (): void {
     Health::clearChecks();
 
     config()->set('app.health_checks_enabled', false);
@@ -23,7 +24,7 @@ it('does not register health checks when disabled', function () {
     expect(Health::registeredChecks())->toBeEmpty();
 });
 
-it('registers health checks when enabled', function () {
+it('registers health checks when enabled', function (): void {
     Health::clearChecks();
 
     config()->set('app.health_checks_enabled', true);
@@ -40,4 +41,23 @@ it('registers health checks when enabled', function () {
         ->toContain(HorizonCheck::class)
         ->toContain(ChatTurnFailureRateCheck::class)
         ->toContain(TorExitListCheck::class);
+});
+
+it('registers the secret file check only when a status path is configured', function (): void {
+    config()->set('app.health_checks_enabled', true);
+
+    $registered = function (): bool {
+        Health::clearChecks();
+        new HealthServiceProvider(app())->boot();
+
+        return collect(Health::registeredChecks())->contains(fn ($check): bool => $check instanceof SecretFileAccessCheck);
+    };
+
+    config()->set('health.secret_access_status_path');
+    $withoutPath = $registered();
+
+    config()->set('health.secret_access_status_path', '/var/lib/relaticle-audit/status.json');
+
+    expect($withoutPath)->toBeFalse()
+        ->and($registered())->toBeTrue();
 });

@@ -17,7 +17,31 @@ BRANCH="${BRANCH:-main}"
 
 DEPLOYED_COMMIT_FILE="storage/framework/deployed-commit"
 LOCK_FILE="storage/framework/deploy.lock"
+DEPLOY_WINDOW_FILE="storage/framework/deploy.window"
+DEPLOY_WINDOWS_LOG="storage/framework/deploy.windows"
 LOCK_WAIT_SECONDS=900
+
+# The audit scan ignores secret reads inside a window. It reads the finished ones from the log, because it runs every 5 minutes.
+open_deploy_window() {
+    if [[ ! -f "$DEPLOY_WINDOW_FILE" ]]; then
+        date +%s > "$DEPLOY_WINDOW_FILE"
+    fi
+
+    trap 'close_deploy_window' EXIT
+}
+
+# shellcheck disable=SC2329
+close_deploy_window() {
+    local start
+    start="$(cat "$DEPLOY_WINDOW_FILE" 2>/dev/null || true)"
+
+    if [[ -n "$start" ]]; then
+        echo "$start $(date +%s)" >> "$DEPLOY_WINDOWS_LOG"
+        tail -n 50 "$DEPLOY_WINDOWS_LOG" > "$DEPLOY_WINDOWS_LOG.tmp" && mv "$DEPLOY_WINDOWS_LOG.tmp" "$DEPLOY_WINDOWS_LOG"
+    fi
+
+    rm -f "$DEPLOY_WINDOW_FILE"
+}
 
 fetch() {
     exec 9>"$LOCK_FILE"
@@ -26,6 +50,8 @@ fetch() {
         echo "✗ another deploy held the lock for ${LOCK_WAIT_SECONDS}s" >&2
         exit 1
     fi
+
+    open_deploy_window
 
     # A changed .env changes deployed_state, so a settings-only change still releases.
     bash bin/fetch-production-secrets.sh
@@ -52,6 +78,9 @@ fetch() {
 
 release() {
     local commit
+
+    # fetch re-executes into this phase, which drops its trap, so the window carries over and closes here.
+    open_deploy_window
     commit="$(git rev-parse HEAD)"
 
     $COMPOSER_BIN install --no-dev --no-interaction --prefer-dist --optimize-autoloader
