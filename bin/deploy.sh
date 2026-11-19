@@ -27,6 +27,9 @@ fetch() {
         exit 1
     fi
 
+    # A changed .env changes deployed_state, so a settings-only change still releases.
+    bash bin/fetch-production-secrets.sh
+
     git fetch --quiet origin "$BRANCH"
 
     local target
@@ -58,6 +61,7 @@ release() {
     # config:cache stores the release, so web requests and queue workers report under this commit.
     # Its view:cache also clears compiled views: Laravel reuses a stale plain-text mail copy after a template change (laravel/framework#62153).
     SENTRY_RELEASE="$commit" $PHP artisan optimize
+    chmod 600 bootstrap/cache/config.php
 
     # PHP-FPM serves the previous code from opcache until this reload. Nothing slow may run
     # between the checkout and here, because until then old classes meet new views.
