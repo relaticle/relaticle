@@ -65,7 +65,7 @@ return [
                 'Relaticle\EmailIntegration\Filament\Concerns\HasEmailReaderActions::requestAccessAction' => 63,
                 'Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist::section' => 66,
                 'Relaticle\EmailIntegration\Filament\Infolists\MeetingDetailInfolist::configure' => 95,
-                'Relaticle\EmailIntegration\Filament\RelationManagers\BaseMeetingsRelationManager::table' => 103,
+                'Relaticle\EmailIntegration\Filament\RelationManagers\BaseMeetingsRelationManager::table' => 80,
                 'Relaticle\EmailIntegration\Filament\Resources\EmailTemplateResource::table' => 61,
                 'Relaticle\EmailIntegration\Jobs\IncrementalCalendarSyncJob::handle' => 100,
                 'Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob::handle' => 137,

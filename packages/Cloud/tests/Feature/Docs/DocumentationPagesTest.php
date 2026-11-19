@@ -25,10 +25,10 @@ it('names the API reference in the page language', function (string $path, strin
     $this->get($path)->assertOk()->assertSee($title, false)->assertSee($description, false);
 })->with([
     ['/developers', 'API Reference', 'REST API documentation for managing CRM entities.'],
-    ['/de/developers', 'API-Referenz', 'REST API-Dokumentation zur Verwaltung von CRM-Einträgen.'],
+    ['/de/developers', 'API-Referenz', 'REST-API-Dokumentation zur Verwaltung von CRM-Einträgen.'],
     ['/es/developers', 'Referencia de la API', 'Documentación de la REST API para administrar registros del CRM.'],
     ['/fr/developers', 'Référence de l&#039;API', 'Documentation de la REST API pour gérer les enregistrements du CRM.'],
-    ['/de/help', 'API-Referenz', 'REST API-Dokumentation zur Verwaltung von CRM-Einträgen.'],
+    ['/de/help', 'API-Referenz', 'REST-API-Dokumentation zur Verwaltung von CRM-Einträgen.'],
 ]);
 
 it('displays the contributing guide', function (): void {

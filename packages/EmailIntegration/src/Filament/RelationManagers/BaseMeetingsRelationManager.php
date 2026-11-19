@@ -80,31 +80,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
 
                 return $query->with(['workspace', 'attendees.contact', 'connectedAccount.user']);
             })
-            ->columns([
-                TextColumn::make('title')
-                    ->label(__('filament/relation-managers/meetings.columns.title.label'))
-                    ->searchable()
-                    ->limit(60),
-                TextColumn::make('starts_at')
-                    ->label(__('filament/relation-managers/meetings.columns.starts_at.label'))
-                    ->isoDateTime('ll · LT')
-                    ->sortable(),
-                ViewColumn::make('attendees')
-                    ->label(__('filament/relation-managers/meetings.columns.attendees_count.label'))
-                    ->view('email-integration::filament.tables.columns.meeting-participants-stack'),
-                TextColumn::make('status')
-                    ->badge(),
-                TextColumn::make('response_status')
-                    ->label(__('filament/relation-managers/meetings.columns.response_status.label'))
-                    ->state(function (Meeting $record): ?AttendeeResponseStatus {
-                        $user = auth()->user();
-
-                        return $user instanceof User
-                            ? resolve(MeetingRespondentResolver::class)->viewerResponseStatus($user, $record)
-                            : null;
-                    })
-                    ->badge(),
-            ])
+            ->columns($this->meetingColumns())
             ->defaultSort('starts_at', 'desc')
             ->emptyStateIcon(fn (): string => $this->hidesOwnerMailbox()
                 ? 'lucide-shield-check'
@@ -153,6 +129,36 @@ abstract class BaseMeetingsRelationManager extends RelationManager
                         }),
                 ]),
             ]);
+    }
+
+    /** @return list<TextColumn|ViewColumn> */
+    private function meetingColumns(): array
+    {
+        return [
+            TextColumn::make('title')
+                ->label(__('filament/relation-managers/meetings.columns.title.label'))
+                ->searchable()
+                ->limit(60),
+            TextColumn::make('starts_at')
+                ->label(__('filament/relation-managers/meetings.columns.starts_at.label'))
+                ->isoDateTime('ll · LT')
+                ->sortable(),
+            ViewColumn::make('attendees')
+                ->label(__('filament/relation-managers/meetings.columns.attendees_count.label'))
+                ->view('email-integration::filament.tables.columns.meeting-participants-stack'),
+            TextColumn::make('status')
+                ->badge(),
+            TextColumn::make('response_status')
+                ->label(__('filament/relation-managers/meetings.columns.response_status.label'))
+                ->state(function (Meeting $record): ?AttendeeResponseStatus {
+                    $user = auth()->user();
+
+                    return $user instanceof User
+                        ? resolve(MeetingRespondentResolver::class)->viewerResponseStatus($user, $record)
+                        : null;
+                })
+                ->badge(),
+        ];
     }
 
     private function resolveRecord(string $type, string $id): Model
