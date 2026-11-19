@@ -34,7 +34,7 @@ it('keeps Auto order as list order', function (): void {
         ->values()
         ->all();
 
-    expect($auto)->toBe(['claude-sonnet-5', 'gpt-5.5']);
+    expect($auto)->toBe(['claude-sonnet-5-5', 'claude-sonnet-5', 'gpt-5.5']);
 });
 
 it('leaves self-hosted models out of settings so env stays their only source', function (): void {

@@ -419,11 +419,11 @@ it('fails loudly when the provider served another model, and still records the t
 });
 
 it('resolves a candidate model the catalog does not offer', function (): void {
-    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5-5'))->toBeNull();
+    expect(resolve(ModelRegistry::class)->find('claude-haiku-5-5'))->toBeNull();
 
     EvalModels::register();
 
-    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5-5')?->provider)->toBe('anthropic')
+    expect(resolve(ModelRegistry::class)->find('claude-haiku-5-5')?->provider)->toBe('anthropic')
         ->and(resolve(ModelRegistry::class)->find('gpt-6-luna')?->provider)->toBe('openai')
         ->and(resolve(ModelRegistry::class)->find('claude-sonnet-5')?->provider)->toBe('anthropic');
 });
