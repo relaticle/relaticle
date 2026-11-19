@@ -127,7 +127,7 @@ See the [Self-Hosting Guide](https://relaticle.com/docs/self-hosting) for Docker
 
 # Internationalization
 
-Relaticle ships English-only in the main repository, but the codebase is fully i18n-ready. Self-host forks can drop a `lang/<locale>/` directory in place to translate the entire app. See [`docs/i18n.md`](docs/i18n.md) for the override workflow and CI guardrails.
+Relaticle ships in English, German, Spanish and French. Each user picks a language under Profile, Language. See [`docs/i18n.md`](docs/i18n.md) for what follows the language and how to fix a translation.
 
 # Documentation
 
