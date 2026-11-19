@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Enums\Notifications\NotificationType;
 use App\Filament\Pages\Dashboard;
 use App\Http\Middleware\SetUserLocale;
 use App\Models\User;
@@ -15,6 +16,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Number;
 use Livewire\Livewire;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -234,6 +236,18 @@ it('renders the panel script data in the user language', function (): void {
         ->get(Dashboard::getUrl(tenant: $user->currentWorkspace))
         ->assertOk()
         ->assertSee('Spaltengröße ändern', false)
+        ->assertDontSee('Resize column', false);
+});
+
+it('renders the panel script data in the guest language on a standalone page', function (): void {
+    $user = User::factory()->create();
+    $url = URL::signedRoute('mail.unsubscribe', ['user' => $user->id, 'type' => NotificationType::TaskDigest->value]);
+
+    $this->withUnencryptedCookies([Locales::COOKIE => 'de'])
+        ->get($url)
+        ->assertOk()
+        ->assertSee('resizeColumnLabel', false)
+        ->assertSee('Spaltengr', false)
         ->assertDontSee('Resize column', false);
 });
 

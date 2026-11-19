@@ -86,7 +86,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\DevCommands;
-use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery as BasePreventRequestForgery;
 use Illuminate\Http\Request;
@@ -102,6 +101,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
@@ -847,8 +847,10 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
         ]);
 
-        $this->registerTranslatedScriptData();
-        Event::listen(LocaleUpdated::class, $this->registerTranslatedScriptData(...));
+        View::composer(
+            ['filament-panels::components.layout.base', '*::filament-standalone'],
+            fn () => $this->registerTranslatedScriptData(),
+        );
     }
 
     private function registerTranslatedScriptData(): void
