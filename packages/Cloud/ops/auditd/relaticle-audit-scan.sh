@@ -146,7 +146,7 @@ def started_by_cron(ses):
     if ses not in cron_sessions:
         try:
             out = subprocess.run(
-                [AUSEARCH, "--input-logs", "-i", "-m", "USER_START", "--session", ses],
+                [AUSEARCH, "--input-logs", "-i", "--start", "boot", "-m", "USER_START", "--session", ses],
                 stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=60,
             ).stdout
         except (OSError, subprocess.SubprocessError):

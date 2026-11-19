@@ -31,3 +31,5 @@ auditd records every read, write and attribute change of the production secret f
 - The deploy window files belong to `forge`, so a `forge` process can open a window of up to 30 minutes and hide reads inside it. Only a root-owned window would close this, and no narrow mechanism exists for it today.
 - Anyone who can edit `forge`'s crontab can run a PHP 8.5 `artisan` command in a cron session.
 - The audit records stay on the server, and root can change them.
+- The backups directory is watched for reads only, because the nightly backup job writes there. Moving a backup out of the directory is not recorded.
+- After a checkpoint mismatch the scan re-reads the whole day, so reads from that day's earlier deploys can be reported once.
