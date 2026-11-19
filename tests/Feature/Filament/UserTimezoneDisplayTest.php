@@ -10,11 +10,13 @@ use App\Models\Note;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentTimezone;
 use Filament\Tables\Table;
 use Illuminate\Support\Facades\Date;
+use Relaticle\CustomFields\CustomFields;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\ListUsers;
@@ -115,6 +117,31 @@ it('renders every app panel datetime in the format the panel declares', function
         ->assertDontSee('Aug 19, 2026 08:30:00');
 });
 
+it('renders a datetime column day first for a german reader', function (): void {
+    $user = actAsTokyoUser();
+
+    Note::factory()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'creator_id' => $user->getKey(),
+        'created_at' => knownInstant(),
+        'updated_at' => knownInstant(),
+    ]);
+
+    Locales::apply('de');
+
+    livewire(ManageNotes::class)
+        ->assertSee('19.08.2026 08:30')
+        ->assertDontSee('Aug 19, 2026');
+});
+
+it('follows the reader language for custom attribute datetimes', function (): void {
+    Locales::apply('de');
+    expect(CustomFields::dateTimeDisplayFormat())->toBe('d.m.Y H:i');
+
+    Locales::apply('en');
+    expect(CustomFields::dateTimeDisplayFormat())->toBe('M j, Y H:i');
+});
+
 it('labels sysadmin datetimes as utc so an admin never has to assume', function (): void {
     User::factory()->create([
         'name' => 'Timezone Fixture',
@@ -203,3 +230,17 @@ it('renders a custom-field datetime on a record page in the panel format, not a 
         ->assertSee('Aug 19, 2026 08:30')
         ->assertDontSee('2026-08-19 08:30:00');
 });
+
+it('formats date-only values day first for a german reader and keeps english unchanged', function (string $locale, string $format): void {
+    actAsTokyoUser();
+
+    Locales::apply($locale);
+
+    expect(Table::make(new ManageNotes)->getDefaultDateDisplayFormat())->toBe($format)
+        ->and(CustomFields::dateDisplayFormat())->toBe($format);
+})->with([
+    'en' => ['en', 'M j, Y'],
+    'de' => ['de', 'd.m.Y'],
+    'es' => ['es', 'd/m/Y'],
+    'fr' => ['fr', 'd/m/Y'],
+]);

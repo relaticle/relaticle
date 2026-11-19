@@ -17,35 +17,31 @@ final readonly class ProposalLabel
      */
     public static function of(ProposalEntity $entity, array $data, array $display): ?string
     {
-        $titleKey = $entity->titleKey();
-
-        return self::filled($data[$titleKey] ?? null)
-            ?? self::titleRow($display, $titleKey)
-            ?? self::quotedName($display)
+        return self::name($entity, $data, $display)
             ?? self::filled($display['summary'] ?? null);
     }
 
     /**
+     * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $display
      */
-    public static function quotedName(array $display): ?string
+    public static function name(ProposalEntity $entity, array $data, array $display): ?string
     {
-        $summary = $display['summary'] ?? null;
+        $titleKey = $entity->titleKey();
 
-        if (! is_string($summary) || preg_match('/"(.*)"/u', $summary, $matches) !== 1) {
-            return null;
-        }
-
-        return self::filled($matches[1]);
+        return self::filled($display['name'] ?? null)
+            ?? self::filled($data[$titleKey] ?? null)
+            ?? self::titleRow($display, $titleKey, $entity->titleLabels());
     }
 
     /**
      * @param  array<string, mixed>  $display
+     * @param  list<string>  $entityLabels
      */
-    private static function titleRow(array $display, string $titleKey): ?string
+    private static function titleRow(array $display, string $titleKey, array $entityLabels): ?string
     {
         $rows = is_array($display['fields'] ?? null) ? $display['fields'] : [];
-        $labels = [...self::TITLE_ROWS, ...array_map(self::translated(...), self::TITLE_ROWS)];
+        $labels = [...self::TITLE_ROWS, ...array_map(self::translated(...), self::TITLE_ROWS), ...$entityLabels];
 
         foreach ($rows as $row) {
             // Only a custom-field row carries a type: a workspace field named "Name" or "Email" is not the record's title.

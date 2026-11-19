@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
+use App\Enums\OptionColor;
 use App\Features\EmailIntegration;
 use App\Models\User;
 use App\Support\DetectsPublicMarkdownRequest;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Http\Controllers\HomeController;
@@ -234,7 +237,7 @@ describe('Hero AI tab: conversation', function () {
         $response = $this->get('/');
 
         $response->assertStatus(200);
-        $response->assertSee("What's overdue this week?", false);
+        $response->assertSee("What's overdue this week?");
         $response->assertSee('Searching tasks');
         $response->assertSee('Call Sarah Chen');
         $response->assertSee('Send proposal to Trellis Labs');
@@ -259,12 +262,12 @@ describe('Hero AI tab: conversation', function () {
         $response->assertSee('You have 3 overdue tasks');
         // Exchange 2 climax. Approving resumes the turn, so the line under the
         // decided row is the agent's own reply, as in the shipped transcript.
-        $response->assertSee("I'll mark it done", false);
+        $response->assertSee("I'll mark it done");
         $response->assertSee('has been marked done');
         // Exchange 3 is a WRITE, so it is gated by review exactly like exchange 2
         // (CreatePersonTool returns a proposal for approval). It must never show
         // a create landing unattended.
-        $response->assertSee("I'll add her to Kovra Systems as VP of Engineering", false);
+        $response->assertSee("I'll add her to Kovra Systems as VP of Engineering");
         $response->assertSee('has been created and linked to');
         // The turn ends on the next-step strip (NextStepSuggester), which is
         // what the shipped transcript puts at its floor once nothing is docked.
@@ -291,8 +294,8 @@ describe('Hero AI tab: conversation', function () {
         expect($dock->text())->not->toContain('Approve or discard the proposal to keep chatting')
             ->and($dock->filter('button')->first()->text())->toBe('Discard')
             ->and($dock->filter('#hero-approve-btn')->text())->toStartWith('Approve')
-            ->and($body)->toContain("I'll mark it done")
-            ->and($body)->toContain("I'll add her to Kovra Systems as VP of Engineering");
+            ->and($body)->toContain(e("I'll mark it done"))
+            ->and($body)->toContain(e("I'll add her to Kovra Systems as VP of Engineering"));
     });
 
     it('mirrors the shipped transcript surfaces rather than the components it replaced', function () {
@@ -435,10 +438,8 @@ describe('Hero AI tab: entry phase', function () {
 
         // Mirrors packages/Chat/resources/views/filament/pages/dashboard.blade.php
         // greeting: large semibold heading + recent-chat link beneath.
-        // assertSee defaults to escape=true; apostrophes are not HTML-escaped
-        // in plain text bodies, so we pass false to compare literally.
         $response->assertSee('Good morning, Marcus.');
-        $response->assertSee("This week's pipeline review", false);
+        $response->assertSee("This week's pipeline review");
     });
 
     it('does not offer canned starter prompts, matching the real dashboard', function () {
@@ -606,4 +607,12 @@ it('renders the hero tabs in their first state before any script runs', function
     expect($classes->keys()->all())->toBe(['ai-agent', 'pipeline', 'companies', 'custom-fields'])
         ->and($classes['ai-agent'])->toContain('border-gray-200')
         ->and($classes->except('ai-agent')->all())->each->toContain('border-transparent');
+});
+
+it('colours the board mock stages by their stable key in every language', function (): void {
+    Lang::addLines(['enums/custom-fields.opportunity.stage.options.prospecting' => 'Akquise'], 'de');
+
+    $html = Locales::within('de', fn (): string => view('cloud::marketing.home.partials.board-mock')->render());
+
+    expect($html)->toContain('background-color: '.OptionColor::Purple->value);
 });

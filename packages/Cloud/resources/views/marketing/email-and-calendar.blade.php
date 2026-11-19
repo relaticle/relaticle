@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     use Illuminate\Support\Arr;
     use Illuminate\Support\Collection;
@@ -17,7 +18,7 @@
             EmailProvider::AZURE => 'Outlook',
         })->all(),
         ', ',
-        ' or ',
+        ' '.__('or').' ',
     );
 
     $vendorNames = $mailProviders->map(fn (EmailProvider $provider): string => match ($provider) {
@@ -31,14 +32,14 @@
             EmailProvider::AZURE => __('Microsoft accounts, such as Outlook and Microsoft 365'),
         })->all(),
         ', ',
-        ', and ',
+        __(', and '),
     );
 
     $title = __('Email and calendar sync for your CRM').' - Relaticle';
     $description = __('Connect :providers to Relaticle. Email and meetings land on the people, companies and opportunities they involve, and you decide what your team sees.', ['providers' => $providerNames]);
 
     $steps = [
-        [__('Connect your inbox'), __('Link a :vendors account from your workspace settings. Your mailbox and calendar import in the background.', ['vendors' => Arr::join($vendorNames, ', ', ' or ')])],
+        [__('Connect your inbox'), __('Link a :vendors account from your workspace settings. Your mailbox and calendar import in the background.', ['vendors' => Arr::join($vendorNames, ', ', ' '.__('or').' ')])],
         [__('Records fill in'), __('People you email are added for you, with their companies. Each email and meeting lands on the record it involves.')],
         [__('You choose who sees what'), __('Pick how much of each mailbox your workspace sees, and change it for any single email.')],
     ];
@@ -92,7 +93,7 @@
         ] : null,
         [
             __('Does it work when I self-host?'),
-            __('Yes. A self-hosted install connects mailboxes through its own :vendors app credentials, which the self-hosting guide explains.', ['vendors' => Arr::join($vendorNames, ', ', ' and ')]),
+            __('Yes. A self-hosted install connects mailboxes through its own :vendors app credentials, which the self-hosting guide explains.', ['vendors' => Arr::join($vendorNames, ', ', ' '.__('and').' ')]),
         ],
     ]));
 @endphp
@@ -236,7 +237,7 @@
                 :label="__('02 · :name', ['name' => $assistantName])"
                 :lead="__(':name drafts. You send.', ['name' => $assistantName])"
                 :link-label="__('Meet :name', ['name' => $assistantName])"
-                :link-href="route('ai')"
+                :link-href="LocalizedUrl::route('ai')"
             >
                 {{ __(':name puts each email on its own card. Nothing leaves until you click Send.', ['name' => $assistantName]) }}
 
@@ -298,7 +299,7 @@
                     @if($documentationActive)
                         <p class="type-prose mt-4 text-gray-500 dark:text-gray-400">
                             {{ __('Step-by-step guides live in the') }}
-                            <a href="{{ route('help.category', ['category' => 'email-and-calendar']) }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('help center') }}</a>.
+                            <a href="{{ LocalizedUrl::route('help.category', ['category' => 'email-and-calendar']) }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('help center') }}</a>.
                         </p>
                     @endif
                 </div>
@@ -324,8 +325,8 @@
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
-                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Email and calendar'))->item(route('emailAndCalendar')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Email and calendar'))->item(LocalizedUrl::route('emailAndCalendar')),
                 ]));
     @endphp
 

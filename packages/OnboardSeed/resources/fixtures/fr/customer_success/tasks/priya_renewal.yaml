@@ -1,0 +1,8 @@
+title: Envoyer la proposition de renouvellement à Loom
+assigned_people:
+  - priya
+custom_fields:
+  description: Incluez le module de reporting et le tarif annuel demandés par Priya.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

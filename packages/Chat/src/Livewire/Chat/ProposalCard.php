@@ -16,7 +16,6 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\QueryException;
-use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
@@ -48,6 +47,7 @@ use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
 use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Throwable;
 
 /**
  * The docked proposal card: the one place a chat-proposed write is decided.
@@ -622,8 +622,9 @@ final class ProposalCard extends BaseLivewireComponent
             'items' => $this->batchItemViews($step),
             'excludableCodes' => $this->excludableCodesOf($step),
             'titleKey' => $entity->titleKey(),
-            'titleLabel' => $entity->titleLabel(),
-            'entityNoun' => Str::lower($entity->singularName()),
+            'titleLabels' => $entity->titleLabels(),
+            'entityNoun' => $entity->inlineName(),
+            'createLabel' => $entity->createLabel(),
             'deletes' => $entity->deletes($step->operation),
             'followUpLabel' => $entity->followUpLabel(),
             'refLinks' => $this->refLinksOf($step, $pendingIds),
@@ -722,22 +723,7 @@ final class ProposalCard extends BaseLivewireComponent
             return '';
         }
 
-        if ($step->operation === PendingActionOperation::Create) {
-            $record = $this->currentRecord($step);
-            $title = $record[$step->entity_type->titleKey()] ?? null;
-
-            if (is_string($title) && $title !== '') {
-                return $title;
-            }
-        }
-
-        $summary = $this->stepSummary($step);
-
-        if (preg_match('/"(.*)"/u', $summary, $matches) === 1 && $matches[1] !== '') {
-            return $matches[1];
-        }
-
-        return '';
+        return ProposalLabel::name($step->entity_type, $this->currentRecord($step), $this->currentRecordDisplay($step)) ?? '';
     }
 
     /**
@@ -762,50 +748,21 @@ final class ProposalCard extends BaseLivewireComponent
             return [
                 'index' => $index,
                 'summary' => is_string($summary) ? $summary : '',
-                'label' => $this->itemLabel($step->entity_type, $display),
+                'label' => $this->itemLabel($step->entity_type, $payload->recordAtOrEmpty($index), $display),
                 'fields' => $this->withOverwrittenValues($step, $index, $this->visibleRows($step, is_array($fields) ? array_values($fields) : [])),
             ];
         }, $this->unresolvedIndices($step));
     }
 
     /**
-     * The identity a batch row leads with: the entity's title value when the row carries one
-     * (an invitation's address), otherwise the name quoted in its summary.
+     * The identity a batch row leads with: the record's own name, from its data or its title row.
      *
+     * @param  array<string, mixed>  $data
      * @param  array<string, mixed>  $display
      */
-    private function itemLabel(ProposalEntity $entity, array $display): string
+    private function itemLabel(ProposalEntity $entity, array $data, array $display): string
     {
-        $fields = is_array($display['fields'] ?? null) ? $display['fields'] : [];
-
-        foreach ($fields as $row) {
-            if (! is_array($row)) {
-                continue;
-            }
-
-            $isTitleRow = ($row['code'] ?? null) === null
-                ? ($row['label'] ?? null) === $entity->titleLabel()
-                : $row['code'] === $entity->titleKey();
-            $value = $row['value'] ?? null;
-
-            if ($isTitleRow && is_string($value) && $value !== '') {
-                return $value;
-            }
-        }
-
-        return $this->labelFromDisplay($display);
-    }
-
-    /**
-     * @param  array<string, mixed>  $display
-     */
-    private function labelFromDisplay(array $display): string
-    {
-        $summary = $display['summary'] ?? null;
-
-        // The quoted record name comes first: the real tools set each item's `title`
-        // to the generic entity title ("Create Person"), which is the eyebrow, not an identity.
-        $name = ProposalLabel::quotedName($display);
+        $name = ProposalLabel::name($entity, $data, $display);
 
         if ($name !== null) {
             return $name;
@@ -816,6 +773,8 @@ final class ProposalCard extends BaseLivewireComponent
         if (is_string($title) && $title !== '') {
             return $title;
         }
+
+        $summary = $display['summary'] ?? null;
 
         return is_string($summary) ? $summary : '';
     }
@@ -979,7 +938,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         } catch (RuntimeException|ValidationException $exception) {
             $this->announceLeftOut($affectedIds, $leftOutRows);
-            $this->reportResolveFailure($anchor, ApprovalFailureMessage::for($exception));
+            $this->reportApprovalException($anchor, $exception);
 
             return;
         }
@@ -996,7 +955,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         if ($result['failed'] !== null) {
-            $this->reportFailedStep($result['failed']['step'], $result['failed']['message']);
+            $this->reportFailedStep($result['failed']['step'], $result['failed']['message'], $result['failed']['shown']);
 
             return;
         }
@@ -1004,12 +963,12 @@ final class ProposalCard extends BaseLivewireComponent
         $this->settleAfterResolution($anchor);
     }
 
-    private function reportFailedStep(PendingAction $failed, string $message): void
+    private function reportFailedStep(PendingAction $failed, string $message, string $shown): void
     {
-        $this->reportResolveFailure($failed, __(':step could not be completed: :message', [
-            'step' => $this->failingRowSummary($failed) ?? $this->stepSummary($failed),
-            'message' => $message,
-        ]));
+        $step = $this->failingRowSummary($failed) ?? $this->stepSummary($failed);
+        $describe = fn (string $reason): string => __(':step could not be completed: :message', ['step' => $step, 'message' => $reason]);
+
+        $this->reportResolveFailure($failed, $describe($message), $describe($shown));
 
         $remaining = $this->loadStep($this->pendingActionId) ?? $this->nextPendingStepOfPlan();
 
@@ -1317,7 +1276,7 @@ final class ProposalCard extends BaseLivewireComponent
             static fn (array $repeat): array => [
                 'text' => __('":name" was created earlier in this conversation. Approving adds another :entity with that name.', [
                     'name' => $repeat['name'],
-                    'entity' => Str::lower($step->entity_type->singularName()),
+                    'entity' => $step->entity_type->inlineName(),
                 ]),
                 'url' => $repeat['url'],
             ],
@@ -1465,7 +1424,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($step, $this->labelledFailure($step, ApprovalFailureMessage::for($exception)));
+            $this->reportApprovalException($step, $exception, labelled: true);
 
             return;
         }
@@ -1517,7 +1476,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException $exception) {
-            $this->reportResolveFailure($step, $exception->getMessage());
+            $this->reportApprovalException($step, $exception);
 
             return;
         }
@@ -1564,7 +1523,7 @@ final class ProposalCard extends BaseLivewireComponent
 
                 return;
             } catch (RuntimeException $exception) {
-                $this->reportResolveFailure($fresh, $exception->getMessage());
+                $this->reportApprovalException($fresh, $exception);
 
                 return;
             }
@@ -1634,7 +1593,7 @@ final class ProposalCard extends BaseLivewireComponent
             // action, e.g. a capability guard) is a RuntimeException too. Livewire
             // would otherwise absorb these into an error bag nothing renders,
             // leaving the button a permanent no-op.
-            $this->reportResolveFailure($pendingAction, ApprovalFailureMessage::for($exception));
+            $this->reportApprovalException($pendingAction, $exception);
 
             return;
         }
@@ -1664,7 +1623,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException $exception) {
-            $this->reportResolveFailure($batch, $exception->getMessage());
+            $this->reportApprovalException($batch, $exception);
 
             return;
         }
@@ -1702,7 +1661,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException $exception) {
-            $this->reportResolveFailure($pendingAction, $exception->getMessage());
+            $this->reportApprovalException($pendingAction, $exception);
 
             return;
         }
@@ -1915,17 +1874,11 @@ final class ProposalCard extends BaseLivewireComponent
     {
         report($exception);
 
-        $this->reportResolveFailure($pendingAction, $this->labelledFailure($pendingAction, ApprovalFailureMessage::forDelivery()));
+        $this->reportResolveFailure($pendingAction, $this->prefixRecord($this->failingRowSummary($pendingAction), ApprovalFailureMessage::forDelivery()));
     }
 
-    /**
-     * On a batch step the earlier rows have committed, so the message names the row
-     * that stopped the run: the first one still undecided.
-     */
-    private function labelledFailure(PendingAction $step, string $message): string
+    private function prefixRecord(?string $record, string $message): string
     {
-        $record = $this->failingRowSummary($step);
-
         return $record === null ? $message : __(':record: :message', ['record' => $record, 'message' => $message]);
     }
 
@@ -1959,9 +1912,21 @@ final class ProposalCard extends BaseLivewireComponent
         $this->dispatch('proposal:lapsed', pendingActionId: $lapsed->getKey(), context: $this->context);
     }
 
-    private function reportResolveFailure(PendingAction $pendingAction, string $message): void
+    private function reportApprovalException(PendingAction $pendingAction, Throwable $exception, bool $labelled = false): void
     {
-        $this->addError('resolve', $message);
+        $record = $labelled ? $this->failingRowSummary($pendingAction) : null;
+
+        $this->reportResolveFailure(
+            $pendingAction,
+            $this->prefixRecord($record, ApprovalFailureMessage::for($exception)),
+            $this->prefixRecord($record, ApprovalFailureMessage::shown($exception)),
+        );
+    }
+
+    private function reportResolveFailure(PendingAction $pendingAction, string $message, ?string $shown = null): void
+    {
+        $shown ??= $message;
+        $this->addError('resolve', $shown);
 
         // Persisted so the model can explain the failure later: without this
         // the card is the only witness, and a proposal discarded after a failed
@@ -1971,7 +1936,7 @@ final class ProposalCard extends BaseLivewireComponent
         $this->dispatch(
             'proposal:resolve-failed',
             pendingActionId: $pendingAction->getKey(),
-            message: $message,
+            message: $shown,
             context: $this->context,
         );
     }

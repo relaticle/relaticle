@@ -8,7 +8,6 @@ use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Queries\ViewerZone;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -77,16 +76,6 @@ abstract class BaseWriteCreateTool implements Tool
     protected function requiredCapability(): ?WorkspaceCapability
     {
         return WorkspaceCapability::RecordsCreate;
-    }
-
-    private function batchVerb(): string
-    {
-        return Str::ucfirst($this->proposalEntity()->verb(PendingActionOperation::Create));
-    }
-
-    private function batchNoun(): string
-    {
-        return Str::headline($this->proposalEntity()->noun());
     }
 
     private function missingCapabilityError(User $user): ?string
@@ -229,8 +218,8 @@ abstract class BaseWriteCreateTool implements Tool
 
         $displayData = $isBatch
             ? [
-                'title' => __(':verb :entities', ['verb' => $this->batchVerb(), 'entities' => Str::plural($this->batchNoun(), count($items))]),
-                'summary' => sprintf('%s %d %s', $this->batchVerb(), count($items), Str::plural(Str::lower($this->batchNoun()), count($items))),
+                'title' => $this->proposalEntity()->batchTitle(PendingActionOperation::Create, count($items)),
+                'summary' => $this->proposalEntity()->batchSummary(PendingActionOperation::Create, count($items)),
                 'items' => $items,
             ]
             : $items[0];

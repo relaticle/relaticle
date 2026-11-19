@@ -44,6 +44,11 @@ final class AccessTokens extends Page
         return __('access-tokens.title');
     }
 
+    public function getTitle(): string
+    {
+        return __('access-tokens.title');
+    }
+
     public function form(Schema $schema): Schema
     {
         return $schema->components([

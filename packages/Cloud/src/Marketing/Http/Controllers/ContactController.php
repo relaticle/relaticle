@@ -14,6 +14,7 @@ use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ContactInquiry;
 use Relaticle\Cloud\Marketing\Http\Requests\ContactRequest;
 use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 
 final readonly class ContactController
 {
@@ -33,7 +34,7 @@ final readonly class ContactController
 
         Mail::to(config('relaticle.contact.email'))->send(new NewContactSubmissionMail($data, $inquiry));
 
-        return to_route('contact', $inquiry instanceof ContactInquiry ? ['plan' => $inquiry->value] : [])
+        return redirect(LocalizedUrl::route('contact', $inquiry instanceof ContactInquiry ? ['plan' => $inquiry->value] : []))
             ->with('fathom.track_contact_submitted', (string) Str::uuid())
             ->with('success', __('Thanks for reaching out! We\'ll get back to you soon.'));
     }

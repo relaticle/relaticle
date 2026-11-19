@@ -1,0 +1,8 @@
+title: 'Verificar las referencias de Emma'
+assigned_people:
+  - emma
+custom_fields:
+  description: 'Contactar a las referencias de Emma Thompson de sus puestos anteriores de gestión de ingeniería. Centrarse en su estilo de liderazgo, su historial de crecimiento de equipos y su toma de decisiones técnicas.'
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

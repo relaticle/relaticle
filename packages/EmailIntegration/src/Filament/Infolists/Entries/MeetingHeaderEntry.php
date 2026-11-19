@@ -43,7 +43,7 @@ final class MeetingHeaderEntry extends Entry
             : Date::parse($record->starts_at)->timezone($timezone);
 
         return [
-            'month' => strtoupper($start->format('M')),
+            'month' => mb_strtoupper(rtrim($start->isoFormat('MMM'), '.')),
             'day' => $start->format('j'),
             'response_status' => $responseStatus,
             'can_respond' => $user instanceof User && $user->can('respond', $record),

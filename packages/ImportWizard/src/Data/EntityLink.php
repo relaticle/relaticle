@@ -86,7 +86,7 @@ final class EntityLink extends Data
             targetEntity: self::getEntityAliasForModel($modelClass),
             targetModelClass: $modelClass,
             storageType: EntityLinkStorage::ForeignKey,
-            label: ucfirst($name),
+            label: __("import-wizard-new::fields.links.{$name}"),
         );
     }
 
@@ -99,7 +99,7 @@ final class EntityLink extends Data
             targetEntity: self::getEntityAliasForModel($modelClass),
             targetModelClass: $modelClass,
             storageType: EntityLinkStorage::MorphToMany,
-            label: ucfirst($name),
+            label: __("import-wizard-new::fields.links.{$name}"),
             allowMultiple: true,
             morphRelation: $name,
         );
@@ -157,7 +157,7 @@ final class EntityLink extends Data
                 MatchableField::name(),
             ])
             ->foreignKey('contact_id')
-            ->label('Point of Contact')
+            ->label(__('import-wizard-new::fields.point_of_contact'))
             ->guess([
                 'contact', 'contact_name', 'person', 'contact_id',
                 'person_id', 'people_id', 'point of contact', 'contact person',

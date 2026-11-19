@@ -87,7 +87,7 @@ final readonly class ActivityValue
     private static function text(mixed $value, callable $plain): string
     {
         if (is_array($value)) {
-            $value = $value['label'] ?? null;
+            $value = is_bool($value['value'] ?? null) ? $value['value'] : ($value['label'] ?? null);
         }
 
         if (is_bool($value)) {

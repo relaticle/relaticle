@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Docs\Support;
 
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Spatie\LaravelMarkdown\MarkdownRenderer;
 
 final readonly class RenderDocMarkdown
@@ -18,6 +19,6 @@ final readonly class RenderDocMarkdown
      */
     public function __invoke(string $body): string
     {
-        return str_replace('<img ', '<img loading="lazy" decoding="async" ', $this->renderer->toHtml($body));
+        return LocalizedUrl::localizeLinks(str_replace('<img ', '<img loading="lazy" decoding="async" ', $this->renderer->toHtml($body)));
     }
 }

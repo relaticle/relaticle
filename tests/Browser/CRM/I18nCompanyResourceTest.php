@@ -7,26 +7,16 @@ use App\Models\User;
 
 mutates(CompanyResource::class);
 
-it('renders CompanyResource list page with French labels when locale is fr', function (): void {
-    config(['app.locale' => 'fr']);
-    app()->setLocale('fr');
-
-    $user = User::factory()->withWorkspace()->create();
+it('renders the companies list in the language the user chose', function (string $locale, string $heading, string $importExport): void {
+    $user = User::factory()->withWorkspace()->create(['locale' => $locale]);
     $workspace = $user->ownedWorkspaces()->first();
 
     visitAs($user, "/app/{$workspace->slug}/companies")
-        ->assertSee('Entreprises')
-        ->assertSee('Importer / Exporter');
-});
-
-it('renders CompanyResource list page with English labels when locale is en', function (): void {
-    config(['app.locale' => 'en']);
-    app()->setLocale('en');
-
-    $user = User::factory()->withWorkspace()->create();
-    $workspace = $user->ownedWorkspaces()->first();
-
-    visitAs($user, "/app/{$workspace->slug}/companies")
-        ->assertSee('Companies')
-        ->assertSee('Import / Export');
-});
+        ->assertSee($heading)
+        ->assertSee($importExport);
+})->with([
+    'en' => ['en', 'Companies', 'Import / Export'],
+    'de' => ['de', 'Unternehmen', 'Import / Export'],
+    'es' => ['es', 'Empresas', 'Importar / Exportar'],
+    'fr' => ['fr', 'Entreprises', 'Importer / Exporter'],
+]);

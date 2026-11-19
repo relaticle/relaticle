@@ -1,0 +1,8 @@
+title: Préparer les documents de due diligence pour Sequoia
+assigned_people:
+  - alfred
+custom_fields:
+  description: Rassemblez les chiffres financiers, la cap table et les indicateurs produit pour la due diligence de Sequoia.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

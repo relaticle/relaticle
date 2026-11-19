@@ -17,10 +17,10 @@ enum AttendeeResponseStatus: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::ACCEPTED => 'Accepted',
-            self::DECLINED => 'Declined',
-            self::TENTATIVE => 'Maybe',
-            self::NEEDS_ACTION => 'Pending',
+            self::ACCEPTED => __('enums/attendee-response-status.accepted'),
+            self::DECLINED => __('enums/attendee-response-status.declined'),
+            self::TENTATIVE => __('enums/attendee-response-status.tentative'),
+            self::NEEDS_ACTION => __('enums/attendee-response-status.needsAction'),
         };
     }
 

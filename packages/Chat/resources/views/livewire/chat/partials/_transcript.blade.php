@@ -146,7 +146,7 @@
                             <template x-if="msg.attachment && !msg.editing">
                                 <div
                                     data-user-attachment
-                                    :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
+                                    :title="msg.created_at ? new Date(msg.created_at).toLocaleString(document.documentElement.lang || undefined) : ''"
                                     class="flex max-w-full items-center gap-2.5 rounded-2xl bg-gray-100 px-3 py-2 dark:bg-white/10"
                                     :class="showsTextBubble(msg) ? '' : 'rounded-br-md'"
                                 >
@@ -168,7 +168,7 @@
                                      without a brand tint. --}}
                                 <div
                                     data-user-text
-                                    :title="msg.created_at ? new Date(msg.created_at).toLocaleString() : ''"
+                                    :title="msg.created_at ? new Date(msg.created_at).toLocaleString(document.documentElement.lang || undefined) : ''"
                                     class="[overflow-wrap:anywhere] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100"
                                 >
                                     <span x-html="renderMessageContent(msg)" class="whitespace-pre-wrap"></span>
@@ -331,7 +331,7 @@
                     <div class="flex flex-col items-start" data-assistant-bubble :data-grouped="decorations(index).grouped">
                         <div class="flex w-full justify-start" x-show="msg.content || !msg.rendered || displayBlocks(msg).length > 0 || (index === messages.length - 1 && isStreaming && currentToolStatus)">
                             <div
-                                :title="msg.created_at ? @js(__('Completed :time')).replace(':time', new Date(msg.created_at).toLocaleString()) : ''"
+                                :title="msg.created_at ? @js(__('Completed :time')).replace(':time', new Date(msg.created_at).toLocaleString(document.documentElement.lang || undefined)) : ''"
                                 class="w-full min-w-0"
                             >
                                 {{-- Rendered reply: text and display blocks interleaved in

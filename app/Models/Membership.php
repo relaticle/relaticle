@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Enums\WorkspaceRole;
 use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Laravel\Jetstream\Jetstream;
 use Laravel\Jetstream\Membership as JetstreamMembership;
 
 #[Table(name: 'workspace_user')]
@@ -46,7 +46,6 @@ final class Membership extends JetstreamMembership
      */
     protected function roleName(): Attribute
     {
-        // @phpstan-ignore-next-line nullCoalesce.expr
-        return Attribute::get(fn (): string => Jetstream::findRole($this->role)?->name ?? 'Unknown');
+        return Attribute::get(fn (): string => WorkspaceRole::tryFrom((string) $this->role)?->label() ?? __('workspaces.roles.unknown'));
     }
 }

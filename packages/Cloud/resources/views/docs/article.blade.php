@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-cloud::docs.shell
     :title="$page->title . ' - ' . config('app.name')"
     :description="$page->description"
@@ -11,10 +12,10 @@
         :previous="$previous"
         :next="$next"
         :eyebrow="__('Developer guides')"
-        :eyebrow-url="route('documentation.index')">
+        :eyebrow-url="LocalizedUrl::route('documentation.index')">
         <x-slot:breadcrumbs>
             <ol class="flex flex-wrap items-center gap-2">
-                <li><a href="{{ route('documentation.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Developers') }}</a></li>
+                <li><a href="{{ LocalizedUrl::route('documentation.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Developers') }}</a></li>
                 <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
                 <li aria-current="page" class="text-gray-900 dark:text-white">{{ $page->title }}</li>
             </ol>
@@ -24,10 +25,10 @@
     @php
         $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->article(
             $page,
-            route('documentation.show', ['type' => $page->slug]),
+            LocalizedUrl::route('documentation.show', ['type' => $page->slug]),
             [
-                ['name' => __('Developers'), 'url' => route('documentation.index')],
-                ['name' => $page->title, 'url' => route('documentation.show', ['type' => $page->slug])],
+                ['name' => __('Developers'), 'url' => LocalizedUrl::route('documentation.index')],
+                ['name' => $page->title, 'url' => LocalizedUrl::route('documentation.show', ['type' => $page->slug])],
             ],
         );
     @endphp

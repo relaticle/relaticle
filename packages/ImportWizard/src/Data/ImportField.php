@@ -61,7 +61,7 @@ final class ImportField extends Data
     {
         return new self(
             key: 'id',
-            label: 'Record ID',
+            label: __('import-wizard-new::fields.record_id'),
             required: false,
             rules: ['nullable', 'ulid'],
             guesses: ['id', 'record_id', 'ulid', 'record id'],

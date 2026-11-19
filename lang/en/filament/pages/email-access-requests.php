@@ -37,7 +37,13 @@ return [
         'email_unavailable' => 'The associated email is no longer available.',
     ],
     'empty' => [
-        'filtered_heading' => 'No :status requests',
+        'filtered_heading' => [
+            'pending' => 'No pending requests',
+            'approved' => 'No approved requests',
+            'denied' => 'No denied requests',
+            'cancelled' => 'No cancelled requests',
+            'expired' => 'No expired requests',
+        ],
         'filtered_description' => 'Try a different filter or clear the active one.',
         'show_all' => 'Show all',
         'incoming_heading' => 'No incoming requests',

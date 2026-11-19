@@ -9,6 +9,7 @@ use App\Mail\WorkspaceInvitationMail;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\WorkspaceInvitation;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -501,6 +502,21 @@ it('refuses to propose an invitation for a member who does not own the workspace
     expect($result)->toContain('Only workspace owners and admins can invite teammates')
         ->and(PendingAction::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0)
         ->and(WorkspaceInvitation::query()->where('workspace_id', $this->workspace->getKey())->count())->toBe(0);
+});
+
+it('keeps the invitation refusals in English for a German user', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->forceFill(['current_workspace_id' => $this->workspace->getKey()])->save();
+
+    $this->actingAs($member);
+    Filament::setTenant($this->workspace);
+
+    $result = Locales::within('de', fn (): string => (new InviteWorkspaceMemberTool)->handle(new Request([
+        'records' => [['email' => 'alex@example.com', 'role' => WorkspaceRole::Member->value]],
+    ])));
+
+    expect($result)->toContain('Only workspace owners and admins can invite teammates. Tell the user to ask one');
 });
 
 it('refuses to propose an invitation into a workspace scheduled for deletion', function (): void {

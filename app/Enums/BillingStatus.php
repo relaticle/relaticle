@@ -169,15 +169,15 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::PastDue => 'Past due',
-            self::Subscribed => 'Subscribed',
-            self::Enterprise => 'Enterprise',
-            self::Trialing => 'Trial',
-            self::Grandfathered => 'Free (legacy)',
-            self::SubscriptionEnded => 'Subscription ended',
-            self::TrialEnded => 'Trial ended',
-            self::Granted => 'Granted',
-            self::Free => 'Free',
+            self::PastDue => __('enums/billing-status.past_due'),
+            self::Subscribed => __('enums/billing-status.subscribed'),
+            self::Enterprise => __('enums/billing-status.enterprise'),
+            self::Trialing => __('enums/billing-status.trialing'),
+            self::Grandfathered => __('enums/billing-status.grandfathered'),
+            self::SubscriptionEnded => __('enums/billing-status.subscription_ended'),
+            self::TrialEnded => __('enums/billing-status.trial_ended'),
+            self::Granted => __('enums/billing-status.granted'),
+            self::Free => __('enums/billing-status.free'),
         };
     }
 
@@ -189,15 +189,15 @@ enum BillingStatus: string implements HasColor, HasDescription, HasLabel
     public function getDescription(): string
     {
         return match ($this) {
-            self::PastDue => 'Paid subscription whose latest charge failed. Access stays open until Stripe cancels it.',
-            self::Subscribed => 'Paying for Cloud Pro or Cloud Scale through a live Stripe subscription.',
-            self::Enterprise => 'Put on the Enterprise plan by hand. No self-serve price exists for it.',
-            self::Trialing => 'Running an unexpired Pro trial. Nothing has been charged yet.',
-            self::Grandfathered => 'Existed before billing shipped, so hosted access stays free for good.',
-            self::SubscriptionEnded => 'Paid subscription ended with nothing behind it. Hosted access is paused until the owner subscribes again.',
-            self::TrialEnded => 'Pro trial expired with no subscription. Hosted access is paused until the owner subscribes.',
-            self::Granted => 'Given a paid plan by hand, with no subscription or trial behind it.',
-            self::Free => 'No subscription, trial, or grandfathering. Hosted access is paused while billing is on.',
+            self::PastDue => __('enums/billing-status.descriptions.past_due'),
+            self::Subscribed => __('enums/billing-status.descriptions.subscribed'),
+            self::Enterprise => __('enums/billing-status.descriptions.enterprise'),
+            self::Trialing => __('enums/billing-status.descriptions.trialing'),
+            self::Grandfathered => __('enums/billing-status.descriptions.grandfathered'),
+            self::SubscriptionEnded => __('enums/billing-status.descriptions.subscription_ended'),
+            self::TrialEnded => __('enums/billing-status.descriptions.trial_ended'),
+            self::Granted => __('enums/billing-status.descriptions.granted'),
+            self::Free => __('enums/billing-status.descriptions.free'),
         };
     }
 

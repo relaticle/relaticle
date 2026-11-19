@@ -277,7 +277,7 @@
                                                 x-bind:aria-selected="(chip.value?.unit === unit.value).toString()"
                                                 x-on:click="pickUnit(chip, unit)"
                                             >
-                                                <span x-text="unit.singular"></span>
+                                                <span x-text="unit.thisPeriod"></span>
                                                 <x-filament::icon icon="lucide-check" class="fi-menu-check" x-show="chip.value?.unit === unit.value" />
                                             </button>
                                         </template>

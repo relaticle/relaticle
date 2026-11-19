@@ -3,10 +3,15 @@
 declare(strict_types=1);
 
 use App\Enums\AccentColor;
+use App\Filament\Pages\AccessTokens;
 use App\Filament\Pages\Appearance;
+use App\Filament\Pages\NotificationPreferences;
+use App\Filament\Pages\Security;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
+use Relaticle\Chat\Filament\Pages\AssistantSettings;
 
 mutates(Appearance::class, AccentColor::class);
 
@@ -49,3 +54,15 @@ it('restores the stored accent on every page load', function (): void {
         ->assertSee('const loadAccent', false)
         ->assertSee("document.addEventListener('livewire:navigated', loadAccent)", false);
 });
+
+it('titles every settings page in the user language', function (string $page, string $title): void {
+    Locales::apply('de');
+
+    expect(Livewire::test($page)->instance()->getTitle())->toBe($title);
+})->with([
+    'appearance' => [Appearance::class, 'Erscheinungsbild'],
+    'security' => [Security::class, 'Sicherheit'],
+    'access tokens' => [AccessTokens::class, 'Zugriffstoken'],
+    'notification preferences' => [NotificationPreferences::class, 'Benachrichtigungseinstellungen'],
+    'assistant settings' => [AssistantSettings::class, 'Assistenteneinstellungen'],
+]);

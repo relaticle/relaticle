@@ -1,7 +1,7 @@
 @php
     $attentionCount = $unreadNotificationsCount + ($pendingRequestsCount ?? 0);
     $label = $attentionCount
-        ? trans_choice('notifications.panel.open_with_count', $attentionCount, ['count' => \Illuminate\Support\Number::format($attentionCount, locale: app()->getLocale())])
+        ? trans_choice('notifications.panel.open_with_count', $attentionCount, ['count' => \Illuminate\Support\Number::format($attentionCount)])
         : __('notifications.panel.open');
 @endphp
 
@@ -22,7 +22,7 @@
 
     @if ($attentionCount)
         <span class="fi-sidebar-notifications-btn-badge">
-            {{ \Illuminate\Support\Number::format($attentionCount, locale: app()->getLocale()) }}
+            {{ \Illuminate\Support\Number::format($attentionCount) }}
         </span>
     @endif
 </button>

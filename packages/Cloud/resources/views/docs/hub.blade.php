@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $baseTitle = __('Developer Documentation');
     $pageDescription = __('Self-host Relaticle with Docker, build integrations on the REST API, and connect AI agents over MCP. Guides for developers building on Relaticle CRM.');
@@ -60,7 +61,7 @@
                 </p>
             </div>
             <div class="mt-4 shrink-0 sm:mt-0">
-                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('help.index') }}" icon-trailing="lucide-arrow-right">
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ LocalizedUrl::route('help.index') }}" icon-trailing="lucide-arrow-right">
                     {{ __('Visit the help center') }}
                 </x-cloud::marketing.button>
             </div>
@@ -69,7 +70,7 @@
 
     @php
         $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->breadcrumbs([
-            ['name' => $baseTitle, 'url' => route('documentation.index')],
+            ['name' => $baseTitle, 'url' => LocalizedUrl::route('documentation.index')],
         ]);
     @endphp
 

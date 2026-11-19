@@ -1,0 +1,8 @@
+title: Rettungsgespräch mit Intercom vereinbaren
+assigned_people:
+  - tomas
+custom_fields:
+  description: Die Nutzung ist um 40 % gesunken. Finden Sie heraus, welches Konkurrenzprodukt im Einsatz ist und was Intercom zum Bleiben bewegen würde.
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: High

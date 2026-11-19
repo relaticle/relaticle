@@ -63,13 +63,13 @@ final class CreateCompanyTool extends BaseWriteCreateTool
     protected function buildRecordDisplay(array $record): array
     {
         $name = (string) ($record['name'] ?? '');
-        $fields = [['label' => 'Name', 'value' => $name]];
+        $fields = [['label' => __('Name'), 'value' => $name]];
 
         $ownerId = $record['account_owner_id'] ?? null;
 
         if (is_string($ownerId) && $ownerId !== '') {
             $fields[] = [
-                'label' => 'Account Owner',
+                'label' => __('Account Owner'),
                 'value' => WorkspaceMembersContext::nameOf($ownerId) ?? $ownerId,
             ];
         }

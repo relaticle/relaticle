@@ -1,0 +1,8 @@
+title: 'Revisar la propuesta de integración con Clearbit'
+assigned_people:
+  - alex
+custom_fields:
+  description: 'Revisar la propuesta de integración de enriquecimiento de datos de Clearbit y preparar comentarios para la próxima sincronización.'
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

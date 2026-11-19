@@ -1,0 +1,8 @@
+title: Relancer Reid sur l'analyse de marché
+assigned_people:
+  - reid
+custom_fields:
+  description: Envoyez à Reid l'analyse de marché mise à jour et le document sur le paysage concurrentiel qu'il a demandés.
+  due_date: '{{ +4d }}'
+  status: To do
+  priority: Medium

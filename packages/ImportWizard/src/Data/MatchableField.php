@@ -21,7 +21,7 @@ final class MatchableField extends Data
     {
         return new self(
             field: 'id',
-            label: 'Record ID',
+            label: __('import-wizard-new::fields.record_id'),
             priority: 100,
             behavior: MatchBehavior::MatchOnly,
         );
@@ -33,7 +33,7 @@ final class MatchableField extends Data
     ): self {
         return new self(
             field: $fieldKey,
-            label: 'Email',
+            label: __('import-wizard-new::fields.email'),
             priority: 90,
             behavior: $behavior,
             multiValue: true,
@@ -46,7 +46,7 @@ final class MatchableField extends Data
     ): self {
         return new self(
             field: $fieldKey,
-            label: 'Domain',
+            label: __('import-wizard-new::fields.domain'),
             priority: 80,
             behavior: $behavior,
             multiValue: true,
@@ -59,7 +59,7 @@ final class MatchableField extends Data
     ): self {
         return new self(
             field: $fieldKey,
-            label: 'Phone',
+            label: __('import-wizard-new::fields.phone'),
             priority: 70,
             behavior: $behavior,
             multiValue: true,
@@ -70,7 +70,7 @@ final class MatchableField extends Data
     {
         return new self(
             field: 'name',
-            label: 'Name',
+            label: __('import-wizard-new::fields.name'),
             priority: 10,
             behavior: MatchBehavior::Create,
         );

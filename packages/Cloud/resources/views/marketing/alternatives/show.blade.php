@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     /**
      * @var array<string, mixed> $relaticle
@@ -104,7 +105,7 @@
     $title = $titles[$competitorSlug];
     $metaTitle = $metaTitles[$competitorSlug];
     $description = $descriptions[$competitorSlug];
-    $factsVerifiedAt = \Carbon\CarbonImmutable::parse($relaticle['verified'])->format('F j, Y');
+    $factsVerifiedAt = \Carbon\CarbonImmutable::parse($relaticle['verified'])->isoFormat('LL');
     $assistantName = (string) config('chat.assistant_name');
     $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 
@@ -138,7 +139,7 @@
                 <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="hero">
                     {{ __('Start for free') }}
                 </x-cloud::marketing.button>
-                <x-cloud::marketing.button variant="secondary" href="{{ route('selfHosted') }}">
+                <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('selfHosted') }}">
                     {{ __('Self-host it') }}
                 </x-cloud::marketing.button>
             </div>
@@ -174,8 +175,8 @@
                 @endforeach
             </p>
             <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
-                <a href="{{ route('selfHosted') }}" class="{{ $linkClass }}">{{ __('See self-hosting options') }}</a>
-                <a href="{{ route('ai') }}" class="{{ $linkClass }}">{{ __('Meet :name, the built-in AI assistant', ['name' => $assistantName]) }}</a>
+                <a href="{{ LocalizedUrl::route('selfHosted') }}" class="{{ $linkClass }}">{{ __('See self-hosting options') }}</a>
+                <a href="{{ LocalizedUrl::route('ai') }}" class="{{ $linkClass }}">{{ __('Meet :name, the built-in AI assistant', ['name' => $assistantName]) }}</a>
             </p>
         </div>
     </x-cloud::marketing.frame>
@@ -184,7 +185,7 @@
         <x-cloud::marketing.button href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="footer">
             {{ __('Start for free') }}
         </x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+        <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}">
             {{ __('Get in touch') }}
         </x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
@@ -197,7 +198,7 @@
                 ->url(url()->current()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
                     \Spatie\SchemaOrg\Schema::listItem()->position(2)->name($title)->item(url()->current()),
                 ]));
     @endphp

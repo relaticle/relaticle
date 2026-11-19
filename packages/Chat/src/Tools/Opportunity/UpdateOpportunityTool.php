@@ -74,7 +74,7 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
 
         if (($request['name'] ?? null) !== null && $request['name'] !== '') {
             $fields[] = [
-                'label' => 'Name',
+                'label' => __('Name'),
                 'old' => $model->getAttribute('name'),
                 'new' => $request['name'],
             ];
@@ -83,7 +83,7 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
         if (array_key_exists('company_id', $request->all())) {
             $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
-                'label' => 'Company',
+                'label' => __('Company'),
                 'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $workspace),
                 'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $workspace),
                 '_oldValue' => $model->getAttribute('company_id'),
@@ -94,7 +94,7 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
         if (array_key_exists('contact_id', $request->all())) {
             $newContactId = $this->stringOrNull($request, 'contact_id');
             $fields[] = [
-                'label' => 'Point of Contact',
+                'label' => __('Point of Contact'),
                 'old' => $this->recordNames()->name($model->getAttribute('contact_id'), People::class, $workspace),
                 'new' => $newContactId === null ? __('(none)') : $this->recordNames()->name($newContactId, People::class, $workspace),
                 '_oldValue' => $model->getAttribute('contact_id'),
@@ -103,8 +103,8 @@ final class UpdateOpportunityTool extends BaseWriteUpdateTool
         }
 
         return [
-            'title' => 'Update Opportunity',
-            'summary' => "Update opportunity \"{$model->getAttribute('name')}\"",
+            'title' => __('Update Opportunity'),
+            'summary' => __('Update opportunity ":name"', ['name' => $model->getAttribute('name')]),
             'fields' => $fields,
         ];
     }

@@ -6,6 +6,7 @@ namespace Relaticle\Cloud\Marketing\Http\Controllers;
 
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 
 final readonly class PrivacyPolicyController
 {
@@ -14,7 +15,7 @@ final readonly class PrivacyPolicyController
         $policyFile = dirname(__DIR__, 4).'/resources/markdown/policy.md';
 
         return view('cloud::marketing.policy', [
-            'policy' => Str::markdown(file_get_contents($policyFile) ?: ''),
+            'policy' => LocalizedUrl::localizeLinks(Str::markdown(file_get_contents($policyFile) ?: '')),
         ]);
     }
 }
