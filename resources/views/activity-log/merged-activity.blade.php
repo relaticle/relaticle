@@ -53,7 +53,7 @@
                     <span class="font-medium text-gray-900 underline decoration-dotted decoration-gray-400 underline-offset-[3px] dark:text-gray-100">{{ __('activity-log::messages.entry.attributes', ['count' => $count]) }}</span>
                 @endif
             @else
-                {{ $outcome ?? \Illuminate\Support\Str::of($summary->summarySentence)->after($summary->causerName)->trim() }}
+                {{ $outcome }}
             @endif
         </p>
 

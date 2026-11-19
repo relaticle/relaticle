@@ -207,6 +207,7 @@ return [
             'created' => 'hat :subject erstellt',
             'deleted' => 'hat :subject gelöscht',
             'restored' => 'hat :subject wiederhergestellt',
+            'other' => 'hat eine Änderung an :subject vorgenommen',
         ],
         'subjects' => [
             'company' => 'ein Unternehmen',

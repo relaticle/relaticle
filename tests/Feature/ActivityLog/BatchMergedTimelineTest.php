@@ -244,3 +244,13 @@ it('words a created, deleted or restored entry as a full sentence in the interfa
     'deleted' => ['deleted', 'hat :subject gelöscht'],
     'restored' => ['restored', 'hat :subject wiederhergestellt'],
 ])->mutates(MergedActivityRenderer::class);
+
+it('words an entry of an unknown event as a full sentence in the interface language', function (): void {
+    app()->setLocale('de');
+    seedActivityRow($this->company, 'custom_event', null);
+
+    $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->sole())->render();
+
+    expect($html)->toContain("hat eine Änderung an {$this->company->name} vorgenommen")
+        ->and($html)->not->toContain('custom event');
+})->mutates(MergedActivityRenderer::class);

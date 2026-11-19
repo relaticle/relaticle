@@ -207,6 +207,7 @@ return [
             'created' => 'creó :subject',
             'deleted' => 'eliminó :subject',
             'restored' => 'restauró :subject',
+            'other' => 'realizó un cambio en :subject',
         ],
         'subjects' => [
             'company' => 'una empresa',
