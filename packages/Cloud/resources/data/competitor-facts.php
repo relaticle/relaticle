@@ -437,7 +437,7 @@ return [
         'license' => 'LGPL-3.0 for Odoo Community; Odoo Enterprise is a separately licensed edition',
         'stars' => 55_926,
         'stars_verified' => '2026-11-19',
-        'contributors' => 305,
+        'contributors' => 'n/a',
         'contributors_verified' => '2026-11-19',
         'pricing' => 'Standard US$7.25, Custom US$13.40 per user/mo billed yearly (US$9.10/US$16.40 monthly), a discount valid for 12 months for the initial users ordered, from list prices of US$8.95 and US$16.40 yearly (US$11.20/US$20.40 monthly); One App Free gives one app to unlimited users on Odoo Online; free trial; see odoo.com/pricing',
         'pricing_verified' => '2026-11-19',
