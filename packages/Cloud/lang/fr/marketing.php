@@ -6,4 +6,9 @@ return [
     'security' => [
         'leave' => 'Partir',
     ],
+    'blog_categories' => [
+        'guides' => 'Guides',
+        'comparisons' => 'Comparatifs',
+        'engineering' => 'Ingénierie',
+    ],
 ];

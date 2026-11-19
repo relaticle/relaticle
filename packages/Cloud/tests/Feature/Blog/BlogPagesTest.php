@@ -7,12 +7,13 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Relaticle\Cloud\CloudServiceProvider;
+use Relaticle\Cloud\Marketing\Support\BlogCategoryName;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\Ink\Models\Tag;
 
-mutates(CloudServiceProvider::class);
+mutates(CloudServiceProvider::class, BlogCategoryName::class);
 
 beforeEach(function () {
     Http::fake([
@@ -415,6 +416,19 @@ describe('Blog languages', function () {
 
         expect(blogHreflangs($this->get('/blog?page=2')->getContent()))->not->toHaveKey('de')
             ->and(blogHreflangs($this->get('/blog')->getContent()))->toHaveKey('de');
+    });
+
+    it('names a category in the page language and keeps the stored name of one without a translation', function () {
+        $guides = Category::factory()->create(['name' => 'Guides', 'slug' => 'guides']);
+        $custom = Category::factory()->create(['name' => 'Release notes', 'slug' => 'release-notes']);
+        $german = Post::factory()->published()->create(['locale' => 'de', 'category_id' => $guides->id]);
+        Post::factory()->published()->create(['locale' => 'de', 'category_id' => $custom->id]);
+        Post::factory()->published()->create(['locale' => 'en', 'category_id' => $guides->id]);
+
+        $this->get('/de/blog')->assertOk()->assertSee('Leitfäden')->assertSee('Release notes');
+        $this->get("/de/blog/{$german->slug}")->assertOk()->assertSee('Leitfäden');
+        $this->get('/de/blog/category/guides')->assertOk()->assertSee('Leitfäden: CRM-Blog', false);
+        $this->get('/blog')->assertOk()->assertSee('Guides')->assertDontSee('Leitfäden');
     });
 
     it('links the English blog index from a German page while no German post exists', function () {

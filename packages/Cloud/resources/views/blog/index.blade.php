@@ -1,12 +1,13 @@
+@use(Relaticle\Cloud\Marketing\Support\BlogCategoryName)
 @use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $title = match (true) {
-        isset($category) => __(':name: CRM Blog', ['name' => $category->name]),
+        isset($category) => __(':name: CRM Blog', ['name' => BlogCategoryName::of($category)]),
         isset($tag) => __(':name: CRM Blog Posts', ['name' => $tag->name]),
         default => __('CRM Guides, Comparisons and Engineering'),
     }.' - '.config('app.name');
     $description = match (true) {
-        isset($category) => __('Read Relaticle articles in :name on self-hosting, MCP and the code behind an open-source CRM.', ['name' => $category->name]),
+        isset($category) => __('Read Relaticle articles in :name on self-hosting, MCP and the code behind an open-source CRM.', ['name' => BlogCategoryName::of($category)]),
         isset($tag) => __('Read Relaticle posts tagged :name about using an open-source CRM, from setup to working with records.', ['name' => $tag->name]),
         default => __('Read Relaticle guides, comparisons and engineering posts on self-hosting, MCP, custom attributes and moving CRM records.'),
     };
@@ -46,7 +47,7 @@
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 @if(isset($category))
-                    {{ __('Posts in') }} <span class="font-medium text-gray-950 dark:text-white">{{ $category->name }}</span>
+                    {{ __('Posts in') }} <span class="font-medium text-gray-950 dark:text-white">{{ BlogCategoryName::of($category) }}</span>
                     &middot; <a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @elseif(isset($tag))
                     {{ __('Posts tagged') }} <span class="font-medium text-gray-950 dark:text-white">#{{ $tag->name }}</span>
