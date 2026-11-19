@@ -12,6 +12,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Support\LikePattern;
 use App\Support\PhoneSearch;
+use App\Support\RichTextSearch;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -22,7 +23,7 @@ use Laravel\Ai\Tools\Request;
 final class SearchCrmTool implements Tool
 {
     /**
-     * Custom field types whose stored value is an option id or markup, never free text.
+     * Custom field types whose stored value is an option id, never free text.
      *
      * @var list<string>
      */
@@ -32,13 +33,14 @@ final class SearchCrmTool implements Tool
         'radio',
         'checkbox-list',
         'tags-input',
-        'rich-editor',
     ];
 
     public function description(): string
     {
         return 'Search across all CRM entity types (companies, people, opportunities, tasks, notes) by keyword. '
-            .'Matches names, titles, and custom attribute (custom field) values such as emails, phone numbers, and links. '
+            .'Matches names, titles, and custom attribute (custom field) values such as emails, phone numbers, links, '
+            .'note bodies and task descriptions. '
+            .'When a keyword finds nothing, retry once with a shorter or singular form before saying nothing matches. '
             .'Returns at most `limit` matches per entity type: when `truncated` is true for an entity there are more, '
             .'so never state a total from these results.';
     }
@@ -156,7 +158,8 @@ final class SearchCrmTool implements Tool
                 ->where('cfv.tenant_id', $tenantId)
                 ->whereNotIn('cf.type', self::EXCLUDED_CUSTOM_FIELD_TYPES)
                 ->where(function (QueryBuilder $w) use ($query, $phonePattern): void {
-                    $w->where('cfv.text_value', 'ilike', "%{$query}%")
+                    $w->where(fn (QueryBuilder $plain): QueryBuilder => $plain->where('cf.type', '!=', 'rich-editor')->where('cfv.text_value', 'ilike', "%{$query}%"))
+                        ->orWhereRaw(RichTextSearch::ELEMENT_CONDITION, ["%{$query}%"])
                         ->orWhere('cfv.string_value', 'ilike', "%{$query}%")
                         ->orWhereRaw(
                             "cfv.json_value is not null and json_typeof(cfv.json_value) = 'array' and exists (select 1 from json_array_elements_text(cfv.json_value) as elem(val) where elem.val ilike ?)",

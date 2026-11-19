@@ -9,12 +9,13 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Support\PhoneSearch;
+use App\Support\RichTextSearch;
 use Illuminate\Support\Facades\DB;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Tools\SearchCrmTool;
 use Relaticle\CustomFields\Services\TenantContextService;
 
-mutates(SearchCrmTool::class, PhoneSearch::class);
+mutates(SearchCrmTool::class, PhoneSearch::class, RichTextSearch::class);
 
 it('finds a person by their email custom field value, not just their name', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
@@ -152,4 +153,22 @@ it('does not match digits inside a field that is not a phone', function (): void
     $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => '(415) 555 0100'])), true);
 
     expect($results['people'])->toBeEmpty();
+});
+
+it('finds a note and a task by a word in their rich text', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $this->actingAs($user);
+    $workspace = $user->currentWorkspace;
+
+    TenantContextService::setTenantId($workspace->getKey());
+    Note::factory()->for($workspace)->create(['title' => 'Call recap'])
+        ->update(['custom_fields' => ['body' => '<p>Send a sample crate of <em>kumquat</em> before the review.</p>']]);
+    Task::factory()->for($workspace)->create(['title' => 'Prepare samples'])
+        ->update(['custom_fields' => ['description' => '<p>Pack the <strong>kumquat</strong> crate.</p>']]);
+    TenantContextService::setTenantId(null);
+
+    $results = json_decode(app(SearchCrmTool::class)->handle(new Request(['query' => 'kumquat'])), true);
+
+    expect(collect($results['notes'])->pluck('title')->all())->toBe(['Call recap'])
+        ->and(collect($results['tasks'])->pluck('title')->all())->toBe(['Prepare samples']);
 });
