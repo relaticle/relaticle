@@ -49,13 +49,13 @@ final class RemoveSampleDataTool implements Tool
         }
 
         if (! $user->hasWorkspaceCapability($workspace?->getKey(), WorkspaceCapability::WorkspaceManage)) {
-            return $this->error(__('Only the workspace owner can remove the sample data. Tell the user to ask the owner, and do not link to any page.'));
+            return $this->error('Only the workspace owner can remove the sample data. Tell the user to ask the owner, and do not link to any page.');
         }
 
         $counts = array_filter(resolve(WorkspaceActivationFacts::class)->sampleRecordCounts($workspace));
 
         if ($counts === []) {
-            return $this->error(__('This workspace has no sample records left to remove.'));
+            return $this->error('This workspace has no sample records left to remove.');
         }
 
         $total = array_sum($counts);

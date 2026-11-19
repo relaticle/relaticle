@@ -6,6 +6,7 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Models\CustomField;
 use App\Models\CustomFieldOption;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -142,6 +143,25 @@ it('refuses a member with the role error and creates no proposal', function (): 
     expect($decoded['error'])->toContain('workspace role does not allow that')
         ->and($decoded['error'])->toContain('Do not link to any page')
         ->and(PendingAction::query()->where('conversation_id', $this->convId)->count())->toBe(0);
+});
+
+it('keeps the role error in English for a German member', function (): void {
+    $member = User::factory()->create();
+    $member->workspaces()->attach($this->workspace, ['role' => 'member']);
+    $member->switchWorkspace($this->workspace);
+
+    Auth::guard('web')->setUser($member);
+    $this->actingAs($member);
+
+    $decoded = Locales::within('de', fn (): array => proposeCustomFields($this->convId, [
+        'entity_type' => 'company',
+        'name' => 'Priority',
+        'type' => 'select',
+        'options' => [['name' => 'High']],
+    ]));
+
+    expect($decoded['error'])->toContain('Tell them a workspace owner or admin can do it')
+        ->and($decoded['error'])->toContain('Do not link to any page');
 });
 
 it('lets an admin propose a field that lands on approval', function (): void {
