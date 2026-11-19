@@ -714,6 +714,84 @@ it('ends a staff session after 60 idle minutes', function (): void {
     isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertUnauthorized();
 });
 
+/**
+ * @param  array<string, array<string, string>>  $cookies
+ * @return TestResponse<Response>
+ */
+function staffLivewireRefresh(array &$cookies, string $snapshot): TestResponse
+{
+    return isolatedAuthRequest($cookies, 'POST', 'https://staff.example.test'.route('default-livewire.update', absolute: false), [
+        'components' => [[
+            'snapshot' => $snapshot,
+            'updates' => [],
+            'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
+        ]],
+    ]);
+}
+
+function staffDashboardSnapshot(array &$cookies): string
+{
+    $page = isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
+    preg_match_all('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
+
+    return collect($matches[1])
+        ->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
+        ->first(fn (string $value): bool => str_contains(json_decode($value, true, flags: JSON_THROW_ON_ERROR)['memo']['name'], '\\Pages\\Dashboard'));
+}
+
+it('refuses a staff Livewire update 24 hours after sign-in and ends the session', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $cookies = [];
+    signInIsolatedStaff($cookies, SystemAdministrator::factory()->create());
+    $snapshot = staffDashboardSnapshot($cookies);
+
+    foreach (range(1, 47) as $ignored) {
+        $this->travelTo(now()->addMinutes(30));
+        staffLivewireRefresh($cookies, $snapshot)->assertOk();
+    }
+
+    $this->travelTo(now()->addMinutes(31));
+
+    staffLivewireRefresh($cookies, $snapshot)->assertStatus(419);
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertUnauthorized();
+});
+
+it('keeps a staff session alive through Livewire updates made inside the idle limit', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $cookies = [];
+    signInIsolatedStaff($cookies, SystemAdministrator::factory()->create());
+    $snapshot = staffDashboardSnapshot($cookies);
+
+    foreach (range(1, 3) as $ignored) {
+        $this->travelTo(now()->addMinutes(30));
+        staffLivewireRefresh($cookies, $snapshot)->assertOk();
+    }
+
+    isolatedAuthRequest($cookies, 'GET', 'https://staff.example.test/instance')->assertOk();
+});
+
+it('leaves a customer Livewire update alone after the staff idle limit', function (): void {
+    $cookies = [];
+    $customer = User::factory()->withWorkspace()->create();
+    isolatedAuthRequest($cookies, 'POST', 'https://app.example.test/login', [
+        'email' => $customer->email,
+        'password' => 'password',
+    ])->assertOk();
+    $page = isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/'.$customer->currentWorkspace->slug.'/companies')->assertOk();
+    preg_match('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
+
+    $this->travelTo(now()->addHours(2));
+
+    isolatedAuthRequest($cookies, 'POST', 'https://app.example.test'.route('default-livewire.update', absolute: false), [
+        'components' => [[
+            'snapshot' => html_entity_decode($matches[1], ENT_QUOTES),
+            'updates' => [],
+            'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
+        ]],
+    ])->assertOk();
+    $this->assertAuthenticated('web');
+});
+
 it('requires second factor enrollment on an existing staff Livewire page', function (): void {
     $cookies = [];
     $administrator = SystemAdministrator::factory()->create();

@@ -166,3 +166,34 @@ it('ends a staff session after 60 idle minutes when the panel is served from a p
     $this->travelTo(now()->addMinutes(61));
     $this->get($instance)->assertRedirect(Filament::getPanel('sysadmin')->getLoginUrl());
 });
+
+it('refuses a staff Livewire update 24 hours after sign-in when the panel is served from a path', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
+    Filament::setCurrentPanel(Filament::getPanel('sysadmin'));
+    $page = $this->get(Dashboard::getUrl())->assertOk()->getContent();
+    preg_match_all('/wire:snapshot="([^"]+)"/', $page, $matches);
+    $snapshot = collect($matches[1])
+        ->map(fn (string $value): string => html_entity_decode($value, ENT_QUOTES))
+        ->first(fn (string $value): bool => str_contains(json_decode($value, true, flags: JSON_THROW_ON_ERROR)['memo']['name'], '\\Pages\\Dashboard'));
+    app()->forgetScopedInstances();
+    $refresh = function () use ($snapshot) {
+        app('livewire')->flushState();
+
+        return $this->withHeader('X-Livewire', '1')->postJson(route('default-livewire.update'), ['components' => [[
+            'snapshot' => $snapshot,
+            'updates' => [],
+            'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
+        ]]]);
+    };
+
+    foreach (range(1, 47) as $ignored) {
+        $this->travelTo(now()->addMinutes(30));
+        $refresh()->assertOk();
+    }
+
+    $this->travelTo(now()->addMinutes(31));
+    $refresh()->assertStatus(419);
+
+    $this->assertGuest('sysadmin');
+});
