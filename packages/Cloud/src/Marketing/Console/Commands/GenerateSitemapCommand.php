@@ -60,6 +60,10 @@ final class GenerateSitemapCommand extends Command
                     return false;
                 }
 
+                if (preg_match($this->explicitSectionsPattern(), $path) === 1) {
+                    return false;
+                }
+
                 if (parse_url($url, PHP_URL_QUERY) !== null) {
                     return false;
                 }
@@ -67,6 +71,13 @@ final class GenerateSitemapCommand extends Command
                 return pathinfo($path, PATHINFO_EXTENSION) === '';
             })
             ->getSitemap();
+    }
+
+    private function explicitSectionsPattern(): string
+    {
+        $locales = implode('|', array_diff(config('app.available_locales'), [LocalizedUrl::DEFAULT_LOCALE]));
+
+        return "#^/(?:(?:{$locales})/)?(?:blog|help|developers(?!/api\\b))(?:/|\$)#";
     }
 
     private function addMarketingUrls(Sitemap $sitemap): void
@@ -121,23 +132,43 @@ final class GenerateSitemapCommand extends Command
      */
     private function addDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
     {
+        $versions = [];
+
         foreach (config('app.available_locales') as $locale) {
-            Locales::within($locale, fn () => $this->addLocalizedDocumentationUrls($sitemap, $docsRepository, $locale));
+            Locales::within($locale, function () use ($docsRepository, $locale, &$versions): void {
+                $docsRepository->categories($locale)
+                    ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
+                    ->each(function (DocCategory $category) use ($locale, &$versions): void {
+                        $versions[$category->path][$locale] = [DocUrl::category($category), null];
+                    });
+
+                $docsRepository->pages($locale)->each(function (DocPage $page) use ($locale, &$versions): void {
+                    $versions[$page->path][$locale] = [DocUrl::page($page), $page->updated];
+                });
+            });
+        }
+
+        foreach ($versions as $pageVersions) {
+            $this->addAlternateSet($sitemap, $pageVersions);
         }
     }
 
-    private function addLocalizedDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository, string $locale): void
+    /** @param  array<string, array{0: string, 1: ?CarbonImmutable}>  $versions */
+    private function addAlternateSet(Sitemap $sitemap, array $versions): void
     {
-        $this->ensureUrl($sitemap, LocalizedUrl::route('help.index', locale: $locale));
-        $this->ensureUrl($sitemap, LocalizedUrl::route('documentation.index', locale: $locale));
+        $alternates = array_map(fn (array $version): string => $version[0], $versions);
 
-        $docsRepository->categories($locale)
-            ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
-            ->each(fn (DocCategory $category): Url => $this->ensureUrl($sitemap, DocUrl::category($category)));
+        if (isset($alternates[LocalizedUrl::DEFAULT_LOCALE])) {
+            $alternates['x-default'] = $alternates[LocalizedUrl::DEFAULT_LOCALE];
+        }
 
-        $docsRepository->pages($locale)->each(function (DocPage $page) use ($sitemap): void {
-            $this->ensureUrl($sitemap, DocUrl::page($page), $page->updated);
-        });
+        foreach ($versions as [$location, $lastModified]) {
+            $tag = $this->ensureUrl($sitemap, $location, $lastModified);
+
+            foreach ($alternates as $hreflang => $href) {
+                $tag->addAlternate($href, $hreflang);
+            }
+        }
     }
 
     private function ensureUrl(Sitemap $sitemap, string $location, ?CarbonImmutable $lastModified = null): Url
