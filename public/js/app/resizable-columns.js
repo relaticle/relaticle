@@ -1382,18 +1382,23 @@
     function registerPaginationFooter() {
         window.Alpine.data('tablePaginationFooter', () => {
             const listeners = new AbortController()
+            let resizeObserver = null
 
             return {
                 init() {
-                    this.$wire.$el.addEventListener(
-                        'scrollToTopOfTable',
-                        () => this.$el.closest('.fi-ta-content-ctn')?.scrollTo({ top: 0 }),
-                        { signal: listeners.signal },
-                    )
+                    const box = this.$el.closest('.fi-ta-content-ctn')
+                    if (!box) return
+
+                    this.$wire.$el.addEventListener('scrollToTopOfTable', () => box.scrollTo({ top: 0 }), { signal: listeners.signal })
+
+                    // Not a container query: containment on the box makes Floating UI flip the popovers in its cells.
+                    resizeObserver = new ResizeObserver(() => this.$el.style.setProperty('--table-visible-width', `${box.clientWidth}px`))
+                    resizeObserver.observe(box)
                 },
 
                 destroy() {
                     listeners.abort()
+                    resizeObserver?.disconnect()
                 },
             }
         })
