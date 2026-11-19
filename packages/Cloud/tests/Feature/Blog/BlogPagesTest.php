@@ -388,12 +388,9 @@ describe('Blog languages', function () {
         ]);
     });
 
-    it('links a German page to the English post when no German version exists', function () {
+    it('keeps an untranslated English post off the German blog', function () {
         [, $german] = translatedPosts();
-        $untranslated = Post::factory()->published()->create(['locale' => 'en', 'slug' => 'only-in-english']);
-
-        expect(LocalizedUrl::route('blog.show', ['slug' => $untranslated->slug], 'de'))->toBe(url('/blog/only-in-english'))
-            ->and(LocalizedUrl::route('blog.show', ['slug' => $german->slug], 'de'))->toBe(url("/de/blog/{$german->slug}"));
+        Post::factory()->published()->create(['locale' => 'en', 'slug' => 'only-in-english']);
 
         $this->get("/de/blog/{$german->slug}")->assertOk();
         $this->get('/de/blog/only-in-english')->assertNotFound();

@@ -26,10 +26,6 @@ final readonly class LocalizedUrl
     {
         $locale ??= app()->getLocale();
 
-        if (self::baseName($name) === 'blog.show' && ! self::hasPost($locale, (string) Arr::first($parameters))) {
-            $locale = self::DEFAULT_LOCALE;
-        }
-
         return route(self::nameIn($name, $locale) ?? self::baseName($name), $parameters, $absolute);
     }
 
@@ -142,7 +138,7 @@ final readonly class LocalizedUrl
         }
         $localizedName = $name === null ? null : self::nameIn($name, $locale);
 
-        if ($name !== null && $locale !== app()->getLocale() && ! self::listingReaches($locale, self::baseName($name), $route?->parameter('slug'), (int) ($query['page'] ?? 1))) {
+        if ($route instanceof RoutingRoute && $locale !== app()->getLocale() && ! self::listingReaches($locale, $route, $query)) {
             return null;
         }
 
@@ -151,13 +147,19 @@ final readonly class LocalizedUrl
             : route($localizedName, [...$query, ...Arr::only($route->parameters(), $route->parameterNames())]);
     }
 
-    private static function listingReaches(string $locale, string $baseName, ?string $slug, int $page): bool
+    /** @param  array<string, mixed>  $query */
+    private static function listingReaches(string $locale, RoutingRoute $route, array $query): bool
     {
-        if (! in_array($baseName, self::PAGINATED_ROUTES, true) || ($baseName === 'blog.index' && $page <= 1)) {
+        $baseName = self::baseName((string) $route->getName());
+        $page = is_numeric($query['page'] ?? null) ? max((int) $query['page'], 1) : 1;
+
+        if (! in_array($baseName, self::PAGINATED_ROUTES, true) || ($baseName === 'blog.index' && $page === 1)) {
             return true;
         }
 
-        return self::listingPostCount($locale, $baseName, $slug) > (max($page, 1) - 1) * (int) config('ink.per_page', 12);
+        $slug = $route->parameter('slug');
+
+        return self::listingPostCount($locale, $baseName, is_string($slug) ? $slug : null) > ($page - 1) * (int) config('ink.per_page', 12);
     }
 
     private static function listingPostCount(string $locale, string $baseName, ?string $slug): int
@@ -246,12 +248,6 @@ final readonly class LocalizedUrl
         }
 
         return $attributes->get('blog.locales');
-    }
-
-    private static function hasPost(string $locale, string $slug): bool
-    {
-        return $locale === self::DEFAULT_LOCALE
-            || Post::query()->published()->inLocale($locale)->where('slug', $slug)->exists();
     }
 
     /** @return array<string, string> */
