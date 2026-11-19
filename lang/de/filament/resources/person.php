@@ -47,6 +47,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Personen exportieren',
+                    'heading' => 'Personen exportieren',
+                ],
                 'create_company' => [
                     'label' => 'Unternehmen erstellen',
                 ],

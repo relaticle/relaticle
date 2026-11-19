@@ -48,6 +48,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Export people',
+                    'heading' => 'Export People',
+                ],
                 'create_company' => [
                     'label' => 'Create Company',
                 ],

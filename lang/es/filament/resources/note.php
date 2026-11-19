@@ -69,6 +69,10 @@ return [
                 'import_export' => [
                     'label' => 'Importar / Exportar',
                 ],
+                'export' => [
+                    'label' => 'Exportar notas',
+                    'heading' => 'Exportar notas',
+                ],
             ],
         ],
     ],

@@ -47,6 +47,10 @@ return [
                 'import_export' => [
                     'label' => 'Importer / Exporter',
                 ],
+                'export' => [
+                    'label' => 'Exporter des entreprises',
+                    'heading' => 'Exporter des entreprises',
+                ],
             ],
         ],
         'view' => [

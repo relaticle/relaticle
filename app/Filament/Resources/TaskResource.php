@@ -107,7 +107,11 @@ final class TaskResource extends Resource
                     ->icon('lucide-upload')
                     ->url(ImportTasks::getUrl())
                     ->visible(ImportTasks::canAccess(...)),
-                ExportAction::make()->exporter(TaskExporter::class)->authorize('exportAny', Task::class),
+                ExportAction::make()
+                    ->label(__('filament/resources/task.pages.list.actions.export.label'))
+                    ->modalHeading(__('filament/resources/task.pages.list.actions.export.heading'))
+                    ->exporter(TaskExporter::class)
+                    ->authorize('exportAny', Task::class),
             ])->label(__('filament/resources/task.pages.list.actions.import_export.label')),
             CreateTaskAction::make()
                 ->icon('lucide-plus')

@@ -70,7 +70,11 @@ final class OpportunityResource extends Resource
                     ->icon('lucide-upload')
                     ->url(ImportOpportunities::getUrl())
                     ->visible(ImportOpportunities::canAccess(...)),
-                ExportAction::make()->exporter(OpportunityExporter::class)->authorize('exportAny', Opportunity::class),
+                ExportAction::make()
+                    ->label(__('filament/resources/opportunity.pages.list.actions.export.label'))
+                    ->modalHeading(__('filament/resources/opportunity.pages.list.actions.export.heading'))
+                    ->exporter(OpportunityExporter::class)
+                    ->authorize('exportAny', Opportunity::class),
             ])->label(__('filament/resources/opportunity.pages.list.actions.import_export.label')),
             CreateAction::make()
                 ->icon('lucide-plus')

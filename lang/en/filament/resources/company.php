@@ -51,6 +51,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Export companies',
+                    'heading' => 'Export Companies',
+                ],
             ],
         ],
         'view' => [

@@ -70,6 +70,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Export notes',
+                    'heading' => 'Export Notes',
+                ],
             ],
         ],
     ],

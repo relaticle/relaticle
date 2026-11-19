@@ -45,6 +45,10 @@ return [
                 'import_export' => [
                     'label' => 'Importer / Exporter',
                 ],
+                'export' => [
+                    'label' => 'Exporter des opportunités',
+                    'heading' => 'Exporter des opportunités',
+                ],
             ],
         ],
         'view' => [

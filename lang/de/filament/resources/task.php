@@ -56,6 +56,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Aufgaben exportieren',
+                    'heading' => 'Aufgaben exportieren',
+                ],
             ],
         ],
     ],

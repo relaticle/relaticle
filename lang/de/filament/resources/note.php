@@ -69,6 +69,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Notizen exportieren',
+                    'heading' => 'Notizen exportieren',
+                ],
             ],
         ],
     ],

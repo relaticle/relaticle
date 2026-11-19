@@ -56,6 +56,10 @@ return [
                 'import_export' => [
                     'label' => 'Importer / Exporter',
                 ],
+                'export' => [
+                    'label' => 'Exporter des tâches',
+                    'heading' => 'Exporter des tâches',
+                ],
             ],
         ],
     ],

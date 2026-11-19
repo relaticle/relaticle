@@ -9,11 +9,16 @@ use App\Enums\WorkspaceRole;
 use App\Events\WorkspaceCreated;
 use App\Filament\Exports\CompanyExporter;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\NoteResource\Pages\ManageNotes;
+use App\Filament\Resources\OpportunityResource\Pages\ListOpportunities;
+use App\Filament\Resources\PeopleResource\Pages\ListPeople;
+use App\Filament\Resources\TaskResource\Pages\ManageTasks;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Export;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Locales;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
@@ -178,3 +183,22 @@ test('export neutralizes a value a spreadsheet would run as a formula', function
 
     expect($exporter($company->fresh())[0])->toBe('\'=HYPERLINK("https://evil.example","Open")');
 });
+
+test('names the export action for each entity in the user language', function (string $page, string $locale, string $label): void {
+    $this->user->forceFill(['locale' => $locale])->save();
+    Locales::apply($locale);
+
+    openList($page)
+        ->assertSee($label)
+        ->mountAction('export')
+        ->assertSee($label);
+})->with([
+    'de companies' => [ListCompanies::class, 'de', 'Unternehmen exportieren'],
+    'de people' => [ListPeople::class, 'de', 'Personen exportieren'],
+    'de opportunities' => [ListOpportunities::class, 'de', 'Verkaufschancen exportieren'],
+    'de tasks' => [ManageTasks::class, 'de', 'Aufgaben exportieren'],
+    'de notes' => [ManageNotes::class, 'de', 'Notizen exportieren'],
+    'es tasks' => [ManageTasks::class, 'es', 'Exportar tareas'],
+    'fr opportunities' => [ListOpportunities::class, 'fr', 'Exporter des opportunités'],
+    'en companies' => [ListCompanies::class, 'en', 'Export companies'],
+]);

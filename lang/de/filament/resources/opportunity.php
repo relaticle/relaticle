@@ -45,6 +45,10 @@ return [
                 'import_export' => [
                     'label' => 'Import / Export',
                 ],
+                'export' => [
+                    'label' => 'Verkaufschancen exportieren',
+                    'heading' => 'Verkaufschancen exportieren',
+                ],
             ],
         ],
         'view' => [
