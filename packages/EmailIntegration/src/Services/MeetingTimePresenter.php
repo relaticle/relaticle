@@ -105,7 +105,7 @@ final readonly class MeetingTimePresenter
             return $date->isoFormat('ddd, ll');
         }
 
-        return $date->isoFormat('ddd, '.__('formats.date_without_year'));
+        return $date->isoFormat('ddd, '.__('formats.iso.date_without_year'));
     }
 
     private function compactDuration(CarbonInterface $start, CarbonInterface $end): string

@@ -56,7 +56,7 @@ final class TaskDigestMail extends Mailable implements ShouldQueue
     {
         $overdue = $this->digest->overdueCount();
         $due = $this->digest->upcomingCount();
-        $replace = ['workspace' => $this->workspace->name, 'date' => now($this->user->effectiveTimezone())->settings(['locale' => app()->getLocale()])->isoFormat(__('formats.date_without_year'))];
+        $replace = ['workspace' => $this->workspace->name, 'date' => now($this->user->effectiveTimezone())->settings(['locale' => app()->getLocale()])->isoFormat(__('formats.iso.date_without_year'))];
 
         if ($overdue > 0 && $due > 0) {
             return __('mail.task_digest.subject_both', [...$replace, 'overdue' => $overdue, 'due' => $due]);

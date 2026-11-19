@@ -491,7 +491,7 @@
                                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $icons['task'] }}"/></svg>
                                                 <span class="chat-chip-label">{{ $taskTitle }}</span>
                                             </span>
-                                            <span class="ms-auto text-xs tabular-nums text-red-600 dark:text-red-400">{{ $due->isoFormat(__('formats.date_without_year')) }}</span>
+                                            <span class="ms-auto text-xs tabular-nums text-red-600 dark:text-red-400">{{ $due->isoFormat(__('formats.iso.date_without_year')) }}</span>
                                         </li>
                                     @endforeach
                                 </ul>

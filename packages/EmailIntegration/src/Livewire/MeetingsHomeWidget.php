@@ -112,7 +112,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
                 ->native(false)
                 ->live()
                 ->closeOnDateSelection()
-                ->displayFormat(fn (): string => __('formats.short_date'))
+                ->displayFormat(fn (): string => __('formats.php.short_date'))
                 ->extraTriggerAttributes(['class' => 'fi-meetings-date-trigger'])
                 ->label(fn (): string => __('filament/pages/dashboard.meetings.pick_date', [
                     'date' => $this->dateLabel(),
@@ -295,7 +295,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     {
         $selected = Date::parse($this->selectedDate, $this->viewerTimezone())->startOfDay();
 
-        return $this->datePrefix().' '.$selected->isoFormat(__('formats.date_without_year'));
+        return $this->datePrefix().' '.$selected->isoFormat(__('formats.iso.date_without_year'));
     }
 
     /**

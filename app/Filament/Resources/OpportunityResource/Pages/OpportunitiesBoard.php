@@ -295,7 +295,7 @@ final class OpportunitiesBoard extends BoardResourcePage implements OrdersBoardS
         $date = Date::parse($state);
         $viewerToday = Date::now(FilamentTimezone::get())->startOfDay();
 
-        $shortDate = $date->isoFormat(__('formats.date_without_year'));
+        $shortDate = $date->isoFormat(__('formats.iso.date_without_year'));
         $closesOn = $date->toDateString();
         $today = $viewerToday->toDateString();
         $tomorrow = $viewerToday->copy()->addDay()->toDateString();

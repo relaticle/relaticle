@@ -33,7 +33,7 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: __('mail.trial_ending.subject', ['date' => $this->endsOn(__('formats.date_without_year'))]));
+        return new Envelope(subject: __('mail.trial_ending.subject', ['date' => $this->endsOn(__('formats.iso.date_without_year'))]));
     }
 
     public function content(): Content
@@ -42,8 +42,8 @@ final class ProTrialEndingSoonMail extends Mailable implements ShouldQueue
             markdown: 'cloud::mail.pro-trial-ending-soon',
             with: [
                 'credits' => number_format(Plan::Pro->credits()),
-                'endsOnLong' => $this->endsOn(__('formats.date_at_time')),
-                'endsOnShort' => $this->endsOn(__('formats.date_without_year')),
+                'endsOnLong' => $this->endsOn(__('formats.iso.date_at_time')),
+                'endsOnShort' => $this->endsOn(__('formats.iso.date_without_year')),
                 'zone' => $this->zoneLabel(),
                 'usage' => resolve(TrialUsageQuery::class)->forWorkspace($this->workspace),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
