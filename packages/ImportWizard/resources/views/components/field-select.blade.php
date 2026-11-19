@@ -129,7 +129,7 @@
         role="combobox"
         aria-haspopup="listbox"
         :aria-expanded="open"
-        aria-label="{{ __('Map column :column to field', ['column' => $column]) }}"
+        aria-label="{{ __('Map column :column to an attribute', ['column' => $column]) }}"
         class="w-full flex items-center gap-1.5 px-2.5 py-1.5 text-sm rounded-lg border bg-white dark:bg-gray-900 focus:outline-none transition-colors cursor-pointer"
         :class="open
             ? 'border-primary-500 dark:border-primary-400 ring-2 ring-primary-500/20'
@@ -185,7 +185,7 @@
         x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100"
         role="listbox"
-        aria-label="{{ __('Available fields') }}"
+        aria-label="{{ __('Available attributes') }}"
         class="absolute z-50 w-52 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg ring-1 ring-black/5 dark:ring-white/5 overflow-hidden"
     >
         {{-- Search Header --}}
@@ -194,7 +194,7 @@
             <input
                 type="text"
                 placeholder="{{ __('Search...') }}"
-                aria-label="{{ __('Search fields') }}"
+                aria-label="{{ __('Search attributes') }}"
                 class="w-full h-8 pl-8 pr-2 text-xs bg-transparent text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none"
                 x-ref="searchInput"
                 x-model="search"

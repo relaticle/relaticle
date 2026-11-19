@@ -127,6 +127,16 @@ it('searches the mapping options case-insensitively for accented labels', functi
         ->assertSeeHtml(Js::from('étape')->toHtml().'.includes(search.toLowerCase())');
 });
 
+it('calls every mapping target an attribute', function (): void {
+    app()->setLocale('de');
+    createStoreWithHeaders($this, ['Name']);
+
+    mountMappingStep($this)
+        ->assertSeeHtml('aria-label="Spalte Name einem Attribut zuordnen"')
+        ->assertSeeHtml('aria-label="Verfügbare Attribute"')
+        ->assertSeeHtml('aria-label="Attribute durchsuchen"');
+});
+
 it('auto-maps Name header to name field on mount', function (): void {
     createStoreWithHeaders($this, ['Name', 'Phone']);
 
