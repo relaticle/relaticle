@@ -108,6 +108,7 @@ return [
             'today' => 'today',
             'deleted_record' => ':name (deleted)',
             'empty_heading' => 'No :records match this view',
+            'empty_description' => 'Change the filters, or clear them to see every record.',
             'periods' => [
                 'days' => '{1} :count day|[2,*] :count days',
                 'weeks' => '{1} :count week|[2,*] :count weeks',

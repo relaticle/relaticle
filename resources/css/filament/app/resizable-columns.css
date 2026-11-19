@@ -316,5 +316,10 @@ body.reordering-column .column-resize-handle-bar::before {
         .fi-ta-empty-state:not(.fi-modal *) {
             @apply flex min-h-0 flex-1 flex-col justify-center;
         }
+
+        /* Otherwise the empty table takes half the height and the message sits in the lower half. */
+        .fi-ta-main:not(.fi-modal *):has(> .fi-ta-empty-state) > .fi-ta-content-ctn {
+            @apply flex-none;
+        }
     }
 }

@@ -449,6 +449,7 @@ it('tells the empty list which rules hide its records and clears them from a but
         ->assertDontSee("No {$records} match this view")
         ->call('setFilterRules', [['field' => $column, 'condition' => 'contains', 'value' => 'zzqx-no-match']])
         ->assertSee("No {$records} match this view")
+        ->assertSee('Change the filters, or clear them to see every record.')
         ->assertSee('Clear filters')
         ->callAction(TestAction::make('clearFilterBar')->table())
         ->assertDontSee("No {$records} match this view")

@@ -108,6 +108,7 @@ return [
             'today' => 'aujourd\'hui',
             'deleted_record' => ':name (supprimé)',
             'empty_heading' => 'Aucun résultat parmi les :records pour cette vue',
+            'empty_description' => 'Modifiez les filtres ou effacez-les pour voir tous les résultats.',
             'periods' => [
                 'days' => '{1} :count jour|[2,*] :count jours',
                 'weeks' => '{1} :count semaine|[2,*] :count semaines',

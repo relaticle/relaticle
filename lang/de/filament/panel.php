@@ -108,6 +108,7 @@ return [
             'today' => 'heute',
             'deleted_record' => ':name (gelöscht)',
             'empty_heading' => 'Kein Eintrag in :records passt zu dieser Ansicht',
+            'empty_description' => 'Ändern Sie die Filter oder setzen Sie sie zurück, um alle Einträge zu sehen.',
             'periods' => [
                 'days' => '{1} :count Tag|[2,*] :count Tagen',
                 'weeks' => '{1} :count Woche|[2,*] :count Wochen',

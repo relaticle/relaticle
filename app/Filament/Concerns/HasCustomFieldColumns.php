@@ -84,6 +84,7 @@ trait HasCustomFieldColumns
                 ->columnManager(false)
                 ->groupingSettingsHidden()
                 ->recordActionsColumnLabel(fn (): ?Htmlable => $this->addColumnHeader())
+                ->emptyStateIcon($this->tableEntity()->icon())
                 ->pushColumns($columns)
                 ->filters([ConditionsFilter::make($this->healedFilterRules(...)), TrashedFilter::make()->indicateUsing(fn (): array => [])]),
         );
