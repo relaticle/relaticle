@@ -38,6 +38,7 @@ use Relaticle\EmailIntegration\Models\Meeting;
 use Relaticle\EmailIntegration\Models\MeetingAttendee;
 use Relaticle\EmailIntegration\Services\MailboxDisplayNameDirectory;
 use Relaticle\EmailIntegration\Services\MeetingTemporalState;
+use Relaticle\EmailIntegration\Support\EmailHtmlSanitizer;
 
 final class MeetingDetailInfolist
 {
@@ -188,7 +189,7 @@ final class MeetingDetailInfolist
     private static function descriptionHtml(string $description): string
     {
         if ($description !== strip_tags($description)) {
-            return $description;
+            return EmailHtmlSanitizer::sanitize($description) ?? '';
         }
 
         $lines = array_filter(

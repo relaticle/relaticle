@@ -704,6 +704,28 @@ it('keeps the line breaks of a plain-text description and drops divider lines', 
         ->assertMountedActionModalDontSee('____');
 });
 
+it('strips scripts, handlers and javascript links from a meeting description', function (): void {
+    $description = '<p onclick="x()">Hi <a href="javascript:alert(1)">a</a><a href="https://ok.example">b</a><script>alert(2)</script></p>';
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->id,
+        'description' => $description,
+    ]);
+
+    $helper = new ReflectionMethod(MeetingDetailInfolist::class, 'descriptionHtml');
+    $html = $helper->invoke(null, $description);
+
+    expect($html)->not->toContain('onclick')
+        ->not->toContain('javascript:')
+        ->not->toContain('<script')
+        ->toContain('https://ok.example');
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee('https://ok.example', escape: false)
+        ->assertMountedActionModalDontSee(['onclick', 'javascript:', '<script'], escape: false);
+});
+
 it('offers a join link on an upcoming meeting that has one', function (): void {
     $meeting = Meeting::factory()->create([
         'workspace_id' => $this->workspace->id,
