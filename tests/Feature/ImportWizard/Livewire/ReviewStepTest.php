@@ -692,3 +692,15 @@ it('counts the unique values of a column with the right plural in each language'
     'en one' => ['en', 1, '1 unique value'],
     'en many' => ['en', 2, '2 unique values'],
 ]);
+
+it('names the column in a format error instead of the word value', function (string $locale): void {
+    Locales::apply($locale);
+    $component = mountReviewStep($this);
+    $component->call('selectColumn', 'Emails');
+    $label = $component->get('selectedColumn')->getLabel();
+
+    $component
+        ->call('updateMappedValue', 'john@test.com', 'valid@test.com, not-an-email')
+        ->assertReturned(fn (array $errors): bool => str_contains(mb_strtolower($errors['not-an-email']), mb_strtolower($label))
+            && ! str_contains($errors['not-an-email'], 'alue'));
+})->with(['en', 'de', 'es', 'fr']);

@@ -87,7 +87,7 @@ final class ColumnValidator
         }
 
         $errors = $this->parseCommaSeparated($value)
-            ->mapWithKeys(fn (string $item): array => [$item => $this->runValidator($item, $rules)])
+            ->mapWithKeys(fn (string $item): array => [$item => $this->runValidator($item, $rules, $column->getLabel())])
             ->filter()
             ->all();
 
@@ -117,7 +117,7 @@ final class ColumnValidator
             return null;
         }
 
-        $error = $this->runValidator($value, $rules);
+        $error = $this->runValidator($value, $rules, $column->getLabel());
 
         if ($error !== null) {
             return ValidationError::message($error);
@@ -172,9 +172,9 @@ final class ColumnValidator
     }
 
     /** @param array<int, string> $rules */
-    private function runValidator(string $value, array $rules): ?string
+    private function runValidator(string $value, array $rules, string $label): ?string
     {
-        $validator = Validator::make(['value' => $value], ['value' => $rules]);
+        $validator = Validator::make(['value' => $value], ['value' => $rules], [], ['value' => $label]);
 
         if ($validator->passes()) {
             return null;
