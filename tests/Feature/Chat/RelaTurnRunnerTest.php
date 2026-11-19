@@ -395,7 +395,7 @@ it('reads a stored error row as a failed turn', function (): void {
 it('fails loudly when the provider served another model, and still records the turn', function (): void {
     CrmAssistant::fake(['Fine.']);
     RelaTurn::forget();
-    $turn = new RelaTurn(EvalWorkspace::seed(), model: 'claude-opus-5');
+    $turn = new RelaTurn(EvalWorkspace::seed(), model: 'claude-opus-5-5');
     $rewriting = false;
     DB::listen(function (QueryExecuted $query) use (&$rewriting): void {
         if ($rewriting || ! str_starts_with($query->sql, 'insert into "agent_conversation_messages"')) {
@@ -414,7 +414,7 @@ it('fails loudly when the provider served another model, and still records the t
         $served = $e->getMessage();
     }
 
-    expect($served)->toBe('Asked for claude-opus-5, served by claude-sonnet-5')
+    expect($served)->toBe('Asked for claude-opus-5-5, served by claude-sonnet-5')
         ->and(RelaTurn::$last)->toBeInstanceOf(TurnEnvelope::class);
 });
 
