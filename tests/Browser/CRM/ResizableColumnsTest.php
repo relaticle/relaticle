@@ -349,7 +349,12 @@ it('opens the next page at its first row from the pagination after the last row'
 
     $page->wait(1.5)
         ->assertScript('document.querySelector(".fi-ta-content-ctn tfoot .fi-pagination-overview").innerText.includes("26")', true)
-        ->assertScript('document.querySelector(".fi-ta-content-ctn").scrollTop', 0)
+        ->assertScript('document.querySelector(".fi-ta-content-ctn").scrollTop', 0);
+
+    $page->script('(() => { const c = document.querySelector(".fi-ta-content-ctn"); c.scrollTo(c.scrollWidth, c.scrollHeight); })()');
+
+    $page->wait(0.3)
+        ->assertScript(footerPaginationBox(), json_encode(['belowFold' => false, 'atContainerBottom' => true, 'spansContainer' => true]))
         ->assertNoJavaScriptErrors();
 });
 
