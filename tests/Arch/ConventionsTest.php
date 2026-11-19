@@ -114,7 +114,10 @@ function retiredRecordWordOffenders(string $root, array $directories): array
     $labelPathsNamingSomethingElse = [
         'packages/Cloud/src/Marketing/Support/MarketingNavigation.php',
         'packages/Cloud/resources/views/marketing/alternatives/',
-        'packages/Cloud/lang/en.json',
+    ];
+
+    $labelLinesNamingSomethingElse = [
+        'packages/Cloud/lang/en.json' => ['"Contact": "Contact",', '"Deals": "Deals",'],
     ];
 
     $emailParticipantPaths = [
@@ -146,7 +149,9 @@ function retiredRecordWordOffenders(string $root, array $directories): array
             foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $index => $line) {
                 $retired = [];
 
-                if ($checksLabels && preg_match('/([\'"])(?:Contacts?|Deals?)\1/', $line, $label) === 1) {
+                $namesSomethingElse = in_array(trim($line), $labelLinesNamingSomethingElse[$relativePath] ?? [], true);
+
+                if ($checksLabels && ! $namesSomethingElse && preg_match('/([\'"])(?:Contacts?|Deals?)\1/', $line, $label) === 1) {
                     $retired[] = $label[0];
                 }
 
