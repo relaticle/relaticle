@@ -49,7 +49,7 @@ return [
         ],
         'add_workspace_member' => [
             'title' => 'Inviter des membres',
-            'description' => 'Invitez des personnes par e-mail. Chacune reçoit sa propre invitation.',
+            'description' => 'Invitez des membres par e-mail. Chaque personne invitée reçoit sa propre invitation.',
         ],
         'workspace_members' => [
             'title' => 'Membres',

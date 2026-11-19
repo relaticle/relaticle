@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\BlogCategoryName)
 @use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @props([
     'post',
@@ -16,7 +17,7 @@
                 <li><a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $crumbClass }}">{{ __('Blog') }}</a></li>
                 @if($post->category)
                     <li aria-hidden="true">/</li>
-                    <li><a href="{{ LocalizedUrl::route('blog.category', ['slug' => $post->category->slug]) }}" class="{{ $crumbClass }}">{{ $post->category->name }}</a></li>
+                    <li><a href="{{ LocalizedUrl::route('blog.category', ['slug' => $post->category->slug]) }}" class="{{ $crumbClass }}">{{ BlogCategoryName::of($post->category) }}</a></li>
                 @endif
             </ol>
         </nav>

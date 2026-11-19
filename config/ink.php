@@ -39,8 +39,6 @@ return [
     ],
 
     'feed' => [
-        'title' => 'Relaticle Engineering Blog',
-        'description' => 'Deep dives into building an open-source CRM for AI agents.',
         'author_email' => 'hello@relaticle.com',
     ],
 

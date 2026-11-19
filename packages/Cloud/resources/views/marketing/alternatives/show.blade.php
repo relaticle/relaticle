@@ -116,6 +116,28 @@
                 ],
             ],
         ],
+        'odoo' => [
+            'badge' => __('Alternative'),
+            'opening' => __('This page compares Relaticle with Odoo for CRM work. Odoo Community is open source under LGPL-3.0. Odoo Enterprise carries a separate license. Odoo prices its paid plans per user. On the Custom plan, you can host Enterprise yourself. Relaticle is an open-source CRM. Run it on your own server for free, or on a hosted plan priced per workspace with unlimited users. Both :name, the built-in AI assistant, and its MCP server for Claude and ChatGPT work self-hosted.', ['name' => (string) config('chat.assistant_name')]),
+            'sections' => [
+                [
+                    'heading' => __('License & pricing'),
+                    'body' => __('Odoo license: :odooLicense. Odoo pricing: :odooPricing. Relaticle is AGPL-3.0. Its hosted plans charge per workspace. Relaticle pricing: :relaticlePricing.', ['odooLicense' => $competitor['license'], 'odooPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                ],
+                [
+                    'heading' => __('AI capabilities'),
+                    'body' => __('Odoo\'s AI: :odooAi. Relaticle\'s AI: :relaticleAi.', ['odooAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                ],
+                [
+                    'heading' => __('Data ownership & deployment'),
+                    'body' => __('Odoo: :odooSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['odooSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                ],
+                [
+                    'heading' => __('Extensibility'),
+                    'body' => __('Odoo\'s extensibility: :odooExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['odooExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
+                ],
+            ],
+        ],
     ][$competitorSlug];
 
     $titles = [
@@ -124,6 +146,7 @@
         'pipedrive' => __('Pipedrive Alternative'),
         'zoho' => __('Zoho CRM Alternative'),
         'dynamics' => __('Microsoft Dynamics 365 Alternative'),
+        'odoo' => __('Odoo Alternative'),
     ];
 
     /*
@@ -138,6 +161,7 @@
         'pipedrive' => __('Open Source Pipedrive Alternative, Self-Hosted | Relaticle'),
         'zoho' => __('Open Source Zoho CRM Alternative, Self-Hosted | Relaticle'),
         'dynamics' => __('Open Source Microsoft Dynamics 365 Alternative | Relaticle'),
+        'odoo' => __('Open Source Odoo Alternative | Relaticle'),
     ];
 
     /*
@@ -150,6 +174,7 @@
         'pipedrive' => __('Pipedrive lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
         'zoho' => __('Zoho CRM lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
         'dynamics' => __('Dynamics 365 Sales charges per user. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
+        'odoo' => __('Odoo prices its paid plans per user. Relaticle is an open-source CRM with built-in AI. Self-host it free, or pick a hosted plan with unlimited users.'),
     ];
 
     $title = $titles[$competitorSlug];
