@@ -281,6 +281,7 @@ final class AppPanelProvider extends PanelProvider
             AddQueuedCookiesToResponse::class,
             StartSession::class,
             'auth.context',
+            'auth.lifetime',
             AuthenticateSession::class,
             SetUserLocale::class,
             ShareErrorsFromSession::class,

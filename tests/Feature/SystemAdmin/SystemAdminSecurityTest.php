@@ -13,7 +13,6 @@ use App\Models\Workspace;
 use Filament\Actions\Action;
 use Filament\Actions\Testing\TestAction;
 use Filament\Auth\MultiFactor\App\AppAuthentication;
-use Filament\Auth\Pages\Login;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\Authenticate;
 use Illuminate\Routing\Route as RoutingRoute;
@@ -31,6 +30,7 @@ use Relaticle\SystemAdmin\Actions\Passkeys\DeletePasskey as SysadminDeletePasske
 use Relaticle\SystemAdmin\Auth\StaffWebAuthn;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Filament\Pages\Auth\EditProfile;
+use Relaticle\SystemAdmin\Filament\Pages\Auth\Login;
 use Relaticle\SystemAdmin\Filament\Pages\Settings\ManageAiSettings;
 use Relaticle\SystemAdmin\Filament\Resources\UserResource\Pages\EditUser;
 use Relaticle\SystemAdmin\Http\Middleware\RequireSecondFactor;
@@ -292,6 +292,13 @@ describe('Second factor', function () {
         expect($unguarded)->toBeEmpty();
     });
 
+    it('renders the staff sign-in without a remember-me checkbox', function () {
+        livewire(Login::class)
+            ->assertFormFieldExists('email')
+            ->assertFormFieldExists('password')
+            ->assertFormFieldDoesNotExist('remember');
+    });
+
     it('challenges a password sign-in for a one-time code', function () {
         $secret = app(Google2FA::class)->generateSecretKey(16);
         $administrator = SystemAdministrator::factory()->create([
@@ -408,9 +415,16 @@ describe('Staff passkeys', function () {
             'credential' => $assertion['storedCredential'],
         ]);
 
-        $this->postJson('/sysadmin/passkeys/login', $assertion['payload'])->assertOk();
+        $response = $this->postJson('/sysadmin/passkeys/login', [...$assertion['payload'], 'remember' => true])->assertOk();
 
         $this->assertAuthenticatedAs($administrator, 'sysadmin');
+        $response->assertCookieMissing(auth('sysadmin')->getRecallerName());
+    });
+
+    it('serves the staff sign-in page without a remember-me label', function () {
+        $this->get('/sysadmin/login')
+            ->assertOk()
+            ->assertDontSee(__('filament-panels::auth/pages/login.form.remember.label'));
     });
 
     it('refuses a staff assertion minted on the customer panel origin', function () {

@@ -69,6 +69,7 @@ final readonly class Impersonator
         }
 
         AuthenticationSession::clear();
+        AuthenticationSession::forgetStarted();
         $session->forget([Auth::guard('web')->getName(), self::PASSWORD_HASH]);
         $session->migrate(true);
         Auth::guard('web')->forgetUser();

@@ -164,6 +164,26 @@ test('callback from socialite provider logs in existing user when social account
     $response->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
 });
 
+test('sets no remember-me cookie after a Google sign-in', function (): void {
+    $user = User::factory()->withWorkspace()->create(['email' => 'cookie@example.com']);
+
+    UserSocialAccount::factory()->create([
+        'user_id' => $user->id,
+        'provider_name' => SocialiteProvider::GOOGLE->value,
+        'provider_id' => '555',
+    ]);
+
+    Socialite::fake(
+        SocialiteProvider::GOOGLE->value,
+        makeSocialiteUser('555', 'Cookie User', 'cookie@example.com'),
+    );
+
+    $response = $this->get(route('auth.socialite.callback', ['provider' => SocialiteProvider::GOOGLE->value, 'code' => 'test-code']));
+
+    $this->assertAuthenticatedAs($user);
+    expect(collect($response->headers->getCookies())->map->getName()->filter(fn (string $name): bool => str_starts_with($name, 'remember_web_')))->toBeEmpty();
+});
+
 test('linked Google login cannot bypass enrolled MFA', function (): void {
     $user = User::factory()->withConfirmedMfa()->create();
 
@@ -188,7 +208,7 @@ test('unlinking a social account while its MFA challenge is pending cannot compl
         'provider_name' => SocialiteProvider::GOOGLE->value,
     ]);
 
-    AuthenticationSession::begin($user, AuthMethod::GOOGLE, (string) $account->getKey(), true);
+    AuthenticationSession::begin($user, AuthMethod::GOOGLE, (string) $account->getKey());
 
     $account->delete();
 

@@ -178,6 +178,7 @@ final class ResetDemoAccountCommand extends Command
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
+            'two_factor_last_used_step' => null,
         ];
 
         if ($password !== null) {

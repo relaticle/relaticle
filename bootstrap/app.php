@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Features\EmailIntegration;
 use App\Http\Middleware\ConfigureTrustedProxies;
 use App\Http\Middleware\DenyIndexingOnSecondaryHosts;
+use App\Http\Middleware\EnforceAbsoluteSessionLifetime;
 use App\Http\Middleware\EnsureAuthenticationComplete;
 use App\Http\Middleware\NoReferrer;
 use App\Http\Middleware\ReadAcrossWorkspaces;
@@ -121,6 +122,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(
             append: [
                 'auth.context',
+                'auth.lifetime',
                 RedirectToPrimaryHost::class,
                 EnsureAuthenticationComplete::class,
                 StopImpersonationOnLogout::class,
@@ -185,6 +187,11 @@ return Application::configure(basePath: dirname(__DIR__))
             append: EnsureAuthenticationContext::class,
         );
 
+        $middleware->appendToPriorityList(
+            after: EnsureAuthenticationContext::class,
+            append: EnforceAbsoluteSessionLifetime::class,
+        );
+
         $middleware->prependToPriorityList(
             before: SetUpPanel::class,
             prepend: RedirectToPrimaryHost::class,
@@ -192,6 +199,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'auth.context' => EnsureAuthenticationContext::class,
+            'auth.lifetime' => EnforceAbsoluteSessionLifetime::class,
             'signed' => ValidateSignature::class,
             'no-referrer' => NoReferrer::class,
             'workspaces.across' => ReadAcrossWorkspaces::class,

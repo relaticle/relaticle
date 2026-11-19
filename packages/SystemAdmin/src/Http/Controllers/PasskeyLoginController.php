@@ -47,7 +47,7 @@ final class PasskeyLoginController extends Controller
 
         $intended = $request->session()->pull('url.intended', $panel->getUrl());
 
-        $guard->login($passkey->user, $request->remember());
+        $guard->login($passkey->user);
 
         $request->session()->regenerate();
 
