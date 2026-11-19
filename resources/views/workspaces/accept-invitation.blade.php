@@ -18,7 +18,7 @@
 
         <x-slot:details>
             <x-workspaces.invitation-identity
-                :label="__('workspaces.invite_link.join.joining_as')"
+                :label="__('workspaces.invitation.joining_as')"
                 :value="$accountEmail"
             />
 

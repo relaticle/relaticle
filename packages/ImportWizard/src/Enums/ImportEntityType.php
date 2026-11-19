@@ -22,11 +22,11 @@ enum ImportEntityType: string
     public function label(): string
     {
         return match ($this) {
-            self::Company => 'Companies',
-            self::People => 'People',
-            self::Opportunity => 'Opportunities',
-            self::Task => 'Tasks',
-            self::Note => 'Notes',
+            self::Company => __('enums/import-entity-type.company'),
+            self::People => __('enums/import-entity-type.people'),
+            self::Opportunity => __('enums/import-entity-type.opportunity'),
+            self::Task => __('enums/import-entity-type.task'),
+            self::Note => __('enums/import-entity-type.note'),
         };
     }
 

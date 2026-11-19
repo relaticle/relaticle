@@ -2,7 +2,6 @@
 
 declare(strict_types=1);
 
-use App\Filament\Pages\Dashboard;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\Members;
 use App\Livewire\App\Workspaces\InviteWorkspaceMembers;
@@ -10,7 +9,6 @@ use App\Livewire\App\Workspaces\UpdateWorkspaceName;
 use App\Livewire\App\Workspaces\WorkspaceMembers;
 use App\Mail\WorkspaceInvitationMail;
 use App\Models\User;
-use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -152,22 +150,4 @@ test('extend action is removed from the invitation rows', function () {
 
     livewire(WorkspaceMembers::class, ['workspace' => $this->workspace])
         ->assertActionDoesNotExist(TestAction::make('extendWorkspaceInvitation')->table($invitation->id));
-});
-
-test('onboarding-generated invite link still works for an authenticated user', function () {
-    $owner = User::factory()->create();
-    /** @var Workspace $workspace */
-    $workspace = Workspace::factory()->create(['user_id' => $owner->id]);
-    $token = $workspace->invite_link_token;
-
-    expect($token)->toBeString()->toHaveLength(40);
-
-    $joiner = User::factory()->create(['email_verified_at' => now()]);
-
-    $this->actingAs($joiner)
-        ->post(route('workspaces.join.confirm', ['token' => $token]))
-        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
-
-    expect($workspace->fresh()->users()->where('users.id', $joiner->id)->exists())->toBeTrue()
-        ->and($joiner->fresh()->current_workspace_id)->toBe($workspace->id);
 });

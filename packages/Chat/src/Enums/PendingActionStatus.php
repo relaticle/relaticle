@@ -28,11 +28,11 @@ enum PendingActionStatus: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::Pending => 'Pending Approval',
-            self::Approved => 'Approved',
-            self::Rejected => 'Rejected',
-            self::Expired => 'Expired',
-            self::Superseded => 'Superseded',
+            self::Pending => __('enums/pending-action-status.pending'),
+            self::Approved => __('enums/pending-action-status.approved'),
+            self::Rejected => __('enums/pending-action-status.rejected'),
+            self::Expired => __('enums/pending-action-status.expired'),
+            self::Superseded => __('enums/pending-action-status.superseded'),
         };
     }
 

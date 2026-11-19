@@ -52,6 +52,6 @@ final class InactiveWorkspaceDeletionWarningMail extends Mailable implements Sho
 
     private function onDate(CarbonImmutable $moment): string
     {
-        return $moment->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
+        return $moment->setTimezone($this->workspace->ownerTimezone())->settings(['locale' => app()->getLocale()])->isoFormat('ll');
     }
 }

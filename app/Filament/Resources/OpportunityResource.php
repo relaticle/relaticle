@@ -70,7 +70,11 @@ final class OpportunityResource extends Resource
                     ->icon('lucide-upload')
                     ->url(ImportOpportunities::getUrl())
                     ->visible(ImportOpportunities::canAccess(...)),
-                ExportAction::make()->exporter(OpportunityExporter::class)->authorize('exportAny', Opportunity::class),
+                ExportAction::make()
+                    ->label(__('filament/resources/opportunity.pages.list.actions.export.label'))
+                    ->modalHeading(__('filament/resources/opportunity.pages.list.actions.export.heading'))
+                    ->exporter(OpportunityExporter::class)
+                    ->authorize('exportAny', Opportunity::class),
             ])->label(__('filament/resources/opportunity.pages.list.actions.import_export.label')),
             CreateAction::make()
                 ->icon('lucide-plus')
@@ -89,6 +93,7 @@ final class OpportunityResource extends Resource
             ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns([
                 RecordChipColumn::make('name')
+                    ->label(__('Name'))
                     ->previewable(),
                 TextColumn::make('creator.name')
                     ->label(__('filament/resources/opportunity.fields.creator.label'))
@@ -97,15 +102,18 @@ final class OpportunityResource extends Resource
                     ->visibleFrom('sm')
                     ->getStateUsing(fn (Opportunity $record): string => $record->created_by),
                 TextColumn::make('deleted_at')
+                    ->label(__('filament/resources/opportunity.fields.deleted_at.label'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('created_at')
+                    ->label(__('filament/resources/opportunity.fields.created_at.label'))
                     ->dateTime()
                     ->sortable()
                     ->visibleFrom('sm')
                     ->toggleable(isToggledHiddenByDefault: true),
                 TextColumn::make('updated_at')
+                    ->label(__('filament/resources/opportunity.fields.updated_at.label'))
                     ->dateTime()
                     ->sortable()
                     ->toggleable(isToggledHiddenByDefault: true),

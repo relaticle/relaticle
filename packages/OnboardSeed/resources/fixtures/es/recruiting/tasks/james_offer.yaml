@@ -1,0 +1,8 @@
+title: 'Preparar la carta de oferta para James'
+assigned_people:
+  - james
+custom_fields:
+  description: 'Redactar la carta de oferta para James Park con el paquete de compensación, los detalles de capital y la fecha de inicio. Alinearla con la plantilla estándar de oferta de Supabase para desarrolladores backend.'
+  due_date: '{{ +1d }}'
+  status: To do
+  priority: High

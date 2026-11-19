@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace App\Concerns;
 
-use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Support\HtmlString;
@@ -22,31 +21,12 @@ trait DetectsWorkspaceInvitation
         return WorkspaceInvitation::findByRawToken($token);
     }
 
-    protected function getWorkspaceFromInviteLinkInSession(): ?Workspace
-    {
-        $token = $this->getIntendedUrlSegmentAfter('join');
-
-        if ($token === null) {
-            return null;
-        }
-
-        return Workspace::query()
-            ->where('invite_link_token', $token)
-            ->first();
-    }
-
     protected function getWorkspaceInvitationSubheading(): ?Htmlable
     {
         $invitation = $this->getWorkspaceInvitationFromSession();
 
         if ($invitation && ! $invitation->isExpired() && ! $invitation->workspace->isScheduledForDeletion()) {
             return $this->renderInvitationBanner($invitation->workspace->name);
-        }
-
-        $workspace = $this->getWorkspaceFromInviteLinkInSession();
-
-        if ($workspace && ! $workspace->isInviteLinkTokenExpired() && ! $workspace->isScheduledForDeletion()) {
-            return $this->renderInvitationBanner($workspace->name);
         }
 
         return null;

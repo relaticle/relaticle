@@ -1,0 +1,8 @@
+title: Term Sheet von Benchmark prüfen
+assigned_people:
+  - peter
+custom_fields:
+  description: Prüfen Sie das Term Sheet von Benchmark für die Seed-Runde und kommentieren Sie Änderungswünsche.
+  due_date: '{{ +3d }}'
+  status: In progress
+  priority: High

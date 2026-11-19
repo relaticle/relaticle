@@ -31,9 +31,9 @@ enum DateFormat: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::ISO => 'ISO standard',
-            self::EUROPEAN => 'European',
-            self::AMERICAN => 'American',
+            self::ISO => __('enums/date-format.iso'),
+            self::EUROPEAN => __('enums/date-format.european'),
+            self::AMERICAN => __('enums/date-format.american'),
         };
     }
 

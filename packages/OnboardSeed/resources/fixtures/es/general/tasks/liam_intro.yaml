@@ -1,0 +1,8 @@
+title: 'Llamada introductoria con Liam'
+assigned_people:
+  - liam
+custom_fields:
+  description: 'Programar una llamada introductoria de 30 minutos con Liam para explorar oportunidades de alianza en medios y la afinidad mutua.'
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium

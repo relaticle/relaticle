@@ -32,13 +32,13 @@
      @theme-changed.window="theme = $event.detail"
      class="inline-flex items-center rounded-full border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-900 p-0.5"
 >
-    <button @click="apply('system')" :aria-pressed="theme === 'system'" aria-label="System theme" class="{{ $buttonClass }}">
+    <button @click="apply('system')" :aria-pressed="theme === 'system'" aria-label="{{ __('System theme') }}" class="{{ $buttonClass }}">
         <x-lucide-monitor class="{{ $iconSize }}" />
     </button>
-    <button @click="apply('light')" :aria-pressed="theme === 'light'" aria-label="Light theme" class="{{ $buttonClass }}">
+    <button @click="apply('light')" :aria-pressed="theme === 'light'" aria-label="{{ __('Light theme') }}" class="{{ $buttonClass }}">
         <x-lucide-sun class="{{ $iconSize }}" />
     </button>
-    <button @click="apply('dark')" :aria-pressed="theme === 'dark'" aria-label="Dark theme" class="{{ $buttonClass }}">
+    <button @click="apply('dark')" :aria-pressed="theme === 'dark'" aria-label="{{ __('Dark theme') }}" class="{{ $buttonClass }}">
         <x-lucide-moon class="{{ $iconSize }}" />
     </button>
 </div>

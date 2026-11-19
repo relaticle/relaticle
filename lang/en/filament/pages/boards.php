@@ -99,6 +99,11 @@ return [
         'form' => [
             'name_placeholder' => 'Enter opportunity title',
         ],
+        'badges' => [
+            'today' => 'Closes Today',
+            'tomorrow' => 'Closes Tomorrow',
+            'overdue' => ':date (Overdue)',
+        ],
         'groupings' => [
             'company' => 'Company',
             'no_company' => 'No company',
@@ -111,6 +116,11 @@ return [
             'add' => 'Add Task',
             'edit' => 'Edit',
             'delete' => 'Delete',
+        ],
+        'badges' => [
+            'today' => 'Due Today',
+            'tomorrow' => 'Due Tomorrow',
+            'overdue' => ':date (Overdue)',
         ],
         'groupings' => [
             'assignee' => 'Assignee',

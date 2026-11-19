@@ -112,7 +112,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
                 ->native(false)
                 ->live()
                 ->closeOnDateSelection()
-                ->displayFormat('M j')
+                ->displayFormat(fn (): string => __('formats.php.short_date'))
                 ->extraTriggerAttributes(['class' => 'fi-meetings-date-trigger'])
                 ->label(fn (): string => __('filament/pages/dashboard.meetings.pick_date', [
                     'date' => $this->dateLabel(),
@@ -282,7 +282,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
             1 => __('filament/pages/dashboard.meetings.date.tomorrow'),
             -1 => __('filament/pages/dashboard.meetings.date.yesterday'),
             default => __('filament/pages/dashboard.meetings.date.other', [
-                'weekday' => $selected->format('D'),
+                'weekday' => $selected->isoFormat('ddd'),
             ]),
         };
     }
@@ -295,7 +295,7 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
     {
         $selected = Date::parse($this->selectedDate, $this->viewerTimezone())->startOfDay();
 
-        return $this->datePrefix().' '.$selected->format('M j');
+        return $this->datePrefix().' '.$selected->isoFormat(__('formats.iso.date_without_year'));
     }
 
     /**
@@ -367,8 +367,8 @@ final class MeetingsHomeWidget extends Component implements HasActions, HasSchem
         }
 
         $end = $meeting->ends_at->timezone($timezone);
-        $startLabel = $start->format('g:i A');
-        $endLabel = $end->equalTo($start) ? null : $end->format('g:i A');
+        $startLabel = $start->isoFormat('LT');
+        $endLabel = $end->equalTo($start) ? null : $end->isoFormat('LT');
 
         return [
             'start' => $startLabel,

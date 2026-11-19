@@ -28,6 +28,11 @@ final class NotificationPreferences extends Page
         return __('notifications.title');
     }
 
+    public function getTitle(): string
+    {
+        return __('Notification Preferences');
+    }
+
     public function getHeading(): string
     {
         return __('notifications.title');

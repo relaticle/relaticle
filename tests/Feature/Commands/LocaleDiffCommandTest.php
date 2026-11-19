@@ -142,3 +142,14 @@ function artisan(string $command, array $arguments): string
 
     return Artisan::output();
 }
+
+it('reports a sentence key missing from the locale json', function (): void {
+    $root = $this->fixturePath.'/json-only';
+    File::ensureDirectoryExists($root);
+    File::put($root.'/en.json', json_encode(['Done. Saved.' => 'Done. Saved.', 'Cancel' => 'Cancel']));
+    File::put($root.'/fr.json', json_encode(['Cancel' => 'Annuler']));
+
+    $this->artisan('locale:diff', ['locale' => 'fr', '--lang-path' => $root])
+        ->expectsOutputToContain('Missing in fr: [json] Done. Saved.')
+        ->assertExitCode(1);
+});

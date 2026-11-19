@@ -28,6 +28,8 @@ use Relaticle\Documentation\Support\PageSections;
  */
 final readonly class SearchDocsTool implements Tool
 {
+    private const string FALLBACK_LOCALE = 'en';
+
     private const int MAX_RESULTS = 5;
 
     private const int DEFAULT_RESULTS = 3;
@@ -113,7 +115,7 @@ final readonly class SearchDocsTool implements Tool
         $terms = $this->terms((string) $request->string('query'));
         $limit = max(1, min((int) ($request['limit'] ?? self::DEFAULT_RESULTS), self::MAX_RESULTS));
 
-        $results = $terms === [] ? [] : $this->search($terms, $limit);
+        $results = $terms === [] ? [] : $this->searchLocalizedFirst($terms, $limit);
 
         if ($results === []) {
             return (string) json_encode([
@@ -133,9 +135,31 @@ final readonly class SearchDocsTool implements Tool
      * @param  list<string>  $terms
      * @return list<array{title: string, section: string, area: string, url: string, content: string}>
      */
-    private function search(array $terms, int $limit): array
+    private function searchLocalizedFirst(array $terms, int $limit): array
     {
-        $records = ($this->index)()['records'];
+        $locale = app()->getLocale();
+        $hits = $this->search($terms, $limit, $locale);
+
+        if ($locale !== self::FALLBACK_LOCALE && count($hits) < $limit) {
+            $answered = array_column($hits, 'path');
+
+            foreach ($this->search($terms, $limit, self::FALLBACK_LOCALE) as $hit) {
+                if (count($hits) < $limit && ! in_array($hit['path'], $answered, true)) {
+                    $hits[] = $hit;
+                }
+            }
+        }
+
+        return array_column($hits, 'result');
+    }
+
+    /**
+     * @param  list<string>  $terms
+     * @return list<array{path: string, result: array{title: string, section: string, area: string, url: string, content: string}}>
+     */
+    private function search(array $terms, int $limit, string $locale): array
+    {
+        $records = ($this->index)($locale)['records'];
         $weights = $this->weights($records, $terms);
 
         $scored = [];
@@ -160,14 +184,14 @@ final readonly class SearchDocsTool implements Tool
                 continue;
             }
 
-            $result = $this->present($hit['record']);
+            $result = $this->present($hit['record'], $locale);
 
             if ($result === null) {
                 continue;
             }
 
             $perPage[$path] = ($perPage[$path] ?? 0) + 1;
-            $results[] = $result;
+            $results[] = ['path' => $path, 'result' => $result];
 
             if (count($results) === $limit) {
                 break;
@@ -291,9 +315,9 @@ final readonly class SearchDocsTool implements Tool
      * @param  array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}  $record
      * @return array{title: string, section: string, area: string, url: string, content: string}|null
      */
-    private function present(array $record): ?array
+    private function present(array $record, string $locale): ?array
     {
-        $content = $this->sectionMarkdown($record) ?? $record['content'];
+        $content = $this->sectionMarkdown($record, $locale) ?? $record['content'];
 
         if (trim($content) === '') {
             return null;
@@ -314,9 +338,9 @@ final readonly class SearchDocsTool implements Tool
      *
      * @param  array{path: string, title: string, section: string, anchor: string, content: string, url: string, crumb: string}  $record
      */
-    private function sectionMarkdown(array $record): ?string
+    private function sectionMarkdown(array $record, string $locale): ?string
     {
-        $page = $this->docs->find($record['path']);
+        $page = $this->docs->find($record['path'], $locale);
 
         if (! $page instanceof DocPage) {
             return null;

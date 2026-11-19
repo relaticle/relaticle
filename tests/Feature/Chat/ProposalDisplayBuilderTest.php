@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Features\OnboardSeed;
 use App\Models\CustomField;
 use App\Models\User;
+use Illuminate\Support\Facades\Lang;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Services\Tools\ProposalDisplayBuilder;
@@ -122,4 +123,22 @@ it('does not duplicate a custom row when the stored display row carries no type 
     expect($linkedinRows)->toHaveCount(1)
         ->and($linkedinRows[0])->toHaveKey('type')
         ->and($linkedinRows[0]['type'])->toBe('link');
+});
+
+it('drops a stored English title row once, in every language', function (string $locale): void {
+    Lang::addLines(['enums/proposal-entity.title_label.title' => 'Titre', 'enums/proposal-entity.title_label.name' => 'Nom'], 'fr');
+    Lang::addLines(['enums/proposal-entity.title_label.title' => 'Titel', 'enums/proposal-entity.title_label.name' => 'Name'], 'de');
+    app()->setLocale($locale);
+
+    $stored = [['label' => 'Title', 'value' => 'Call Jane'], ['label' => 'Priority', 'value' => 'High']];
+
+    $display = resolve(ProposalDisplayBuilder::class)->build($this->user, ProposalEntity::Task, ['title' => 'Call Jane', 'custom_fields' => []], $stored);
+
+    expect(collect($display['fields'])->where('code', 'title'))->toHaveCount(1)
+        ->and(collect($display['fields'])->where('value', 'Call Jane'))->toHaveCount(1)
+        ->and(collect($display['fields'])->firstWhere('label', 'Priority'))->not->toBeNull();
+})->with(['fr', 'de']);
+
+it('exposes the stable title code on every receipt', function (): void {
+    expect(ProposalEntity::receipts()['task']['titleKey'])->toBe('title');
 });

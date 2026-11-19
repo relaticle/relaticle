@@ -43,7 +43,7 @@ final class ManagedPlanInvoiceMail extends Mailable implements ShouldQueue
             with: [
                 'planName' => $this->plan->marketingLabel(),
                 'formattedAmount' => Number::currency($this->amount, 'USD', precision: 0),
-                'dueDate' => $this->dueOn?->toFormattedDateString(),
+                'dueDate' => $this->dueOn?->isoFormat('ll'),
             ],
         );
     }

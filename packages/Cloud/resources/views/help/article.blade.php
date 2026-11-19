@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-cloud::docs.shell
     :title="__(':title - :brand', ['title' => $page->title, 'brand' => config('app.name')])"
     :description="$page->description"
@@ -10,13 +11,13 @@
         :headings="$headings"
         :related="$related"
         :eyebrow="$category?->title"
-        :eyebrow-url="$category ? route('help.category', ['category' => $page->category]) : null">
+        :eyebrow-url="$category ? LocalizedUrl::route('help.category', ['category' => $page->category]) : null">
         <x-slot:breadcrumbs>
             <ol class="flex flex-wrap items-center gap-2">
-                <li><a href="{{ route('help.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Help center') }}</a></li>
+                <li><a href="{{ LocalizedUrl::route('help.index') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Help center') }}</a></li>
                 @if($category)
                     <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
-                    <li><a href="{{ route('help.category', ['category' => $page->category]) }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ $category->title }}</a></li>
+                    <li><a href="{{ LocalizedUrl::route('help.category', ['category' => $page->category]) }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ $category->title }}</a></li>
                 @endif
                 <li aria-hidden="true" class="text-gray-300 dark:text-gray-600">/</li>
                 <li aria-current="page" class="text-gray-900 dark:text-white">{{ $page->title }}</li>
@@ -26,18 +27,18 @@
 
     @php
         $breadcrumbTrail = [
-            ['name' => __('Help center'), 'url' => route('help.index')],
+            ['name' => __('Help center'), 'url' => LocalizedUrl::route('help.index')],
         ];
 
         if ($category) {
-            $breadcrumbTrail[] = ['name' => $category->title, 'url' => route('help.category', ['category' => $page->category])];
+            $breadcrumbTrail[] = ['name' => $category->title, 'url' => LocalizedUrl::route('help.category', ['category' => $page->category])];
         }
 
-        $breadcrumbTrail[] = ['name' => $page->title, 'url' => route('help.show', ['category' => $page->category, 'slug' => $page->slug])];
+        $breadcrumbTrail[] = ['name' => $page->title, 'url' => LocalizedUrl::route('help.show', ['category' => $page->category, 'slug' => $page->slug])];
 
         $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->article(
             $page,
-            route('help.show', ['category' => $page->category, 'slug' => $page->slug]),
+            LocalizedUrl::route('help.show', ['category' => $page->category, 'slug' => $page->slug]),
             $breadcrumbTrail,
         );
     @endphp

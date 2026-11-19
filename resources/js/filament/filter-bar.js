@@ -866,7 +866,7 @@
 
                 pickUnit(chip, unit) {
                     chip.value = { unit: unit.value }
-                    chip.display = unit.singular
+                    chip.display = unit.thisPeriod
                     this.push()
                     this.close(true)
                 },

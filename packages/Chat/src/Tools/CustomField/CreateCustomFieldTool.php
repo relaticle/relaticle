@@ -259,7 +259,7 @@ final class CreateCustomFieldTool implements Tool
         $replace = ['name' => $name, 'type' => $typeLabel, 'entity' => $entityType, 'options' => implode(', ', $optionNames)];
 
         return [
-            'title' => __('Create Custom Attribute'),
+            'title' => ProposalEntity::CustomField->createTitle(),
             'summary' => $optionNames === []
                 ? __('Create ":name" (:type) on :entity', $replace)
                 : __('Create ":name" (:type) on :entity with options: :options', $replace),

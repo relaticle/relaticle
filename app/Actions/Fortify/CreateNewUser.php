@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Fortify;
 
 use App\Models\User;
+use App\Support\Locales;
 use Illuminate\Support\Str;
 
 final readonly class CreateNewUser
@@ -15,6 +16,7 @@ final readonly class CreateNewUser
             'name' => $this->guessNameFromEmail($email),
             'email' => $email,
             'password' => $password,
+            'locale' => Locales::fromRequest(request()),
         ]);
     }
 

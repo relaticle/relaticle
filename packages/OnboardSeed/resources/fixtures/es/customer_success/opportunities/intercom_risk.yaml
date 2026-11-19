@@ -1,0 +1,6 @@
+name: 'Renovación de Intercom en riesgo'
+company: intercom
+custom_fields:
+  amount: 15000
+  close_date: '{{ +4w }}'
+  stage: At risk

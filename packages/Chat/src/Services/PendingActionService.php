@@ -46,6 +46,7 @@ use Relaticle\Chat\Enums\PendingActionOperation;
 use Relaticle\Chat\Enums\PendingActionStatus;
 use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Chat\Events\PendingActionResolved;
+use Relaticle\Chat\Exceptions\ProposalNotResolvable;
 use Relaticle\Chat\Models\AgentConversation;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ProposalReceiptsQuery;
@@ -502,7 +503,7 @@ final readonly class PendingActionService
      */
     private function assertItemIndex(array $records, int $index): void
     {
-        throw_if($index < 0 || $index >= count($records), RuntimeException::class, 'Item index out of range');
+        throw_if($index < 0 || $index >= count($records), ProposalNotResolvable::itemOutOfRange());
     }
 
     /**
@@ -544,8 +545,7 @@ final readonly class PendingActionService
     {
         throw_unless(
             in_array($pendingAction->action_class, self::ALLOWED_ACTION_CLASSES, true),
-            RuntimeException::class,
-            'Action class not allowlisted',
+            ProposalNotResolvable::actionNotAllowlisted(),
         );
 
         return app()->make($pendingAction->action_class);
@@ -563,7 +563,7 @@ final readonly class PendingActionService
 
         // A vanished record fails only this item (RuntimeException -> resolve-failed),
         // never the sibling items. Per-item resolution is independent, not atomic.
-        throw_if(! $model instanceof Model, RuntimeException::class, 'Record not found');
+        throw_if(! $model instanceof Model, ProposalNotResolvable::recordNotFound());
 
         return $model;
     }
@@ -926,10 +926,10 @@ final readonly class PendingActionService
                 'status' => PendingActionStatus::Expired,
                 'resolved_at' => now(),
             ]);
-            throw new RuntimeException('This action has expired');
+            throw ProposalNotResolvable::expired();
         }
 
-        throw_unless($pendingAction->isPending(), RuntimeException::class, 'This action has already been resolved');
+        throw_unless($pendingAction->isPending(), ProposalNotResolvable::alreadyResolved());
     }
 
     /**
@@ -954,8 +954,7 @@ final readonly class PendingActionService
 
         throw_unless(
             in_array($actionClass, self::ALLOWED_ACTION_CLASSES, true),
-            RuntimeException::class,
-            'Action class not allowlisted',
+            ProposalNotResolvable::actionNotAllowlisted(),
         );
 
         $action = app()->make($actionClass);

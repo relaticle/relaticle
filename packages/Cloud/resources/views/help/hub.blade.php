@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $baseTitle = __('Help center');
     $pageTitle = __('Help center: Records, imports and setup');
@@ -81,7 +82,7 @@
                 </p>
             </div>
             <div class="mt-4 flex shrink-0 flex-wrap gap-2 sm:mt-0">
-                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('contact') }}" icon="lucide-mail">
+                <x-cloud::marketing.button variant="secondary" size="sm" href="{{ LocalizedUrl::route('contact') }}" icon="lucide-mail">
                     {{ __('Contact us') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" size="sm" href="{{ route('discord') }}" icon="ri-discord-fill" :external="true">
@@ -96,7 +97,7 @@
 
     @php
         $jsonLd = (new \Relaticle\Cloud\Docs\Support\DocsJsonLd)->breadcrumbs([
-            ['name' => $baseTitle, 'url' => route('help.index')],
+            ['name' => $baseTitle, 'url' => LocalizedUrl::route('help.index')],
         ]);
     @endphp
 

@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @props([
     'title',
     'description',
@@ -42,7 +43,7 @@
         active: 0,
         warmPromise: null,
         warm() {
-            return this.warmPromise ??= (window.RelaticleDocs?.loadIndex('{{ route('help.search-index') }}') ?? Promise.reject())
+            return this.warmPromise ??= (window.RelaticleDocs?.loadIndex('{{ LocalizedUrl::route('help.search-index') }}') ?? Promise.reject())
                 .then((records) => { this.records = records; })
                 .catch(() => { this.warmPromise = null; });
         },
@@ -111,14 +112,14 @@
                 <x-lucide-menu class="h-5 w-5" />
             </button>
 
-            <a href="{{ url('/') }}" class="flex shrink-0 items-center gap-2.5" aria-label="{{ __('Relaticle home') }}">
+            <a href="{{ LocalizedUrl::route('home') }}" class="flex shrink-0 items-center gap-2.5" aria-label="{{ __('Relaticle home') }}">
                 <x-brand.logomark size="sm" />
                 <span class="hidden items-center gap-2.5 sm:flex">
                     <span class="font-display text-[15px] font-bold tracking-tight text-gray-900 dark:text-white">Relaticle</span>
                     <span aria-hidden="true" class="h-3.5 w-px bg-gray-200 dark:bg-white/15"></span>
                 </span>
             </a>
-            <a href="{{ route('help.index') }}"
+            <a href="{{ LocalizedUrl::route('help.index') }}"
                class="font-display text-[15px] font-semibold tracking-tight text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                 {{ __('Docs') }}
             </a>
@@ -132,7 +133,7 @@
                         x-on:focus="warm()"
                         class="hidden w-60 cursor-pointer items-center gap-2.5 rounded-lg border border-[var(--surface-input-border)] bg-[var(--surface-input-bg)] px-3 py-1.5 text-left text-[13px] text-gray-500 transition-colors hover:border-gray-300 hover:text-gray-700 md:flex dark:text-gray-400 dark:hover:border-white/15 dark:hover:text-gray-200">
                     <x-lucide-search class="h-4 w-4 shrink-0" />
-                    <span class="flex-1">{{ __('Search the docs') }}</span>
+                    <span class="min-w-0 flex-1 truncate">{{ __('Search the docs') }}</span>
                     <kbd class="rounded border border-gray-200 bg-white px-1.5 font-sans text-pico font-medium text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-400">⌘K</kbd>
                 </button>
                 <button type="button"
@@ -196,8 +197,8 @@
                 <div class="flex flex-col gap-4 text-[13px] text-gray-500 sm:flex-row sm:items-center sm:justify-between dark:text-gray-400">
                     <p>&copy; {{ date('Y') }} Relaticle</p>
                     <div class="flex flex-wrap items-center gap-x-6 gap-y-2">
-                        <a href="{{ url('/') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Product') }}</a>
-                        <a href="{{ route('pricing') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Pricing') }}</a>
+                        <a href="{{ LocalizedUrl::route('home') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Product') }}</a>
+                        <a href="{{ LocalizedUrl::route('pricing') }}" class="transition-colors hover:text-gray-900 dark:hover:text-white">{{ __('Pricing') }}</a>
                         <a href="{{ route('discord') }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1.5 transition-colors hover:text-gray-900 dark:hover:text-white">
                             <x-ri-discord-fill class="h-4 w-4" />
                             {{ __('Discord') }}
@@ -206,6 +207,7 @@
                             <x-ri-github-fill class="h-4 w-4" />
                             {{ __('GitHub') }}
                         </a>
+                        <x-cloud::language-switcher />
                         <x-theme-switcher />
                     </div>
                 </div>

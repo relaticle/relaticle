@@ -15,10 +15,10 @@
         default => 'text',
     };
     $placeholder = match($inputType) {
-        'email' => 'Add email...',
-        'tel' => 'Add phone...',
-        'url' => 'Add URL...',
-        default => 'Add value...',
+        'email' => __('Add email...'),
+        'tel' => __('Add phone...'),
+        'url' => __('Add URL...'),
+        default => __('Add value...'),
     };
     $rowKey = 'multi-value-' . crc32($rawValue);
 @endphp

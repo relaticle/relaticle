@@ -6,6 +6,7 @@ namespace App\Filament\Resources\CompanyResource\RelationManagers;
 
 use App\Filament\Components\Tables\RelatedRecordColumns;
 use App\Filament\Concerns\CountsRelatedRecords;
+use App\Filament\Concerns\LabelsRelationFromResource;
 use App\Filament\Resources\PeopleResource;
 use App\Models\People;
 use Filament\Actions\ActionGroup;
@@ -25,16 +26,15 @@ use Relaticle\CustomFields\Facades\CustomFields;
 final class PeopleRelationManager extends RelationManager
 {
     use CountsRelatedRecords;
+    use LabelsRelationFromResource;
 
     protected static string $relationship = 'people';
 
-    protected static ?string $modelLabel = null;
-
     protected static string|\BackedEnum|null $icon = 'lucide-user';
 
-    public static function getModelLabel(): string
+    protected static function labelResource(): string
     {
-        return __('filament/resources/company.relation_managers.people.model_label');
+        return PeopleResource::class;
     }
 
     public function form(Schema $schema): Schema

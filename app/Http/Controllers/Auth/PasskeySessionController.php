@@ -31,7 +31,6 @@ final readonly class PasskeySessionController
         $next = $this->authenticatePasskey->execute(
             $request->credential(),
             $request->verificationOptions(),
-            $request->remember(),
         );
 
         return response()->json(['redirect' => $next]);

@@ -6,6 +6,10 @@ namespace App\Filament\Pages\Workspace;
 
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use Filament\Panel;
+use Illuminate\Support\Collection;
+use Livewire\Attributes\Computed;
+use Relaticle\CustomFields\Data\EntityConfigurationData;
+use Relaticle\CustomFields\Facades\Entities;
 use Relaticle\CustomFields\Filament\Management\Pages\CustomFieldsManagementPage;
 
 /**
@@ -26,6 +30,25 @@ final class CustomFields extends CustomFieldsManagementPage
         return 'workspace/custom-fields';
     }
 
+    /** @return Collection<string, string> */
+    #[Computed]
+    public function entityTypes(): Collection
+    {
+        return Entities::globallyManaged()
+            ->sortedByPriority()
+            ->mapWithKeys(fn (EntityConfigurationData $entity): array => [
+                $entity->getAlias() => $this->pluralLabel($entity),
+            ]);
+    }
+
+    #[Computed]
+    public function currentEntityLabel(): string
+    {
+        $entity = Entities::getEntity((string) $this->currentEntityType);
+
+        return $entity instanceof EntityConfigurationData ? $this->pluralLabel($entity) : (string) $this->currentEntityType;
+    }
+
     public function getTitle(): string
     {
         return __('custom-fields::custom-fields.heading.title');
@@ -34,5 +57,12 @@ final class CustomFields extends CustomFieldsManagementPage
     public function getSubheading(): ?string
     {
         return null;
+    }
+
+    private function pluralLabel(EntityConfigurationData $entity): string
+    {
+        $resource = $entity->getResourceClass();
+
+        return $resource !== null ? $resource::getPluralModelLabel() : $entity->getLabelPlural();
     }
 }

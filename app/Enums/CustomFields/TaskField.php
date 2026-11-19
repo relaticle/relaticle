@@ -6,12 +6,14 @@ namespace App\Enums\CustomFields;
 
 use App\Enums\CustomFieldType;
 use App\Enums\OptionColor;
+use App\Models\CustomFieldOption;
 use App\Support\ChecklistHtml;
+use Illuminate\Support\Collection;
 use Relaticle\CustomFields\Enums\CustomFieldWidth;
 
 enum TaskField: string
 {
-    public const string DONE_STATUS = 'Done';
+    public const string DONE_LABEL_KEY = 'enums/custom-fields.task.status.options.done';
 
     public const string CHECKLIST_INPUT_FORMAT = 'bulleted markdown items "- [ ]" and "- [x]" become a checklist, while numbered items such as "1. [ ]" stay a numbered list';
 
@@ -47,10 +49,10 @@ enum TaskField: string
     public function getDisplayName(): string
     {
         return match ($this) {
-            self::STATUS => 'Status',
-            self::PRIORITY => 'Priority',
-            self::DESCRIPTION => 'Description',
-            self::DUE_DATE => 'Due Date',
+            self::STATUS => __('enums/custom-fields.task.status.name'),
+            self::PRIORITY => __('enums/custom-fields.task.priority.name'),
+            self::DESCRIPTION => __('enums/custom-fields.task.description.name'),
+            self::DUE_DATE => __('enums/custom-fields.task.due_date.name'),
         };
     }
 
@@ -108,45 +110,54 @@ enum TaskField: string
     }
 
     /**
-     * Get available options for this field
-     *
-     * @return array<int|string, string>|null Array of options for select/multi-select fields or null if not applicable
+     * @return array<string, string>|null
      */
-    public function getOptions(): ?array
+    public function optionKeyColors(): ?array
     {
         return match ($this) {
             self::STATUS => [
-                'To do',
-                'In progress',
-                self::DONE_STATUS,
+                'enums/custom-fields.task.status.options.to_do' => OptionColor::Purple->value,
+                'enums/custom-fields.task.status.options.in_progress' => OptionColor::Blue->value,
+                self::DONE_LABEL_KEY => OptionColor::Green->value,
             ],
             self::PRIORITY => [
-                'Low',
-                'Medium',
-                'High',
+                'enums/custom-fields.task.priority.options.low' => OptionColor::Gray->value,
+                'enums/custom-fields.task.priority.options.medium' => OptionColor::Amber->value,
+                'enums/custom-fields.task.priority.options.high' => OptionColor::Red->value,
             ],
             default => null,
         };
     }
 
     /**
-     * @return array<string, string>|null
+     * @return list<string>
      */
-    public function getOptionColors(): ?array
+    public static function doneNames(): array
     {
-        return match ($this) {
-            self::STATUS => [
-                'To do' => OptionColor::Purple->value,
-                'In progress' => OptionColor::Blue->value,
-                self::DONE_STATUS => OptionColor::Green->value,
-            ],
-            self::PRIORITY => [
-                'Low' => OptionColor::Gray->value,
-                'Medium' => OptionColor::Amber->value,
-                'High' => OptionColor::Red->value,
-            ],
-            default => null,
-        };
+        return array_values(array_unique(array_map(
+            fn (string $locale): string => __(self::DONE_LABEL_KEY, [], $locale),
+            config('app.available_locales'),
+        )));
+    }
+
+    /**
+     * The done option of a status field is the earliest-created one named like a done label.
+     *
+     * @template TKey of array-key
+     *
+     * @param  Collection<TKey, CustomFieldOption>  $options
+     */
+    public static function doneOption(Collection $options): ?CustomFieldOption
+    {
+        return $options
+            ->filter(fn (CustomFieldOption $option): bool => self::isDone($option->name))
+            ->sortBy(fn (CustomFieldOption $option): string => (string) $option->getKey())
+            ->first();
+    }
+
+    public static function isDone(string $name): bool
+    {
+        return in_array($name, self::doneNames(), true);
     }
 
     /**

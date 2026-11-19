@@ -600,7 +600,7 @@ describe('an edit made after the proposal', function (): void {
 
         Livewire::test(ProposalCard::class, ['context' => 'conversation'])
             ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
-            ->assertSee('Maya Chen set Amount to $20,000.00 at 14:32, after Rela proposed this. Approving replaces that change.')
+            ->assertSee('Maya Chen set Amount to $20,000.00 at 2:32 PM, after Rela proposed this. Approving replaces that change.')
             ->assertSeeHtml('line-through decoration-gray-300 dark:text-gray-500 dark:decoration-gray-600">$20,000.00</span>')
             ->assertDontSee('$10,000.00')
             ->assertSee('Overwrite')
@@ -652,7 +652,7 @@ describe('an edit made after the proposal', function (): void {
         $card->call('createCurrent')
             ->assertHasErrors('resolve')
             ->assertNotDispatched('proposal:resolved')
-            ->assertSee('Maya Chen set Amount to $20,000.00 at 14:32');
+            ->assertSee('Maya Chen set Amount to $20,000.00 at 2:32 PM');
 
         expect($proposal->fresh()->status)->toBe(PendingActionStatus::Pending)
             ->and((float) amountOf($this->opportunity))->toBe(20000.0);
@@ -702,7 +702,7 @@ describe('an edit made after the proposal', function (): void {
 
         Livewire::test(ProposalCard::class, ['context' => 'conversation'])
             ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
-            ->assertSee('Maya Chen set Name to Figma Renewal FY27 at 14:32, after Rela proposed this.')
+            ->assertSee('Maya Chen set Name to Figma Renewal FY27 at 2:32 PM, after Rela proposed this.')
             ->assertSeeHtml('dark:decoration-gray-600">Figma Renewal FY27</span>')
             ->assertSee('Overwrite');
     });
@@ -717,7 +717,7 @@ describe('an edit made after the proposal', function (): void {
 
         Livewire::test(ProposalCard::class, ['context' => 'conversation'])
             ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
-            ->assertSee('Maya Chen set Company to Notion at 14:32, after Rela proposed this.')
+            ->assertSee('Maya Chen set Company to Notion at 2:32 PM, after Rela proposed this.')
             ->assertSeeHtml('dark:decoration-gray-600">Notion</span>')
             ->assertSee('Overwrite');
     });
@@ -730,7 +730,7 @@ describe('an edit made after the proposal', function (): void {
 
         Livewire::test(ProposalCard::class, ['context' => 'conversation'])
             ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
-            ->assertSee('You set Amount to $20,000.00 at 14:32, after Rela proposed this.');
+            ->assertSee('You set Amount to $20,000.00 at 2:32 PM, after Rela proposed this.');
     });
 
     it('warns on the batch row whose record changed and drops the shortcut for the whole batch', function (): void {
@@ -746,7 +746,7 @@ describe('an edit made after the proposal', function (): void {
 
         $card = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
             ->dispatch('proposal:set-active', id: $proposal->getKey(), context: 'conversation')
-            ->assertSee('Maya Chen set Amount to $20,000.00 at 14:32')
+            ->assertSee('Maya Chen set Amount to $20,000.00 at 2:32 PM')
             ->assertSee('Approve 2 changes')
             ->assertDontSeeHtml('data-proposal-shortcut');
 

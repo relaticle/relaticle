@@ -522,14 +522,14 @@ final readonly class ListActivityTool implements Tool
 
         return [
             'block' => 'records_table',
-            'title' => 'Activity',
+            'title' => __('Activity'),
             'type' => 'activity',
             'core' => 'record',
             'columns' => [
-                ['key' => 'when', 'label' => 'When'],
-                ['key' => 'record', 'label' => 'Record'],
-                ['key' => 'who', 'label' => 'Who'],
-                ['key' => 'what', 'label' => 'What Changed'],
+                ['key' => 'when', 'label' => __('When')],
+                ['key' => 'record', 'label' => __('Record')],
+                ['key' => 'who', 'label' => __('Who')],
+                ['key' => 'what', 'label' => __('What changed')],
             ],
             'rows' => $rows,
             'total' => $total,
@@ -538,7 +538,7 @@ final readonly class ListActivityTool implements Tool
 
     private function whenCell(string $at): string
     {
-        return Date::parse($at)->isoFormat('MMM D, HH:mm');
+        return Date::parse($at)->isoFormat('lll');
     }
 
     /**
