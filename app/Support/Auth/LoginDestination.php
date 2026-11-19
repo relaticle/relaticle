@@ -30,7 +30,7 @@ final readonly class LoginDestination
             return $fallback;
         }
 
-        return $this->isAccessible($intended, $user) ? $intended : $fallback;
+        return $this->isAccessible($user, $intended) ? $intended : $fallback;
     }
 
     private function fallback(User $user): string
@@ -40,7 +40,7 @@ final readonly class LoginDestination
             : url()->getAppUrl();
     }
 
-    private function isAccessible(string $intended, User $user): bool
+    public function isAccessible(User $user, string $intended): bool
     {
         if (! $this->isSameSite($intended)) {
             return false;

@@ -704,6 +704,19 @@ it('keeps the line breaks of a plain-text description and drops divider lines', 
         ->assertMountedActionModalDontSee('____');
 });
 
+it('renders a meeting description as a safe html fragment', function (): void {
+    $meeting = Meeting::factory()->create([
+        'workspace_id' => $this->workspace->id,
+        'connected_account_id' => $this->account->id,
+        'description' => '<p onclick="x()"><b>Bold</b> <a href="javascript:alert(1)">a</a> <a href="https://ok.example">b</a></p><style>body{display:none}</style><script>alert(2)</script>',
+    ]);
+
+    meetingDetailsOnRecord([$meeting])
+        ->mountAction(TestAction::make('view')->table($meeting))
+        ->assertMountedActionModalSee(['<b>Bold</b>', 'https://ok.example'], escape: false)
+        ->assertMountedActionModalDontSee(['onclick', 'javascript:', '<script', '<style', 'display:none'], escape: false);
+});
+
 it('offers a join link on an upcoming meeting that has one', function (): void {
     $meeting = Meeting::factory()->create([
         'workspace_id' => $this->workspace->id,
