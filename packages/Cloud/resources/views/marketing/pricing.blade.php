@@ -26,11 +26,11 @@
                 'min_plan' => $model->minPlan->value,
                 'credit_multiplier' => $model->creditMultiplier,
             ]);
-        $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
-        $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
+        $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' '.__('and').' ');
+        $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' '.__('and').' ');
         $multiplierClauses = $toolCapableCloudModels
             ->groupBy(fn (array $model): string => rtrim(rtrim(number_format($model['credit_multiplier'], 2, '.', ''), '0'), '.'))
-            ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' and '));
+            ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' '.__('and').' '));
 
         $creditMultiplierList = $multiplierClauses
             ->sortKeys(SORT_NUMERIC)
@@ -95,7 +95,7 @@
                     'scaleMailboxes' => $scalePlan->connectedMailboxes(),
                     'scalePrice' => $scalePlan->yearlyPricePerMonth(),
                     'credits' => $proCredits,
-                    'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' and '),
+                    'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' '.__('and').' '),
                     'cheapestModel' => $cheapestModel,
                     'dearestModel' => $dearestEntry['label'],
                     'dearestReplies' => \Illuminate\Support\Number::format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),

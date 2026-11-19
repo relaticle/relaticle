@@ -14,8 +14,8 @@
             'provider' => $model->provider,
             'min_plan' => $model->minPlan->value,
         ]);
-    $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
-    $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
+    $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' '.__('and').' ');
+    $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' '.__('and').' ');
 
     // Independent sentences rather than one with two holes in it: the catalog is editable at
     // runtime, and a tier with no model rendered " is free on every plan".

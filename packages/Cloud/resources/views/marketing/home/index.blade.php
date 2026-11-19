@@ -7,7 +7,7 @@
     $offeredProviders = collect(resolve(\Relaticle\Chat\Services\ModelRegistry::class)->offered())
         ->map(fn (\Relaticle\Chat\Support\ModelDescriptor $model): string => $providerNames[$model->provider] ?? (string) $model->provider)
         ->unique()
-        ->join(', ', ' or ');
+        ->join(', ', ' '.__('or').' ');
 
     $faqs = array_values(array_filter([
         [__('Can :name create, change, or delete my CRM data without my approval?', ['name' => $assistantName]), __('No. :name proposes every create, update, and delete as a card showing exactly what will change. Nothing is written until you confirm it, and you can discard any proposal. An unanswered proposal expires after :expiry. Reading and searching need no approval.', ['name' => $assistantName, 'expiry' => $proposalExpiry])],

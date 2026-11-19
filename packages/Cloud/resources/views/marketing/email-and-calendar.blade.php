@@ -18,7 +18,7 @@
             EmailProvider::AZURE => 'Outlook',
         })->all(),
         ', ',
-        ' or ',
+        ' '.__('or').' ',
     );
 
     $vendorNames = $mailProviders->map(fn (EmailProvider $provider): string => match ($provider) {
@@ -32,14 +32,14 @@
             EmailProvider::AZURE => __('Microsoft accounts, such as Outlook and Microsoft 365'),
         })->all(),
         ', ',
-        ', and ',
+        __(', and '),
     );
 
     $title = __('Email and calendar sync for your CRM').' - Relaticle';
     $description = __('Connect :providers to Relaticle. Email and meetings land on the people, companies and opportunities they involve, and you decide what your team sees.', ['providers' => $providerNames]);
 
     $steps = [
-        [__('Connect your inbox'), __('Link a :vendors account from your workspace settings. Your mailbox and calendar import in the background.', ['vendors' => Arr::join($vendorNames, ', ', ' or ')])],
+        [__('Connect your inbox'), __('Link a :vendors account from your workspace settings. Your mailbox and calendar import in the background.', ['vendors' => Arr::join($vendorNames, ', ', ' '.__('or').' ')])],
         [__('Records fill in'), __('People you email are added for you, with their companies. Each email and meeting lands on the record it involves.')],
         [__('You choose who sees what'), __('Pick how much of each mailbox your workspace sees, and change it for any single email.')],
     ];
@@ -93,7 +93,7 @@
         ] : null,
         [
             __('Does it work when I self-host?'),
-            __('Yes. A self-hosted install connects mailboxes through its own :vendors app credentials, which the self-hosting guide explains.', ['vendors' => Arr::join($vendorNames, ', ', ' and ')]),
+            __('Yes. A self-hosted install connects mailboxes through its own :vendors app credentials, which the self-hosting guide explains.', ['vendors' => Arr::join($vendorNames, ', ', ' '.__('and').' ')]),
         ],
     ]));
 @endphp
