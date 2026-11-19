@@ -32,7 +32,6 @@ final readonly class PasswordSessionController
         $next = $this->authenticatePassword->execute(
             (string) $request->input(Fortify::username()),
             (string) $request->input('password'),
-            $request->boolean('remember'),
         );
 
         if ($request->wantsJson()) {

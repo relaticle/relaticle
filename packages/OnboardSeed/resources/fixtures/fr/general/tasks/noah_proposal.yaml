@@ -1,0 +1,8 @@
+title: Envoyer la proposition de projet à Noah
+assigned_people:
+  - noah
+custom_fields:
+  description: Préparez et envoyez à Noah la proposition de refonte de marque, avec le périmètre, le calendrier et le tarif.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: Medium

@@ -17,8 +17,10 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use App\Models\User;
 use App\Models\Workspace;
 use App\Onboarding\FieldOptionRows;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
@@ -38,7 +40,10 @@ final readonly class CreateWorkspaceCustomFields
 
     public function handle(WorkspaceCreated $event): void
     {
-        $this->seedDefaultFields($event->workspace);
+        $owner = $event->workspace->owner()->first();
+        $locale = $owner instanceof User ? $owner->effectiveLocale() : (string) config('app.default_locale');
+
+        Locales::within($locale, fn () => $this->seedDefaultFields($event->workspace));
     }
 
     private function seedDefaultFields(Workspace $workspace): void

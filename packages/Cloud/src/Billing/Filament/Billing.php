@@ -65,6 +65,11 @@ final class Billing extends Page
         return __('billing.title');
     }
 
+    public function getTitle(): string
+    {
+        return __('billing.title');
+    }
+
     public function mount(): void
     {
         abort_unless(Feature::active(BillingFeature::class), 403);
@@ -240,7 +245,7 @@ final class Billing extends Page
         }
 
         return __('cloud::billing.managed.renews', [
-            'date' => Date::createFromTimestamp($renewal['renews_at'])->toFormattedDateString(),
+            'date' => Date::createFromTimestamp($renewal['renews_at'])->isoFormat('ll'),
             'amount' => Number::currency($renewal['amount'] / 100, strtoupper($renewal['currency']), precision: $renewal['amount'] % 100 === 0 ? 0 : 2),
         ]);
     }

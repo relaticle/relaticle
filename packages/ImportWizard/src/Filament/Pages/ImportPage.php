@@ -52,13 +52,13 @@ abstract class ImportPage extends Page
     #[Override]
     public function getTitle(): string
     {
-        return 'Import '.static::getEntityType()->label();
+        return __('Import :entity', ['entity' => static::getEntityType()->label()]);
     }
 
     #[Override]
     public function getSubheading(): string
     {
-        return 'Import '.strtolower(static::getEntityType()->label()).' from a CSV file';
+        return __('Import :entity from a CSV file', ['entity' => static::getEntityType()->label()]);
     }
 
     #[Override]

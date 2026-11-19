@@ -1,8 +1,9 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $documentationActive = \Laravel\Pennant\Feature::active(\App\Features\Documentation::class);
     $linkClass = 'font-medium text-gray-900 underline decoration-gray-300 underline-offset-2 hover:decoration-gray-900 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
     $source = static fn (string $label, string $category, string $slug): string => $documentationActive
-        ? '<a href="'.e(route('help.show', ['category' => $category, 'slug' => $slug])).'" class="'.$linkClass.'">'.e($label).'</a>'
+        ? '<a href="'.e(LocalizedUrl::route('help.show', ['category' => $category, 'slug' => $slug])).'" class="'.$linkClass.'">'.e($label).'</a>'
         : '<span class="'.$linkClass.'">'.e($label).'</span>';
 @endphp
 

@@ -25,11 +25,14 @@ use Filament\Facades\Filament;
 use Filament\Support\Facades\FilamentAsset;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Laravel\Fortify\Fortify;
 use Laravel\Passkeys\Events\PasskeyVerified;
 use Laravel\Passkeys\Passkey;
 use Laravel\Passkeys\Passkeys;
@@ -205,10 +208,113 @@ test('the Fortify password route completes login without MFA', function (): void
     $this->post(route('login.store'), [
         'email' => $user->email,
         'password' => 'password',
+    ])->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+it('sets no remember-me cookie on password sign-in', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+
+    $response = $this->post(route('login.store'), [
+        'email' => $user->email,
+        'password' => 'password',
         'remember' => 'on',
     ])->assertRedirect(Dashboard::getUrl(['tenant' => $user->currentWorkspace]));
 
     $this->assertAuthenticatedAs($user);
+    expect(collect($response->headers->getCookies())->map->getName()->filter(fn (string $name): bool => str_starts_with($name, 'remember_web_')))->toBeEmpty();
+});
+
+it('stamps the sign-in time when a password sign-in completes', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+
+    expect(session('auth.started_at'))->toBe(now()->getTimestamp());
+});
+
+it('ends a customer session 90 days after sign-in despite activity', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+
+    $this->travelTo(now()->addDays(90)->subMinute());
+    $this->get($dashboard)->assertOk();
+
+    $this->travelTo(now()->addMinutes(2));
+    $this->get($dashboard)->assertRedirect(Filament::getPanel('app')->getLoginUrl());
+
+    $this->assertGuest('web');
+});
+
+it('stamps a session that has no start time instead of ending it', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+
+    $this->actingAs($user)
+        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
+        ->assertOk();
+
+    expect(session('auth.started_at'))->toBe(now()->getTimestamp());
+});
+
+it('answers a Livewire update from a capped session as an expired session', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+    $page = $this->actingAs($user)->get($dashboard)->assertOk()->getContent();
+    preg_match('/wire:snapshot="([^"]+)"/', $page, $matches);
+    app()->forgetScopedInstances();
+
+    $this->travelTo(now()->addDays(90)->addMinute());
+
+    $this->withHeaders(['X-Livewire' => '1', 'Referer' => $dashboard])->postJson(route('default-livewire.update'), ['components' => [[
+        'snapshot' => html_entity_decode($matches[1]),
+        'updates' => [],
+        'calls' => [['path' => '', 'method' => '$refresh', 'params' => []]],
+    ]]])->assertStatus(419);
+
+    $this->assertGuest('web');
+    expect(session()->has('auth.started_at'))->toBeFalse();
+});
+
+it('keeps the sign-in time when a session is re-challenged after the second factor changes', function (): void {
+    $this->travelTo('2026-11-13 10:00:00');
+    $user = User::factory()->withConfirmedMfa()->withWorkspace()->create();
+    $dashboard = Dashboard::getUrl(['tenant' => $user->currentWorkspace]);
+    $this->post(route('login.store'), ['email' => $user->email, 'password' => 'password']);
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-one']);
+    $signedInAt = now()->getTimestamp();
+    expect(session('auth.started_at'))->toBe($signedInAt);
+
+    $this->travelTo(now()->addDays(80));
+    $user->forceFill(['two_factor_secret' => Fortify::currentEncrypter()->encrypt('JBSWY3DPEHPK3PXQ')])->save();
+    Auth::forgetGuards();
+    $this->get($dashboard)->assertRedirect(route('two-factor.login'));
+    $this->post(route('two-factor.login.store'), ['recovery_code' => 'recovery-code-two']);
+
+    $this->assertAuthenticated('web');
+    expect(session('auth.started_at'))->toBe($signedInAt);
+
+    $this->travelTo(now()->addDays(10)->addMinute());
+    $this->get($dashboard)->assertRedirect(Filament::getPanel('app')->getLoginUrl());
+
+    $this->assertGuest('web');
+});
+
+it('ignores an old remember-me cookie once the session is gone', function (): void {
+    $user = User::factory()->withWorkspace()->create(['remember_token' => 'issued-before-the-change']);
+    $recaller = Auth::guard('web')->getRecallerName();
+
+    $this->withCookie($recaller, "{$user->getKey()}|issued-before-the-change|".$user->password)
+        ->get(Dashboard::getUrl(['tenant' => $user->currentWorkspace]))
+        ->assertRedirect(Filament::getPanel('app')->getLoginUrl());
+
+    $this->assertGuest('web');
 });
 
 test('a recovery code completes pending password MFA', function (): void {
@@ -433,11 +539,12 @@ test('a well-formed passkey assertion completes login through the installed veri
     $assertion = buildRealPasskeyAssertion((string) $options['rpId'], config('fortify.passkeys.allowed_origins')[0], (string) $challenge);
     storePasskeyAssertionFor($user, $assertion);
 
-    $this->postJson(route('passkey.login'), $assertion['payload'])
+    $response = $this->postJson(route('passkey.login'), [...$assertion['payload'], 'remember' => true])
         ->assertOk()
         ->assertJson(['redirect' => Dashboard::getUrl(['tenant' => $user->currentWorkspace])]);
 
     $this->assertAuthenticatedAs($user);
+    $response->assertCookieMissing(Auth::guard('web')->getRecallerName());
 });
 
 test('a verified passkey satisfies enrolled MFA at login', function (): void {
@@ -1059,7 +1166,8 @@ test('signup creates a user and sends a verification email', function (): void {
     Notification::assertSentTo($user, VerifyEmail::class);
 
     $this->assertAuthenticated();
-    expect($user->fresh()->remember_token)->not->toBeNull();
+    expect($user->fresh()->remember_token)->toBeNull();
+    expect(collect(Cookie::getQueuedCookies())->map->getName())->not->toContain(Auth::guard('web')->getRecallerName());
 });
 
 test('signup with a matching invitation auto-verifies the email and fires Verified', function (): void {
@@ -1359,8 +1467,8 @@ test('the remember me checkbox no longer renders on the login page', function ()
         ->assertDontSee(__('filament-panels::auth/pages/login.form.remember.label'));
 });
 
-test('password login always remembers the session even without a checkbox', function (): void {
-    $user = User::factory()->withWorkspace()->create();
+test('password login stores no remember token', function (): void {
+    $user = User::factory()->withWorkspace()->create(['remember_token' => null]);
 
     livewire(Login::class)
         ->fillForm(['email' => $user->email])
@@ -1370,7 +1478,7 @@ test('password login always remembers the session even without a checkbox', func
         ->assertHasNoErrors();
 
     $this->assertAuthenticated();
-    expect($user->fresh()->remember_token)->not->toBeNull();
+    expect($user->fresh()->remember_token)->toBeNull();
 });
 
 test('switching accounts cancels pending MFA without authenticating', function (): void {
@@ -1424,4 +1532,27 @@ it('lists no local accounts on the login page outside the local environment', fu
     $this->get(Filament::getPanel('app')->getLoginUrl())
         ->assertOk()
         ->assertDontSee('value="owner@relaticle.test"', false);
+});
+
+it('seeds a missing language from Accept-Language once on login', function (): void {
+    $user = User::factory()->create(['locale' => null]);
+    $kept = User::factory()->create(['locale' => 'de']);
+
+    request()->headers->set('Accept-Language', 'fr-FR,fr;q=0.9');
+
+    Auth::login($user);
+    Auth::login($kept);
+
+    expect($user->fresh()->locale)->toBe('fr')
+        ->and($kept->fresh()->locale)->toBe('de');
+});
+
+it('leaves the language empty on login when the header names no listed language', function (): void {
+    $user = User::factory()->create(['locale' => null]);
+
+    request()->headers->set('Accept-Language', 'pt-BR,pt;q=0.9');
+
+    Auth::login($user);
+
+    expect($user->fresh()->locale)->toBeNull();
 });

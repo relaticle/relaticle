@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\RateLimiter;
 use Laravel\Ai\Exceptions\InsufficientCreditsException;
+use Laravel\Ai\Exceptions\InvalidApiKeyException;
 use Laravel\Ai\Prompts\TranscriptionPrompt;
 use Laravel\Ai\Transcription;
 use Relaticle\Chat\Http\Controllers\TranscribeController;
@@ -235,18 +236,18 @@ it('counts a rejected recording against the minute allowance', function (): void
     expect($response->headers->get('X-RateLimit-Remaining'))->toBe('8');
 });
 
-it('still reports a provider auth failure', function (int $status): void {
+it('still reports a provider auth failure', function (int $status, string $reported): void {
     Exceptions::fake();
     Http::fake(['api.openai.com/*' => Http::response(['error' => ['message' => 'Incorrect API key provided']], $status)]);
 
     $this->postJson(route('chat.transcribe'), ['audio' => audioUpload()])
         ->assertStatus(500);
 
-    Exceptions::assertReported(RequestException::class);
+    Exceptions::assertReported($reported);
 })->with([
-    'unauthorized' => 401,
-    'forbidden' => 403,
-    'other bad request' => 400,
+    'unauthorized' => [401, InvalidApiKeyException::class],
+    'forbidden' => [403, RequestException::class],
+    'other bad request' => [400, RequestException::class],
 ]);
 
 it('503s when the provider cannot be reached', function (): void {

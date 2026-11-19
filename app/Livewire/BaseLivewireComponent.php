@@ -43,17 +43,17 @@ abstract class BaseLivewireComponent extends Component implements HasActions, Ha
     protected function sendThrottledNotification(int $secondsUntilAvailable): void
     {
         Notification::make()
-            ->title('Too Many Requests')
-            ->body("Please wait {$secondsUntilAvailable} seconds before trying again.")
+            ->title(__('notifications.throttled.title'))
+            ->body(__('notifications.throttled.body', ['seconds' => $secondsUntilAvailable]))
             ->danger()
             ->send();
     }
 
-    protected function sendNotification(string $title = 'Saved', ?string $message = null, string $type = 'success'): void
+    protected function sendNotification(?string $title = null, ?string $message = null, string $type = 'success'): void
     {
         Notification::make()
-            ->title(__($title))
-            ->body(__($message))
+            ->title($title ?? __('Saved'))
+            ->body($message)
             ->{$type}()
             ->send();
     }

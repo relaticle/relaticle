@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-cloud::marketing.frame id="email">
     <x-cloud::marketing.frame-header :label="__('Email and calendar')" :lead="__('Your inbox fills in your CRM.')">
         {{ __('No typing, no copy and paste.') }}
@@ -9,7 +10,7 @@
         :lead="__('Every email and meeting on the record.')"
         :facts="[__('Connect a Google or Microsoft account'), __('Relaticle never changes or deletes a message'), __('Share who you talked to, the subject, or the full email')]"
         :link-label="__('How email works in Relaticle')"
-        :link-href="route('emailAndCalendar')"
+        :link-href="LocalizedUrl::route('emailAndCalendar')"
     >
         {{ __('People and companies fill in from your inbox.') }}
 

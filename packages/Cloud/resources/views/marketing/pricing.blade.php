@@ -1,9 +1,10 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $billingActive = \Laravel\Pennant\Feature::active(\App\Features\Billing::class);
     $proPlan = \App\Enums\Plan::Pro;
     $scalePlan = \App\Enums\Plan::Scale;
-    $scaleCredits = number_format($scalePlan->credits());
-    $enterprisePrice = number_format(config('relaticle.enterprise.starting_price_yearly'));
+    $scaleCredits = \Illuminate\Support\Number::format($scalePlan->credits());
+    $enterprisePrice = \Illuminate\Support\Number::format(config('relaticle.enterprise.starting_price_yearly'));
     $pageTitle = __('Pricing - from $:price/mo per workspace - Relaticle', ['price' => $proPlan->yearlyPricePerMonth()]);
 @endphp
 
@@ -15,7 +16,7 @@
     :ogTitle="$pageTitle"
 >
     @php
-        $proCredits = number_format(\App\Enums\Plan::Pro->credits());
+        $proCredits = \Illuminate\Support\Number::format(\App\Enums\Plan::Pro->credits());
         $freeRateLimit = \App\Enums\Plan::Free->rateLimit();
         $proRateLimit = \App\Enums\Plan::Pro->rateLimit();
         $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
@@ -25,11 +26,11 @@
                 'min_plan' => $model->minPlan->value,
                 'credit_multiplier' => $model->creditMultiplier,
             ]);
-        $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' and ');
-        $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' and ');
+        $freeCloudModels = $toolCapableCloudModels->where('min_plan', 'free')->pluck('label')->join(', ', ' '.__('and').' ');
+        $paidCloudModels = $toolCapableCloudModels->where('min_plan', 'pro')->pluck('label')->join(', ', ' '.__('and').' ');
         $multiplierClauses = $toolCapableCloudModels
             ->groupBy(fn (array $model): string => rtrim(rtrim(number_format($model['credit_multiplier'], 2, '.', ''), '0'), '.'))
-            ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' and '));
+            ->map(fn (\Illuminate\Support\Collection $group): string => $group->pluck('label')->join(', ', ' '.__('and').' '));
 
         $creditMultiplierList = $multiplierClauses
             ->sortKeys(SORT_NUMERIC)
@@ -77,7 +78,7 @@
         if ($billingActive) {
             $selfHostedCreditAnswer .= ' '.__(
                 'On Relaticle Cloud, new workspaces start a :days-day Cloud Pro trial with :trialCredits credits. Hosted access pauses when the trial ends without a subscription.',
-                ['days' => $trialDays, 'trialCredits' => number_format(\App\Enums\Plan::trialCredits())]
+                ['days' => $trialDays, 'trialCredits' => \Illuminate\Support\Number::format(\App\Enums\Plan::trialCredits())]
             );
 
             $hostedPriceCell = __('$:yearlyPerMonth/mo per workspace ($:yearly billed yearly, or $:monthly/mo billed monthly)', [
@@ -94,10 +95,10 @@
                     'scaleMailboxes' => $scalePlan->connectedMailboxes(),
                     'scalePrice' => $scalePlan->yearlyPricePerMonth(),
                     'credits' => $proCredits,
-                    'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' and '),
+                    'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' '.__('and').' '),
                     'cheapestModel' => $cheapestModel,
                     'dearestModel' => $dearestEntry['label'],
-                    'dearestReplies' => number_format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
+                    'dearestReplies' => \Illuminate\Support\Number::format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
                     'days' => $trialDays,
                 ]
             );
@@ -243,7 +244,7 @@
                     <h2 class="type-title text-gray-950 dark:text-white">{{ __('Pricing questions, answered') }}</h2>
                     <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                         {{ __('Something else on your mind?') }}
-                        <a href="{{ route('contact') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('Get in touch') }}</a>
+                        <a href="{{ LocalizedUrl::route('contact') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('Get in touch') }}</a>
                     </p>
                 </div>
             </div>
@@ -270,20 +271,20 @@
             {{ __('Start for free') }}
         </x-cloud::marketing.button>
         @if($billingActive)
-            <x-cloud::marketing.button variant="secondary" :href="route('contact')">
+            <x-cloud::marketing.button variant="secondary" :href="LocalizedUrl::route('contact')">
                 {{ __('Talk to us') }}
             </x-cloud::marketing.button>
         @else
-            <x-cloud::marketing.button variant="secondary" :href="route('selfHosted')">
+            <x-cloud::marketing.button variant="secondary" :href="LocalizedUrl::route('selfHosted')">
                 {{ __('Explore self-hosting') }}
             </x-cloud::marketing.button>
         @endif
 
         <x-slot:note>
-            <a href="{{ route('ai') }}" class="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">{{ __('Explore :name and the MCP server for Claude and ChatGPT', ['name' => config('chat.assistant_name')]) }}</a>
+            <a href="{{ LocalizedUrl::route('ai') }}" class="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">{{ __('Explore :name and the MCP server for Claude and ChatGPT', ['name' => config('chat.assistant_name')]) }}</a>
             @if(! $billingActive)
                 <span class="mx-2" aria-hidden="true">·</span>
-                <a href="{{ route('contact') }}" class="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">{{ __('Questions? Talk to us.') }}</a>
+                <a href="{{ LocalizedUrl::route('contact') }}" class="font-medium text-white underline decoration-white/30 underline-offset-4 hover:decoration-white">{{ __('Questions? Talk to us.') }}</a>
             @endif
         </x-slot:note>
     </x-cloud::marketing.closing-band>
@@ -292,8 +293,8 @@
         $schema = (new \Spatie\SchemaOrg\Graph())
             ->product(fn ($product) => $product
                 ->name('Relaticle')
-                ->description('Open-source CRM with unlimited users and unlimited records on every plan. Self-host free forever under the AGPL-3.0 license, or use the Relaticle-managed hosted plan.')
-                ->url(route('pricing'))
+                ->description(__('Open-source CRM with unlimited users and unlimited records on every plan. Self-host free forever under the AGPL-3.0 license, or use the Relaticle-managed hosted plan.'))
+                ->url(LocalizedUrl::route('pricing'))
                 ->image([
                     asset('images/product-preview-16x9.jpg'),
                     asset('images/product-preview-4x3.jpg'),
@@ -303,47 +304,47 @@
                 ->offers($billingActive
                     ? [
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Self-hosted')
+                            ->name(__('Self-hosted'))
                             ->price('0')
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
-                            ->url(route('pricing'))
-                            ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
+                            ->url(LocalizedUrl::route('pricing'))
+                            ->description(__('Free forever, AGPL-3.0 open source, unlimited users and records.')),
                         ...collect([$proPlan, $scalePlan])->map(fn (\App\Enums\Plan $plan): \Spatie\SchemaOrg\Offer => \Spatie\SchemaOrg\Schema::offer()
                             ->name($plan->marketingLabel())
                             ->price((string) $plan->yearlyPricePerMonth())
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
-                            ->url(route('pricing'))
+                            ->url(LocalizedUrl::route('pricing'))
                             ->description(__('Per workspace, billed yearly at $:yearly/year ($:yearlyPerMonth/mo); $:monthly/mo billed monthly.', [
                                 'yearly' => $plan->yearlyPrice(),
                                 'yearlyPerMonth' => $plan->yearlyPricePerMonth(),
                                 'monthly' => $plan->monthlyPrice(),
                             ])))->all(),
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Enterprise')
+                            ->name(__('Enterprise'))
                             ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()
                                 ->minPrice(config('relaticle.enterprise.starting_price_yearly'))
                                 ->priceCurrency('USD')
                                 ->unitText('year'))
-                            ->url(route('contact', ['plan' => 'enterprise']))
+                            ->url(LocalizedUrl::route('contact', ['plan' => 'enterprise']))
                             ->description(__('cloud::billing.enterprise.faq_body', ['price' => $enterprisePrice])),
                     ]
                     : [
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Self-hosted')
+                            ->name(__('Self-hosted'))
                             ->price('0')
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
-                            ->url(route('pricing'))
-                            ->description('Free forever, AGPL-3.0 open source, unlimited users and records.'),
+                            ->url(LocalizedUrl::route('pricing'))
+                            ->description(__('Free forever, AGPL-3.0 open source, unlimited users and records.')),
                         \Spatie\SchemaOrg\Schema::offer()
-                            ->name('Cloud')
+                            ->name(__('Cloud'))
                             ->price('0')
                             ->priceCurrency('USD')
                             ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
-                            ->url(route('pricing'))
-                            ->description('Free hosted plan, managed by Relaticle.'),
+                            ->url(LocalizedUrl::route('pricing'))
+                            ->description(__('Free hosted plan, managed by Relaticle.')),
                     ]
                 )
             );

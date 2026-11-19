@@ -296,10 +296,10 @@ final class TasksBoard extends BoardResourcePage implements OrdersBoardStages
         $date = Date::parse($state)->setTimezone(FilamentTimezone::get());
 
         return match (true) {
-            $date->isPast() => $date->format('M j, Y').' (Overdue)',
-            $date->isToday() => 'Due Today',
-            $date->isTomorrow() => 'Due Tomorrow',
-            default => $date->format('M j, Y'),
+            $date->isPast() => __('filament/pages/boards.tasks.badges.overdue', ['date' => $date->isoFormat('ll')]),
+            $date->isToday() => __('filament/pages/boards.tasks.badges.today'),
+            $date->isTomorrow() => __('filament/pages/boards.tasks.badges.tomorrow'),
+            default => $date->isoFormat('ll'),
         };
     }
 

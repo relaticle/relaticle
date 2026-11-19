@@ -24,7 +24,7 @@ final class VerifyPasskey extends VendorVerifyPasskey
         try {
             return parent::validate($response, $passkey, $options);
         } catch (Throwable) {
-            throw InvalidPasskeyException::make('Unable to verify passkey. Please try again.');
+            throw InvalidPasskeyException::make(__('Unable to verify passkey. Please try again.'));
         }
     }
 }

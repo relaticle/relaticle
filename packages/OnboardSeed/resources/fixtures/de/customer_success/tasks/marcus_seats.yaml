@@ -1,0 +1,8 @@
+title: Calendly ein Angebot für zusätzliche Lizenzen senden
+assigned_people:
+  - marcus
+custom_fields:
+  description: Zwanzig Lizenzen für zwei neue Support-Teams, ab dem nächsten Quartal.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium

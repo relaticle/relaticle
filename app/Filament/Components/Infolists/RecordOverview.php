@@ -271,7 +271,7 @@ final readonly class RecordOverview
     private static function due(CarbonInterface $due): array
     {
         $local = $due->clone()->setTimezone(FilamentTimezone::get());
-        $date = $local->isoFormat($local->isCurrentYear() ? 'MMM D' : 'MMM D, YYYY');
+        $date = $local->isoFormat($local->isCurrentYear() ? __('formats.iso.date_without_year') : 'll');
 
         return match (true) {
             $local->isPast() => ['label' => $date, 'tone' => 'overdue'],
@@ -313,7 +313,7 @@ final readonly class RecordOverview
 
         $dueField = $fields->get(TaskField::DUE_DATE->value);
         $statusField = $fields->get(TaskField::STATUS->value);
-        $doneOptionId = $statusField?->options->firstWhere('name', TaskField::DONE_STATUS)?->getKey();
+        $doneOptionId = $statusField instanceof CustomField ? TaskField::doneOption($statusField->options)?->getKey() : null;
 
         return $record->tasks()
             ->with(['customFieldValues.customField', 'assignees'])

@@ -41,7 +41,7 @@
                                             <!-- Role Name -->
                                             <div class="flex items-center">
                                                 <div class="text-sm text-gray-600 dark:text-gray-400 {{ $addTeamMemberForm['role'] == $role->key ? 'font-semibold' : '' }}">
-                                                    {{ $role->name }}
+                                                    {{ \App\Enums\WorkspaceRole::labelFor($role->key) }}
                                                 </div>
 
                                                 @if ($addTeamMemberForm['role'] == $role->key)
@@ -53,7 +53,7 @@
 
                                             <!-- Role Description -->
                                             <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 text-start">
-                                                {{ $role->description }}
+                                                {{ \App\Enums\WorkspaceRole::tryFrom($role->key)?->description() ?? $role->description }}
                                             </div>
                                         </div>
                                     </button>
@@ -141,11 +141,11 @@
                                     <!-- Manage Workspace Member Role -->
                                     @if (Gate::check('updateWorkspaceMember', $team) && Laravel\Jetstream\Jetstream::hasRoles())
                                         <button class="ms-2 text-sm text-gray-400 underline" wire:click="manageRole('{{ $user->id }}')">
-                                            {{ Laravel\Jetstream\Jetstream::findRole($user->membership->role)->name }}
+                                            {{ \App\Enums\WorkspaceRole::labelFor($user->membership->role) }}
                                         </button>
                                     @elseif (Laravel\Jetstream\Jetstream::hasRoles())
                                         <div class="ms-2 text-sm text-gray-400">
-                                            {{ Laravel\Jetstream\Jetstream::findRole($user->membership->role)->name }}
+                                            {{ \App\Enums\WorkspaceRole::labelFor($user->membership->role) }}
                                         </div>
                                     @endif
 
@@ -185,7 +185,7 @@
                             <!-- Role Name -->
                             <div class="flex items-center">
                                 <div class="text-sm text-gray-600 dark:text-gray-400 {{ $currentRole == $role->key ? 'font-semibold' : '' }}">
-                                    {{ $role->name }}
+                                    {{ \App\Enums\WorkspaceRole::labelFor($role->key) }}
                                 </div>
 
                                 @if ($currentRole == $role->key)
@@ -197,7 +197,7 @@
 
                             <!-- Role Description -->
                             <div class="mt-2 text-xs text-gray-600 dark:text-gray-400">
-                                {{ $role->description }}
+                                {{ \App\Enums\WorkspaceRole::tryFrom($role->key)?->description() ?? $role->description }}
                             </div>
                         </div>
                     </button>

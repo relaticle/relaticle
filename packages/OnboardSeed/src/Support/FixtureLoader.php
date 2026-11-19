@@ -14,6 +14,8 @@ final class FixtureLoader
 
     private static string $fixtureSet = 'sales';
 
+    private static ?string $locale = null;
+
     public static function setBasePath(string $path): void
     {
         self::$basePath = $path;
@@ -22,6 +24,11 @@ final class FixtureLoader
     public static function setFixtureSet(string $set): void
     {
         self::$fixtureSet = $set;
+    }
+
+    public static function setLocale(?string $locale): void
+    {
+        self::$locale = $locale;
     }
 
     public static function getFixtureSet(): string
@@ -46,15 +53,10 @@ final class FixtureLoader
      */
     public static function load(string $type): array
     {
-        $path = self::getBasePath().'/'.self::$fixtureSet.'/'.$type;
+        $path = self::resolveDirectory($type);
 
-        if (! File::isDirectory($path)) {
-            // Fall back to root-level fixtures for backward compatibility
-            $path = self::getBasePath().'/'.$type;
-
-            if (! File::isDirectory($path)) {
-                return [];
-            }
+        if ($path === null) {
+            return [];
         }
 
         $fixtures = [];
@@ -73,8 +75,24 @@ final class FixtureLoader
         return $fixtures;
     }
 
+    private static function resolveDirectory(string $type): ?string
+    {
+        $roots = array_filter([self::$locale === null ? null : self::getBasePath().'/'.self::$locale, self::getBasePath()]);
+
+        foreach ($roots as $root) {
+            foreach (["{$root}/".self::$fixtureSet."/{$type}", "{$root}/{$type}"] as $candidate) {
+                if (File::isDirectory($candidate)) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return null;
+    }
+
     public static function reset(): void
     {
+        self::$locale = null;
         self::$fixtureSet = 'sales';
         self::$basePath = dirname(__DIR__, 2).'/resources/fixtures';
     }

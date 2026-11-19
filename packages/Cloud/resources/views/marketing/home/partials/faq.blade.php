@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <x-cloud::marketing.frame id="faq">
     <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
         <div class="bg-surface px-6 pb-6 pt-20 md:px-10 md:pt-28 lg:col-span-4">
@@ -8,7 +9,7 @@
                 </h2>
                 <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                     {{ __('Something else on your mind?') }}
-                    <a href="{{ route('contact') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('Get in touch') }}</a>
+                    <a href="{{ LocalizedUrl::route('contact') }}" class="font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white">{{ __('Get in touch') }}</a>
                 </p>
             </div>
         </div>

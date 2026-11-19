@@ -1,0 +1,8 @@
+title: Angebotsschreiben für James vorbereiten
+assigned_people:
+  - james
+custom_fields:
+  description: Entwerfen Sie das Angebotsschreiben für James Park mit Vergütung, Beteiligung und Eintrittsdatum. Orientieren Sie sich an der Standardvorlage von Supabase für Backend-Entwickler.
+  due_date: '{{ +1d }}'
+  status: To do
+  priority: High

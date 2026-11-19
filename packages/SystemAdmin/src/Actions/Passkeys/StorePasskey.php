@@ -27,7 +27,7 @@ final readonly class StorePasskey
         PublicKeyCredentialCreationOptions $options,
     ): SystemAdministratorPasskey {
         if (! $credential->response instanceof AuthenticatorAttestationResponse) {
-            throw InvalidPasskeyException::make('Unable to register passkey. Please try again.');
+            throw InvalidPasskeyException::make(__('Unable to register passkey. Please try again.'));
         }
 
         $source = StaffWebAuthn::attestationValidator()->check(
@@ -39,7 +39,7 @@ final readonly class StorePasskey
         $credentialId = Base64UrlSafe::encodeUnpadded($source->publicKeyCredentialId);
 
         if (SystemAdministratorPasskey::query()->where('credential_id', $credentialId)->exists()) {
-            throw InvalidPasskeyException::make('Unable to register this passkey.');
+            throw InvalidPasskeyException::make(__('Unable to register this passkey.'));
         }
 
         $passkey = $administrator->passkeys()->create([

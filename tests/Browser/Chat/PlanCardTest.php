@@ -36,13 +36,13 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
         (() => {
             {$resolveInterface}
 
-            const step = (id, status, entityType, summary) => ({
+            const step = (id, status, entityType, summary, name) => ({
                 pending_action_id: id,
                 turn_id: 'turn-1',
                 status,
                 operation: 'create',
                 entity_type: entityType,
-                display: { summary },
+                display: { summary, name },
                 itemResults: {},
             });
 
@@ -53,9 +53,9 @@ it('renders a part-decided plan without a phantom progress line, and explains a 
                 rendered: true,
                 html: '<p>Here is the plan.</p>',
                 pending_actions: [
-                    step('pa-1', 'rejected', 'company', 'Create company "Acme"'),
-                    step('pa-2', 'pending', 'people', 'Create person "Jane"'),
-                    step('pa-3', 'pending', 'task', 'Create task "Call Jane"'),
+                    step('pa-1', 'rejected', 'company', 'Create company "Acme"', 'Acme'),
+                    step('pa-2', 'pending', 'people', 'Create person "Jane"', 'Jane'),
+                    step('pa-3', 'pending', 'task', 'Create task "Call Jane"', 'Call Jane'),
                 ],
             }];
 
@@ -326,6 +326,7 @@ it('receipts a mixed outcome: a moved batch with a left-out row and an unsent em
                 moved_to: 'Negotiation',
                 moved_total: '$110,200',
                 items: ['Kovra renewal', 'Kovra add-on seats', 'Kovra platform expansion', 'Kovra pilot', 'Kovra support', 'Kovra training'].map((name) => ({
+                    name,
                     summary: 'Update opportunity "' + name + '"',
                     fields: [{ label: 'Stage', old: 'Open', new: 'Negotiation' }],
                 })),
@@ -486,7 +487,7 @@ it('settles a proposal that lapses or is replaced while open, with the outcome t
         ->assertSourceHas('placeholder="Ask anything..."');
 
     $page->script(seedReceiptMessages(<<<'JS'
-        [message('m1', [Object.assign(step('pa-1', 'pending', 'company', 'create', 'Create company "Acme"'), { expires_at: new Date(Date.now() - 1000).toISOString() })])]
+        [message('m1', [Object.assign(step('pa-1', 'pending', 'company', 'create', 'Create company "Acme"', 'Acme'), { expires_at: new Date(Date.now() - 1000).toISOString() })])]
     JS));
 
     $resolveInterface = ChatBrowser::resolveInterface();

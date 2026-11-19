@@ -1,0 +1,8 @@
+title: Kick-off-Termin mit Olivia vereinbaren
+assigned_people:
+  - olivia
+custom_fields:
+  description: Organisieren Sie einen Kick-off-Termin mit Olivia, um Projektziele und Zeitplan für das Beratungsmandat abzustimmen.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

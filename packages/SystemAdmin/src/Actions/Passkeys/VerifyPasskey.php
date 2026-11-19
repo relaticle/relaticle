@@ -30,7 +30,7 @@ final readonly class VerifyPasskey
         PublicKeyCredentialRequestOptions $options,
     ): SystemAdministratorPasskey {
         if (! $credential->response instanceof AuthenticatorAssertionResponse) {
-            throw InvalidPasskeyException::make('Unable to verify passkey. Please try again.');
+            throw InvalidPasskeyException::make(__('Unable to verify passkey. Please try again.'));
         }
 
         $response = $credential->response;
@@ -41,7 +41,7 @@ final readonly class VerifyPasskey
                 ->where('credential_id', $credentialId)
                 ->lockForUpdate()
                 ->first()
-                ?? throw InvalidPasskeyException::make('Passkey not recognized. It may have been removed from your account.');
+                ?? throw InvalidPasskeyException::make(__('Passkey not recognized. It may have been removed from your account.'));
 
             $source = WebAuthn::fromJson(
                 json_encode($passkey->credential, JSON_THROW_ON_ERROR),
@@ -59,7 +59,7 @@ final readonly class VerifyPasskey
                     userHandle: $source->userHandle,
                 );
             } catch (Throwable) {
-                throw InvalidPasskeyException::make('Unable to verify passkey. Please try again.');
+                throw InvalidPasskeyException::make(__('Unable to verify passkey. Please try again.'));
             }
 
             // Persisted after every use: the signature counter it carries is what

@@ -1,0 +1,8 @@
+title: 'Programar la entrevista técnica con Sarah'
+assigned_people:
+  - sarah
+custom_fields:
+  description: 'Coordinar con el equipo de ingeniería de Stripe una entrevista técnica para Sarah Chen. Incluir una ronda de diseño de sistemas y una sesión de programación en vivo.'
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

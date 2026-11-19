@@ -7,12 +7,12 @@ namespace App\Actions\Auth;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
-use Laravel\Fortify\Actions\ConfirmTwoFactorAuthentication;
+use Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed;
 use Laravel\Fortify\Fortify;
 
 final readonly class ConfirmMfaEnrollment
 {
-    public function __construct(private ConfirmTwoFactorAuthentication $confirmTwoFactorAuthentication) {}
+    public function __construct(private VerifyTotpCode $verifyTotpCode) {}
 
     public function execute(User $user, string $secret, string $code): void
     {
@@ -27,7 +27,15 @@ final readonly class ConfirmMfaEnrollment
                 throw ValidationException::withMessages(['code' => __('profile.sections.mfa.code_invalid')]);
             }
 
-            ($this->confirmTwoFactorAuthentication)($lockedUser, $code);
+            $lockedUser->two_factor_last_used_step = null;
+
+            if (! $this->verifyTotpCode->execute($lockedUser, $secret, $code)) {
+                throw ValidationException::withMessages(['code' => __('profile.sections.mfa.code_invalid')]);
+            }
+
+            $lockedUser->forceFill(['two_factor_confirmed_at' => now()])->save();
+
+            event(new TwoFactorAuthenticationConfirmed($lockedUser));
         });
     }
 }

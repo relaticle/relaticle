@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Support;
 
+use Relaticle\Chat\Exceptions\ProposalNotResolvable;
 use Relaticle\Chat\Models\PendingAction;
 use RuntimeException;
 
@@ -147,7 +148,7 @@ final readonly class ProposalPayload
     {
         $records = $this->batchRecords();
 
-        throw_if($index < 0 || $index >= count($records), RuntimeException::class, 'Item index out of range');
+        throw_if($index < 0 || $index >= count($records), ProposalNotResolvable::itemOutOfRange());
 
         return $records[$index];
     }

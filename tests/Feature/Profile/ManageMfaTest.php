@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Actions\Auth\ConfirmMfaEnrollment;
+use App\Actions\Auth\VerifyTotpCode;
 use App\Enums\SocialiteProvider;
 use App\Livewire\App\Profile\ManageMfa;
 use App\Models\User;
@@ -15,7 +16,7 @@ use Laravel\Socialite\Two\User as SocialiteUser;
 use Livewire\Livewire;
 use PragmaRX\Google2FA\Google2FA;
 
-mutates(ManageMfa::class, ConfirmMfaEnrollment::class);
+mutates(ManageMfa::class, ConfirmMfaEnrollment::class, VerifyTotpCode::class);
 
 test('the section renders and reports that MFA is off', function (): void {
     $this->actingAs(User::factory()->withWorkspace()->create());
@@ -78,6 +79,36 @@ test('confirming a valid code turns MFA on and spends the grant', function (): v
 
     expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue()
         ->and(AuthenticationSession::pendingOperation())->toBe([]);
+});
+
+test('re-enrolling accepts a code from the new secret in the same time step', function (): void {
+    $google2fa = resolve(Google2FA::class);
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+
+    $first = Livewire::test(ManageMfa::class)
+        ->callAction(TestAction::make('enableMfa'), ['password' => 'password']);
+    $firstSecret = $first->get('pendingSecret');
+    $first->setActionData(['code' => $google2fa->getCurrentOtp($firstSecret)])
+        ->callMountedAction();
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue();
+
+    $nextStep = $google2fa->getTimestamp() + 1;
+    $this->actingAs($user->fresh());
+    Livewire::test(ManageMfa::class)
+        ->callAction(TestAction::make('disableMfa'), [
+            'password' => 'password',
+            'code' => $google2fa->oathTotp($firstSecret, $nextStep),
+        ]);
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeFalse();
+
+    $second = Livewire::test(ManageMfa::class)
+        ->callAction(TestAction::make('enableMfa'), ['password' => 'password']);
+    $second->setActionData(['code' => $google2fa->oathTotp($second->get('pendingSecret'), $nextStep)])
+        ->callMountedAction()
+        ->assertActionMounted('saveRecoveryCodes');
+
+    expect($user->fresh()->hasEnabledTwoFactorAuthentication())->toBeTrue();
 });
 
 test('an invalid code leaves MFA off', function (): void {

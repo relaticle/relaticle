@@ -2,12 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Actions\Fortify\CreateNewUser;
 use App\Filament\Pages\Auth\Login;
 use App\Models\User;
 use App\Rules\IndisposableMailHost;
 use App\Support\Email\MailExchangers;
+use App\Support\Locales;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use Livewire\Livewire;
 use Propaganistas\LaravelDisposableEmail\Facades\DisposableDomains;
 
 mutates(Login::class, IndisposableMailHost::class);
@@ -443,3 +447,34 @@ it('does not consume analytics flags when tracking is disabled', function (): vo
     expect(view('filament.app.analytics')->render())->toBe('');
     expect(session()->get('fathom.track_signup'))->toBeTrue();
 });
+
+function signUpWithPassword(string $email): void
+{
+    livewire(Login::class)
+        ->fillForm(['email' => $email])
+        ->call('authenticate')
+        ->fillForm(['password' => 'Password123!'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+}
+
+it('stores the guest language on email sign-up', function (): void {
+    $email = 'lang-'.uniqid().'@gmail.com';
+
+    Livewire::withCookie(Locales::COOKIE, 'de');
+
+    signUpWithPassword($email);
+
+    expect(User::query()->where('email', $email)->sole()->locale)->toBe('de');
+});
+
+it('stores the Accept-Language match when an email sign-up has no cookie', function (string $header, ?string $expected): void {
+    app()->instance('request', Request::create('/', server: ['HTTP_ACCEPT_LANGUAGE' => $header]));
+
+    $user = resolve(CreateNewUser::class)->execute('header-'.uniqid().'@gmail.com', 'Password123!');
+
+    expect($user->locale)->toBe($expected);
+})->with([
+    'listed language' => ['fr-FR,fr;q=0.9', 'fr'],
+    'unlisted language' => ['pt-BR,pt;q=0.9', null],
+]);

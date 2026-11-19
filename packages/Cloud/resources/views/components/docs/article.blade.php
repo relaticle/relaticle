@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @props([
     'page',
     'body',
@@ -103,7 +104,7 @@
 
         @if($page->updated)
             <p class="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                {{ __('Updated :date', ['date' => $page->updated->isoFormat('MMMM D, YYYY')]) }}
+                {{ __('Updated :date', ['date' => $page->updated->isoFormat('LL')]) }}
             </p>
         @endif
 
@@ -126,7 +127,7 @@
             </nav>
         @endif
 
-        <article id="documentation-content" class="prose-docs mt-9">{!! $body !!}</article>
+        <article id="documentation-content" data-copy-label="{{ __('cloud::docs.copy_code') }}" class="prose-docs mt-9">{!! $body !!}</article>
 
         @if($related->isNotEmpty())
             <nav aria-label="{{ __('Related articles') }}" class="mt-14 border-t border-gray-200/80 pt-8 dark:border-white/[0.06]">
@@ -188,7 +189,7 @@
                 <x-ri-discord-fill class="h-4 w-4" />
                 {{ __('Ask a question in Discord') }}
             </a>
-            <a href="{{ route('contact') }}"
+            <a href="{{ LocalizedUrl::route('contact') }}"
                class="inline-flex items-center gap-2 text-gray-500 transition-colors hover:text-gray-900 dark:text-gray-400 dark:hover:text-white">
                 <x-lucide-mail class="h-4 w-4" />
                 {{ __('Contact support') }}
