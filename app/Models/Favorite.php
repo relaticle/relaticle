@@ -35,16 +35,16 @@ use WeakMap;
 #[Fillable(['workspace_id', 'user_id', 'kind', 'parent_id', 'name', 'record_type', 'record_id', 'position'])]
 final class Favorite extends Model
 {
-    public const int NAME_MAX_LENGTH = 60;
-
-    /** @var WeakMap<Model, array<array-key, ?self>>|null */
-    private static ?WeakMap $ownedFor = null;
-
     /** @use HasFactory<FavoriteFactory> */
     use HasFactory;
 
     use HasUlids;
     use HasWorkspace;
+
+    public const int NAME_MAX_LENGTH = 60;
+
+    /** @var WeakMap<Model, array<array-key, ?self>>|null */
+    private static ?WeakMap $ownedFor = null;
 
     protected static function booted(): void
     {
@@ -69,14 +69,6 @@ final class Favorite extends Model
     public function record(): MorphTo
     {
         return $this->morphTo();
-    }
-
-    /**
-     * @return BelongsTo<self, $this>
-     */
-    public function parent(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'parent_id');
     }
 
     /**
