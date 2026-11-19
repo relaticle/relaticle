@@ -82,6 +82,14 @@ return [
             'title' => 'Algunos archivos eran demasiado grandes',
             'body' => 'No adjuntados: :files. Cada archivo debe pesar menos de :max, y todos los adjuntos juntos menos de :total.',
         ],
+        'attachment_empty' => [
+            'title' => 'Algunos archivos estaban vacíos',
+            'body' => 'No adjuntados: :files. Un archivo vacío no tiene nada que enviar.',
+        ],
+        'attachment_type_not_allowed' => [
+            'title' => 'Algunos archivos no se pudieron adjuntar',
+            'body' => 'No adjuntados: :files. Adjunte un PDF, un archivo de Office u OpenDocument, un CSV, un texto, una invitación de calendario, una imagen o un zip.',
+        ],
         'attachment_too_large_for_provider' => 'Cada archivo debe pesar menos de :max, y todos los adjuntos juntos menos de :total después de la codificación.',
         'attachment_unavailable' => [
             'title' => 'No se pudieron incluir algunos adjuntos',
