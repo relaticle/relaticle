@@ -37,12 +37,31 @@ final readonly class SetUserLocale
 
     private function isStaffRequest(): bool
     {
-        $path = '/'.ltrim(Livewire::originalPath(), '/');
-        $adminPath = '/'.trim((string) config('app.sysadmin_path'), '/');
-
         return Auth::getDefaultDriver() === 'sysadmin'
             || $this->currentWorkspace->readsAcrossWorkspaces()
-            || (! config('app.sysadmin_domain') && $adminPath !== '/' && ($path === $adminPath || str_starts_with($path, $adminPath.'/')));
+            || (! config('app.sysadmin_domain') && $this->isUnderAdminPath());
+    }
+
+    private function isUnderAdminPath(): bool
+    {
+        $adminPath = '/'.trim((string) config('app.sysadmin_path'), '/');
+
+        if ($adminPath === '/') {
+            return false;
+        }
+
+        $path = '/'.ltrim($this->requestPath(), '/');
+
+        return $path === $adminPath || str_starts_with($path, $adminPath.'/');
+    }
+
+    private function requestPath(): string
+    {
+        if (Livewire::isLivewireRequest() && ! is_string(request('components.0.snapshot'))) {
+            return request()->path();
+        }
+
+        return Livewire::originalPath();
     }
 
     private function resolve(Request $request): string

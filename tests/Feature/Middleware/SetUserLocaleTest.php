@@ -219,3 +219,9 @@ it('renders the panel script data in the user language', function (): void {
         ->assertSee('Spaltengröße ändern', false)
         ->assertDontSee('Resize column', false);
 });
+
+it('serves a public page when a Livewire request carries a malformed snapshot', function (): void {
+    $this->withHeaders(['X-Livewire' => '1'])
+        ->get('/locale-probe?components[0][snapshot][]=x')
+        ->assertOk();
+});
