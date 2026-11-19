@@ -302,7 +302,7 @@ body.reordering-column .column-resize-handle-bar::before {
             @apply flex min-h-0 flex-col;
         }
 
-        .fi-ta-main > :is(.fi-ta-header-ctn, .fi-ta-filters-below-content) {
+        .fi-ta-main > :is(.fi-ta-header-ctn, .fi-pagination, .fi-ta-filters-below-content) {
             @apply shrink-0;
         }
 
@@ -313,7 +313,7 @@ body.reordering-column .column-resize-handle-bar::before {
 
         /* The pagination rides in the table footer, so it follows the last row. A caption spans every column
            without a colspan, and the bar keeps the visible width while the rows scroll sideways. */
-        .fi-ta-main > .fi-pagination {
+        .fi-ta-main:has(.fi-ta-pagination-footer) > .fi-pagination {
             @apply hidden;
         }
 

@@ -353,6 +353,15 @@ it('opens the next page at its first row from the pagination after the last row'
         ->assertNoJavaScriptErrors();
 });
 
+it('keeps the pagination on a page past the last record', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/people?page=9", 1440, 900)
+        ->assertVisible('.fi-ta-empty-state')
+        ->assertScript('document.querySelector(".fi-ta-main > .fi-pagination").checkVisibility()', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('keeps the pagination below the stacked cards on a phone', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
 
