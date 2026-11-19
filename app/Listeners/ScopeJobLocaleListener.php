@@ -7,8 +7,6 @@ namespace App\Listeners;
 use App\Support\Locales;
 use Illuminate\Container\Attributes\Singleton;
 use Illuminate\Queue\Events\JobAttempted;
-use Illuminate\Queue\Events\JobExceptionOccurred;
-use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Facades\Context;
 
@@ -18,7 +16,7 @@ final class ScopeJobLocaleListener
     /** @var array<int, string> */
     private array $previous = [];
 
-    public function handle(JobProcessing|JobProcessed|JobExceptionOccurred|JobAttempted $event): void
+    public function handle(JobProcessing|JobAttempted $event): void
     {
         $key = spl_object_id($event->job);
 

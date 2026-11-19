@@ -8,6 +8,8 @@ use App\Models\User;
 use App\Support\CurrentWorkspace;
 use App\Support\Locales;
 use Filament\Facades\Filament;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Context;
@@ -18,6 +20,21 @@ use Livewire\Livewire;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
 mutates(SetUserLocale::class, Locales::class);
+
+final class FailingLocaleJob implements ShouldQueue
+{
+    use Dispatchable;
+
+    public function handle(): void
+    {
+        throw new RuntimeException('boom');
+    }
+
+    public function failed(): void
+    {
+        Cache::put('failed-locale', app()->getLocale());
+    }
+}
 
 beforeEach(function (): void {
     Route::middleware('web')->get('/locale-probe', fn (): string => app()->getLocale());
@@ -224,4 +241,16 @@ it('serves a public page when a Livewire request carries a malformed snapshot', 
     $this->withHeaders(['X-Livewire' => '1'])
         ->get('/locale-probe?components[0][snapshot][]=x')
         ->assertOk();
+});
+
+it('runs a failed hook of a synchronous job in the language the job ran in', function (): void {
+    Locales::apply('fr');
+    Context::addHidden('locale', 'de');
+
+    try {
+        dispatch(new FailingLocaleJob);
+    } catch (RuntimeException) {
+    }
+
+    expect(Cache::get('failed-locale'))->toBe('de');
 });
