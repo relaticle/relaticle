@@ -86,6 +86,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\DevCommands;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery as BasePreventRequestForgery;
 use Illuminate\Http\Request;
@@ -846,6 +847,12 @@ final class AppServiceProvider extends ServiceProvider
             Js::make('sheet-backdrop', resource_path('js/filament/sheet-backdrop.js')),
         ]);
 
+        $this->registerTranslatedScriptData();
+        Event::listen(LocaleUpdated::class, $this->registerTranslatedScriptData(...));
+    }
+
+    private function registerTranslatedScriptData(): void
+    {
         FilamentAsset::registerScriptData([
             'payloadTooLarge' => __('filament/panel.payload_too_large'),
             'boardStageOrderFailed' => __('filament/pages/boards.stage_order_failed'),

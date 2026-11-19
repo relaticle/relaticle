@@ -210,3 +210,12 @@ it('restores the outer job language after a nested synchronous job', function ()
 
     expect(Cache::get('after-inner'))->toBe('de');
 });
+
+it('renders the panel script data in the user language', function (): void {
+    $user = User::factory()->withPersonalWorkspace()->create(['locale' => 'de']);
+    $this->actingAs($user)
+        ->get(Dashboard::getUrl(tenant: $user->currentWorkspace))
+        ->assertOk()
+        ->assertSee('Spaltengröße ändern', false)
+        ->assertDontSee('Resize column', false);
+});
