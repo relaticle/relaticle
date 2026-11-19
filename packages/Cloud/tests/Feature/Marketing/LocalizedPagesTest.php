@@ -127,6 +127,24 @@ it('emits hreflang for all four languages plus x-default and a self canonical', 
     expect($canonical)->toBe(url('/de/pricing'));
 });
 
+it('points hreflang and the switcher at the same docs page the reader is on', function (string $path): void {
+    $html = (string) $this->get("/de{$path}")->assertOk()->getContent();
+    $switcher = (new Crawler($html))->filter('footer [data-language-switcher] a[hreflang]');
+
+    expect(hreflangLinks($html))->toBe([
+        'en' => url($path),
+        'de' => url("/de{$path}"),
+        'es' => url("/es{$path}"),
+        'fr' => url("/fr{$path}"),
+        'x-default' => url($path),
+    ])->and($switcher->each(fn (Crawler $a): string => $a->attr('href')))->toBe([
+        url($path),
+        url("/de{$path}"),
+        url("/es{$path}"),
+        url("/fr{$path}"),
+    ]);
+})->with(['/developers/mcp', '/developers/rest-api', '/help/import/prepare-your-csv']);
+
 it('builds alternates without leaking route defaults into the query string', function (): void {
     $html = (string) $this->get('/fr/crm-for-claude')->assertOk()->getContent();
 

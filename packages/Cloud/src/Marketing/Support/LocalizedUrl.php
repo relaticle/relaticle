@@ -11,7 +11,6 @@ use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Route;
 use Locale;
 use Relaticle\Ink\Models\Post;
-use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 final readonly class LocalizedUrl
 {
@@ -114,13 +113,22 @@ final readonly class LocalizedUrl
 
     private static function routeNameOf(string $path): ?string
     {
-        try {
-            $route = Route::getRoutes()->match(Request::create((string) parse_url($path, PHP_URL_PATH)));
-        } catch (HttpExceptionInterface) {
-            return null;
+        $request = Request::create((string) parse_url($path, PHP_URL_PATH));
+        $fallback = null;
+
+        foreach (Route::getRoutes()->get($request->getMethod()) as $route) {
+            if (! $route->matches($request)) {
+                continue;
+            }
+
+            if (! $route->isFallback) {
+                return $route->getName();
+            }
+
+            $fallback ??= $route;
         }
 
-        return $route->getName();
+        return $fallback?->getName();
     }
 
     /** @return array<string, int> */
