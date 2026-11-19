@@ -8,6 +8,7 @@ use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
@@ -1328,4 +1329,30 @@ it('links the enterprise contact button to the contact page in the owner languag
     $this->get(Billing::getUrl(panel: 'app', tenant: $workspace))
         ->assertOk()
         ->assertSee('href="https://marketing.test/fr/contact"', false);
+});
+
+it('words the allowance reset date in the user language', function (): void {
+    withHostedBilling();
+    $this->travelTo('2026-11-10 10:00:00');
+
+    [, $workspace] = billingPageOwner();
+
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'credits_remaining' => 500,
+        'credits_used' => 0,
+        'purchased_credits' => 0,
+        'period_starts_at' => now()->startOfMonth(),
+        'period_ends_at' => CarbonImmutable::parse('2026-11-30 23:59:59'),
+    ]);
+    Locales::apply('de');
+
+    livewire(Billing::class)->assertSee('Wird am 30. Nov 2026 zurückgesetzt');
+});
+
+it('titles the page in the user language', function (): void {
+    withHostedBilling();
+    billingPageOwner();
+    Locales::apply('de');
+
+    expect(livewire(Billing::class)->instance()->getTitle())->toBe('Abrechnung');
 });

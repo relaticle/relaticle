@@ -90,12 +90,12 @@
                                     {{ __('cloud::billing.trial.active_title') }} ({{ trans_choice('cloud::billing.trial.days_left', $trialDaysLeft, ['days' => $trialDaysLeft]) }})
                                 @elseif($onGrace)
                                     {{ $isGrandfathered
-                                        ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])
-                                        : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()]) }}
+                                        ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])
+                                        : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')]) }}
                                 @elseif($pastDue)
                                     {{ __('cloud::billing.manage.past_due_tagline') }}
                                 @elseif($onStripeTrial)
-                                    {{ __('cloud::billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->toFormattedDateString()]) }}
+                                    {{ __('cloud::billing.manage.first_charge', ['date' => $subscription?->trial_ends_at?->isoFormat('ll')]) }}
                                 @elseif($isSubscribed)
                                     {{ __('cloud::billing.manage.auto_renews') }}
                                 @elseif($onLegacyFree)
@@ -133,7 +133,7 @@
                     @endif
 
                     @if($balance?->period_ends_at)
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.resets', ['date' => $balance->period_ends_at->toFormattedDateString()]) }}</p>
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.resets', ['date' => $balance->period_ends_at->isoFormat('ll')]) }}</p>
                     @endif
 
                     @if($purchased > 0)
@@ -193,10 +193,10 @@
                         <h3 class="text-sm font-semibold text-warning-800 dark:text-warning-300">{{ __('cloud::billing.manage.cancel_scheduled_title') }}</h3>
                         <p class="mt-0.5 text-sm text-warning-700/80 dark:text-warning-400/70">
                             {{ $isManaged
-                                ? __('cloud::billing.managed.previous_subscription_canceling', ['date' => $subscription?->ends_at?->toFormattedDateString()])
+                                ? __('cloud::billing.managed.previous_subscription_canceling', ['date' => $subscription?->ends_at?->isoFormat('ll')])
                                 : ($isGrandfathered
-                                ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])
-                                : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->toFormattedDateString()])) }}
+                                ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])
+                                : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])) }}
                         </p>
                     </div>
                 </div>

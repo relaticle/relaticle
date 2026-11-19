@@ -130,7 +130,7 @@
 
                     @if($trialEndsAt !== null)
                         <p class="mt-4 rounded-lg bg-primary/[0.06] p-3 text-xs text-primary-700 dark:text-primary-300">
-                            {{ __('cloud::billing.upgrade.trial_notice', ['date' => $trialEndsAt->toFormattedDateString()]) }}
+                            {{ __('cloud::billing.upgrade.trial_notice', ['date' => $trialEndsAt->isoFormat('ll')]) }}
                         </p>
                     @endif
 
