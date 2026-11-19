@@ -162,3 +162,17 @@ it('translates every English key of a root into a locale', function (string $loc
 
     expect($missing)->toBe([]);
 })->with(fn (): array => localeRootRows());
+
+it('gives a key both catalogues define the same value, because the app catalogue wins', function (string $locale): void {
+    $base = dirname(__DIR__, 2);
+    $app = json_decode((string) file_get_contents("{$base}/lang/{$locale}.json"), true, flags: JSON_THROW_ON_ERROR);
+    $cloud = json_decode((string) file_get_contents("{$base}/packages/Cloud/lang/{$locale}.json"), true, flags: JSON_THROW_ON_ERROR);
+
+    $drifted = array_keys(array_filter(
+        array_intersect_key($cloud, $app),
+        fn (string $value, string $key): bool => $value !== $app[$key],
+        ARRAY_FILTER_USE_BOTH,
+    ));
+
+    expect($drifted)->toBe([]);
+})->with(fn (): array => array_map(fn (string $locale): array => [$locale], translatedLocales()));
