@@ -19,6 +19,7 @@ auditd records every read, write and attribute change of the production secret f
 - A PHP 8.5 or PHP-FPM 8.5 process with no login session: FPM, Horizon and Reverb under supervisor.
 - A PHP 8.5 `artisan` command whose session cron started. The scan asks auditd for the session's `USER_START` record and requires `/usr/sbin/cron`. Other programs in that session stay unexpected, and so does `artisan tinker`.
 - `php8.5 artisan blog:mcp`.
+- `sftp` or `find` reading `/home/forge/backups` in a session cron started: the nightly backup uploads the new dump and prunes old ones.
 - Any event inside a deploy window.
 
 ## Deploy windows
@@ -29,7 +30,7 @@ auditd records every read, write and attribute change of the production secret f
 
 - Anything that can run code as `forge` inside FPM or Horizon reads the secrets as an expected reader. The audit does not stop or flag it.
 - The deploy window files belong to `forge`, so a `forge` process can open a window of up to 30 minutes and hide reads inside it. Only a root-owned window would close this, and no narrow mechanism exists for it today.
-- Anyone who can edit `forge`'s crontab can run a PHP 8.5 `artisan` command in a cron session.
+- Anyone who can edit `forge`'s crontab can run a PHP 8.5 `artisan` command in a cron session, or copy a backup out with `sftp`.
 - The audit records stay on the server, and root can change them.
 - The backups directory is watched for reads only, because the nightly backup job writes there. Moving a backup out of the directory is not recorded.
 - After a checkpoint mismatch the scan re-reads the whole day, so reads from that day's earlier deploys can be reported once.

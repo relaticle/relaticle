@@ -9,6 +9,7 @@ export LC_ALL=C
 AUSEARCH="${AUSEARCH:-/usr/sbin/ausearch}"
 PYTHON="${PYTHON:-/usr/bin/python3}"
 SITE_DIR="${SITE_DIR:-/home/forge/relaticle.com}"
+BACKUP_DIR="${BACKUP_DIR:-/home/forge/backups}"
 STATE_DIR="${STATE_DIR:-/var/lib/relaticle-audit}"
 STATUS_FILE="${STATUS_FILE:-$STATE_DIR/status.json}"
 CHECKPOINT="$STATE_DIR/ausearch.checkpoint"
@@ -54,7 +55,7 @@ elif [[ "$status" -ne 0 ]]; then
     exit 1
 fi
 
-AUSEARCH="$AUSEARCH" SITE_DIR="$SITE_DIR" STATUS_FILE="$STATUS_FILE" RAW="$RAW" "$PYTHON" -I - <<'PY'
+AUSEARCH="$AUSEARCH" SITE_DIR="$SITE_DIR" BACKUP_DIR="$BACKUP_DIR" STATUS_FILE="$STATUS_FILE" RAW="$RAW" "$PYTHON" -I - <<'PY'
 import json
 import os
 import re
@@ -63,6 +64,7 @@ import time
 
 AUSEARCH = os.environ["AUSEARCH"]
 SITE = os.environ["SITE_DIR"]
+BACKUPS = os.environ["BACKUP_DIR"].rstrip("/")
 STATUS = os.environ["STATUS_FILE"]
 RAW = os.environ["RAW"]
 
@@ -74,6 +76,8 @@ UNSET = ("unset", "4294967295")
 ARTISAN = r"^(?:\S*/)?php[\d.]*\s+(?:\S*/)?artisan\s+"
 CRON_ARTISAN = re.compile(ARTISAN + r"(?!tinker\b)[a-z][a-z0-9:_-]*(?:\s.*)?$")
 BLOG_MCP = re.compile(ARTISAN + r"blog:mcp\s*$")
+# The nightly backup script lists the directory to prune it and uploads the new dump with sftp.
+BACKUP_JOB_EXES = {"/usr/bin/sftp", "/usr/bin/find"}
 
 now = int(time.time())
 cron_sessions = {}
@@ -182,6 +186,10 @@ def deploy_windows(floor):
     return windows
 
 
+def in_backups(path):
+    return path == BACKUPS or path.startswith(BACKUPS + "/")
+
+
 def expected(event, windows):
     exe = event["exe"]
     title = event["proctitle"]
@@ -190,6 +198,8 @@ def expected(event, windows):
     if exe == "/usr/bin/php8.5" and BLOG_MCP.search(title):
         return True
     if exe == "/usr/bin/php8.5" and CRON_ARTISAN.search(title) and started_by_cron(event["ses"]):
+        return True
+    if exe in BACKUP_JOB_EXES and in_backups(event["path"]) and started_by_cron(event["ses"]):
         return True
     return any(start <= event["at"] <= end for start, end in windows)
 
