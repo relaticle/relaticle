@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Favorites;
 
 use App\Models\Company;
-use App\Models\FavoriteRecord;
+use App\Models\Favorite;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
@@ -16,9 +16,6 @@ final readonly class RemoveFavoriteRecord
     {
         abort_unless($user->belongsToWorkspaceId($record->workspace_id), 403);
 
-        FavoriteRecord::query()
-            ->ownedBy($user, $record->workspace_id)
-            ->forRecord($record)
-            ->delete();
+        Favorite::ownedFor($user, $record)?->delete();
     }
 }

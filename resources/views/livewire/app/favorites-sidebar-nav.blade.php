@@ -5,15 +5,16 @@
 <li
     x-data="{
         label: @js($groupLabel),
-        keys(list) {
-            return [...list.children].filter((item) => item.dataset.favoriteKey).map((item) => item.dataset.favoriteKey)
+        neighbour(item, direction) {
+            let sibling = item[direction]
+            while (sibling && ! sibling.dataset.favoriteKey) {
+                sibling = sibling[direction]
+            }
+            return sibling?.dataset.favoriteKey ?? null
         },
-        arrange() {
-            const folders = {}
-            this.$refs.favorites.querySelectorAll('[data-favorite-folder]').forEach((list) => {
-                folders[list.dataset.favoriteFolder] = this.keys(list).map((key) => key.replace(/^record:/, ''))
-            })
-            this.$wire.arrange({ top: this.keys(this.$refs.favorites), folders })
+        move(key) {
+            const item = this.$root.querySelector(`[data-favorite-key='${key}']`)
+            this.$wire.move(key, item.parentElement.dataset.favoriteFolder ?? null, this.neighbour(item, 'previousElementSibling'), this.neighbour(item, 'nextElementSibling'))
         },
     }"
     data-group-label="{{ $groupLabel }}"
@@ -59,13 +60,13 @@
         x-show="$store.sidebar.isOpen ? ! $store.sidebar.groupIsCollapsed(label) : true"
         x-collapse.duration.200ms
         x-ref="favorites"
-        x-sort.ghost="arrange"
+        x-sort.ghost="move"
         x-sort:group="favorites"
         x-sort:config="{ delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }"
         class="fi-sidebar-group-items"
     >
         @foreach ($items as $item)
-            @if ($item instanceof \App\Models\FavoriteFolder)
+            @if ($item->isFolder())
                 @include('livewire.app.favorites-sidebar-nav.folder', ['folder' => $item])
             @else
                 @include('livewire.app.favorites-sidebar-nav.favorite', ['favorite' => $item])

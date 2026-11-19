@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace App\Livewire\App;
 
-use App\Actions\Favorites\ArrangeFavorites;
 use App\Actions\Favorites\CreateFavoriteFolder;
 use App\Actions\Favorites\DeleteFavoriteFolder;
+use App\Actions\Favorites\MoveFavorite;
 use App\Actions\Favorites\RemoveFavoriteRecord;
 use App\Actions\Favorites\RenameFavoriteFolder;
 use App\Livewire\BaseLivewireComponent;
 use App\Models\Company;
-use App\Models\FavoriteFolder;
-use App\Models\FavoriteRecord;
+use App\Models\Favorite;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
@@ -22,6 +21,7 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Listens to nothing, like ChatSidebarNav: nested in Filament's sidebar, its own
@@ -29,7 +29,7 @@ use Illuminate\Contracts\View\View;
  */
 final class FavoritesSidebarNav extends BaseLivewireComponent
 {
-    public function removeFavorite(string $favoriteRecordId, RemoveFavoriteRecord $removeFavoriteRecord): void
+    public function removeFavorite(string $favoriteId, RemoveFavoriteRecord $removeFavoriteRecord): void
     {
         $user = Filament::auth()->user();
         $workspace = Filament::getTenant();
@@ -38,9 +38,9 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
             return;
         }
 
-        $record = FavoriteRecord::query()
+        $record = Favorite::query()
             ->ownedBy($user, $workspace->getKey())
-            ->find($favoriteRecordId)
+            ->find($favoriteId)
             ?->record()
             ->withTrashed()
             ->first();
@@ -55,15 +55,11 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
         $this->dispatch('favorites-updated');
     }
 
-    /**
-     * @param  array<mixed>  $tree
-     */
-    public function arrange(array $tree, ArrangeFavorites $arrangeFavorites): void
+    public function move(string $favoriteId, ?string $folderId, ?string $afterId, ?string $beforeId, MoveFavorite $moveFavorite): void
     {
-        $workspace = Filament::getTenant();
-        abort_unless($workspace instanceof Workspace, 403);
+        $find = fn (?string $id): ?Favorite => $id === null ? null : $this->ownedFavorites()->find($id);
 
-        $arrangeFavorites->execute($this->authUser(), $workspace, $tree);
+        $moveFavorite->execute($this->authUser(), $this->ownedFavorites()->findOrFail($favoriteId), $find($folderId), $find($afterId), $find($beforeId));
 
         $this->dispatch('refresh-sidebar');
         $this->dispatch('favorites-updated');
@@ -131,7 +127,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
             TextInput::make('name')
                 ->label(__('favorites.folders.name'))
                 ->required()
-                ->maxLength(FavoriteFolder::NAME_MAX_LENGTH)
+                ->maxLength(Favorite::NAME_MAX_LENGTH)
                 ->autofocus()
                 ->dehydrateStateUsing(fn (?string $state): string => trim((string) $state)),
         ];
@@ -140,14 +136,20 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
     /**
      * @param  array<string, mixed>  $arguments
      */
-    private function folderFromArguments(array $arguments): FavoriteFolder
+    private function folderFromArguments(array $arguments): Favorite
+    {
+        return $this->ownedFavorites()->folders()->findOrFail((string) ($arguments['folder'] ?? ''));
+    }
+
+    /**
+     * @return Builder<Favorite>
+     */
+    private function ownedFavorites(): Builder
     {
         $workspace = Filament::getTenant();
-        abort_unless($workspace instanceof Workspace, 403);
+        abort_unless($workspace instanceof Workspace && $this->authUser()->belongsToWorkspaceId($workspace->getKey()), 403);
 
-        return FavoriteFolder::query()
-            ->ownedBy($this->authUser(), $workspace->getKey())
-            ->findOrFail((string) ($arguments['folder'] ?? ''));
+        return Favorite::query()->ownedBy($this->authUser(), $workspace->getKey());
     }
 
     public function render(): View

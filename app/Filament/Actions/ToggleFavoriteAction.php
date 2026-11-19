@@ -7,7 +7,7 @@ namespace App\Filament\Actions;
 use App\Actions\Favorites\AddFavoriteRecord;
 use App\Actions\Favorites\RemoveFavoriteRecord;
 use App\Models\Company;
-use App\Models\FavoriteRecord;
+use App\Models\Favorite;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
@@ -61,6 +61,6 @@ final class ToggleFavoriteAction extends Action
 
     private function isStarred(): bool
     {
-        return FavoriteRecord::ownedFor($this->member(), $this->crmRecord()) instanceof FavoriteRecord;
+        return Favorite::ownedFor($this->member(), $this->crmRecord()) instanceof Favorite;
     }
 }

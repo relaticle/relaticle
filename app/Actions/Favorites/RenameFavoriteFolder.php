@@ -4,16 +4,16 @@ declare(strict_types=1);
 
 namespace App\Actions\Favorites;
 
-use App\Models\FavoriteFolder;
+use App\Models\Favorite;
 use App\Models\User;
 
 final readonly class RenameFavoriteFolder
 {
-    public function execute(User $user, FavoriteFolder $folder, string $name): FavoriteFolder
+    public function execute(User $user, Favorite $folder, string $name): Favorite
     {
-        abort_unless($user->belongsToWorkspaceId($folder->workspace_id) && $folder->user_id === $user->getKey(), 403);
+        abort_unless($folder->isFolder() && $folder->isOwnedBy($user, $folder->workspace_id) && $user->belongsToWorkspaceId($folder->workspace_id), 403);
 
-        $folder->update(['name' => trim($name)]);
+        $folder->update(['name' => Favorite::folderName($name)]);
 
         return $folder;
     }

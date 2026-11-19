@@ -6,8 +6,7 @@ use App\Enums\CrmEntity;
 use App\Filament\Pages\Dashboard;
 use App\Livewire\App\FavoritesSidebarNav;
 use App\Models\Company;
-use App\Models\FavoriteFolder;
-use App\Models\FavoriteRecord;
+use App\Models\Favorite;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
@@ -46,7 +45,7 @@ it('hides the group while there is no favorite and no folder', function (): void
 });
 
 it('shows the group with only an empty folder', function (): void {
-    FavoriteFolder::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey(), 'name' => 'Q4 renewals', 'position' => 1]);
+    favoriteFolderFor($this->user, $this->workspace, 'Q4 renewals', 1);
 
     Livewire::test(FavoritesSidebarNav::class)
         ->assertSeeHtml('fi-sidebar-group-btn')
@@ -56,7 +55,7 @@ it('shows the group with only an empty folder', function (): void {
 });
 
 it('shows the group when the only favorite sits in a folder', function (): void {
-    $folder = FavoriteFolder::factory()->create(['workspace_id' => $this->workspace->getKey(), 'user_id' => $this->user->getKey(), 'name' => 'Q4 renewals', 'position' => 1]);
+    $folder = favoriteFolderFor($this->user, $this->workspace, 'Q4 renewals', 1);
     favoriteFor($this->user, $this->workspace, Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Acme Corp']), 1, $folder);
 
     Livewire::test(FavoritesSidebarNav::class)
@@ -65,12 +64,7 @@ it('shows the group when the only favorite sits in a folder', function (): void 
 });
 
 it('lists a folder with its favorites between top-level favorites', function (): void {
-    $folder = FavoriteFolder::factory()->create([
-        'workspace_id' => $this->workspace->getKey(),
-        'user_id' => $this->user->getKey(),
-        'name' => 'Q4 renewals',
-        'position' => 2,
-    ]);
+    $folder = favoriteFolderFor($this->user, $this->workspace, 'Q4 renewals', 2);
     $companies = Company::factory()->recycle([$this->user, $this->workspace])
         ->forEachSequence(['name' => 'Acme Corp'], ['name' => 'Globex expansion'], ['name' => 'Initech renewal'])
         ->create();
@@ -128,7 +122,7 @@ it('removes a favorite from the sidebar', function (): void {
         ->call('removeFavorite', $favorite->getKey())
         ->assertDispatched('refresh-sidebar');
 
-    expect(FavoriteRecord::query()->whereKey($favorite->getKey())->exists())->toBeFalse();
+    expect(Favorite::query()->whereKey($favorite->getKey())->exists())->toBeFalse();
 });
 
 it('removes a favorite whose record was trashed meanwhile', function (): void {
@@ -140,7 +134,7 @@ it('removes a favorite whose record was trashed meanwhile', function (): void {
         ->call('removeFavorite', $favorite->getKey())
         ->assertDispatched('refresh-sidebar');
 
-    expect(FavoriteRecord::query()->whereKey($favorite->getKey())->exists())->toBeFalse();
+    expect(Favorite::query()->whereKey($favorite->getKey())->exists())->toBeFalse();
 });
 
 it("ignores removing another member's favorite", function (): void {
@@ -152,7 +146,7 @@ it("ignores removing another member's favorite", function (): void {
         ->call('removeFavorite', $favorite->getKey())
         ->assertNotDispatched('refresh-sidebar');
 
-    expect(FavoriteRecord::query()->withoutGlobalScopes()->whereKey($favorite->getKey())->exists())->toBeTrue();
+    expect(Favorite::query()->withoutGlobalScopes()->whereKey($favorite->getKey())->exists())->toBeTrue();
 });
 
 it('renders the favorites group in the app sidebar above the chats', function (): void {

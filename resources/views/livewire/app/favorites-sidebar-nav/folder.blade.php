@@ -5,8 +5,9 @@
 
 <li
     wire:key="favorite-folder-{{ $folder->getKey() }}"
-    x-sort:item="@js('folder:'.$folder->getKey())"
-    data-favorite-key="folder:{{ $folder->getKey() }}"
+    x-sort:item="@js($folder->getKey())"
+    data-favorite-key="{{ $folder->getKey() }}"
+    data-favorite-kind="folder"
     class="fi-sidebar-favorites-folder"
 >
     <div
@@ -55,14 +56,14 @@
     <ul
         x-show="! $store.sidebar.isOpen || ! $store.sidebar.groupIsCollapsed(@js($folderKey))"
         x-collapse.duration.200ms
-        x-sort.ghost="arrange"
+        x-sort.ghost="move"
         {{-- A folder may not hold a folder, so this list only accepts favorites. --}}
-        x-sort:config="{ group: { name: 'favorites', put: (to, from, item) => item.dataset.favoriteKey?.startsWith('record:') ?? false }, delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }"
+        x-sort:config="{ group: { name: 'favorites', put: (to, from, item) => item.dataset.favoriteKind === 'record' }, delay: 200, delayOnTouchOnly: true, animation: $dragAnimation() }"
         data-favorite-folder="{{ $folder->getKey() }}"
         x-bind:class="{ 'ps-5': $store.sidebar.isOpen }"
         class="fi-sidebar-favorites-folder-items"
     >
-        @forelse ($folder->favoriteRecords as $favorite)
+        @forelse ($folder->children as $favorite)
             @include('livewire.app.favorites-sidebar-nav.favorite', ['favorite' => $favorite])
         @empty
             <li x-sort:ignore x-show="$store.sidebar.isOpen" data-favorite-folder-empty class="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400">

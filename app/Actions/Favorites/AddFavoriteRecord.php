@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Actions\Favorites;
 
+use App\Enums\FavoriteKind;
 use App\Models\Company;
-use App\Models\FavoriteFolder;
-use App\Models\FavoriteRecord;
+use App\Models\Favorite;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
@@ -14,10 +14,10 @@ use Illuminate\Database\UniqueConstraintViolationException;
 
 final readonly class AddFavoriteRecord
 {
-    public function execute(User $user, Company|People|Opportunity $record, ?FavoriteFolder $folder = null): FavoriteRecord
+    public function execute(User $user, Company|People|Opportunity $record, ?Favorite $folder = null): Favorite
     {
         abort_unless($user->can('view', $record), 403);
-        abort_if($folder instanceof FavoriteFolder && ! $folder->isOwnedBy($user, $record->workspace_id), 403);
+        abort_if($folder instanceof Favorite && (! $folder->isFolder() || ! $folder->isOwnedBy($user, $record->workspace_id)), 403);
 
         $keys = [
             'workspace_id' => $record->workspace_id,
@@ -27,12 +27,13 @@ final readonly class AddFavoriteRecord
         ];
 
         try {
-            return FavoriteRecord::query()->withoutGlobalScopes()->firstOrCreate($keys, [
-                'favorite_folder_id' => $folder?->getKey(),
-                'position' => FavoriteRecord::nextPosition($user, $record->workspace_id, $folder),
+            return Favorite::query()->withoutGlobalScopes()->firstOrCreate($keys, [
+                'kind' => FavoriteKind::Record,
+                'parent_id' => $folder?->getKey(),
+                'position' => Favorite::nextPosition($user, $record->workspace_id, $folder?->getKey()),
             ]);
         } catch (UniqueConstraintViolationException) {
-            return FavoriteRecord::query()->withoutGlobalScopes()->where($keys)->firstOrFail();
+            return Favorite::query()->withoutGlobalScopes()->where($keys)->firstOrFail();
         }
     }
 }

@@ -4,33 +4,26 @@ declare(strict_types=1);
 
 namespace App\Actions\Favorites;
 
-use App\Models\FavoriteFolder;
-use App\Models\FavoriteRecord;
+use App\Models\Favorite;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Relaticle\Flowforge\Services\DecimalPosition;
 
 final readonly class DeleteFavoriteFolder
 {
-    public function execute(User $user, FavoriteFolder $folder): void
+    public function execute(User $user, Favorite $folder): void
     {
-        abort_unless($user->belongsToWorkspaceId($folder->workspace_id) && $folder->user_id === $user->getKey(), 403);
+        abort_unless($folder->isFolder() && $folder->isOwnedBy($user, $folder->workspace_id) && $user->belongsToWorkspaceId($folder->workspace_id), 403);
 
         DB::transaction(function () use ($user, $folder): void {
-            $favorites = FavoriteRecord::query()
-                ->ownedBy($user, $folder->workspace_id)
-                ->where('favorite_folder_id', $folder->getKey())
-                ->orderBy('position')
-                ->get();
+            $position = Favorite::nextPosition($user, $folder->workspace_id, null);
 
-            $favorites->each->update(['favorite_folder_id' => null, 'position' => 0]);
+            foreach (Favorite::query()->ownedBy($user, $folder->workspace_id)->where('parent_id', $folder->getKey())->orderBy('position')->get() as $child) {
+                $child->update(['parent_id' => null, 'position' => $position]);
+                $position = DecimalPosition::after($position);
+            }
 
             $folder->delete();
-
-            $position = FavoriteRecord::nextTopLevelPosition($user, $folder->workspace_id);
-
-            foreach ($favorites as $favorite) {
-                $favorite->update(['favorite_folder_id' => null, 'position' => $position++]);
-            }
         });
     }
 }

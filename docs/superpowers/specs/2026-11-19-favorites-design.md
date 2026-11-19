@@ -24,6 +24,8 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
 | 6 | The folder modal | Opens in the center of the page, not inside the sidebar |
 | 7 | The group's new-folder button | 16px, the size of the sidebar's other icons, and no taller than the group header |
 | 8 | An empty folder | Shows "No items" while open, as Attio does. The row is also the drop target, so a favorite can be dragged into an empty folder |
+| 9 | Storage | One `favorites` table. `kind` (`record` or `folder`) says which; a folder has a `name`, a favorite has `record_type` and `record_id`, and a check constraint holds that shape. `parent_id` points at the folder |
+| 10 | Order | `position` is `decimal(20,10)`, ordered by Flowforge's `DecimalPosition`, the same scheme the boards use. A drag writes one row: the midpoint of its new neighbours, or one gap past the last sibling |
 
 ## What a member sees
 
@@ -72,9 +74,11 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
 
 | Piece | Owner |
 |---|---|
-| Add, move, remove a favorite | `AddFavoriteRecord`, `MoveFavoriteRecord`, `RemoveFavoriteRecord` in `app/Actions/Favorites` |
-| Create, rename, delete a folder, drag order | `CreateFavoriteFolder`, `RenameFavoriteFolder`, `DeleteFavoriteFolder`, `ArrangeFavorites` |
-| A record's favorite | `FavoriteRecord::forRecord()` scope and `FavoriteRecord::ownedFor()` |
+| Storage and order | `App\Models\Favorite`, `App\Enums\FavoriteKind`, `Favorite::nextPosition()` |
+| Add, remove a favorite | `AddFavoriteRecord`, `RemoveFavoriteRecord` in `app/Actions/Favorites` |
+| Move by menu or drag | `MoveFavorite`: into a folder, out of one, or between two neighbours. It rebalances the list when two neighbours leave no room |
+| Create, rename, delete a folder | `CreateFavoriteFolder`, `RenameFavoriteFolder`, `DeleteFavoriteFolder`. `Favorite::folderName()` holds the name rule |
+| A record's favorite | `Favorite::forRecord()` scope and `Favorite::ownedFor()`, memoized per request and cleared on every favorites write |
 | Header star | `App\Filament\Actions\ToggleFavoriteAction` |
 | Header "..." menu items | `App\Filament\Actions\FavoriteMenuActions` |
 | Sidebar group | `App\Livewire\App\FavoritesSidebarNav`, rendered at `SIDEBAR_NAV_END` |
@@ -111,7 +115,8 @@ Four Livewire and CSS facts shaped the build:
 - `tests/Feature/Favorites/FavoritesSidebarTest.php`: the group, its visibility rule, trashed and
   restored records, and other members' favorites
 - `tests/Feature/Favorites/FavoriteFoldersTest.php`: folder create, rename and delete
-- `tests/Feature/Favorites/ArrangeFavoritesTest.php`: drag order
+- `tests/Feature/Favorites/MoveFavoriteTest.php`: moves between neighbours, into and out of folders, rebalancing, and ownership
+- `ToggleFavoriteTest` also pins a record page to two favorites queries per render. Before the memo it ran 101 with five folders
 - `tests/Browser/Panel/FavoritesDragTest.php`: a real drag into an empty folder and back out, in
   Chromium and WebKit. It fails if the link goes back to `wire:navigate`. It also opens a folder's
   menu and fails when the panel leaves its button: a transform on the menu's wrapper once placed

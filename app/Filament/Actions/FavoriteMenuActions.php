@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace App\Filament\Actions;
 
 use App\Actions\Favorites\AddFavoriteRecord;
-use App\Actions\Favorites\MoveFavoriteRecord;
+use App\Actions\Favorites\MoveFavorite;
 use App\Actions\Favorites\RemoveFavoriteRecord;
 use App\Models\Company;
-use App\Models\FavoriteFolder;
-use App\Models\FavoriteRecord;
+use App\Models\Favorite;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
@@ -24,8 +23,8 @@ final class FavoriteMenuActions
 {
     public static function group(Company|People|Opportunity $record): ActionGroup
     {
-        $folders = FavoriteFolder::query()->ownedBy(self::member(), $record->workspace_id)->orderBy('position')->get();
-        $isFavorite = fn (): bool => self::favorite($record) instanceof FavoriteRecord;
+        $folders = Favorite::query()->ownedBy(self::member(), $record->workspace_id)->folders()->orderBy('position')->get();
+        $isFavorite = fn (): bool => self::favorite($record) instanceof Favorite;
 
         return ActionGroup::make([
             Action::make('addFavorite')
@@ -35,11 +34,11 @@ final class FavoriteMenuActions
                 ->action(function (Component $livewire, AddFavoriteRecord $addFavoriteRecord) use ($record): void {
                     self::add($livewire, $addFavoriteRecord, $record, null);
                 }),
-            self::folderPicker($folders, 'addFavoriteTo', __('favorites.actions.add'), fn (): bool => ! $isFavorite(), null, function (Component $livewire, ?FavoriteFolder $folder) use ($record): void {
+            self::folderPicker($folders, 'addFavoriteTo', __('favorites.actions.add'), fn (): bool => ! $isFavorite(), null, function (Component $livewire, ?Favorite $folder) use ($record): void {
                 self::add($livewire, resolve(AddFavoriteRecord::class), $record, $folder);
             }),
-            self::folderPicker($folders, 'moveFavoriteTo', __('favorites.actions.move'), $isFavorite, fn (): ?string => self::favorite($record)?->favorite_folder_id, function (Component $livewire, ?FavoriteFolder $folder) use ($record): void {
-                resolve(MoveFavoriteRecord::class)->execute(self::member(), $record, $folder);
+            self::folderPicker($folders, 'moveFavoriteTo', __('favorites.actions.move'), $isFavorite, fn (): ?string => self::favorite($record)?->parent_id, function (Component $livewire, ?Favorite $folder) use ($record): void {
+                resolve(MoveFavorite::class)->execute(self::member(), self::favorite($record) ?? abort(404), $folder);
                 $livewire->dispatch('refresh-sidebar');
             }),
             Action::make('removeFavorite')
@@ -53,21 +52,21 @@ final class FavoriteMenuActions
         ])->dropdown(false);
     }
 
-    private static function add(Component $livewire, AddFavoriteRecord $addFavoriteRecord, Company|People|Opportunity $record, ?FavoriteFolder $folder): void
+    private static function add(Component $livewire, AddFavoriteRecord $addFavoriteRecord, Company|People|Opportunity $record, ?Favorite $folder): void
     {
         $addFavoriteRecord->execute(self::member(), $record, $folder);
         $livewire->dispatch('refresh-sidebar');
     }
 
     /**
-     * @param  Collection<int, FavoriteFolder>  $folders
+     * @param  Collection<int, Favorite>  $folders
      * @param  Closure(): bool  $visible
      * @param  (Closure(): ?string)|null  $currentFolderId
-     * @param  Closure(Component, ?FavoriteFolder): void  $choose
+     * @param  Closure(Component, ?Favorite): void  $choose
      */
     private static function folderPicker(Collection $folders, string $name, string $label, Closure $visible, ?Closure $currentFolderId, Closure $choose): ActionGroup
     {
-        $choice = fn (?FavoriteFolder $folder): Action => self::folderChoice($name, $folder, $currentFolderId, $choose);
+        $choice = fn (?Favorite $folder): Action => self::folderChoice($name, $folder, $currentFolderId, $choose);
 
         return ActionGroup::make([
             ActionGroup::make([$choice(null)])->dropdown(false),
@@ -82,11 +81,11 @@ final class FavoriteMenuActions
 
     /**
      * @param  (Closure(): ?string)|null  $currentFolderId
-     * @param  Closure(Component, ?FavoriteFolder): void  $choose
+     * @param  Closure(Component, ?Favorite): void  $choose
      */
-    private static function folderChoice(string $name, ?FavoriteFolder $folder, ?Closure $currentFolderId, Closure $choose): Action
+    private static function folderChoice(string $name, ?Favorite $folder, ?Closure $currentFolderId, Closure $choose): Action
     {
-        $label = $folder instanceof FavoriteFolder ? e($folder->name) : e(__('favorites.actions.no_folder'));
+        $label = $folder instanceof Favorite ? e($folder->name) : e(__('favorites.actions.no_folder'));
 
         return Action::make($name.($folder?->getKey() ?? 'Top'))
             ->label(fn (): HtmlString => new HtmlString(
@@ -94,15 +93,15 @@ final class FavoriteMenuActions
                     ? '<span class="flex w-full items-center gap-2"><span class="truncate">'.$label.'</span>'.svg('lucide-check', 'fi-menu-check')->toHtml().'</span>'
                     : $label,
             ))
-            ->icon($folder instanceof FavoriteFolder ? 'lucide-folder' : 'lucide-square-slash')
+            ->icon($folder instanceof Favorite ? 'lucide-folder' : 'lucide-square-slash')
             ->action(function (Component $livewire) use ($choose, $folder): void {
                 $choose($livewire, $folder);
             });
     }
 
-    private static function favorite(Company|People|Opportunity $record): ?FavoriteRecord
+    private static function favorite(Company|People|Opportunity $record): ?Favorite
     {
-        return FavoriteRecord::ownedFor(self::member(), $record);
+        return Favorite::ownedFor(self::member(), $record);
     }
 
     private static function member(): User
