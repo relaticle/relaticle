@@ -190,7 +190,13 @@ final class CreateAccessToken extends BaseLivewireComponent
 
     public static function permissionLabel(string $permission): string
     {
-        return EmailGrant::tryFrom($permission)?->label() ?? ucfirst($permission);
+        return EmailGrant::tryFrom($permission)?->label() ?? match ($permission) {
+            'read' => __('access-tokens.permissions.read'),
+            'create' => __('access-tokens.permissions.create'),
+            'update' => __('access-tokens.permissions.update'),
+            'delete' => __('access-tokens.permissions.delete'),
+            default => ucfirst($permission),
+        };
     }
 
     public static function permissionsCheckboxList(): CheckboxList

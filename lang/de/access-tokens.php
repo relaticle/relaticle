@@ -46,6 +46,10 @@ return [
 
     'permissions' => [
         'all' => 'Alle',
+        'read' => 'Lesen',
+        'create' => 'Erstellen',
+        'update' => 'Aktualisieren',
+        'delete' => 'Löschen',
         'email_read' => 'E-Mails lesen',
         'email_draft' => 'E-Mails entwerfen',
         'email_send' => 'E-Mails senden',

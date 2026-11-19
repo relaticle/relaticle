@@ -46,6 +46,10 @@ return [
 
     'permissions' => [
         'all' => 'All',
+        'read' => 'Read',
+        'create' => 'Create',
+        'update' => 'Update',
+        'delete' => 'Delete',
         'email_read' => 'Read email',
         'email_draft' => 'Draft email',
         'email_send' => 'Send email',

@@ -46,6 +46,10 @@ return [
 
     'permissions' => [
         'all' => 'Toutes',
+        'read' => 'Lire',
+        'create' => 'Créer',
+        'update' => 'Mettre à jour',
+        'delete' => 'Supprimer',
         'email_read' => 'Lire les e-mails',
         'email_draft' => 'Rédiger des brouillons d\'e-mail',
         'email_send' => 'Envoyer des e-mails',
