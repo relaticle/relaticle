@@ -19,6 +19,7 @@ it('renders each declared comparison page with a facts table and dates', functio
     ['/alternatives/attio', 'Attio'],
     ['/alternatives/hubspot', 'HubSpot'],
     ['/alternatives/salesforce', 'Salesforce'],
+    ['/alternatives/pipedrive', 'Pipedrive'],
 ]);
 
 it('404s for undeclared competitors', function (): void {
@@ -70,6 +71,7 @@ it('gives each page a search title that leads with open source and stays under 6
     ['/alternatives/attio', 'Open Source Attio Alternative, Self-Hosted | Relaticle'],
     ['/alternatives/hubspot', 'Open Source HubSpot Alternative, Self-Hosted | Relaticle'],
     ['/alternatives/salesforce', 'Open Source Salesforce Alternative, Self-Hosted | Relaticle'],
+    ['/alternatives/pipedrive', 'Open Source Pipedrive Alternative, Self-Hosted | Relaticle'],
 ]);
 
 it('keeps the on-page heading short and distinct from the longer search title', function (string $url, string $heading): void {
@@ -99,6 +101,7 @@ it('keeps competitor prices out of meta descriptions so the facts file stays the
     '/alternatives/attio',
     '/alternatives/hubspot',
     '/alternatives/salesforce',
+    '/alternatives/pipedrive',
 ]);
 
 it('does not lowercase the leading acronym of an extensibility fact in alternatives prose', function (): void {

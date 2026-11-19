@@ -23,6 +23,6 @@ return [
     /*
      * Rendered at /alternatives/{competitor}, framed for migration intent.
      */
-    'alternatives' => ['attio', 'hubspot', 'salesforce'],
+    'alternatives' => ['attio', 'hubspot', 'salesforce', 'pipedrive'],
 
 ];
