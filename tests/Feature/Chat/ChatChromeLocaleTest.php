@@ -203,5 +203,5 @@ it('words a proposal conflict in the viewer language with the viewer as subject'
     'fr you' => ['fr', 'you', 'Vous avez défini Amount sur 20 à 14:32', 'Vous avez défini Amount sur 20 le 12 nov. 2026 09:05'],
     'fr other' => ['fr', 'other', 'Maya Chen a défini Amount sur 20 à 14:32', 'Maya Chen a défini Amount sur 20 le 12 nov. 2026 09:05'],
     'de you' => ['de', 'you', 'Sie haben Amount auf 20 gesetzt (um 14:32)', 'Sie haben Amount auf 20 gesetzt (am 12. Nov 2026 09:05)'],
-    'en other' => ['en', 'other', 'Maya Chen set Amount to 20 at 14:32', 'Maya Chen set Amount to 20 on Nov 12, 2026 9:05 AM'],
+    'en other' => ['en', 'other', 'Maya Chen set Amount to 20 at 2:32 PM', 'Maya Chen set Amount to 20 on Nov 12, 2026 9:05 AM'],
 ]);

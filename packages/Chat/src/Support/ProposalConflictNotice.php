@@ -80,7 +80,7 @@ final readonly class ProposalConflictNotice
         $local = $at->setTimezone($viewer->effectiveTimezone());
 
         return $local->isToday()
-            ? __('at :time', ['time' => $local->isoFormat('HH:mm')])
+            ? __('at :time', ['time' => $local->isoFormat('LT')])
             : __('on :time', ['time' => $local->isoFormat('lll')]);
     }
 }
