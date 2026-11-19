@@ -21,6 +21,11 @@ final readonly class Locales
         Date::setLocale($locale);
     }
 
+    public static function numberLocale(string $locale): string
+    {
+        return $locale === 'es' ? 'es_419' : $locale;
+    }
+
     public static function isListed(?string $locale): bool
     {
         return in_array($locale, config('app.available_locales'), true);

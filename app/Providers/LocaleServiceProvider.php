@@ -14,7 +14,7 @@ final class LocaleServiceProvider extends ServiceProvider
 {
     public function boot(): void
     {
-        Event::listen(LocaleUpdated::class, fn (LocaleUpdated $event) => Number::useLocale($event->locale));
+        Event::listen(LocaleUpdated::class, fn (LocaleUpdated $event) => Number::useLocale(Locales::numberLocale($event->locale)));
 
         Locales::apply($this->app->getLocale());
     }

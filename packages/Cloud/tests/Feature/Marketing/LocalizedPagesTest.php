@@ -239,6 +239,12 @@ it('groups the credits on a localized pricing page the way that language does', 
     $this->get("/{$locale}/pricing")->assertOk()->assertSee($each, false);
 })->with(['de', 'fr']);
 
+it('groups the credits of the Spanish pricing page the Latin American way', function (): void {
+    Feature::for(null)->activate(Billing::class);
+
+    $this->get('/es/pricing')->assertOk()->assertSee('2,000 créditos', false);
+});
+
 it('keeps English grouping on the English pricing page', function (): void {
     Feature::for(null)->activate(Billing::class);
 
