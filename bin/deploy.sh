@@ -23,7 +23,7 @@ LOCK_WAIT_SECONDS=900
 
 # The audit scan ignores secret reads inside a window. It reads the finished ones from the log, because it runs every 5 minutes.
 open_deploy_window() {
-    if [[ ! -f "$DEPLOY_WINDOW_FILE" ]]; then
+    if [[ "${1:-}" == "fresh" || ! -f "$DEPLOY_WINDOW_FILE" ]]; then
         date +%s > "$DEPLOY_WINDOW_FILE"
     fi
 
@@ -51,7 +51,7 @@ fetch() {
         exit 1
     fi
 
-    open_deploy_window
+    open_deploy_window fresh
 
     # A changed .env changes deployed_state, so a settings-only change still releases.
     bash bin/fetch-production-secrets.sh

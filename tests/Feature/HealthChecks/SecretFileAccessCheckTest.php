@@ -82,3 +82,23 @@ it('fails when the scan file is not valid json', function (): void {
 
     expect(SecretFileAccessCheck::new()->run()->status)->toBe(Status::failed());
 });
+
+it('treats a scan exactly 30 minutes old as fresh and one second older as stale', function (): void {
+    writeSecretAccessStatus($this->statusPath, now()->subMinutes(30)->timestamp);
+    $atBoundary = SecretFileAccessCheck::new()->run();
+
+    writeSecretAccessStatus($this->statusPath, now()->subMinutes(30)->subSecond()->timestamp);
+
+    expect($atBoundary->status)->toBe(Status::ok())
+        ->and(SecretFileAccessCheck::new()->run()->status)->toBe(Status::failed());
+});
+
+it('stops failing exactly 24 hours after an unexpected read', function (): void {
+    writeSecretAccessStatus($this->statusPath, now()->timestamp, [unexpectedSecretRead(now()->subHours(24)->addSecond()->timestamp)]);
+    $justInside = SecretFileAccessCheck::new()->run();
+
+    writeSecretAccessStatus($this->statusPath, now()->timestamp, [unexpectedSecretRead(now()->subHours(24)->timestamp)]);
+
+    expect($justInside->status)->toBe(Status::failed())
+        ->and(SecretFileAccessCheck::new()->run()->status)->toBe(Status::ok());
+});
