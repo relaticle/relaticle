@@ -15,7 +15,7 @@
     ])
 >
     <a
-        {!! $url !== null ? 'href="'.e($url).'"' : '' !!}
+        @if ($url !== null) href="{{ $url }}" @endif
         {{-- Not wire:navigate: it cancels mousedown, so the row could never be dragged, and it navigated on every drop. --}}
         x-on:click="
             $store.sidebar.isMobile && $store.sidebar.close()
