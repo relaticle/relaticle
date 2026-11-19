@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 return [
+    'title' => 'Reuniones',
+    'label' => 'reunión',
+    'plural_label' => 'reuniones',
+
     'columns' => [
         'starts_at' => [
             'label' => 'Hora',

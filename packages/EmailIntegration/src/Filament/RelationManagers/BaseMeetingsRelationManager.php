@@ -33,9 +33,22 @@ abstract class BaseMeetingsRelationManager extends RelationManager
 {
     protected static string $relationship = 'meetings';
 
-    protected static ?string $title = 'Meetings';
-
     protected static string|\BackedEnum|null $icon = 'lucide-calendar';
+
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return __('filament/relation-managers/meetings.title');
+    }
+
+    protected static function getModelLabel(): ?string
+    {
+        return __('filament/relation-managers/meetings.label');
+    }
+
+    protected static function getPluralModelLabel(): ?string
+    {
+        return __('filament/relation-managers/meetings.plural_label');
+    }
 
     public function table(Table $table): Table
     {

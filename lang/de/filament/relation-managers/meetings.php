@@ -3,6 +3,10 @@
 declare(strict_types=1);
 
 return [
+    'title' => 'Meetings',
+    'label' => 'Meeting',
+    'plural_label' => 'Meetings',
+
     'columns' => [
         'starts_at' => [
             'label' => 'Zeit',

@@ -66,10 +66,4 @@ return [
             ],
         ],
     ],
-
-    'relation_managers' => [
-        'people' => [
-            'model_label' => 'person',
-        ],
-    ],
 ];
