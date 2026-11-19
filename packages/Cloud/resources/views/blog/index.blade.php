@@ -31,7 +31,7 @@
     :canonical="$canonical"
     :robots="$searchQuery ? 'noindex,follow' : null">
     @push('header')
-        <x-ink::feed-link />
+        <x-cloud::blog.feed-link />
     @endpush
 
     <x-cloud::marketing.hero align="start">
