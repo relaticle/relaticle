@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 return [
 
+    'empty' => [
+        'description' => 'Erstellen Sie ein(e) :model, um zu beginnen.',
+    ],
+
     'actions' => [
 
         'move_record_down' => [

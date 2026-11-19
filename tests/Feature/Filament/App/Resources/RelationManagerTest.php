@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Filament\Resources\CompanyResource\RelationManagers\MeetingsRelationManager as CompanyMeetingsRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\NotesRelationManager as CompanyNotesRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\PeopleRelationManager;
 use App\Filament\Resources\CompanyResource\RelationManagers\TasksRelationManager as CompanyTasksRelationManager;
@@ -23,6 +24,7 @@ use App\Models\User;
 use App\Support\Locales;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
+use Filament\Tables\Columns\TextColumn;
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -369,3 +371,15 @@ it('names the record page tabs and their empty states in the user language', fun
     'es' => ['es', ['Personas', 'Tareas', 'Notas', 'Correos electrónicos', 'Reuniones'], ['personas', 'tareas', 'notas']],
     'fr' => ['fr', ['Personnes', 'Tâches', 'Notes', 'E-mails', 'Réunions'], ['personnes', 'tâches', 'notes']],
 ]);
+
+it('labels the meetings title column and asks formally in an empty state in German', function (): void {
+    $this->user->forceFill(['locale' => 'de'])->save();
+    Locales::apply('de');
+    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
+
+    livewire(CompanyMeetingsRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->assertTableColumnExists('title', fn (TextColumn $column): bool => $column->getLabel() === 'Titel');
+
+    livewire(PeopleRelationManager::class, ['ownerRecord' => $company, 'pageClass' => ViewCompany::class])
+        ->assertSee('Erstellen Sie ein(e) Person, um zu beginnen.');
+});

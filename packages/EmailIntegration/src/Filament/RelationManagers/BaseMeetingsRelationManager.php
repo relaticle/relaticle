@@ -82,6 +82,7 @@ abstract class BaseMeetingsRelationManager extends RelationManager
             })
             ->columns([
                 TextColumn::make('title')
+                    ->label(__('filament/relation-managers/meetings.columns.title.label'))
                     ->searchable()
                     ->limit(60),
                 TextColumn::make('starts_at')

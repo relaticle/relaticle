@@ -8,6 +8,9 @@ return [
     'plural_label' => 'reuniones',
 
     'columns' => [
+        'title' => [
+            'label' => 'Título',
+        ],
         'starts_at' => [
             'label' => 'Hora',
         ],
