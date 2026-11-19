@@ -8,6 +8,7 @@ use App\Actions\Onboarding\ScheduleAssistantArrivalTurn;
 use App\Jobs\FetchFaviconForCompany;
 use App\Models\Company;
 use App\Observers\Concerns\TagsFirstCrmData;
+use App\Services\Favicon\Drivers\LogoFinderDriver;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 
 final readonly class CompanyObserver
@@ -29,7 +30,9 @@ final readonly class CompanyObserver
 
     private function dispatchFaviconFetchIfNeeded(Company $company): void
     {
-        $domain = FetchFaviconForCompany::domainOf($company);
+        $company->unsetRelation('domainValue');
+
+        $domain = resolve(LogoFinderDriver::class)->isConfigured() ? $company->logoDomain() : null;
 
         if ($domain === null) {
             return;

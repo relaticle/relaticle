@@ -105,7 +105,7 @@ $toolContracts = [
     ListActivityTool::class => ['title' => 'List CRM Activity', 'name' => 'list-activity-tool', 'annotations' => $readAnnotations],
     ListCustomFieldsTool::class => ['title' => 'List Custom Attributes', 'name' => 'list-custom-fields-tool', 'annotations' => $readAnnotations],
     CreateUploadUrlTool::class => ['title' => 'Create Upload URL', 'name' => 'create-upload-url', 'annotations' => $createAnnotations],
-    UploadFileTool::class => ['title' => 'Upload File', 'name' => 'upload-file', 'annotations' => $createTaskAnnotations],
+    UploadFileTool::class => ['title' => 'Upload File', 'name' => 'upload-file', 'annotations' => $createAnnotations],
     ListCompaniesTool::class => ['title' => 'List Companies', 'name' => 'list-companies-tool', 'annotations' => $readAnnotations],
     GetCompanyTool::class => ['title' => 'Get Company', 'name' => 'get-company-tool', 'annotations' => $readAnnotations],
     CreateCompanyTool::class => ['title' => 'Create Company', 'name' => 'create-company-tool', 'annotations' => $createAnnotations],

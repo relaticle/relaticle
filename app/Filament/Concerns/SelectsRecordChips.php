@@ -24,7 +24,7 @@ trait SelectsRecordChips
     {
         return function (Builder $query, ?string $search) use ($modifyQueryUsing): Builder {
             if ($query->getModel() instanceof HasMedia) {
-                $query->with($query->getModel() instanceof Company ? ['media', 'customFieldValues.customField'] : ['media']);
+                $query->with($query->getModel() instanceof Company ? ['media', 'domainValue'] : ['media']);
             }
 
             if ($modifyQueryUsing instanceof Closure) {

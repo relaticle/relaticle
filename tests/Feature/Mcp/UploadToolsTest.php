@@ -329,7 +329,8 @@ describe('upload-file', function (): void {
     });
 
     it('refuses source_url', function (): void {
-        Http::fake();
+        resolveHostsTo(['93.184.216.34']);
+        Http::fake(['https://cdn.example.com/*' => Http::response(pdfBytes(), 200, ['Content-Type' => 'application/pdf'])]);
 
         RelaticleServer::actingAs($this->user)
             ->tool(UploadFileTool::class, ['source_url' => 'https://cdn.example.com/brief.pdf'])

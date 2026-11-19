@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\CreationSource;
+use App\Enums\CustomFields\CompanyField;
 use App\Enums\MediaCollection;
-use App\Jobs\FetchFaviconForCompany;
 use App\Models\Concerns\BelongsToWorkspaceCreator;
 use App\Models\Concerns\HasActivityTimeline;
 use App\Models\Concerns\HasCreator;
@@ -24,14 +24,17 @@ use finfo;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Str;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
 use Relaticle\CustomFields\Models\Concerns\UsesCustomFields;
 use Relaticle\CustomFields\Models\Contracts\HasCustomFields;
@@ -85,6 +88,8 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
 
     private const int BRANDFETCH_SIZE = 128;
 
+    private const string HOSTNAME_PATTERN = '/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/';
+
     /** @var array<string, string> */
     public const array LOGO_MIME_TYPES = [
         'image/png' => 'png',
@@ -126,16 +131,57 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
     public function brandfetchUrl(): ?string
     {
         $clientId = config('services.brandfetch.client_id');
-
-        if (blank($clientId)) {
-            return null;
-        }
-
-        $domain = FetchFaviconForCompany::domainOf($this);
+        $domain = filled($clientId) ? $this->logoDomain() : null;
 
         return $domain === null
             ? null
             : sprintf('https://cdn.brandfetch.io/domain/%s/w/%d/h/%d/fallback/404/icon?c=%s', $domain, self::BRANDFETCH_SIZE, self::BRANDFETCH_SIZE, rawurlencode((string) $clientId));
+    }
+
+    /**
+     * @return MorphOne<CustomFieldValue, $this>
+     */
+    public function domainValue(): MorphOne
+    {
+        return $this->customFieldValues()
+            ->one()
+            ->whereHas('customField', fn (Builder $field): Builder => $field->where('code', CompanyField::DOMAINS->value))
+            ->with('customField');
+    }
+
+    public function logoDomain(): ?string
+    {
+        $value = $this->domainValue;
+
+        if ($value === null || data_get($value, 'customField.tenant_id') !== $this->workspace_id) {
+            return null;
+        }
+
+        $stored = $value->getValue();
+
+        return collect(is_iterable($stored) ? $stored : [$stored])
+            ->map(self::domainFrom(...))
+            ->first(fn (?string $domain): bool => $domain !== null);
+    }
+
+    public static function domainFrom(mixed $value): ?string
+    {
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $host = Str::of($value)->trim()->lower()
+            ->replaceMatches('#^[a-z][a-z0-9+.-]*://#', '')
+            ->replaceMatches('#[/?\#].*$#', '')
+            ->replaceMatches('#^[^@]*@#', '')
+            ->replaceMatches('#:\d*$#', '')
+            ->rtrim('.')
+            ->chopStart('www.')
+            ->toString();
+
+        $ascii = idn_to_ascii($host, IDNA_NONTRANSITIONAL_TO_ASCII, INTL_IDNA_VARIANT_UTS46);
+
+        return is_string($ascii) && preg_match(self::HOSTNAME_PATTERN, $ascii) === 1 ? $ascii : null;
     }
 
     public function getFilamentAvatarUrl(): ?string

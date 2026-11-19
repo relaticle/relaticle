@@ -6,8 +6,5 @@ namespace App\Data;
 
 final readonly class LogoImage
 {
-    public function __construct(
-        public string $bytes,
-        public string $mimeType,
-    ) {}
+    public function __construct(public string $bytes) {}
 }

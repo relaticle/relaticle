@@ -14,8 +14,7 @@ use Illuminate\Support\Collection;
  * A record rendered as one avatar-and-name pill.
  *
  * The leading mark is the record's own image, or the shared entity icon when it
- * has none: a company with no logo, and every person. A logo that fails to load
- * in the browser swaps back to the icon.
+ * has none: a company with no logo, and every person.
  */
 final readonly class RecordChip implements Htmlable
 {

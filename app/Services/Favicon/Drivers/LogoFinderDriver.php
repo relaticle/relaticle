@@ -8,7 +8,6 @@ use App\Data\LogoImage;
 use App\Support\Http\SsrfGuard;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 final readonly class LogoFinderDriver
 {
@@ -22,9 +21,7 @@ final readonly class LogoFinderDriver
     }
 
     /**
-     * Null means the service answered and has no icon for the domain.
-     *
-     * @throws RequestException when the service refuses or fails, so a working logo is kept
+     * @throws RequestException
      */
     public function fetch(string $domain): ?LogoImage
     {
@@ -33,14 +30,12 @@ final readonly class LogoFinderDriver
             ->withHeaders(['X-Logo-Finder-Key' => (string) config('services.logo_finder.key')])
             ->get(rtrim((string) config('services.logo_finder.url'), '/').'/logo', ['domain' => $domain]);
 
-        if (in_array($response->status(), [204, 400], true)) {
+        if ($response->status() === 204) {
             return null;
         }
 
-        $response->throw();
+        throw_unless($response->ok(), RequestException::class, $response);
 
-        $mimeType = Str::lower(trim(Str::before((string) $response->header('Content-Type'), ';')));
-
-        return str_starts_with($mimeType, 'image/') ? new LogoImage($response->body(), $mimeType) : null;
+        return new LogoImage($response->body());
     }
 }

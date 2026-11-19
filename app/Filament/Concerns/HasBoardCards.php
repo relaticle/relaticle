@@ -212,7 +212,7 @@ trait HasBoardCards
 
         $relations = array_intersect_key(self::CARD_RELATIONS, array_flip($this->cardAttributeKeys()));
 
-        return array_values(array_merge($relations, isset($relations['company']) ? ['company.customFieldValues.customField'] : []));
+        return array_values(array_merge($relations, isset($relations['company']) ? ['company.domainValue'] : []));
     }
 
     protected function cardAttributeLabel(string $key): string

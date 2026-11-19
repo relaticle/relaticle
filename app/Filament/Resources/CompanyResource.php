@@ -197,13 +197,13 @@ final class CompanyResource extends Resource
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return parent::getGlobalSearchEloquentQuery()->with(['media', 'customFieldValues.customField']);
+        return parent::getGlobalSearchEloquentQuery()->with(['media', 'domainValue']);
     }
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['accountOwner', 'media', 'customFieldValues.customField.options'])
+            ->with(['accountOwner', 'media', 'domainValue', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

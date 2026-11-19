@@ -37,11 +37,6 @@ final class UploadFileTool extends Tool
         return false;
     }
 
-    protected function openWorldHint(): bool
-    {
-        return true;
-    }
-
     public function schema(JsonSchema $schema): array
     {
         return [

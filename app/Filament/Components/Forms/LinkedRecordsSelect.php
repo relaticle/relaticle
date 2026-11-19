@@ -229,7 +229,7 @@ final class LinkedRecordsSelect extends Select
             $query->whereBelongsTo($workspace);
         }
 
-        return $entity === CrmEntity::Company ? $query->with(['media', 'customFieldValues.customField']) : $query->with('company');
+        return $entity === CrmEntity::Company ? $query->with(['media', 'domainValue']) : $query->with('company');
     }
 
     /**

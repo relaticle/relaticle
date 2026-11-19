@@ -274,7 +274,7 @@ final class TaskResource extends Resource
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['assignees', 'companies.media', 'companies.customFieldValues.customField', 'people', 'opportunities', 'customFieldValues.customField.options'])
+            ->with(['assignees', 'companies.media', 'companies.domainValue', 'people', 'opportunities', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

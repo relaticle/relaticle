@@ -37,6 +37,10 @@ final readonly class LinkOption
             $columns[] = 'profile_photo_path';
         }
 
+        if ($model instanceof Company) {
+            $columns[] = 'workspace_id';
+        }
+
         return array_map($model->qualifyColumn(...), array_values(array_unique($columns)));
     }
 
@@ -49,7 +53,7 @@ final readonly class LinkOption
 
         return [
             'media' => fn (Relation $media): Relation => $media->where('collection_name', constant($model::class.'::LOGO_MEDIA_COLLECTION')),
-            ...($model instanceof Company ? ['customFieldValues.customField'] : []),
+            ...($model instanceof Company ? ['domainValue'] : []),
         ];
     }
 

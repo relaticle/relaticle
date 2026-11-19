@@ -18,6 +18,19 @@ beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
     Filament::setTenant($this->user->currentWorkspace);
+    config()->set('services.logo_finder.url', 'https://logos.example.test');
+    config()->set('services.logo_finder.key', 'worker-secret');
+});
+
+test('observer dispatches no favicon job when no logo finder is configured', function (): void {
+    Bus::fake([FetchFaviconForCompany::class]);
+    config()->set('services.logo_finder.url', null);
+
+    Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['example.com']],
+    ]);
+
+    Bus::assertNotDispatched(FetchFaviconForCompany::class);
 });
 
 test('observer dispatches favicon job when company has domain and no existing logo', function (): void {

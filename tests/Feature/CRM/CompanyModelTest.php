@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 use App\Enums\CustomFields\CompanyField;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
+use App\Filament\Resources\PeopleResource\Pages\ListPeople;
 use App\Models\Company;
+use App\Models\CustomField;
+use App\Models\CustomFieldValue;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
@@ -138,6 +141,8 @@ test('company builds one clean Brandfetch url from messy domains', function (arr
     'query string' => [['http://example.com?utm=1'], 'example.com'],
     'multi-value field' => [['https://example.com', 'other.org'], 'example.com'],
     'subdomain kept' => [['app.example.co.uk'], 'app.example.co.uk'],
+    'first valid value of several' => [['not a domain', 'https://example.com'], 'example.com'],
+    'unicode domain' => [['Bücher.de'], 'xn--bcher-kva.de'],
     'not a domain' => [['not a domain'], null],
     'no dot' => [['localhost'], null],
     'ip address' => [['192.168.0.1'], null],
@@ -151,19 +156,22 @@ test('company asks Brandfetch for nothing without a client id', function () {
     expect($company->fresh()->brandfetchUrl())->toBeNull();
 });
 
-test('company logos add no query per row on the companies list', function () {
+test('company logos add no query per row on the companies and people lists', function (string $page) {
     config()->set('services.brandfetch.client_id', 'test-client');
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
     Filament::setTenant($user->currentWorkspace);
 
-    $createCompanies = fn (int $from, int $to) => collect(range($from, $to))->each(fn (int $index) => Company::factory()->recycle([$user, $user->currentWorkspace])->create([
-        'custom_fields' => [CompanyField::DOMAINS->value => ["company-{$index}.com"]],
-    ]));
-    $listQueryCount = function (): int {
+    $createCompanies = fn (int $from, int $to) => collect(range($from, $to))->each(function (int $index) use ($user): void {
+        $company = Company::factory()->recycle([$user, $user->currentWorkspace])->create([
+            'custom_fields' => [CompanyField::DOMAINS->value => ["company-{$index}.com"]],
+        ]);
+        People::factory()->recycle([$user, $user->currentWorkspace])->create(['company_id' => $company->getKey()]);
+    });
+    $listQueryCount = function () use ($page): int {
         DB::flushQueryLog();
         DB::enableQueryLog();
-        $html = livewire(ListCompanies::class)->html();
+        $html = livewire($page)->html();
 
         expect($html)->toContain('cdn.brandfetch.io/domain/company-1.com/');
 
@@ -176,6 +184,26 @@ test('company logos add no query per row on the companies list', function () {
     $createCompanies(2, 10);
 
     expect($listQueryCount())->toBe($withOneRow);
+})->with([ListCompanies::class, ListPeople::class]);
+
+test('company ignores a domain stored against another workspace field', function () {
+    config()->set('services.brandfetch.client_id', 'test-client');
+    $user = User::factory()->withWorkspace()->create();
+    $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $foreignField = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $otherWorkspace->getKey())->where('entity_type', 'company')
+        ->where('code', CompanyField::DOMAINS->value)->firstOrFail();
+    $company = Company::factory()->for($user->currentWorkspace)->create();
+
+    CustomFieldValue::withoutEvents(fn () => CustomFieldValue::query()->forceCreate([
+        'tenant_id' => $otherWorkspace->getKey(),
+        'entity_type' => 'company',
+        'entity_id' => $company->getKey(),
+        'custom_field_id' => $foreignField->getKey(),
+        'json_value' => ['foreign.com'],
+    ]));
+
+    expect($company->fresh()->brandfetchUrl())->toBeNull();
 });
 
 test('company uses media library', function () {

@@ -66,15 +66,15 @@ test('asks only the logo finder', function (): void {
         ->and($logo?->getCustomProperty('domain'))->toBe('example.com');
 });
 
-test('stores nothing when the logo finder has no icon', function (int $status): void {
-    Http::fake(['https://logos.example.test/*' => Http::response('', $status)]);
+test('stores nothing when the logo finder has no icon', function (): void {
+    Http::fake(['https://logos.example.test/*' => Http::response('', 204)]);
     $company = ($this->companyWith)('example.com');
 
     new FetchFaviconForCompany($company->fresh())->handle(resolve(LogoFinderDriver::class));
 
     expect($company->fresh()->getMedia('logo'))->toBeEmpty();
     Exceptions::assertNothingReported();
-})->with([204, 400]);
+});
 
 test('does nothing when no logo finder is configured', function (): void {
     config()->set('services.logo_finder.url', null);
@@ -104,11 +104,20 @@ test('refuses a body that is not a raster image', function (string $contentType,
 })->with([
     'svg with script' => ['image/svg+xml', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
     'html page claiming png' => ['image/png', '<!DOCTYPE html><html><body><script>alert(1)</script></body></html>'],
-    'png bytes claiming html' => ['text/html', 'not an image'],
 ]);
 
-test('names the stored logo after its content rather than the header', function (): void {
-    Http::fake(['https://logos.example.test/*' => Http::response(onePixelPng(), 200, ['Content-Type' => 'image/x-icon'])]);
+test('keeps the logo when the body is not an image', function (): void {
+    Http::fake(['https://logos.example.test/*' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html'])]);
+    $company = ($this->companyWith)('example.com');
+    $company->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection('logo');
+
+    new FetchFaviconForCompany($company->fresh())->handle(resolve(LogoFinderDriver::class));
+
+    expect($company->fresh()->getMedia('logo'))->toHaveCount(1);
+});
+
+test('decides the type by the bytes, whatever the header says', function (): void {
+    Http::fake(['https://logos.example.test/*' => Http::response(onePixelPng(), 200, ['Content-Type' => 'text/html'])]);
     $company = ($this->companyWith)('example.com');
 
     new FetchFaviconForCompany($company->fresh())->handle(resolve(LogoFinderDriver::class));
@@ -178,7 +187,7 @@ test('keeps the logo of a previous domain when the finder fails', function (int 
     new FetchFaviconForCompany($company->fresh())->handle(resolve(LogoFinderDriver::class));
 
     expect($company->fresh()->getMedia('logo'))->toHaveCount(1);
-})->with([401, 429, 500]);
+})->with([400, 401, 429, 500]);
 
 test('a rate limited or unreachable finder is not reported', function (Closure $answer): void {
     Http::fake(['https://logos.example.test/*' => $answer]);

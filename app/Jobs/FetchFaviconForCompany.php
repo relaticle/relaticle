@@ -5,14 +5,11 @@ declare(strict_types=1);
 namespace App\Jobs;
 
 use App\Data\LogoImage;
-use App\Enums\CustomFields\CompanyField;
 use App\Exceptions\SsrfGuardException;
 use App\Models\Company;
-use App\Models\CustomFieldValue;
 use App\Services\Favicon\Drivers\LogoFinderDriver;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Http\Client\ConnectionException;
@@ -21,8 +18,6 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\Timeout;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\Attributes\UniqueFor;
-use Illuminate\Support\Arr;
-use Illuminate\Support\Str;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Throwable;
 
@@ -34,8 +29,6 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 {
     use Dispatchable;
     use Queueable;
-
-    private const string HOSTNAME_PATTERN = '/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z][a-z0-9-]{0,61}[a-z0-9]$/';
 
     public function __construct(public readonly Company $company) {}
 
@@ -50,7 +43,7 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
 
     private function storeLogo(LogoFinderDriver $finder): void
     {
-        $domain = self::domainOf($this->company);
+        $domain = $this->company->logoDomain();
 
         if ($domain === null || ! $finder->isConfigured()) {
             return;
@@ -99,45 +92,11 @@ final class FetchFaviconForCompany implements ShouldBeUnique, ShouldQueue
         return $exception instanceof SsrfGuardException && $exception->hostUnresolved;
     }
 
-    public static function domainOf(Company $company): ?string
-    {
-        $stored = $company->relationLoaded('customFieldValues')
-            ? $company->customFieldValues->first(fn (CustomFieldValue $value): bool => data_get($value, 'customField.code') === CompanyField::DOMAINS->value)
-            : $company->customFieldValues()
-                ->whereHas('customField', fn (Builder $field): Builder => $field
-                    ->where('code', CompanyField::DOMAINS->value)
-                    ->where('tenant_id', $company->workspace_id))
-                ->with('customField')
-                ->first();
-
-        $value = $stored?->getValue();
-
-        return self::hostFrom(is_iterable($value) ? Arr::first($value) : $value);
-    }
-
-    public static function hostFrom(mixed $value): ?string
-    {
-        if (! is_string($value)) {
-            return null;
-        }
-
-        $host = Str::of($value)->trim()->lower()
-            ->replaceMatches('#^[a-z][a-z0-9+.-]*://#', '')
-            ->replaceMatches('#[/?\#].*$#', '')
-            ->replaceMatches('#^[^@]*@#', '')
-            ->replaceMatches('#:\d*$#', '')
-            ->rtrim('.')
-            ->chopStart('www.')
-            ->toString();
-
-        return preg_match(self::HOSTNAME_PATTERN, $host) === 1 ? $host : null;
-    }
-
     public static function fetchedFrom(Media $logo, string $domain): bool
     {
         $stored = $logo->getCustomProperty('domain');
 
-        return $stored === null || self::hostFrom($stored) === $domain;
+        return $stored === null || Company::domainFrom($stored) === $domain;
     }
 
     public function uniqueId(): string

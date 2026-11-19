@@ -200,7 +200,7 @@
         <x-cloud::marketing.frame-header :label="__('Service providers')" :lead="$hosted ? __('Who handles data for Relaticle Cloud.') : __('Run by its own operator.')">
             {{ $hosted
                 ? __('And what each one receives.')
-                : __('This install is run by its own operator. It shows company logos only if the operator sets a Brandfetch client ID, and then each browser loads them from Brandfetch.') }}
+                : __('This install is run by its own operator. Logos stored before an upgrade stay. It finds new ones only if the operator sets LOGO_FINDER_URL, and shows a Brandfetch logo only with a Brandfetch client ID, which each browser then loads from Brandfetch.') }}
         </x-cloud::marketing.frame-header>
 
         @if($hosted)
