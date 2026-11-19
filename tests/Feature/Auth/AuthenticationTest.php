@@ -1533,3 +1533,26 @@ it('lists no local accounts on the login page outside the local environment', fu
         ->assertOk()
         ->assertDontSee('value="owner@relaticle.test"', false);
 });
+
+it('seeds a missing language from Accept-Language once on login', function (): void {
+    $user = User::factory()->create(['locale' => null]);
+    $kept = User::factory()->create(['locale' => 'de']);
+
+    request()->headers->set('Accept-Language', 'fr-FR,fr;q=0.9');
+
+    Auth::login($user);
+    Auth::login($kept);
+
+    expect($user->fresh()->locale)->toBe('fr')
+        ->and($kept->fresh()->locale)->toBe('de');
+});
+
+it('leaves the language empty on login when the header names no listed language', function (): void {
+    $user = User::factory()->create(['locale' => null]);
+
+    request()->headers->set('Accept-Language', 'pt-BR,pt;q=0.9');
+
+    Auth::login($user);
+
+    expect($user->fresh()->locale)->toBeNull();
+});

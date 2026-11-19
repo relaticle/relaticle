@@ -41,7 +41,7 @@ final readonly class ProposalFieldSchemaDescriber
     private function coreFields(User $user, ProposalEntity $entity, array $record): array
     {
         $nameKey = $entity->titleKey();
-        $nameLabel = $nameKey === 'title' ? 'Title' : 'Name';
+        $nameLabel = $nameKey === 'title' ? __('Title') : __('Name');
 
         $fields = [
             [
@@ -58,7 +58,7 @@ final readonly class ProposalFieldSchemaDescriber
 
             $fields[] = [
                 'code' => 'account_owner_id',
-                'label' => 'Account Owner',
+                'label' => __('Account Owner'),
                 'kind' => 'select',
                 'value' => $owner === null ? null : (string) $owner,
                 'options' => array_map(

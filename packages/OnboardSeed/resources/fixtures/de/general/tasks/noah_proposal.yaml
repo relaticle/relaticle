@@ -1,0 +1,8 @@
+title: Projektangebot an Noah senden
+assigned_people:
+  - noah
+custom_fields:
+  description: Erstellen Sie das Angebot für die Markenneugestaltung mit Umfang, Zeitplan und Preisen und senden Sie es Noah zur Prüfung.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: Medium

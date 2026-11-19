@@ -52,6 +52,21 @@ abstract class BaseEmailsRelationManager extends RelationManager
 
     public string $search = '';
 
+    public static function getTitle(Model $ownerRecord, string $pageClass): string
+    {
+        return __('filament/relation-managers/emails.title');
+    }
+
+    protected static function getModelLabel(): ?string
+    {
+        return __('filament/relation-managers/emails.label');
+    }
+
+    protected static function getPluralModelLabel(): ?string
+    {
+        return __('filament/relation-managers/emails.plural_label');
+    }
+
     public static function getBadge(Model $ownerRecord, string $pageClass): ?string
     {
         if (! $ownerRecord instanceof Company && ! $ownerRecord instanceof Opportunity && ! $ownerRecord instanceof People) {

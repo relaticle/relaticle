@@ -166,14 +166,14 @@ final class ImportWizard extends Component implements HasActions, HasForms
     public function startOverAction(): Action
     {
         return Action::make('startOver')
-            ->label('Start over')
+            ->label(__('import-wizard-new::actions.start_over.label'))
             ->color('gray')
             ->icon('lucide-refresh-cw')
             ->requiresConfirmation()
-            ->modalHeading('Start a new import?')
-            ->modalDescription('Are you sure you want to start a new import? Your current progress will be lost.')
-            ->modalSubmitActionLabel('Start over')
-            ->modalCancelActionLabel('Cancel')
+            ->modalHeading(__('import-wizard-new::actions.start_over.heading'))
+            ->modalDescription(__('import-wizard-new::actions.start_over.description'))
+            ->modalSubmitActionLabel(__('import-wizard-new::actions.start_over.label'))
+            ->modalCancelActionLabel(__('import-wizard-new::actions.cancel'))
             ->action(fn () => $this->startOver());
     }
 

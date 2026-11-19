@@ -1,0 +1,5 @@
+title: 'Señales de riesgo de baja'
+noteable_type: company
+noteable_key: intercom
+custom_fields:
+  body: '<p>El uso cayó un 40% durante el último mes. Tomas mencionó una herramienta de la competencia en el último seguimiento.</p>'

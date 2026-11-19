@@ -14,6 +14,7 @@ use App\Http\Middleware\RequireIdentityConfirmation;
 use App\Http\Middleware\RequireOperationGrant;
 use App\Http\Middleware\SecurityHeaders;
 use App\Http\Middleware\SetApiWorkspaceContext;
+use App\Http\Middleware\SetUserLocale;
 use App\Http\Middleware\StopImpersonationOnLogout;
 use App\Http\Middleware\SubdomainRootResponse;
 use App\Http\Middleware\SuperviseImpersonation;
@@ -21,6 +22,7 @@ use App\Http\Middleware\ThrottleBeforeAuthentication;
 use App\Http\Middleware\ValidateSignature;
 use App\Models\ActivityLog\Activity;
 use App\Models\Notification;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Filament\Http\Middleware\SetUpPanel;
 use Filament\Notifications\Notification as FilamentNotification;
@@ -113,6 +115,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Global rather than the web group: Filament panel routes do not run the web group.
         $middleware->append(SecurityHeaders::class);
 
+        $middleware->encryptCookies(except: [Locales::COOKIE]);
+
         $middleware->authenticateSessions();
 
         $middleware->web(
@@ -123,6 +127,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 EnsureAuthenticationComplete::class,
                 StopImpersonationOnLogout::class,
                 SuperviseImpersonation::class,
+                SetUserLocale::class,
             ],
         );
 
@@ -240,19 +245,19 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             $indexes = array_filter([
-                __('Site index') => DocUrl::root().'/llms.txt',
-                __('Help center') => DocUrl::area(DocUrl::HELP),
-                __('Developer docs') => DocUrl::area(DocUrl::DOCS),
-                __('REST API spec') => Route::has('openapi.json') ? route('openapi.json') : null,
+                'Site index' => DocUrl::root().'/llms.txt',
+                'Help center' => DocUrl::area(DocUrl::HELP),
+                'Developer docs' => DocUrl::area(DocUrl::DOCS),
+                'REST API spec' => Route::has('openapi.json') ? route('openapi.json') : null,
             ]);
 
-            $lines = ['# '.__('Not found'), '', __('Nothing lives at :url.', ['url' => '`'.str_replace('`', '%60', $request->url()).'`']), ''];
+            $lines = ['# Not found', '', 'Nothing lives at `'.str_replace('`', '%60', $request->url()).'`.', ''];
 
             foreach ($indexes as $label => $url) {
                 $lines[] = "- {$label}: {$url}";
             }
 
-            $lines[] = '- '.__('Home: :url', ['url' => config('app.url')]);
+            $lines[] = '- Home: '.config('app.url');
             $lines[] = '';
 
             return response(implode("\n", $lines), 404, ['Content-Type' => 'text/markdown; charset=UTF-8']);

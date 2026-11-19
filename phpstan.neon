@@ -48,36 +48,6 @@ parameters:
             path: app/Mcp/*
             reportUnmatched: false
 
-        # i18n: ImportWizard package, deferred to Phase 4
-        -
-            identifier: app.i18n.hardcodedUserFacingString
-            path: packages/ImportWizard/*
-            reportUnmatched: false
-
-        # i18n: ImportWizard static properties, deferred to Phase 4
-        -
-            identifier: app.i18n.hardcodedStaticProperty
-            path: packages/ImportWizard/*
-            reportUnmatched: false
-
-        # i18n: Notifications + mail templates, deferred to Phase 2
-        -
-            identifier: app.i18n.hardcodedUserFacingString
-            path: app/Notifications/*
-            reportUnmatched: false
-
-        # i18n: notification ->label() inside the NotifyTaskAssignees action
-        -
-            identifier: app.i18n.hardcodedUserFacingString
-            path: app/Actions/Task/NotifyTaskAssignees.php
-            reportUnmatched: false
-
-        # i18n: notification ->title() emitted by the shared Livewire base class
-        -
-            identifier: app.i18n.hardcodedUserFacingString
-            path: app/Livewire/BaseLivewireComponent.php
-            reportUnmatched: false
-
         # i18n: AI tool ->description() text is the schema passed to the LLM, not user-facing UI
         -
             identifier: app.i18n.hardcodedUserFacingString

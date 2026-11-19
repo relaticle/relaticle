@@ -50,11 +50,11 @@ final class TipTapDocumentParser
     private function walkDocument(array $node, array &$textParts, array &$mentions, int &$nodeCount, int $depth): void
     {
         if ($depth > self::MAX_DEPTH) {
-            throw ValidationException::withMessages(['document' => 'Message is too deep.']);
+            throw ValidationException::withMessages(['document' => __('Message is too deep.')]);
         }
 
         if (++$nodeCount > self::MAX_NODES) {
-            throw ValidationException::withMessages(['document' => 'Message is too large.']);
+            throw ValidationException::withMessages(['document' => __('Message is too large.')]);
         }
 
         $type = $node['type'] ?? null;

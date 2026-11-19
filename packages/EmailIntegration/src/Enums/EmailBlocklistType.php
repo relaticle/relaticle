@@ -14,8 +14,8 @@ enum EmailBlocklistType: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::EMAIL => 'Email address',
-            self::DOMAIN => 'Domain',
+            self::EMAIL => __('enums/email-blocklist-type.email'),
+            self::DOMAIN => __('enums/email-blocklist-type.domain'),
         };
     }
 }

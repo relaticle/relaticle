@@ -12,12 +12,14 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Events\TenantSet;
 use Filament\Facades\Filament;
 use Illuminate\Auth\Events\Authenticated;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Filesystem\FilesystemAdapter;
+use Illuminate\Foundation\Events\LocaleUpdated;
 use Illuminate\Queue\Middleware\FailOnException;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
@@ -43,7 +45,7 @@ use Tests\Helpers\ImportExecutionFixture;
 mutates(ExecuteImportJob::class, EntityLinkResolver::class, ImportFinishedNotification::class);
 
 beforeEach(function (): void {
-    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class]);
+    Event::fake()->except([WorkspaceCreated::class, Authenticated::class, TenantSet::class, LocaleUpdated::class]);
 
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
@@ -787,6 +789,21 @@ it('includes result counts in completion notification body', function (): void {
         ->and($row->data['skipped'])->toBe(1)
         ->and($row->data['failed'])->toBe(0)
         ->and(ImportFinishedNotification::present($row)->getBody())->toBe('1 created, 1 updated, 1 skipped');
+});
+
+it('groups the completion counts the way the reader writes numbers', function (): void {
+    ImportExecutionFixture::readyStore($this, ['Name'], [
+        ImportExecutionFixture::row(2, ['Name' => 'New Person'], ['match_action' => RowMatchAction::Create->value]),
+    ], [ColumnData::toField(source: 'Name', target: 'name')]);
+
+    ImportExecutionFixture::run($this);
+
+    $row = $this->user->notifications()->sole();
+    $row->forceFill(['data' => [...$row->data, 'created' => 1234, 'updated' => 5678]])->save();
+
+    Locales::apply('de');
+
+    expect(ImportFinishedNotification::present($row->refresh())->getBody())->toBe('1.234 erstellt, 5.678 aktualisiert');
 });
 
 it('records failed rows with row number and error message', function (): void {

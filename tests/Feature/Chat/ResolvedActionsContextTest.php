@@ -284,7 +284,7 @@ it('labels each record of an approved batch with its own title and url', functio
         ]);
 });
 
-it('labels each record of a batch update that changes only a custom field by the name its summary quotes', function (): void {
+it('labels each record of a batch update that changes only a custom field by the record name its display carries', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-U', $user);
@@ -302,6 +302,7 @@ it('labels each record of a batch update that changes only a custom field by the
         'display_data' => ['title' => 'Update People', 'summary' => 'Update 3 people', 'items' => array_map(
             static fn (string $name): array => [
                 'title' => 'Update Person',
+                'name' => $name,
                 'summary' => "Update person \"{$name}\"",
                 'fields' => [['label' => 'Tier', 'old' => 'Silver', 'new' => 'Gold']],
             ],
@@ -348,7 +349,7 @@ it('names an unchecked field by its label and the code the proposal summary uses
     expect($resolved[0]['excluded'])->toBe([['record' => null, 'fields' => ['Industry (industry)']]]);
 });
 
-it('labels an update by the name its summary quotes when a custom field is named like a title row', function (): void {
+it('labels an update by the record name its display carries when a custom field is named like a title row', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-E', $user);
@@ -360,6 +361,7 @@ it('labels an update by the name its summary quotes when a custom field is named
         'action_data' => ['_record_id' => 'p-1', '_model_class' => 'App\\Models\\People', 'custom_fields' => ['email' => 'ada@acme.test']],
         'display_data' => [
             'title' => 'Update Person',
+            'name' => 'Ada Lovelace',
             'summary' => 'Update person "Ada Lovelace"',
             'fields' => [['label' => 'Email', 'code' => 'email', 'old' => 'ada@old.test', 'new' => 'ada@acme.test']],
         ],
@@ -372,7 +374,7 @@ it('labels an update by the name its summary quotes when a custom field is named
     expect($resolved[0]['label'])->toBe('Ada Lovelace');
 });
 
-it('labels an update by the name its summary quotes when a custom field shares the title key', function (): void {
+it('labels an update by the record name its display carries when a custom field shares the title key', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $this->actingAs($user);
     seedResolvedConv('conv-K', $user);
@@ -384,6 +386,7 @@ it('labels an update by the name its summary quotes when a custom field shares t
         'action_data' => ['_record_id' => 'c-1', '_model_class' => 'App\\Models\\Company', 'custom_fields' => ['name' => 'Legal name']],
         'display_data' => [
             'title' => 'Update Company',
+            'name' => 'Acme',
             'summary' => 'Update company "Acme"',
             'fields' => [['label' => 'Name', 'code' => 'name', 'type' => 'text', 'old' => 'Old legal name', 'new' => 'Legal name']],
         ],

@@ -1,9 +1,10 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $facts = \Relaticle\Cloud\Marketing\Support\CompetitorFacts::all()['relaticle'];
     $starsLabel = $githubStars > 0
-        ? __(':stars stars', ['stars' => number_format($githubStars)])
-        : __(':stars stars as of :date', ['stars' => number_format($facts['stars']), 'date' => \Illuminate\Support\Facades\Date::parse($facts['stars_verified'])->format('F j, Y')]);
-    $factsVerifiedAt = \Illuminate\Support\Facades\Date::parse($facts['verified'])->format('F j, Y');
+        ? __(':stars stars', ['stars' => \Illuminate\Support\Number::format($githubStars)])
+        : __(':stars stars as of :date', ['stars' => \Illuminate\Support\Number::format($facts['stars']), 'date' => \Illuminate\Support\Facades\Date::parse($facts['stars_verified'])->isoFormat('LL')]);
+    $factsVerifiedAt = \Illuminate\Support\Facades\Date::parse($facts['verified'])->isoFormat('LL');
     $brand = json_decode(file_get_contents(public_path('brand/kit/manifest.json')), true, flags: JSON_THROW_ON_ERROR);
     $avatarLabels = ['light' => __('Light'), 'purple' => __('Purple'), 'dark' => __('Dark')];
     $screenshots = [
@@ -199,7 +200,7 @@
                         </li>
                     @endforeach
                 </ul>
-                <p class="border-rail border-t px-6 py-5 text-sm text-gray-500 md:px-8 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
+                <p class="border-rail border-t px-6 py-5 text-sm text-gray-500 md:px-8 dark:text-gray-400">{{ __('Company facts verified :date.', ['date' => $factsVerifiedAt]) }} <a href="{{ LocalizedUrl::route('pricing') }}" class="underline underline-offset-4">{{ __('See current pricing') }}</a>.</p>
             </div>
         </div>
     </x-cloud::marketing.frame>
@@ -212,7 +213,7 @@
                 <p class="mt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Use these assets to identify or cover Relaticle. Do not imply a partnership or endorsement without our agreement.') }}</p>
             </div>
             <div class="bg-surface flex items-center p-6 md:p-10 lg:col-span-4">
-                <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}" iconTrailing="lucide-arrow-right">{{ __('Contact the team') }}</x-cloud::marketing.button>
+                <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}" iconTrailing="lucide-arrow-right">{{ __('Contact the team') }}</x-cloud::marketing.button>
             </div>
         </div>
     </x-cloud::marketing.frame>

@@ -1,0 +1,8 @@
+title: 'Revisar el calendario de contenido con David'
+assigned_people:
+  - david
+custom_fields:
+  description: 'Repasar con David el calendario de contenido del segundo trimestre y alinear los temas de las campañas de correo y la frecuencia de publicación.'
+  due_date: '{{ +2d }}'
+  status: To do
+  priority: Medium

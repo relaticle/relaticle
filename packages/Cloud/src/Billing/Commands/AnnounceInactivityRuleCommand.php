@@ -65,7 +65,7 @@ final class AnnounceInactivityRuleCommand extends Command
 
                     $this->info("Notifying the owner of {$workspace->name}...");
 
-                    Mail::to($owner->email)->queue(new InactivityRuleNoticeMail($workspace, $deletesAt));
+                    Mail::to($owner)->queue(new InactivityRuleNoticeMail($workspace, $deletesAt));
 
                     return true;
                 });

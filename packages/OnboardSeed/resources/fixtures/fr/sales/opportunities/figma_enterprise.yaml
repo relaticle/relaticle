@@ -1,0 +1,6 @@
+name: Forfait Enterprise Figma
+company: figma
+custom_fields:
+  amount: 15000
+  close_date: '{{ +2w }}'
+  stage: Proposal/Price Quote

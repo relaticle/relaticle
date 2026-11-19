@@ -61,13 +61,13 @@ final class CreatePersonTool extends BaseWriteCreateTool
         $workspace = $user->currentWorkspace;
 
         $name = (string) ($record['name'] ?? '');
-        $fields = [['label' => 'Name', 'value' => $name]];
+        $fields = [['label' => __('Name'), 'value' => $name]];
 
         $companyId = $record['company_id'] ?? null;
         $companyId = is_string($companyId) && $companyId !== '' ? $companyId : null;
         $companyName = $this->recordNames()->name($companyId, Company::class, $workspace);
         if ($companyName !== '') {
-            $fields[] = ['label' => 'Company', 'value' => $companyName];
+            $fields[] = ['label' => __('Company'), 'value' => $companyName];
         }
 
         return [

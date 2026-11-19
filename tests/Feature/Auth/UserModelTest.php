@@ -7,8 +7,10 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Models\Workspace;
+use App\Notifications\Auth\VerifyEmail;
 use App\Services\AvatarService;
 use Filament\Panel;
+use Illuminate\Support\Facades\Notification;
 
 mutates(User::class, AvatarService::class);
 
@@ -62,4 +64,26 @@ test('user has a consistent local initial avatar', function () {
         ->toStartWith('data:image/svg+xml;base64,')
         ->toBe($user->profile_photo_url)
         ->and($user->avatar)->toBe($user->profile_photo_url);
+});
+
+test('reads a listed stored locale', function () {
+    $user = User::factory()->make(['locale' => 'de']);
+
+    expect($user->effectiveLocale())->toBe('de');
+});
+
+test('falls back to the install default for a null or unlisted locale', function (?string $stored) {
+    app()->setLocale('fr');
+    $user = User::factory()->make(['locale' => $stored]);
+
+    expect($user->effectiveLocale())->toBe('en');
+})->with([null, 'pt', 'zz']);
+
+test('sends notifications in the recipient language', function () {
+    Notification::fake();
+    $user = User::factory()->create(['locale' => 'de']);
+
+    $user->notify(new VerifyEmail);
+
+    Notification::assertSentTo($user, VerifyEmail::class, fn ($notification, $channels, $notifiable, $locale) => $locale === 'de');
 });

@@ -36,3 +36,10 @@ it('links the docs and help center from the api reference through the documentat
         ->and($html)->toContain('<a href="https://docs.example.test/developers" class="relaticle-nav-title"')
         ->and($html)->not->toContain('href="/pricing"');
 });
+
+it('prefixes a localized help url by its registered route, whatever the install language is', function (): void {
+    config()->set('app.default_locale', 'de');
+    app()->setLocale('de');
+
+    expect(DocUrl::area('help'))->toEndWith('/de/help');
+});

@@ -384,7 +384,7 @@ test('inviting an address longer than the database holds is reported, not thrown
         ->assertNotified(
             Notification::make()
                 ->title(__('workspaces.notifications.some_invites_failed.title'))
-                ->body("{$address}: ".__('validation.max.string', ['attribute' => 'email', 'max' => 255]))
+                ->body("{$address}: ".__('validation.max.string', ['attribute' => __('validation.attributes.email'), 'max' => 255]))
                 ->warning()
         );
 
@@ -786,4 +786,16 @@ test('resending an invitation counts against the workspace ceiling', function ()
         ->assertNotified(__('workspaces.notifications.invite_rate_limited.title'));
 
     Mail::assertQueuedCount(20);
+});
+
+test('an invalid invitation email names its attribute in the interface language', function () {
+    app()->setLocale('es');
+
+    try {
+        app(InviteWorkspaceMember::class)->invite($this->user, $this->workspace, 'not-an-email');
+    } catch (ValidationException $exception) {
+        $message = $exception->errors()['email'][0];
+    }
+
+    expect($message)->toContain('correo electrónico')->not->toContain('email');
 });

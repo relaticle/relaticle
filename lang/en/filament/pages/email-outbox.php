@@ -33,6 +33,9 @@ return [
     'actions' => [
         'reschedule_field' => 'Send at',
         'bulk_cancel' => 'Cancel selected',
+        'cancel' => 'Cancel',
+        'reschedule' => 'Reschedule',
+        'retry' => 'Retry',
     ],
     'notifications' => [
         'cancelled' => 'Cancelled',

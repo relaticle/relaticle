@@ -31,38 +31,46 @@ function renderedTitleBudgetAfterBrandSuffix(): int
     return 60 - mb_strlen(' - '.config('app.name'));
 }
 
-it('resolves every related entry to a real page', function (): void {
+it('resolves every related entry to a real page', function (string $locale): void {
     $repo = app(DocsRepository::class);
 
-    $broken = $repo->pages()->flatMap(fn (DocPage $page): array => collect($page->related)
-        ->reject(fn (string $related): bool => $repo->find($related) instanceof DocPage)
+    $broken = $repo->pages($locale)->flatMap(fn (DocPage $page): array => collect($page->related)
+        ->reject(fn (string $related): bool => $repo->find($related, $locale) instanceof DocPage)
         ->map(fn (string $related): string => "{$page->path} -> {$related}")
         ->all());
 
     expect($broken)->toBeEmpty(offendersMessage('Unresolved related: entries', $broken));
-});
+})->with('content locales');
 
-it('resolves every internal link -- including anchored and query-qualified ones -- to a real page and heading', function (): void {
+it('resolves every internal link -- including anchored and query-qualified ones -- to a real page and heading', function (string $locale): void {
     $repo = app(DocsRepository::class);
     $headingAnchors = new HeadingAnchors;
+    $prefix = $locale === 'en' ? '' : "/{$locale}";
+    $prefixes = implode('|', array_diff(config('app.available_locales'), ['en']));
 
-    $broken = $repo->pages()->flatMap(function (DocPage $page) use ($repo, $headingAnchors): array {
-        // Path first, then an optional `?query` (order doesn't matter for a
-        // real URL, but query-before-fragment is the only shape a browser
-        // would ever produce), then an optional `#fragment` -- both must be
-        // consumed before the closing `)`, or a link like
+    $broken = $repo->pages($locale)->flatMap(function (DocPage $page) use ($repo, $headingAnchors, $locale, $prefix, $prefixes): array {
+        // Prefix first, then the path, an optional `?query` and an optional
+        // `#fragment`, all consumed before the closing `)`, or a link like
         // `/help/a/b#section` never matches at all.
-        preg_match_all('/\]\((\/help\/[a-z0-9\-\/]+)(?:\?[^)#]*)?(?:#([^)]*))?\)/u', $page->body, $matches, PREG_SET_ORDER);
+        preg_match_all('/\]\(((?:\/(?:'.$prefixes.'))?)(\/(?:help|developers)(?:\/[a-z0-9\-]+)*)(?:\?[^)#]*)?(?:#([^)]*))?\)/u', $page->body, $matches, PREG_SET_ORDER);
 
-        return collect($matches)->flatMap(function (array $match) use ($page, $repo, $headingAnchors): array {
-            $url = $match[1];
-            $fragment = $match[2] ?? '';
-            $path = ltrim($url, '/');
-            $target = $repo->find($path);
+        return collect($matches)->flatMap(function (array $match) use ($page, $repo, $headingAnchors, $locale, $prefix): array {
+            $url = $match[1].$match[2];
+            $fragment = $match[3] ?? '';
 
-            // A one-segment-deep /help link is a category page, valid as
-            // long as the category exists and no fragment points into it.
-            if (! $target instanceof DocPage && $fragment === '' && $repo->findCategory($path) !== null) {
+            if ($match[2] === '/developers/api') {
+                return $match[1] === '' ? [] : ["{$page->path} -> {$url} (the API reference has one unprefixed URL)"];
+            }
+
+            if ($match[1] !== $prefix) {
+                return ["{$page->path} -> {$url} (must start with ".($prefix === '' ? 'no language prefix' : "{$prefix}/").')'];
+            }
+
+            $path = ltrim($match[2], '/');
+            $path = str_starts_with($path, 'developers/') ? 'docs/guides/'.substr($path, strlen('developers/')) : $path;
+            $target = $repo->find($path, $locale);
+
+            if (! $target instanceof DocPage && $fragment === '' && ($match[2] === '/developers' || $match[2] === '/help' || $repo->findCategory($path, $locale) !== null)) {
                 return [];
             }
 
@@ -78,13 +86,29 @@ it('resolves every internal link -- including anchored and query-qualified ones 
         })->all();
     });
 
-    expect($broken)->toBeEmpty(offendersMessage('Broken internal /help links', $broken));
-});
+    expect($broken)->toBeEmpty(offendersMessage('Broken internal /help and /developers links', $broken));
+})->with('content locales');
 
-it('resolves every referenced image to a file on disk', function (): void {
+it('resolves every same-page anchor link to a heading of that page', function (string $locale): void {
+    $headingAnchors = new HeadingAnchors;
+
+    $broken = app(DocsRepository::class)->pages($locale)->flatMap(function (DocPage $page) use ($headingAnchors): array {
+        preg_match_all('/\]\(#([^)\s]*)\)/u', withoutFencedCodeBlocks($page->body), $matches);
+        $anchors = $headingAnchors($page->body);
+
+        return collect($matches[1])
+            ->reject(fn (string $fragment): bool => in_array(urldecode($fragment), $anchors, true))
+            ->map(fn (string $fragment): string => "{$page->path} -> #{$fragment}")
+            ->all();
+    });
+
+    expect($broken)->toBeEmpty(offendersMessage('Same-page anchors with no matching heading', $broken));
+})->with('content locales');
+
+it('resolves every referenced image to a file on disk', function (string $locale): void {
     $repo = app(DocsRepository::class);
 
-    $broken = $repo->pages()->flatMap(function (DocPage $page): array {
+    $broken = $repo->pages($locale)->flatMap(function (DocPage $page): array {
         preg_match_all('/!\[[^\]]*\]\((\/[^)]+)\)/', $page->body, $matches);
 
         return collect($matches[1])
@@ -94,10 +118,10 @@ it('resolves every referenced image to a file on disk', function (): void {
     });
 
     expect($broken)->toBeEmpty(offendersMessage('Referenced images missing from disk', $broken));
-});
+})->with('content locales');
 
-it('gives every page a unique, length-bounded title and description', function (): void {
-    $pages = app(DocsRepository::class)->pages();
+it('gives every page a unique, length-bounded title and description', function (string $locale): void {
+    $pages = app(DocsRepository::class)->pages($locale);
 
     $duplicateTitles = $pages->pluck('title')->duplicates();
     $duplicateTitleOffenders = $pages
@@ -127,11 +151,11 @@ it('gives every page a unique, length-bounded title and description', function (
         ->and($duplicateDescriptionOffenders)->toBeEmpty(offendersMessage('Duplicate descriptions', $duplicateDescriptionOffenders))
         ->and($overLongTitles)->toBeEmpty(offendersMessage("Titles over {$titleBudget} chars", $overLongTitles))
         ->and($descriptionsOutOfBounds)->toBeEmpty(offendersMessage('Descriptions outside 70 to 160 chars', $descriptionsOutOfBounds));
-});
+})->with('content locales');
 
-it('gives every category a unique, length-bounded title and description, distinct from every page', function (): void {
+it('gives every category a unique, length-bounded title and description, distinct from every page', function (string $locale): void {
     $repo = app(DocsRepository::class);
-    $categories = $repo->categories();
+    $categories = $repo->categories($locale);
 
     $titleBudget = renderedTitleBudgetAfterBrandSuffix();
 
@@ -143,18 +167,18 @@ it('gives every category a unique, length-bounded title and description, distinc
     // Categories render as pages (hub sections, <title> tags, sitemap URLs),
     // so their metadata competes in the same SERPs as articles -- uniqueness
     // has to hold across both sets, not within each.
-    $titles = $repo->pages()->pluck('title')->merge($categories->pluck('title'));
-    $descriptions = $repo->pages()->pluck('description')->merge($categories->pluck('description'));
+    $titles = $repo->pages($locale)->pluck('title')->merge($categories->pluck('title'));
+    $descriptions = $repo->pages($locale)->pluck('description')->merge($categories->pluck('description'));
 
     expect($overLong)->toBeEmpty(offendersMessage('Category metadata over bounds', $overLong))
         ->and($titles->duplicates()->values()->all())->toBe([])
         ->and($descriptions->duplicates()->values()->all())->toBe([]);
-});
+})->with('content locales');
 
-it('gives every page exactly one h1-equivalent, which is its front-matter title', function (): void {
-    $offenders = app(DocsRepository::class)->pages()
+it('gives every page exactly one h1-equivalent, which is its front-matter title', function (string $locale): void {
+    $offenders = app(DocsRepository::class)->pages($locale)
         ->filter(fn (DocPage $page): bool => (bool) preg_match('/^# /m', withoutFencedCodeBlocks($page->body)))
         ->keys();
 
     expect($offenders)->toBeEmpty(offendersMessage('Pages with a stray "# " heading in the body', $offenders));
-});
+})->with('content locales');

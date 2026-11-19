@@ -24,7 +24,7 @@
             this.draftDate = this.closeDate
         },
         formatted(date) {
-            return new Date(`${date}T00:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+            return new Date(`${date}T00:00:00`).toLocaleDateString(@js(str_replace('_', '-', app()->getLocale())), { month: 'short', day: 'numeric', year: 'numeric' })
         },
         saveDate() {
             if (this.draftDate) {
@@ -126,7 +126,7 @@
                                 @if($date)
                                     <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ $before }}</span>
                                     <x-lucide-arrow-right class="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-                                    <span class="text-gray-900 dark:text-white" x-text="formatted(closeDate)" data-approval-close-date>{{ $date->format('M j, Y') }}</span>
+                                    <span class="text-gray-900 dark:text-white" x-text="formatted(closeDate)" data-approval-close-date>{{ $date->isoFormat('ll') }}</span>
                                     <button
                                         type="button"
                                         x-show="decision === 'pending'"

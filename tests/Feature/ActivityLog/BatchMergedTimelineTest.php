@@ -2,13 +2,17 @@
 
 declare(strict_types=1);
 
+use App\ActivityLog\AppEventRenderer;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\CustomFieldSection;
+use App\Models\Task;
 use App\Models\User;
 use App\Support\ActivityLog\MergedActivityRenderer;
+use App\Support\Locales;
 use Filament\Facades\Filament;
+use Relaticle\ActivityLog\Timeline\TimelineEntry;
 
 beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
@@ -230,3 +234,39 @@ it('offers no full text toggle for a change that fits its row', function (): voi
 
     expect($html)->not->toContain(__('workspaces.activity.full_change.show'));
 })->mutates(MergedActivityRenderer::class);
+
+it('words a created, deleted or restored entry as a full sentence in the interface language', function (string $event, string $expected): void {
+    app()->setLocale('de');
+    seedActivityRow($this->company, $event, null);
+
+    $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->sole())->render();
+
+    expect($html)->toContain(str_replace(':subject', e($this->company->name), $expected))
+        ->and($html)->not->toContain($event.' '.e($this->company->name));
+})->with([
+    'created' => ['created', 'hat :subject erstellt'],
+    'deleted' => ['deleted', 'hat :subject gelöscht'],
+    'restored' => ['restored', 'hat :subject wiederhergestellt'],
+])->mutates(MergedActivityRenderer::class);
+
+it('words an entry of an unknown event as a full sentence in the interface language', function (): void {
+    app()->setLocale('de');
+    seedActivityRow($this->company, 'custom_event', null);
+
+    $html = (new MergedActivityRenderer)->render($this->company->timeline()->get()->sole())->render();
+
+    expect($html)->toContain('hat eine Änderung an '.e($this->company->name).' vorgenommen')
+        ->and($html)->not->toContain('custom event');
+})->mutates(MergedActivityRenderer::class);
+
+it('names a task in the timeline in the interface language', function (): void {
+    $task = Task::factory()->for($this->workspace)->create(['creator_id' => $this->user->getKey()]);
+    $this->company->tasks()->attach($task);
+    Locales::apply('de');
+
+    $entry = $this->company->timeline()->get()->first(fn (TimelineEntry $entry): bool => $entry->event === 'task_created');
+    $html = resolve(AppEventRenderer::class)->render($entry)->render();
+
+    expect($html)->toContain(e($this->user->name).' Aufgabe')
+        ->and($html)->not->toContain(e($this->user->name).' aufgabe');
+});

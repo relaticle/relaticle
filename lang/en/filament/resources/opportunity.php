@@ -23,13 +23,13 @@ return [
             'label' => 'Created By',
         ],
         'created_at' => [
-            'label' => 'Created At',
+            'label' => 'Created at',
         ],
         'updated_at' => [
-            'label' => 'Updated At',
+            'label' => 'Updated at',
         ],
         'deleted_at' => [
-            'label' => 'Deleted At',
+            'label' => 'Deleted at',
         ],
     ],
 
@@ -45,6 +45,10 @@ return [
                 ],
                 'import_export' => [
                     'label' => 'Import / Export',
+                ],
+                'export' => [
+                    'label' => 'Export opportunities',
+                    'heading' => 'Export Opportunities',
                 ],
             ],
         ],

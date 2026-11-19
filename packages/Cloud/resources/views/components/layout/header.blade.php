@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 {{-- The mobile overlay is `fixed inset-0`, which does not stop the page behind it
      from scrolling, and does not stop Tab from walking into the page behind it
      either. `bodyLock` handles the first, `trapTab` the second.
@@ -46,7 +47,7 @@
             <div class="flex h-16 items-center justify-between">
 
                 <div class="flex flex-1 items-center">
-                    <a href="{{ url('/') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="Relaticle Home">
+                    <a href="{{ LocalizedUrl::route('home') }}" class="focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary rounded-sm" aria-label="{{ __('Relaticle Home') }}">
                         <x-brand.logo-lockup size="md" class="text-black dark:text-white" />
                     </a>
                 </div>
@@ -307,11 +308,11 @@
                         @else
                             <a href="{{ route('login') }}" referrerpolicy="no-referrer-when-downgrade" data-analytics-intent="login" data-analytics-placement="header"
                                class="max-md:hidden whitespace-nowrap rounded-full px-3 py-1.5 text-sm font-medium text-gray-700 transition-colors duration-200 hover:text-gray-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary dark:text-gray-300 dark:hover:text-white">
-                                Sign In
+                                {{ __('Sign In') }}
                             </a>
 
                             <x-cloud::marketing.button size="sm" class="whitespace-nowrap" href="{{ route('login') }}" data-analytics-intent="signup" data-analytics-placement="header">
-                                Start for free
+                                {{ __('Start for free') }}
                             </x-cloud::marketing.button>
                         @endauth
                     </div>
@@ -329,7 +330,7 @@
                             x-ref="hamburger"
                             class="md:hidden p-2.5 -mr-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 hover:bg-gray-100 dark:hover:text-white dark:hover:bg-white/[0.08] rounded-lg transition-colors duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
                             :aria-expanded="mobileMenu"
-                            :aria-label="mobileMenu ? 'Close menu' : 'Open menu'">
+                            :aria-label="mobileMenu ? @js(__('Close menu')) : @js(__('Open menu'))">
                         <span class="relative block h-5 w-5" aria-hidden="true">
                             <span class="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-current transition-[translate,rotate] duration-300 ease-[var(--ease-out-expo)] motion-reduce:transition-none"
                                   :class="mobileMenu && 'translate-y-[6px] rotate-45'"></span>

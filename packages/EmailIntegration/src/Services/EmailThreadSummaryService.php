@@ -126,7 +126,7 @@ final readonly class EmailThreadSummaryService
             ? ($firstFrom->name ?? $firstFrom->email_address ?? 'Unknown')
             : 'Unknown';
         $date = $email->sent_at?->toDateTimeString() ?? '—';
-        $dir = $email->direction->getLabel();
+        $dir = $email->direction->getLabel('en');
 
         $lines = [
             "--- Email {$n} ({$dir}) ---",

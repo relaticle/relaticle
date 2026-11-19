@@ -1,0 +1,8 @@
+title: 'Impartir la capacitación de RevOps a Zapier'
+assigned_people:
+  - elena
+custom_fields:
+  description: 'Primera de dos sesiones de incorporación. Finanzas sigue cuando RevOps esté en funcionamiento.'
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

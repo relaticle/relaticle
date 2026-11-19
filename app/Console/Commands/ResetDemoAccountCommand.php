@@ -172,6 +172,7 @@ final class ResetDemoAccountCommand extends Command
     {
         $attributes = [
             'name' => 'Relaticle Demo',
+            'locale' => null,
             'email_verified_at' => now(),
             'scheduled_deletion_at' => null,
             'two_factor_secret' => null,

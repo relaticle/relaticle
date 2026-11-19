@@ -1,0 +1,6 @@
+name: Investissement de croissance a16z
+company: a16z
+custom_fields:
+  amount: 15000000
+  close_date: '{{ +3m }}'
+  stage: Partner meeting

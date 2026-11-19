@@ -1,0 +1,8 @@
+title: 'Dar seguimiento a Reid sobre el análisis de mercado'
+assigned_people:
+  - reid
+custom_fields:
+  description: 'Enviar el análisis de mercado actualizado y el documento del panorama competitivo que Reid solicitó.'
+  due_date: '{{ +4d }}'
+  status: To do
+  priority: Medium

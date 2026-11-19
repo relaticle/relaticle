@@ -69,7 +69,7 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
 
         if (($request['name'] ?? null) !== null) {
             $fields[] = [
-                'label' => 'Name',
+                'label' => __('Name'),
                 'old' => $model->getAttribute('name'),
                 'new' => $request['name'],
             ];
@@ -78,7 +78,7 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
         if (array_key_exists('company_id', $request->all())) {
             $newCompanyId = $this->stringOrNull($request, 'company_id');
             $fields[] = [
-                'label' => 'Company',
+                'label' => __('Company'),
                 'old' => $this->recordNames()->name($model->getAttribute('company_id'), Company::class, $workspace),
                 'new' => $newCompanyId === null ? __('(none)') : $this->recordNames()->name($newCompanyId, Company::class, $workspace),
                 '_oldValue' => $model->getAttribute('company_id'),
@@ -88,7 +88,7 @@ final class UpdatePersonTool extends BaseWriteUpdateTool
 
         return [
             'title' => __('Update Person'),
-            'summary' => "Update person \"{$model->getAttribute('name')}\"",
+            'summary' => __('Update person ":name"', ['name' => $model->getAttribute('name')]),
             'fields' => $fields,
         ];
     }

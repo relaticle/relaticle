@@ -27,6 +27,7 @@ final class StreamJson
             $event = self::decode($line);
 
             if (($event['type'] ?? '') === 'stream_event') {
+                $model = $model === '' ? (string) ($event['event']['message']['model'] ?? '') : $model;
                 $usage = array_replace($usage, array_filter((array) ($event['event']['usage'] ?? []), fn (mixed $value): bool => $value !== null && ! is_array($value)));
 
                 continue;

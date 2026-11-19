@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\UserSocialAccount;
 use App\Support\Auth\AuthenticationSession;
 use App\Support\Auth\IdentityConfirmation;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Auth\SessionGuard;
 use Illuminate\Support\Facades\DB;
@@ -402,4 +403,14 @@ test('rotates the remember token and does not claim other sessions ended when th
         ->assertNotified(__('profile.notifications.logged_out_other_sessions.remembered_only', ['minutes' => config('session.lifetime')]));
 
     expect($user->refresh()->remember_token)->not->toBe('other-device-token');
+});
+
+it('labels the security sections in the user language for screen readers', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $this->actingAs($user);
+    Filament::setTenant($user->currentWorkspace);
+    Locales::apply('de');
+
+    Livewire::test(Security::class)
+        ->assertDontSee('Browser sessions');
 });

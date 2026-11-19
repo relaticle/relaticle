@@ -18,77 +18,101 @@ use Symfony\Component\Yaml\Yaml;
  * value objects, keyed by their path. Nav, search, sitemap entries, and the
  * `.md` variant of a page all derive from this manifest. The content files
  * are the single source of truth, never front matter.
- *
- * Resolved as a container singleton, so the manifest is parsed once, eagerly,
- * here in the constructor. A caller resolving this class already intends to
- * use it, and there is no cheaper "maybe I won't need it" case to defer for.
  */
 final readonly class DocsRepository
 {
     private const string CACHE_KEY = 'documentation.manifest';
 
-    /** @var Collection<string, DocPage> */
-    private Collection $pages;
+    private const string DEFAULT_LOCALE = 'en';
 
-    /** @var Collection<string, DocCategory> */
-    private Collection $categories;
+    /** @var Collection<string, array{pages: Collection<string, DocPage>, categories: Collection<string, DocCategory>}> */
+    private Collection $manifests;
 
     public function __construct()
     {
-        [$pages, $categories] = $this->resolve();
-
-        $this->categories = $categories->filter(
-            fn (DocCategory $category): bool => $category->feature === null || Feature::active($category->feature),
-        );
-
-        $gated = $categories->diffKeys($this->categories);
-
-        $this->pages = $pages->reject(fn (DocPage $page): bool => $gated->has("{$page->area}/{$page->category}"));
+        $this->manifests = collect();
+        $this->manifest(null);
     }
 
     /** @return Collection<string, DocPage> */
-    public function pages(): Collection
+    public function pages(?string $locale = null): Collection
     {
-        return $this->pages;
+        return $this->manifest($locale)['pages'];
     }
 
     /** @return Collection<string, DocCategory> */
-    public function categories(): Collection
+    public function categories(?string $locale = null): Collection
     {
-        return $this->categories;
+        return $this->manifest($locale)['categories'];
     }
 
-    public function find(string $path): ?DocPage
+    public function find(string $path, ?string $locale = null): ?DocPage
     {
-        return $this->pages->get($path);
+        return $this->pages($locale)->get($path);
     }
 
-    public function findCategory(string $path): ?DocCategory
+    public function findCategory(string $path, ?string $locale = null): ?DocCategory
     {
-        return $this->categories->get($path);
+        return $this->categories($locale)->get($path);
     }
 
     /** @return Collection<string, DocPage> */
-    public function pagesIn(string $categoryPath): Collection
+    public function pagesIn(string $categoryPath, ?string $locale = null): Collection
     {
-        return $this->pages
+        return $this->pages($locale)
             ->filter(fn (DocPage $page): bool => "{$page->area}/{$page->category}" === $categoryPath)
             ->sortBy(fn (DocPage $page): int => $page->order);
     }
 
-    /** @return array{0: Collection<string, DocPage>, 1: Collection<string, DocCategory>} */
-    private function resolve(): array
+    /** @return array{pages: Collection<string, DocPage>, categories: Collection<string, DocCategory>} */
+    private function manifest(?string $locale): array
     {
-        $root = (string) config('documentation.content_path');
+        $locale ??= app()->getLocale();
+
+        $manifest = $this->manifests->get($locale);
+
+        if ($manifest === null) {
+            $manifest = $this->gated($this->resolve($locale));
+            $this->manifests->put($locale, $manifest);
+        }
+
+        return $manifest;
+    }
+
+    /**
+     * @param  array{0: Collection<string, DocPage>, 1: Collection<string, DocCategory>}  $manifest
+     * @return array{pages: Collection<string, DocPage>, categories: Collection<string, DocCategory>}
+     */
+    private function gated(array $manifest): array
+    {
+        [$pages, $categories] = $manifest;
+
+        $open = $categories->filter(
+            fn (DocCategory $category): bool => $category->feature === null || Feature::active($category->feature),
+        );
+
+        $gated = $categories->diffKeys($open);
+
+        return [
+            'pages' => $pages->reject(fn (DocPage $page): bool => $gated->has("{$page->area}/{$page->category}")),
+            'categories' => $open,
+        ];
+    }
+
+    /** @return array{0: Collection<string, DocPage>, 1: Collection<string, DocCategory>} */
+    private function resolve(string $locale): array
+    {
+        $root = $this->root($locale);
 
         if (! $this->cachingEnabled()) {
             return $this->build($root);
         }
 
         $signature = $this->signature($root);
+        $cacheKey = self::CACHE_KEY.".{$locale}";
 
         /** @var array{signature: string, pages: Collection<string, DocPage>, categories: Collection<string, DocCategory>}|null $cached */
-        $cached = Cache::get(self::CACHE_KEY);
+        $cached = Cache::get($cacheKey);
 
         if (is_array($cached) && $cached['signature'] === $signature) {
             return [$cached['pages'], $cached['categories']];
@@ -96,16 +120,38 @@ final readonly class DocsRepository
 
         [$pages, $categories] = $this->build($root);
 
-        // One stable key holding the current manifest, not one key per content
-        // state. Otherwise every edit abandons the previous key forever with
-        // no TTL to reclaim it.
-        Cache::forever(self::CACHE_KEY, [
+        // One stable key per language holding the current manifest, not one key
+        // per content state. Otherwise every edit abandons the previous key
+        // forever with no TTL to reclaim it.
+        Cache::forever($cacheKey, [
             'signature' => $signature,
             'pages' => $pages,
             'categories' => $categories,
         ]);
 
         return [$pages, $categories];
+    }
+
+    // Other languages mirror the English tree under {root}/{locale}. A page missing there is absent, never borrowed.
+    private function root(string $locale): string
+    {
+        $root = (string) config('documentation.content_path');
+
+        return $locale === self::DEFAULT_LOCALE ? $root : "{$root}/{$locale}";
+    }
+
+    /** @return list<SplFileInfo> */
+    private function files(string $root): array
+    {
+        $files = [];
+
+        foreach ([DocUrl::HELP, DocUrl::DOCS] as $area) {
+            if (File::isDirectory("{$root}/{$area}")) {
+                array_push($files, ...File::allFiles("{$root}/{$area}"));
+            }
+        }
+
+        return $files;
     }
 
     /**
@@ -132,16 +178,12 @@ final readonly class DocsRepository
         /** @var Collection<string, DocCategory> $categories */
         $categories = collect();
 
-        if (! File::isDirectory($root)) {
-            return [$pages, $categories];
-        }
-
-        foreach (File::allFiles($root) as $file) {
+        foreach ($this->files($root) as $file) {
             if ($file->getExtension() !== 'md') {
                 continue;
             }
 
-            $relative = str($file->getRelativePathname())->replace(DIRECTORY_SEPARATOR, '/')->beforeLast('.md')->value();
+            $relative = str($file->getPathname())->replace(DIRECTORY_SEPARATOR, '/')->after("{$root}/")->beforeLast('.md')->value();
             $segments = explode('/', $relative);
 
             throw_if(count($segments) !== 3, RuntimeException::class, "Content file [{$relative}.md] must be nested as {area}/{category}/{slug}.md.");
@@ -216,12 +258,8 @@ final readonly class DocsRepository
      */
     private function signature(string $root): string
     {
-        if (! File::isDirectory($root)) {
-            return hash('sha256', $root);
-        }
-
-        $fileList = collect(File::allFiles($root))
-            ->map(fn (SplFileInfo $file): string => $file->getRelativePathname().':'.$file->getMTime())
+        $fileList = collect($this->files($root))
+            ->map(fn (SplFileInfo $file): string => $file->getPathname().':'.$file->getMTime())
             ->implode('|');
 
         return hash('sha256', $root.'|'.$fileList);

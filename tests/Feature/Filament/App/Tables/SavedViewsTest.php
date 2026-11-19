@@ -29,10 +29,12 @@ use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
 use App\Policies\SavedViewPolicy;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Database\Events\QueryExecuted;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
@@ -435,6 +437,27 @@ it('offers the standard view and nothing to manage when no view is saved', funct
         ->assertSeeText('All companies')
         ->assertActionHidden('renameSavedView')
         ->assertActionHidden('deleteSavedView');
+});
+
+it('names the standard view with the plural noun capitalised as the language spells it', function (string $page, string $expected): void {
+    $this->user->forceFill(['locale' => 'de'])->save();
+    Locales::apply('de');
+
+    livewire($page)
+        ->assertSeeText($expected)
+        ->assertDontSeeText(Str::lower($expected));
+})->with([
+    'companies' => [ListCompanies::class, 'Alle Unternehmen'],
+    'people' => [ListPeople::class, 'Alle Personen'],
+    'notes' => [ManageNotes::class, 'Alle Notizen'],
+]);
+
+it('words the attribute search in the plural noun of the language', function (): void {
+    $this->user->forceFill(['locale' => 'de'])->save();
+    Locales::apply('de');
+
+    livewire(ListCompanies::class)
+        ->assertSeeHtml('placeholder="Attribute für Unternehmen suchen…"');
 });
 
 it('keeps the table and clears the pointers when a view is deleted', function (): void {

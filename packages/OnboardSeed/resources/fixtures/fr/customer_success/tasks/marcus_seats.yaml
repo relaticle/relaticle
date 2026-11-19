@@ -1,0 +1,8 @@
+title: Envoyer à Calendly un devis pour les licences supplémentaires
+assigned_people:
+  - marcus
+custom_fields:
+  description: Vingt licences réparties sur deux nouvelles équipes support, dès le trimestre prochain.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium

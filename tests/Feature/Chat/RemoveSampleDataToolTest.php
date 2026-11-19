@@ -12,6 +12,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -151,6 +152,28 @@ it('refuses a member who does not own the workspace and proposes nothing', funct
 
     expect($result['error'])->toContain('Only the workspace owner')
         ->and(PendingAction::query()->count())->toBe(0);
+});
+
+it('lists the sample counts under the record names of the user language', function (): void {
+    seedChatSampleRecords($this->workspace, $this->owner);
+
+    Locales::within('de', fn (): array => proposeSampleRemoval());
+
+    $pending = PendingAction::query()->where('workspace_id', $this->workspace->getKey())->sole();
+
+    expect(collect($pending->display_data['fields'])->pluck('label')->all())
+        ->toBe(['Unternehmen', 'Personen', 'Aufgaben', 'Notizen', 'Verkaufschancen']);
+});
+
+it('keeps the refusals for the assistant in English for a German user', function (): void {
+    $admin = User::factory()->create();
+    $this->workspace->users()->attach($admin, ['role' => WorkspaceRole::Admin->value]);
+    $admin->switchWorkspace($this->workspace);
+    $this->actingAs($admin);
+
+    $result = Locales::within('de', fn (): array => proposeSampleRemoval());
+
+    expect($result['error'])->toBe('Only the workspace owner can remove the sample data. Tell the user to ask the owner, and do not link to any page.');
 });
 
 it('refuses when no sample records remain', function (): void {

@@ -297,7 +297,7 @@ final class ClaudeCodeProcess
             if ($type === 'system' && ($event['subtype'] ?? '') === 'init') {
                 $this->assertInit($event);
             } elseif ($type === 'stream_event' && ($event['event']['type'] ?? '') === 'message_start') {
-                $this->messageLines = [];
+                $this->messageLines = [$line];
                 $this->messageId = (string) ($event['event']['message']['id'] ?? '');
             } elseif ($type === 'assistant' || $type === 'stream_event' && ($event['event']['type'] ?? '') === 'message_delta') {
                 $flushed = $this->collect($line, $type);

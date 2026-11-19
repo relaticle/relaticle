@@ -17,10 +17,12 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\TaskAssignedNotification;
+use App\Support\Locales;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\RichEditor;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Component;
 use Filament\Support\Enums\IconSize;
 use Filament\Tables\Columns\Column;
@@ -693,3 +695,28 @@ it('groups tasks by a select custom field and titles each group with its option 
         ->assertOk()
         ->assertSee($option->name);
 })->with(['status', 'priority']);
+
+it('labels the task title and date columns, filter fields and form in the user language', function (string $locale, array $expected): void {
+    $this->user->forceFill(['locale' => $locale])->save();
+    Locales::apply($locale);
+
+    $page = livewire(ManageTasks::class);
+    $columns = collect($page->instance()->getTable()->getColumns())
+        ->map(fn (Column $column): string => trim(strip_tags((string) $column->getLabel())))
+        ->all();
+    $filterFields = collect($page->instance()->getFilterBarData()['fields'])->pluck('label', 'key');
+
+    $page->mountAction('create');
+    $title = collect($page->instance()->getSchema($page->instance()->getMountedActionSchemaName())->getFlatComponents(withHidden: true))
+        ->first(fn (Component $component): bool => $component instanceof TextInput && $component->getName() === 'title');
+
+    expect($columns)->toContain(...array_values($expected))
+        ->and($filterFields['title'])->toBe($expected['title'])
+        ->and($filterFields['created_at'])->toBe($expected['created_at'])
+        ->and($filterFields['updated_at'])->toBe($expected['updated_at'])
+        ->and($title->getLabel())->toBe($expected['title']);
+})->with([
+    'de' => ['de', ['title' => 'Titel', 'created_at' => 'Erstellt am', 'updated_at' => 'Aktualisiert am', 'deleted_at' => 'Gelöscht am']],
+    'es' => ['es', ['title' => 'Título', 'created_at' => 'Creada el', 'updated_at' => 'Actualizada el', 'deleted_at' => 'Eliminada el']],
+    'fr' => ['fr', ['title' => 'Titre', 'created_at' => 'Créé le', 'updated_at' => 'Mis à jour le', 'deleted_at' => 'Supprimé le']],
+]);

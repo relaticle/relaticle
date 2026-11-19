@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 <div x-show="mobileMenu" x-transition.opacity.duration.150ms @click="mobileMenu = false" class="fixed inset-0 z-[59] md:hidden" x-cloak aria-hidden="true"></div>
 
 <nav x-show="mobileMenu"
@@ -15,7 +16,7 @@
 
     {{-- Header --}}
     <div class="flex items-center justify-between h-16 shrink-0 px-6 sm:px-[25px]">
-        <a href="{{ url('/') }}" aria-label="Relaticle Home">
+        <a href="{{ LocalizedUrl::route('home') }}" aria-label="{{ __('Relaticle Home') }}">
             <x-brand.logo-lockup size="md" class="text-black dark:text-white"/>
         </a>
         {{-- Focus lands here when the overlay opens, so the trap has somewhere to
@@ -28,7 +29,7 @@
                 x-ref="close"
                 x-effect="if (mobileMenu) $nextTick(() => $refs.close.focus())"
                 class="p-2.5 -mr-1 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white active:opacity-60 rounded-lg transition-[color,opacity] duration-200 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                aria-label="Close menu">
+                aria-label="{{ __('Close menu') }}">
             <span class="relative block h-5 w-5" aria-hidden="true">
                 <span class="absolute left-0 top-[3px] h-[2px] w-5 rounded-full bg-current translate-y-[6px] rotate-45"></span>
                 <span class="absolute left-0 top-[15px] h-[2px] w-5 rounded-full bg-current -translate-y-[6px] -rotate-45"></span>
@@ -103,10 +104,10 @@
         @else
             <div class="grid grid-cols-2 gap-3">
                 <x-cloud::marketing.button variant="secondary" href="{{ route('login') }}" class="active:scale-[0.98]" data-analytics-intent="login" data-analytics-placement="mobile">
-                    Sign In
+                    {{ __('Sign In') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button href="{{ route('login') }}" class="active:scale-[0.98]" data-analytics-intent="signup" data-analytics-placement="mobile">
-                    Start for free
+                    {{ __('Start for free') }}
                 </x-cloud::marketing.button>
             </div>
         @endauth
