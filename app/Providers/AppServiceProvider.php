@@ -69,6 +69,7 @@ use Filament\Auth\Notifications\ResetPassword;
 use Filament\Auth\Notifications\VerifyEmail;
 use Filament\Auth\Notifications\VerifyEmailChange;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Toggle;
 use Filament\Livewire\Notifications;
 use Filament\Notifications\Notification;
@@ -296,6 +297,7 @@ final class AppServiceProvider extends ServiceProvider
         $this->configureSessions();
         $this->configureModels();
         $this->configureFilament();
+        $this->configureFileUploads();
         $this->configureLivewire();
         $this->configureMacros();
         $this->configureRateLimiting();
@@ -759,6 +761,11 @@ final class AppServiceProvider extends ServiceProvider
     /**
      * Configure Filament.
      */
+    private function configureFileUploads(): void
+    {
+        FileUpload::configureUsing(fn (FileUpload $upload): FileUpload => $upload->placeholder(__('Drag & Drop your files or <span class="filepond--label-action">Browse</span>')));
+    }
+
     private function configureFilament(): void
     {
         ExportColumn::configureUsing(fn (ExportColumn $column): ExportColumn => $column->preventFormulaInjection());

@@ -15,6 +15,7 @@ use App\Support\Auth\AuthenticationSession;
 use App\Support\Locales;
 use App\Support\SameOriginUrl;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\FileUpload;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -953,4 +954,12 @@ describe('language', function () {
 
         expect($user->fresh()->name)->toBe('Renamed');
     });
+});
+
+it('addresses the photo upload with usted in Spanish', function (): void {
+    $this->actingAs(User::factory()->withWorkspace()->create());
+    Locales::apply('es');
+
+    Livewire::test(UpdateProfileInformationComponent::class)
+        ->assertFormFieldExists('profile_photo_path', fn (FileUpload $field): bool => str_contains((string) $field->getPlaceholder(), 'Arrastre y suelte sus archivos'));
 });
