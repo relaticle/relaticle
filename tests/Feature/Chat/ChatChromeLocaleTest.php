@@ -140,6 +140,36 @@ it('stores the approval error in English and shows it in the user language', fun
         ->and($action->fresh()->result_data['last_error'])->not->toContain('Action non');
 });
 
+function unapprovablePendingAction(User $user): PendingAction
+{
+    return PendingAction::query()->create([
+        'workspace_id' => $user->currentWorkspace->getKey(),
+        'user_id' => $user->getKey(),
+        'conversation_id' => null,
+        'action_class' => 'App\\Actions\\Company\\NotAnAllowedAction',
+        'operation' => PendingActionOperation::Create,
+        'entity_type' => 'company',
+        'action_data' => ['name' => 'Acme'],
+        'display_data' => ['title' => 'Create company', 'summary' => 'Create company "Acme"', 'fields' => []],
+        'status' => PendingActionStatus::Pending,
+        'expires_at' => now()->addMinutes(15),
+    ]);
+}
+
+it('shows a German user the approval error in German and stores it in English', function (string $method): void {
+    $action = unapprovablePendingAction($this->user);
+    Locales::apply('de');
+
+    $component = Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->dispatch('proposal:set-active', id: $action->getKey(), context: 'conversation')
+        ->call($method)
+        ->assertDispatched('proposal:resolve-failed');
+
+    expect($component->errors()->first('resolve'))->toContain(Lang::get('Action class not allowlisted', [], 'de'))
+        ->and($component->errors()->first('resolve'))->not->toContain('Action class not allowlisted')
+        ->and($action->fresh()->result_data['last_error'])->toContain('Action class not allowlisted');
+})->with(['createCurrent', 'approveAll']);
+
 it('builds batch receipts as whole phrases in the user language', function (): void {
     $receipts = Locales::within('de', fn (): array => ProposalEntity::receipts());
 

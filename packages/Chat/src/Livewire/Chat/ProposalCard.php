@@ -47,6 +47,7 @@ use Relaticle\Chat\Support\WorkspaceMembersContext;
 use Relaticle\CustomFields\Facades\CustomFields;
 use RuntimeException;
 use Symfony\Component\Mailer\Exception\TransportExceptionInterface;
+use Throwable;
 
 /**
  * The docked proposal card: the one place a chat-proposed write is decided.
@@ -937,7 +938,7 @@ final class ProposalCard extends BaseLivewireComponent
             return;
         } catch (RuntimeException|ValidationException $exception) {
             $this->announceLeftOut($affectedIds, $leftOutRows);
-            $this->reportResolveFailure($anchor, ApprovalFailureMessage::for($exception));
+            $this->reportApprovalException($anchor, $exception);
 
             return;
         }
@@ -954,7 +955,7 @@ final class ProposalCard extends BaseLivewireComponent
         }
 
         if ($result['failed'] !== null) {
-            $this->reportFailedStep($result['failed']['step'], $result['failed']['message']);
+            $this->reportFailedStep($result['failed']['step'], $result['failed']['message'], $result['failed']['shown']);
 
             return;
         }
@@ -962,12 +963,12 @@ final class ProposalCard extends BaseLivewireComponent
         $this->settleAfterResolution($anchor);
     }
 
-    private function reportFailedStep(PendingAction $failed, string $message): void
+    private function reportFailedStep(PendingAction $failed, string $message, string $shown): void
     {
-        $this->reportResolveFailure($failed, __(':step could not be completed: :message', [
-            'step' => $this->failingRowSummary($failed) ?? $this->stepSummary($failed),
-            'message' => $message,
-        ]));
+        $step = $this->failingRowSummary($failed) ?? $this->stepSummary($failed);
+        $describe = fn (string $reason): string => __(':step could not be completed: :message', ['step' => $step, 'message' => $reason]);
+
+        $this->reportResolveFailure($failed, $describe($message), $describe($shown));
 
         $remaining = $this->loadStep($this->pendingActionId) ?? $this->nextPendingStepOfPlan();
 
@@ -1423,7 +1424,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException|ValidationException $exception) {
-            $this->reportResolveFailure($step, $this->labelledFailure($step, ApprovalFailureMessage::for($exception)));
+            $this->reportApprovalException($step, $exception, labelled: true);
 
             return;
         }
@@ -1475,7 +1476,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException $exception) {
-            $this->reportResolveFailure($step, $exception->getMessage());
+            $this->reportApprovalException($step, $exception);
 
             return;
         }
@@ -1522,7 +1523,7 @@ final class ProposalCard extends BaseLivewireComponent
 
                 return;
             } catch (RuntimeException $exception) {
-                $this->reportResolveFailure($fresh, $exception->getMessage());
+                $this->reportApprovalException($fresh, $exception);
 
                 return;
             }
@@ -1592,7 +1593,7 @@ final class ProposalCard extends BaseLivewireComponent
             // action, e.g. a capability guard) is a RuntimeException too. Livewire
             // would otherwise absorb these into an error bag nothing renders,
             // leaving the button a permanent no-op.
-            $this->reportResolveFailure($pendingAction, ApprovalFailureMessage::for($exception));
+            $this->reportApprovalException($pendingAction, $exception);
 
             return;
         }
@@ -1622,7 +1623,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException $exception) {
-            $this->reportResolveFailure($batch, $exception->getMessage());
+            $this->reportApprovalException($batch, $exception);
 
             return;
         }
@@ -1660,7 +1661,7 @@ final class ProposalCard extends BaseLivewireComponent
 
             return;
         } catch (RuntimeException $exception) {
-            $this->reportResolveFailure($pendingAction, $exception->getMessage());
+            $this->reportApprovalException($pendingAction, $exception);
 
             return;
         }
@@ -1882,8 +1883,11 @@ final class ProposalCard extends BaseLivewireComponent
      */
     private function labelledFailure(PendingAction $step, string $message): string
     {
-        $record = $this->failingRowSummary($step);
+        return $this->prefixRecord($this->failingRowSummary($step), $message);
+    }
 
+    private function prefixRecord(?string $record, string $message): string
+    {
         return $record === null ? $message : __(':record: :message', ['record' => $record, 'message' => $message]);
     }
 
@@ -1917,9 +1921,21 @@ final class ProposalCard extends BaseLivewireComponent
         $this->dispatch('proposal:lapsed', pendingActionId: $lapsed->getKey(), context: $this->context);
     }
 
-    private function reportResolveFailure(PendingAction $pendingAction, string $message): void
+    private function reportApprovalException(PendingAction $pendingAction, Throwable $exception, bool $labelled = false): void
     {
-        $this->addError('resolve', ApprovalFailureMessage::displayed($message));
+        $record = $labelled ? $this->failingRowSummary($pendingAction) : null;
+
+        $this->reportResolveFailure(
+            $pendingAction,
+            $this->prefixRecord($record, ApprovalFailureMessage::for($exception)),
+            $this->prefixRecord($record, ApprovalFailureMessage::shown($exception)),
+        );
+    }
+
+    private function reportResolveFailure(PendingAction $pendingAction, string $message, ?string $shown = null): void
+    {
+        $shown ??= $message;
+        $this->addError('resolve', $shown);
 
         // Persisted so the model can explain the failure later: without this
         // the card is the only witness, and a proposal discarded after a failed
@@ -1929,7 +1945,7 @@ final class ProposalCard extends BaseLivewireComponent
         $this->dispatch(
             'proposal:resolve-failed',
             pendingActionId: $pendingAction->getKey(),
-            message: ApprovalFailureMessage::displayed($message),
+            message: $shown,
             context: $this->context,
         );
     }

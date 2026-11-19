@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Relaticle\Chat\Support;
 
 use Illuminate\Validation\ValidationException;
+use Relaticle\Chat\Exceptions\ProposalNotResolvable;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 use Throwable;
 
@@ -24,27 +25,9 @@ final readonly class ApprovalFailureMessage
         return $exception->getMessage();
     }
 
-    public static function displayed(string $message): string
+    public static function shown(Throwable $exception): string
     {
-        $translations = [
-            'This action has expired' => __('This action has expired'),
-            'This action has already been resolved' => __('This action has already been resolved'),
-            'Record not found' => __('Record not found'),
-            'Item index out of range' => __('Item index out of range'),
-            'Action class not allowlisted' => __('Action class not allowlisted'),
-        ];
-
-        foreach ($translations as $english => $translated) {
-            if ($message === $english) {
-                return $translated;
-            }
-
-            if (str_ends_with($message, ": {$english}")) {
-                return substr($message, 0, -strlen($english)).$translated;
-            }
-        }
-
-        return $message;
+        return $exception instanceof ProposalNotResolvable ? $exception->userMessage() : self::for($exception);
     }
 
     public static function forDelivery(): string

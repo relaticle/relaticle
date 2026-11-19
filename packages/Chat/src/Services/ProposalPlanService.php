@@ -229,7 +229,7 @@ final readonly class ProposalPlanService
      *
      * @param  list<string>  $leftOutSteps
      * @param  array<string, list<int>>  $leftOutRows
-     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}|null}
+     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string, shown: string}|null}
      */
     public function approveAll(PendingAction $action, User $user, array $leftOutSteps = [], array $leftOutRows = []): array
     {
@@ -255,7 +255,7 @@ final readonly class ProposalPlanService
 
                 return $this->failure($approved, $step, ApprovalFailureMessage::forDelivery());
             } catch (RuntimeException|ValidationException $exception) {
-                return $this->failure($approved, $step, ApprovalFailureMessage::for($exception));
+                return $this->failure($approved, $step, ApprovalFailureMessage::for($exception), ApprovalFailureMessage::shown($exception));
             }
 
             $approved[] = $step;
@@ -316,11 +316,11 @@ final readonly class ProposalPlanService
 
     /**
      * @param  list<PendingAction>  $approved
-     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string}}
+     * @return array{approved: list<PendingAction>, failed: array{step: PendingAction, message: string, shown: string}}
      */
-    private function failure(array $approved, PendingAction $step, string $message): array
+    private function failure(array $approved, PendingAction $step, string $message, ?string $shown = null): array
     {
-        return ['approved' => $approved, 'failed' => ['step' => $step, 'message' => $message]];
+        return ['approved' => $approved, 'failed' => ['step' => $step, 'message' => $message, 'shown' => $shown ?? $message]];
     }
 
     /**
