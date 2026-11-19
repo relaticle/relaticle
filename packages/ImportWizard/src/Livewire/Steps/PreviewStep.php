@@ -14,6 +14,7 @@ use Illuminate\Pagination\LengthAwarePaginator as Paginator;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\URL;
 use Illuminate\View\View;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
@@ -24,9 +25,7 @@ use Relaticle\ImportWizard\Enums\ImportStatus;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Livewire\Concerns\WithImportStore;
 use Relaticle\ImportWizard\Livewire\ImportWizard;
-use Relaticle\ImportWizard\Models\FailedImportRow;
 use Relaticle\ImportWizard\Store\ImportRow;
-use Symfony\Component\HttpFoundation\StreamedResponse;
 
 final class PreviewStep extends Component implements HasActions, HasForms
 {
@@ -330,39 +329,7 @@ final class PreviewStep extends Component implements HasActions, HasForms
             ->color('danger')
             ->icon('lucide-download')
             ->visible(fn (): bool => $this->isCompleted && $this->import()->failed_rows > 0)
-            ->action(fn (): StreamedResponse => $this->downloadFailedRows());
-    }
-
-    public function downloadFailedRows(): StreamedResponse
-    {
-        $import = $this->import();
-        $headers = $import->headers;
-
-        return response()->streamDownload(function () use ($import, $headers): void {
-            $handle = fopen('php://output', 'w');
-
-            if ($handle === false) {
-                return;
-            }
-
-            fwrite($handle, "\xEF\xBB\xBF");
-            fputcsv($handle, [...$headers, __('import-wizard-new::failed-rows.error_header')], escape: '\\');
-
-            $import->failedRows()
-                ->lazyById(100)
-                ->each(function (FailedImportRow $row) use ($handle, $headers): void {
-                    $values = [];
-
-                    foreach ($headers as $header) {
-                        $values[] = $row->data[$header] ?? '';
-                    }
-
-                    $values[] = $row->validation_error ?? '';
-                    fputcsv($handle, $values, escape: '\\');
-                });
-
-            fclose($handle);
-        }, 'failed-rows.csv', ['Content-Type' => 'text/csv']);
+            ->url(fn (): string => URL::temporarySignedRoute('import-history.failed-rows.download', now()->addHour(), ['import' => $this->import()]), shouldOpenInNewTab: true);
     }
 
     public function checkMatchResolution(): void

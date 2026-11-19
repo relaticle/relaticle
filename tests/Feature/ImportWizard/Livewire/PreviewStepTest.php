@@ -29,6 +29,7 @@ use Relaticle\ImportWizard\Enums\RowMatchAction;
 use Relaticle\ImportWizard\Jobs\ExecuteImportJob;
 use Relaticle\ImportWizard\Jobs\ValidateColumnJob;
 use Relaticle\ImportWizard\Livewire\Steps\PreviewStep;
+use Relaticle\ImportWizard\Models\FailedImportRow;
 use Relaticle\ImportWizard\Models\Import;
 use Relaticle\ImportWizard\Store\ImportStore;
 use Relaticle\ImportWizard\Support\MatchResolver;
@@ -787,6 +788,28 @@ it('downloadFailedRows action is hidden when there are no failed rows', function
     $component = mountPreviewStep($this);
 
     $component->assertDontSee('Download Failed Rows');
+});
+
+it('downloadFailedRows action links the signed download with the shared csv writer', function (): void {
+    createPreviewReadyStore($this, ['Name'], [
+        makePreviewRow(2, ['Name' => 'John']),
+    ], [
+        ColumnData::toField(source: 'Name', target: 'name'),
+    ]);
+
+    $this->import->update(['status' => ImportStatus::Completed, 'failed_rows' => 1]);
+    FailedImportRow::query()->create([
+        'import_id' => $this->import->id,
+        'workspace_id' => $this->workspace->id,
+        'data' => ['Name' => 'John'],
+        'validation_error' => null,
+    ]);
+
+    $url = mountPreviewStep($this)->instance()->downloadFailedRowsAction()->getUrl();
+
+    $csv = $this->get($url)->assertOk()->streamedContent();
+
+    expect($csv)->toContain('John,"System error"');
 });
 
 function completePreviewImport(object $context): void
