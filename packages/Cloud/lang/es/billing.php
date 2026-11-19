@@ -7,7 +7,7 @@ return [
         'trialing' => 'Prueba',
         'active' => 'Activo',
         'past_due' => 'Pago vencido',
-        'canceling' => 'Cancelándose',
+        'canceling' => 'Se cancelará',
         'grandfathered' => 'Histórico',
         'managed' => 'Administrado',
     ],

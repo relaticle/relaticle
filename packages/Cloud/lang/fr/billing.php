@@ -73,7 +73,7 @@ return [
         ],
         'switch' => 'Changer d\'espace de travail',
         'help' => 'Besoin d\'aide avec votre offre ?',
-        'contact' => 'Parlez-nous',
+        'contact' => 'Contactez-nous',
         'privacy' => 'Confidentialité',
         'sign_out' => 'Se déconnecter',
         'copyright' => '© :year Relaticle',
@@ -87,7 +87,7 @@ return [
     'per_month' => '/ mois',
     'pro_plan' => [
         'tagline' => 'Pour les équipes qui mettent l\'IA au travail',
-        'pricing_tagline' => 'Pour un vendeur avec une liste nommée',
+        'pricing_tagline' => 'Pour un vendeur avec une liste ciblée',
         'features' => [
             'Utilisateurs et enregistrements illimités',
             '2 000 crédits d\'IA / mois',
@@ -99,7 +99,7 @@ return [
     ],
     'scale_plan' => [
         'tagline' => 'Pour les équipes qui travaillent toute la journée sur Relaticle',
-        'pricing_tagline' => 'Pour une équipe qui travaille un seul pipeline',
+        'pricing_tagline' => 'Pour une équipe sur un seul pipeline',
         'badge' => 'Recommandé',
         'includes' => 'Tout ce qui est dans Cloud Pro, plus',
         'features' => [
@@ -174,7 +174,7 @@ return [
             'Accès direct à l\'équipe fondatrice',
         ],
         'terms' => 'Périmètre et prix convenus avant votre signature.',
-        'contact' => 'Parlez-nous',
+        'contact' => 'Contactez-nous',
         'manage' => 'Contactez votre équipe Relaticle',
         'faq_title' => 'Que comprend Enterprise ?',
         'faq_body' => 'Enterprise démarre à $:price par an. Il comprend Cloud Scale avec un projet de mise en œuvre cadré, des intégrations convenues, ainsi que la maintenance et le support continus. Nous convenons des livrables, de l\'usage de l\'IA, des limites d\'API, des conditions de support et des jalons avant la signature. Tout travail supplémentaire fait l\'objet d\'un devis distinct.',

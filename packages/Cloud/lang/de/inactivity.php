@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 return [
     'notice' => [
-        'subject' => 'Pausierte Testarbeitsbereiche löschen wir künftig nach 60 Tagen',
+        'subject' => 'Pausierte Arbeitsbereiche aus der Testphase löschen wir künftig nach 60 Tagen',
         'preheader' => ':workspace ist bis zum :date sicher. Wählen Sie einen Tarif oder melden Sie sich an, um ihn länger zu behalten.',
-        'heading' => 'Pausierte Testarbeitsbereiche löschen wir künftig nach 60 Tagen',
-        'body' => ':workspace ist seit dem Ende der Testphase pausiert. Ab heute löschen wir einen pausierten Testarbeitsbereich nach 60 Tagen ohne Anmeldung.',
+        'heading' => 'Pausierte Arbeitsbereiche aus der Testphase löschen wir künftig nach 60 Tagen',
+        'body' => ':workspace ist seit dem Ende der Testphase pausiert. Ab heute löschen wir einen pausierten Arbeitsbereich aus der Testphase nach 60 Tagen ohne Anmeldung.',
         'date' => 'Ihre 60 Tage beginnen heute. Wenn sich niemand anmeldet und niemand einen Tarif wählt, löschen wir :workspace am :date.',
         'warn' => 'Wir schreiben Ihnen :warning Tage und :reminder Tage vorher per E-Mail.',
         'cta' => 'Tarif wählen',
@@ -17,10 +17,10 @@ return [
         'preheader' => 'Seit dem :since hat sich niemand angemeldet. Wählen Sie einen Tarif oder melden Sie sich an, um ihn zu behalten.',
         'heading' => ':workspace wird am :date gelöscht',
         'paused' => ':workspace ist pausiert, und seit dem :since hat sich niemand angemeldet.',
-        'rule' => 'Wir löschen einen pausierten Testarbeitsbereich nach 60 Tagen ohne Anmeldung. Am :date löschen wir :workspace und jeden Eintrag darin. Das lässt sich nicht rückgängig machen.',
+        'rule' => 'Wir löschen einen pausierten Arbeitsbereich aus der Testphase nach 60 Tagen ohne Anmeldung. Am :date löschen wir :workspace und jeden Eintrag darin. Das lässt sich nicht rückgängig machen.',
         'keep' => 'Um den Arbeitsbereich zu behalten, wählen Sie vorher einen Tarif.',
         'cta' => 'Tarif wählen',
-        'sign_in' => 'Eine Anmeldung behält ihn ebenfalls weitere 60 Tage.',
+        'sign_in' => 'Auch eine Anmeldung sichert ihn für weitere 60 Tage.',
     ],
     'reminder' => [
         'subject' => ':workspace wird am :date gelöscht',
