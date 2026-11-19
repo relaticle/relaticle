@@ -25,6 +25,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Passkeys\Contracts\PasskeyUser;
 use Laravel\Passkeys\PasskeyAuthenticatable;
+use Laravel\Sanctum\HasApiTokens;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 
 /**
@@ -55,6 +56,8 @@ use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 #[Table(name: 'system_administrators')]
 final class SystemAdministrator extends Authenticatable implements FilamentUser, HasAppAuthentication, HasAppAuthenticationRecovery, HasAvatar, MustVerifyEmail, PasskeyUser
 {
+    use HasApiTokens;
+
     /** @use HasFactory<SystemAdministratorFactory> */
     use HasFactory;
 

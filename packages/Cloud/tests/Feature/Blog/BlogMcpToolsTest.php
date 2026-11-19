@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\User;
+use Laravel\Sanctum\TransientToken;
 use Relaticle\Ink\Mcp\BlogServer;
 use Relaticle\Ink\Mcp\Tools\CreatePostTool;
 use Relaticle\Ink\Models\Category;
@@ -20,6 +21,7 @@ beforeEach(function (): void {
         'role' => SystemAdministratorRole::SuperAdministrator,
         'email' => 'founder@relaticle.com',
     ]);
+    $this->admin->withAccessToken(new TransientToken);
     $this->category = Category::factory()->create(['name' => 'Engineering']);
 });
 

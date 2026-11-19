@@ -16,7 +16,7 @@ final class FragmentedStream
 {
     public static string $payload = '';
 
-    public $context;
+    public mixed $context = null;
 
     private int $position = 0;
 

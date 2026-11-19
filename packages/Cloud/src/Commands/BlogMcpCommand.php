@@ -9,6 +9,7 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Support\Facades\Auth;
+use Laravel\Sanctum\PersonalAccessToken;
 use Relaticle\Cloud\Blog\BlogMcpStreams;
 use Relaticle\Cloud\Blog\LocalStdioTransport;
 use Relaticle\Ink\Mcp\BlogServer;
@@ -37,9 +38,15 @@ final class BlogMcpCommand extends Command
         $administratorId = $administrators->first()->getKey();
         $guard = Auth::guard(config('ink.mcp.guard'));
         $actAsAdministrator = function () use ($administratorId, $guard): void {
-            $administrator = SystemAdministrator::query()->find($administratorId);
+            $administrator = SystemAdministrator::query()->whereKey($administratorId)->first();
 
-            $administrator === null ? $guard->forgetUser() : $guard->setUser($administrator);
+            if ($administrator === null) {
+                $guard->forgetUser();
+
+                return;
+            }
+
+            $guard->setUser($administrator->withAccessToken(new PersonalAccessToken(['abilities' => ['*']])));
         };
 
         $actAsAdministrator();
