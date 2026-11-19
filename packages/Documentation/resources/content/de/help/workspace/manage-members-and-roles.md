@@ -1,8 +1,8 @@
 ---
 title: Mitglieder und Rollen verwalten
-description: Was die Rollen Inhaber, Administrator, Mitglied und Betrachter jeweils dürfen, dazu Einladungen, Beitrittslinks und das Entfernen von Mitgliedern.
+description: Was die Rollen Inhaber, Administrator, Mitglied und Betrachter jeweils dürfen, dazu Einladungen per E-Mail und das Entfernen von Mitgliedern.
 order: 1
-updated: "2026-09-22"
+updated: "2026-11-19"
 related: [help/getting-started/invite-your-team, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -51,8 +51,8 @@ Der Inhaber ist keine Rolle, die Sie vergeben. Wer den Arbeitsbereich besitzt,
 erscheint immer mit einem Badge **Inhaber**, hat keine Rolle, die sich ändern ließe,
 und kann den Arbeitsbereich weder verlassen noch daraus entfernt werden.
 
-Überall, wo Sie eine Rolle wählen, in **Mitglieder einladen**, **Rolle ändern** oder
-**Einladungslink**, steht **Rollen vergleichen** neben der Auswahl. Es öffnet diese
+Überall, wo Sie eine Rolle wählen, in **Mitglieder einladen** oder **Rolle ändern**,
+steht **Rollen vergleichen** neben der Auswahl. Es öffnet diese
 Tabelle in der App, und sie stimmt immer mit dem überein, was jede Rolle tatsächlich
 darf.
 
@@ -73,27 +73,6 @@ Eine Einladung gilt 48 Stunden. Danach steht in der Zeile **Einladung abgelaufen
 und **Erneut senden** stellt eine neue aus.
 
 ![Die Liste Mitglieder mit einer eingeladenen E-Mail-Adresse, markiert als Einladung ausstehend, über den Personen, die beigetreten sind](/help-assets/workspace/manage-members-and-roles-1.png)
-
-## Der Link zum Arbeitsbereich
-
-**Einladungslink** neben **Mitglieder einladen** enthält einen einzelnen Link, mit dem
-jeder beitreten kann. Kopieren Sie ihn, um ihn direkt zu teilen, und legen Sie die
-Rolle fest, die Personen beim Beitritt damit erhalten, standardmäßig Mitglied. Die
-Rolle wird gespeichert, sobald Sie sie wählen. Der Link gilt 7 Tage und kann die
-Rolle Mitglied oder Betrachter vergeben. Administratoren werden per E-Mail
-eingeladen, damit die Person immer namentlich bekannt ist.
-
-Der Dialog zeigt, wie lange der Link noch gültig ist. Sobald er abläuft, kann
-niemand mehr damit beitreten, und der Dialog bietet stattdessen **Neuen Link
-erzeugen** an.
-
-Zwei Steuerelemente stehen darunter:
-
-- **Neuen Link erzeugen** ersetzt den Link, falls der aktuelle öffentlich geworden
-  ist. Der alte funktioniert sofort nicht mehr.
-- **Link deaktivieren** entfernt ihn ganz, sodass Einladungen per E-Mail der einzige
-  Weg hinein bleiben. Wenn Sie ihn wieder aktivieren, entsteht ein anderer Link, der
-  deaktivierte bleibt also ungültig.
 
 ## Mitglieder ändern und entfernen
 

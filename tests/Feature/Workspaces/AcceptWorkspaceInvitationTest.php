@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use App\Actions\Jetstream\AcceptWorkspaceInvitation;
 use App\Enums\DeletionReason;
+use App\Enums\WorkspaceRole;
 use App\Filament\Pages\Dashboard;
 use App\Models\User;
 use App\Models\Workspace;
@@ -81,7 +82,7 @@ test('the accept page names the account that will join', function () {
     $this->actingAs($this->user)
         ->get(route('workspace-invitations.token.accept', ['token' => rawTokenFor($invitation)]))
         ->assertOk()
-        ->assertSeeInOrder([__('workspaces.invite_link.join.joining_as'), $this->user->email]);
+        ->assertSeeInOrder([__('workspaces.invitation.joining_as'), $this->user->email]);
 });
 
 test('expired invitation shows the expired state', function () {
@@ -530,11 +531,11 @@ test('an invitation carrying an unregistered role joins on the workspace default
 
     expect($this->user->fresh()->belongsToWorkspace($this->workspace))->toBeTrue()
         ->and($this->workspace->fresh()->users()->find($this->user->id)->membership->role)
-        ->toBe($this->workspace->invite_link_default_role)
+        ->toBe(WorkspaceRole::Member->value)
         ->and(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
 });
 
-test('an invitation carrying no role joins on the workspace default', function (): void {
+test('falls back to the member role when an invitation names no role', function (): void {
     $invitation = WorkspaceInvitation::factory()->create([
         'workspace_id' => $this->workspace->id,
         'email' => $this->user->email,
@@ -549,7 +550,7 @@ test('an invitation carrying no role joins on the workspace default', function (
         ->assertRedirect(Dashboard::getUrl(['tenant' => $this->workspace]));
 
     expect($this->workspace->fresh()->users()->find($this->user->id)->membership->role)
-        ->toBe($this->workspace->invite_link_default_role);
+        ->toBe(WorkspaceRole::Member->value);
 });
 
 test('an invitation whose stored email kept its original case still matches the invitee', function (): void {
@@ -695,4 +696,18 @@ test('an invitation to a workspace on an inactivity countdown joins it and stops
     expect($workspace->hasUser($this->user))->toBeTrue()
         ->and($workspace->scheduled_deletion_at)->toBeNull()
         ->and($workspace->deletion_reason)->toBeNull();
+});
+
+test('returns 404 for a join link path', function (): void {
+    $token = Str::random(40);
+
+    $this->get("/join/{$token}")->assertNotFound();
+
+    $this->actingAs($this->user)
+        ->post("/join/{$token}")
+        ->assertNotFound();
+
+    $this->actingAs($this->user)
+        ->get("/join/{$token}")
+        ->assertNotFound();
 });

@@ -24,8 +24,7 @@ time; changing the slug changes your URLs, so update any bookmarks.
 The workspace switcher at the top of the sidebar lists every workspace
 you're a member of, and switching is instant. **Create Workspace** in the same
 menu starts a short wizard: name it, pick its URL handle, tell Relaticle
-what you'll use it for, and invite your first teammates, by email or by
-copying the 7-day join link.
+what you'll use it for, and invite your first teammates by email.
 
 Separate clients, separate businesses, or a sandbox to try things in: each
 workspace keeps its data, fields, and plan entirely to itself.

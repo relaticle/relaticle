@@ -39,7 +39,7 @@ return [
         ],
         'update_workspace_logo' => [
             'title' => 'Workspace Logo',
-            'description' => 'Your logo appears in the workspace switcher, on invitations, and on the join page.',
+            'description' => 'Your logo appears in the workspace switcher, on invitations, and on the invitation page.',
         ],
         'assistant' => [
             'description' => 'Choose what :assistant, the built-in AI assistant, may do for members of this workspace.',
@@ -49,7 +49,7 @@ return [
         ],
         'add_workspace_member' => [
             'title' => 'Invite people',
-            'description' => 'Send an email invitation, or share a link that lets people join themselves.',
+            'description' => 'Invite people by email. Each person gets their own invitation.',
         ],
         'workspace_members' => [
             'title' => 'Members',
@@ -67,12 +67,7 @@ return [
         'save' => 'Save',
         'invite_people' => 'Invite workspace members',
         'send_invitations' => 'Send invitations',
-        'invite_link' => 'Invite link',
         'close' => 'Close',
-        'copy_invite_link' => 'Copy link',
-        'rotate_invite_link' => 'Generate a new link',
-        'disable_invite_link' => 'Turn off the link',
-        'enable_invite_link' => 'Turn on the link',
         'update_workspace_role' => 'Change role',
         'compare_roles' => 'Compare roles',
         'compare_roles_help_link' => 'Read the full breakdown',
@@ -113,18 +108,6 @@ return [
         'role_updated' => [
             'success' => 'Role updated.',
         ],
-        'invite_link_role_updated' => [
-            'success' => 'Anyone joining with this link is now a :role.',
-        ],
-        'invite_link_rotated' => [
-            'success' => 'A new invite link was generated. The previous link no longer works.',
-        ],
-        'invite_link_disabled' => [
-            'success' => 'The workspace link is off. Invite people by email instead.',
-        ],
-        'invite_link_enabled' => [
-            'success' => 'The workspace link is on. Anyone who opens it can join.',
-        ],
         'resend_throttled' => 'Please wait :seconds seconds before resending.',
         'some_invites_failed' => [
             'title' => 'Some invitations could not be sent',
@@ -143,7 +126,6 @@ return [
         'email_already_invited' => 'This user has already been invited to the workspace.',
         'email_already_member' => 'This user already belongs to the workspace.',
         'only_owner_promotes_admins' => 'Only the workspace owner can grant the Admin role.',
-        'invite_link_role_cannot_be_admin' => 'The workspace link cannot grant the Admin role. Invite admins by email instead.',
         'no_valid_emails' => 'Enter at least one email address.',
         'too_many_invites' => 'You can invite up to :max people at a time.',
         'managed_plan_before_deleting' => 'This workspace is on a plan billed by Relaticle. Talk to us to end the plan before you delete the workspace.',
@@ -165,14 +147,6 @@ return [
         ],
         'delete_workspace' => [
             'notice' => 'This will schedule the workspace for deletion. You will have 30 days to cancel before all data is permanently removed.',
-        ],
-        'rotate_invite_link' => [
-            'heading' => 'Generate a new invite link?',
-            'notice' => 'The current link stops working immediately. Anyone still holding it, in a chat or an email, will not be able to join.',
-        ],
-        'disable_invite_link' => [
-            'heading' => 'Turn off the workspace link?',
-            'notice' => 'Nobody can join with the current link once it is off. Turning it back on issues a different link, so the old one stays dead.',
         ],
         'cancel_deletion' => [
             'heading' => 'Cancel workspace deletion?',
@@ -358,37 +332,8 @@ return [
     ],
 
     'invitation' => [
+        'joining_as' => 'Joining as',
         'members' => '{1} 1 person is already in this workspace|[2,*] :count people are already in this workspace',
-    ],
-
-    'invite_link' => [
-        'heading' => 'Invite link',
-        'description' => 'Share one link instead of typing addresses. Anyone who opens it joins this workspace.',
-        'url' => 'Workspace link',
-        'copied' => 'Link copied.',
-        'expires_in' => 'Stops working in :time. Generating a new link resets the clock.',
-        'default_role' => 'People join as',
-        'default_role_helper' => 'Saved as soon as you pick it. Admins are invited by email instead.',
-        'lapsed' => [
-            'title' => 'This link expired :time ago',
-            'notice' => 'Nobody can join with it. Generate a new link to keep inviting people.',
-        ],
-        'disabled' => [
-            'title' => 'The workspace link is off',
-            'notice' => 'Email invitations are the only way in. Turning the link on issues a new one.',
-        ],
-        'join' => [
-            'heading' => 'Join :workspace',
-            'body' => 'You will join with :role access.',
-            'joining_as' => 'Joining as',
-            'action' => 'Join workspace',
-            'decline' => 'Not now',
-        ],
-        'expired' => [
-            'heading' => 'This invite link no longer works',
-            'body' => 'It expired, was turned off, or was replaced by a new one. Ask the workspace owner to share the current link.',
-            'action' => 'Go to my workspace',
-        ],
     ],
 
     'deletion_banner' => [

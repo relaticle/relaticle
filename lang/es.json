@@ -646,7 +646,6 @@
     "Yes": "Sí",
     "Yesterday": "Ayer",
     "You are no longer a member of this workspace, so the assistant stopped.": "Ya no es miembro de este espacio de trabajo, por lo que el asistente se detuvo.",
-    "You cannot join workspaces while your account is scheduled for deletion.": "No puede unirse a espacios de trabajo mientras su cuenta esté programada para eliminarse.",
     "You changed :field :when, after :assistant proposed this.": "Usted cambió :field :when, después de que :assistant propuso esto.",
     "You changed :fields :when, after :assistant proposed this.": "Usted cambió :fields :when, después de que :assistant propuso esto.",
     "You cleared :field :when, after :assistant proposed this.": "Usted borró :field :when, después de que :assistant propuso esto.",

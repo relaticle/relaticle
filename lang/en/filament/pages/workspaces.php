@@ -99,9 +99,6 @@ return [
             'emails_placeholder' => 'maya@acme.com, leo@acme.com',
             'helper' => 'Paste several at once. Everyone gets the same role.',
             'invalid_emails' => 'Check these addresses: :emails',
-            'link_label' => 'Or share an invite link',
-            'copy_link' => 'Copy link',
-            'create_link' => 'Create link',
             'send_and_start' => 'Send invites and get started',
             'not_sent' => [
                 'title' => 'Some invitations were not sent',

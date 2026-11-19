@@ -646,7 +646,6 @@
     "Yes": "Yes",
     "Yesterday": "Yesterday",
     "You are no longer a member of this workspace, so the assistant stopped.": "You are no longer a member of this workspace, so the assistant stopped.",
-    "You cannot join workspaces while your account is scheduled for deletion.": "You cannot join workspaces while your account is scheduled for deletion.",
     "You changed :field :when, after :assistant proposed this.": "You changed :field :when, after :assistant proposed this.",
     "You changed :fields :when, after :assistant proposed this.": "You changed :fields :when, after :assistant proposed this.",
     "You cleared :field :when, after :assistant proposed this.": "You cleared :field :when, after :assistant proposed this.",

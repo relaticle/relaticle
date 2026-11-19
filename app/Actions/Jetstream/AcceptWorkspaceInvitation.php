@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Jetstream;
 
+use App\Enums\WorkspaceRole;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
@@ -46,7 +47,7 @@ final readonly class AcceptWorkspaceInvitation
             }
 
             if (! $user->belongsToWorkspace($workspace)) {
-                $this->addMember($user, $workspace, $this->registeredRole($workspace, $locked->role));
+                $this->addMember($user, $workspace, $this->registeredRole($locked->role));
             }
 
             $locked->delete();
@@ -64,13 +65,13 @@ final readonly class AcceptWorkspaceInvitation
 
     // An unregistered or absent role key fails AddWorkspaceMember's validation from
     // inside the transaction, dead-ending the invitee on a page that never completes.
-    private function registeredRole(Workspace $workspace, ?string $role): string
+    private function registeredRole(?string $role): string
     {
         if ($role !== null && Jetstream::findRole($role) !== null) {
             return $role;
         }
 
-        return $workspace->invite_link_default_role;
+        return WorkspaceRole::Member->value;
     }
 
     /**

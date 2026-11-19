@@ -1,8 +1,8 @@
 ---
 title: Gérer les membres et les rôles
-description: Ce que peuvent faire les rôles Propriétaire, Administrateur, Membre et Lecteur, plus les invitations, les liens d'invitation et le retrait de membres.
+description: Ce que peuvent faire les rôles Propriétaire, Administrateur, Membre et Lecteur, plus les invitations par e-mail et le retrait de membres.
 order: 1
-updated: "2026-09-22"
+updated: "2026-11-19"
 related: [help/getting-started/invite-your-team, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -52,8 +52,7 @@ travail apparaît toujours avec un badge **Propriétaire**, n'a aucun rôle à c
 ne peut ni partir ni être retirée.
 
 Partout où vous choisissez un rôle, dans **Inviter des membres de l'espace de
-travail**, **Changer le rôle** ou **Lien d'invitation**, **Comparer les rôles** se
-trouve à côté du choix. Il ouvre ce tableau dans l'application, et il correspond
+travail** ou **Changer le rôle**, **Comparer les rôles** se trouve à côté du choix. Il ouvre ce tableau dans l'application, et il correspond
 toujours à ce que chaque rôle peut réellement faire.
 
 ## Invitations
@@ -74,28 +73,6 @@ Une invitation dure 48 heures. Ensuite la ligne indique **Invitation expirée**,
 **Renvoyer** en émet une nouvelle.
 
 ![La liste des membres avec un e-mail invité marqué Invitation en attente au-dessus des personnes qui ont rejoint l'espace de travail](/help-assets/workspace/manage-members-and-roles-1.png)
-
-## Le lien de l'espace de travail
-
-**Lien d'invitation**, à côté de **Inviter des membres de l'espace de travail**,
-contient un lien unique avec lequel n'importe qui peut rejoindre l'espace de travail.
-Copiez-le pour le partager directement, et définissez le rôle que reçoivent les
-personnes qui rejoignent avec lui, Membre par défaut. Le rôle s'enregistre dès que
-vous le choisissez. Le lien dure 7 jours et peut accorder le rôle Membre ou Lecteur.
-Les administrateurs sont invités par e-mail, de sorte que la personne est toujours
-nommée.
-
-La boîte de dialogue indique le temps qu'il reste au lien. Une fois expiré, personne
-ne peut rejoindre avec lui, et la boîte de dialogue propose **Générer un nouveau
-lien** à la place.
-
-Deux commandes se trouvent en dessous :
-
-- **Générer un nouveau lien** remplace le lien si l'actuel a fuité. L'ancien cesse de
-  fonctionner immédiatement.
-- **Désactiver le lien** le supprime entièrement, ce qui laisse les invitations par
-  e-mail comme seule voie d'entrée. Le réactiver émet un lien différent : celui que
-  vous avez désactivé reste donc mort.
 
 ## Changer et retirer des membres
 

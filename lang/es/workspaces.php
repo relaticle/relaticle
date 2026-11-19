@@ -39,7 +39,7 @@ return [
         ],
         'update_workspace_logo' => [
             'title' => 'Logotipo del espacio de trabajo',
-            'description' => 'Su logotipo aparece en el selector de espacios de trabajo, en las invitaciones y en la página de unión.',
+            'description' => 'Su logotipo aparece en el selector de espacios de trabajo, en las invitaciones y en la página de invitación.',
         ],
         'assistant' => [
             'description' => 'Elija qué puede hacer :assistant, el asistente de IA integrado, por los miembros de este espacio de trabajo.',
@@ -49,7 +49,7 @@ return [
         ],
         'add_workspace_member' => [
             'title' => 'Invitar personas',
-            'description' => 'Envíe una invitación por correo electrónico o comparta un enlace con el que las personas puedan unirse por su cuenta.',
+            'description' => 'Invite a personas por correo electrónico. Cada persona recibe su propia invitación.',
         ],
         'workspace_members' => [
             'title' => 'Miembros',
@@ -67,12 +67,7 @@ return [
         'save' => 'Guardar',
         'invite_people' => 'Invitar miembros del espacio de trabajo',
         'send_invitations' => 'Enviar invitaciones',
-        'invite_link' => 'Enlace de invitación',
         'close' => 'Cerrar',
-        'copy_invite_link' => 'Copiar enlace',
-        'rotate_invite_link' => 'Generar un enlace nuevo',
-        'disable_invite_link' => 'Desactivar el enlace',
-        'enable_invite_link' => 'Activar el enlace',
         'update_workspace_role' => 'Cambiar rol',
         'compare_roles' => 'Comparar roles',
         'compare_roles_help_link' => 'Leer el detalle completo',
@@ -113,18 +108,6 @@ return [
         'role_updated' => [
             'success' => 'Rol actualizado.',
         ],
-        'invite_link_role_updated' => [
-            'success' => 'Quien se una con este enlace ahora tendrá el rol de :role.',
-        ],
-        'invite_link_rotated' => [
-            'success' => 'Se generó un enlace de invitación nuevo. El enlace anterior ya no funciona.',
-        ],
-        'invite_link_disabled' => [
-            'success' => 'El enlace del espacio de trabajo está desactivado. Invite a las personas por correo electrónico.',
-        ],
-        'invite_link_enabled' => [
-            'success' => 'El enlace del espacio de trabajo está activado. Cualquiera que lo abra puede unirse.',
-        ],
         'resend_throttled' => 'Espere :seconds segundos antes de reenviar.',
         'some_invites_failed' => [
             'title' => 'No se pudieron enviar algunas invitaciones',
@@ -143,7 +126,6 @@ return [
         'email_already_invited' => 'Esta persona ya fue invitada al espacio de trabajo.',
         'email_already_member' => 'Esta persona ya pertenece al espacio de trabajo.',
         'only_owner_promotes_admins' => 'Solo el propietario del espacio de trabajo puede conceder el rol de administrador.',
-        'invite_link_role_cannot_be_admin' => 'El enlace del espacio de trabajo no puede conceder el rol de administrador. Invite a los administradores por correo electrónico.',
         'no_valid_emails' => 'Ingrese al menos una dirección de correo electrónico.',
         'too_many_invites' => 'Puede invitar hasta :max personas a la vez.',
         'managed_plan_before_deleting' => 'Este espacio de trabajo tiene un plan facturado por Relaticle. Comuníquese con nosotros para finalizar el plan antes de eliminar el espacio de trabajo.',
@@ -165,14 +147,6 @@ return [
         ],
         'delete_workspace' => [
             'notice' => 'Se programará la eliminación del espacio de trabajo. Tendrá 30 días para cancelarla antes de que todos los datos se eliminen de forma permanente.',
-        ],
-        'rotate_invite_link' => [
-            'heading' => '¿Generar un enlace de invitación nuevo?',
-            'notice' => 'El enlace actual deja de funcionar de inmediato. Quien aún lo tenga, en un chat o en un correo electrónico, no podrá unirse.',
-        ],
-        'disable_invite_link' => [
-            'heading' => '¿Desactivar el enlace del espacio de trabajo?',
-            'notice' => 'Nadie podrá unirse con el enlace actual una vez desactivado. Al volver a activarlo se emite un enlace distinto, por lo que el anterior queda inutilizable.',
         ],
         'cancel_deletion' => [
             'heading' => '¿Cancelar la eliminación del espacio de trabajo?',
@@ -358,37 +332,8 @@ return [
     ],
 
     'invitation' => [
+        'joining_as' => 'Se une como',
         'members' => '{1} 1 persona ya está en este espacio de trabajo|[2,*] :count personas ya están en este espacio de trabajo',
-    ],
-
-    'invite_link' => [
-        'heading' => 'Enlace de invitación',
-        'description' => 'Comparta un enlace en lugar de escribir direcciones. Quien lo abra se une a este espacio de trabajo.',
-        'url' => 'Enlace del espacio de trabajo',
-        'copied' => 'Enlace copiado.',
-        'expires_in' => 'Deja de funcionar en :time. Al generar un enlace nuevo se reinicia el plazo.',
-        'default_role' => 'Las personas se unen como',
-        'default_role_helper' => 'Queda guardado al seleccionarlo. Los administradores se invitan por correo electrónico.',
-        'lapsed' => [
-            'title' => 'Este enlace venció hace :time',
-            'notice' => 'Nadie puede unirse con él. Genere un enlace nuevo para seguir invitando personas.',
-        ],
-        'disabled' => [
-            'title' => 'El enlace del espacio de trabajo está desactivado',
-            'notice' => 'Las invitaciones por correo electrónico son la única forma de entrar. Al activar el enlace se emite uno nuevo.',
-        ],
-        'join' => [
-            'heading' => 'Unirse a :workspace',
-            'body' => 'Se unirá con acceso de :role.',
-            'joining_as' => 'Se une como',
-            'action' => 'Unirse al espacio de trabajo',
-            'decline' => 'Ahora no',
-        ],
-        'expired' => [
-            'heading' => 'Este enlace de invitación ya no funciona',
-            'body' => 'Venció, se desactivó o fue reemplazado por uno nuevo. Pida al propietario del espacio de trabajo que comparta el enlace actual.',
-            'action' => 'Ir a mi espacio de trabajo',
-        ],
     ],
 
     'deletion_banner' => [
