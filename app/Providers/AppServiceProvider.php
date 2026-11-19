@@ -15,6 +15,7 @@ use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Tables\ResizableColumns;
+use App\Http\Middleware\EnforceAbsoluteSessionLifetime;
 use App\Http\Middleware\PreventRequestForgery;
 use App\Http\Middleware\ReadAcrossWorkspaces;
 use App\Http\Responses\LoginResponse;
@@ -518,7 +519,7 @@ final class AppServiceProvider extends ServiceProvider
         Livewire::component(Notifications::class, FilamentNotifications::class);
 
         // Livewire matches persistent middleware by class, so the panel's alias alone skips update requests.
-        Livewire::addPersistentMiddleware(ReadAcrossWorkspaces::class);
+        Livewire::addPersistentMiddleware([ReadAcrossWorkspaces::class, EnforceAbsoluteSessionLifetime::class]);
 
         ImportWizard::continueUrlUsing((new ContinueWithSetupChat)(...));
     }

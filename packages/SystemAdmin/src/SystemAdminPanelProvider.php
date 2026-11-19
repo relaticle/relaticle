@@ -41,7 +41,6 @@ use Relaticle\SystemAdmin\Filament\Pages\Dashboard;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyLoginController;
 use Relaticle\SystemAdmin\Http\Controllers\PasskeyRegistrationController;
 use Relaticle\SystemAdmin\Http\Middleware\DenySearchIndexing;
-use Relaticle\SystemAdmin\Http\Middleware\EnforceStaffSessionLifetime;
 use Relaticle\SystemAdmin\Http\Middleware\IsolateAuthenticationSession;
 use Relaticle\SystemAdmin\Http\Middleware\RequireSecondFactor;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
@@ -98,8 +97,6 @@ final class SystemAdminPanelProvider extends PanelProvider
     public function boot(): void
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'system-admin');
-
-        Livewire::addPersistentMiddleware(EnforceStaffSessionLifetime::class);
 
         // Blog MCP requests are not Filament panel requests, so the panel-scoped
         // policy discovery in AppServiceProvider never sees them.
@@ -222,7 +219,7 @@ final class SystemAdminPanelProvider extends PanelProvider
                 AddQueuedCookiesToResponse::class,
                 StartSession::class,
                 'auth.context',
-                EnforceStaffSessionLifetime::class,
+                'auth.lifetime:system-admin.session,idle',
                 AuthenticateSession::class,
                 ShareErrorsFromSession::class,
                 PreventRequestForgery::class,
