@@ -2,119 +2,26 @@
 
 declare(strict_types=1);
 
-use App\Models\User;
-use Illuminate\Routing\Route;
-use Relaticle\Ink\Models\Category;
-use Relaticle\Ink\Models\Post;
+use Relaticle\Cloud\Commands\BlogMcpCommand;
 use Relaticle\SystemAdmin\Enums\SystemAdministratorRole;
 use Relaticle\SystemAdmin\Models\SystemAdministrator;
 
-// No mutates() here: this file's production code is either vendor (Relaticle\Ink\Mcp\BlogTool,
-// installed from Packagist, outside app/ and packages/) or route/config wiring with no owning
-// class -- neither is a valid --mutate --class target under phpunit.xml's <source> config.
+mutates(BlogMcpCommand::class);
 
-it('registers the blog mcp endpoint', function (): void {
-    expect(collect(app('router')->getRoutes())->contains(
-        fn (Route $route): bool => $route->uri() === 'mcp/blog'
-    ))->toBeTrue();
-});
-
-it('denies blog deletion with a token issued before staff demotion', function (string $model, string $tool): void {
-    $administrator = SystemAdministrator::factory()->create();
-    $token = $administrator->createToken('review-demotion', ['*'])->plainTextToken;
-    $record = $model::factory()->create();
-    $administrator->update(['role' => SystemAdministratorRole::Administrator]);
-
-    $this->withHeader('Authorization', "Bearer {$token}")
-        ->postJson('/mcp/blog', [
-            'jsonrpc' => '2.0',
-            'id' => 1,
-            'method' => 'tools/call',
-            'params' => [
-                'name' => $tool,
-                'arguments' => ['id' => $record->getKey()],
-            ],
-        ])
-        ->assertOk()
-        ->assertJsonPath('result.isError', true)
-        ->assertJsonPath('result.content.0.text', 'This action is unauthorized.');
-
-    expect($record->refresh()->deleted_at)->toBeNull();
-})->with([
-    'posts' => [Post::class, 'delete-post-tool'],
-    'categories' => [Category::class, 'delete-category-tool'],
-]);
-
-it('rejects unauthenticated blog mcp requests', function (): void {
+it('no longer serves the blog mcp over http', function (): void {
     $this->postJson('/mcp/blog', [
         'jsonrpc' => '2.0',
         'id' => 1,
         'method' => 'tools/list',
-    ])->assertUnauthorized();
+    ])->assertNotFound();
 });
 
-/**
- * The mirror of the app MCP guard test (rejects a personal access token minted
- * for a tokenable outside the users provider): 'sanctum-sysadmin' is scoped to
- * the system_administrators provider (config/auth.php), so a token minted for
- * an App\Models\User must never authenticate here. Before the guard split this
- * endpoint used the default 'sanctum' guard with `provider: null`, which
- * accepted any CRM user's PAT.
- */
-it('rejects a personal access token minted for a tokenable outside the system_administrators provider', function (): void {
-    $user = User::factory()->create();
-    $token = $user->createToken('crm-pat', ['*'])->plainTextToken;
+it('refuses to start without exactly one super administrator', function (int $count): void {
+    SystemAdministrator::factory()->count($count)->create(['role' => SystemAdministratorRole::SuperAdministrator]);
+    SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::Administrator]);
 
-    $this->withHeader('Authorization', "Bearer {$token}")
-        ->withHeader('Accept', 'application/json')
-        ->postJson('/mcp/blog', [
-            'jsonrpc' => '2.0',
-            'id' => 1,
-            'method' => 'tools/list',
-        ])
-        ->assertUnauthorized();
-});
-
-it('serves tools/list to a bearer token issued to a super administrator', function (): void {
-    $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
-    $token = $admin->createToken('e2e', ['posts:read'])->plainTextToken;
-
-    $this->withHeader('Authorization', "Bearer {$token}")
-        ->withHeader('Accept', 'application/json')
-        ->postJson('/mcp/blog', [
-            'jsonrpc' => '2.0',
-            'id' => 1,
-            'method' => 'tools/list',
-        ])
-        ->assertOk()
-        ->assertJsonPath('jsonrpc', '2.0')
-        ->assertJsonPath('result.tools', fn (array $tools): bool => count($tools) > 0);
-});
-
-it('denies a tool call outside the token abilities', function (): void {
-    $admin = SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator]);
-    $token = $admin->createToken('e2e-restricted', ['posts:read'])->plainTextToken;
-    $category = Category::factory()->create(['name' => 'Engineering']);
-
-    $this->withHeader('Authorization', "Bearer {$token}")
-        ->withHeader('Accept', 'application/json')
-        ->postJson('/mcp/blog', [
-            'jsonrpc' => '2.0',
-            'id' => 2,
-            'method' => 'tools/call',
-            'params' => [
-                'name' => 'create-post-tool',
-                'arguments' => [
-                    'title' => 'Forbidden',
-                    'content' => 'x',
-                    'excerpt' => 'x',
-                    'category_id' => $category->id,
-                ],
-            ],
-        ])
-        ->assertOk()
-        ->assertJsonPath('result.isError', true)
-        ->assertJsonPath('result.content.0.text', 'Token missing required ability: posts:create');
-
-    expect(Post::where('title', 'Forbidden')->exists())->toBeFalse();
-});
+    $this->artisan('blog:mcp')->assertExitCode(1);
+})->with([
+    'none' => 0,
+    'two' => 2,
+]);

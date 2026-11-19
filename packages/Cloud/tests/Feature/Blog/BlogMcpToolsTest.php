@@ -17,6 +17,7 @@ use Relaticle\SystemAdmin\Models\SystemAdministrator;
 // would never generate a mutant for it.
 
 beforeEach(function (): void {
+    config(['ink.mcp.guard' => 'sysadmin']);
     $this->admin = SystemAdministrator::factory()->create([
         'role' => SystemAdministratorRole::SuperAdministrator,
         'email' => 'founder@relaticle.com',
@@ -25,10 +26,10 @@ beforeEach(function (): void {
     $this->category = Category::factory()->create(['name' => 'Engineering']);
 });
 
-it('creates a post authored by the matching user account', function (): void {
+it('creates a post as the super administrator through the local server', function (): void {
     $author = User::factory()->create(['email' => 'founder@relaticle.com']);
 
-    BlogServer::actingAs($this->admin)
+    BlogServer::actingAs($this->admin, 'sysadmin')
         ->tool(CreatePostTool::class, [
             'title' => 'Agent-Native CRM',
             'content' => 'Body text.',
@@ -42,7 +43,7 @@ it('creates a post authored by the matching user account', function (): void {
 });
 
 it('fails loudly when no user account matches the sysadmin email', function (): void {
-    BlogServer::actingAs($this->admin)
+    BlogServer::actingAs($this->admin, 'sysadmin')
         ->tool(CreatePostTool::class, [
             'title' => 'Orphan Post',
             'content' => 'Body.',

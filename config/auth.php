@@ -50,16 +50,10 @@ return [
         // here first. Scoping it to 'users' means a bearer token minted for a
         // different tokenable (e.g. SystemAdministrator) fails authentication on
         // every route guarded by `auth:sanctum` -- app API and MCP routes never see
-        // an unexpected caller type. The blog MCP endpoint authenticates system
-        // administrators through the separate 'sanctum-sysadmin' guard instead.
+        // an unexpected caller type.
         'sanctum' => [
             'driver' => 'sanctum',
             'provider' => 'users',
-        ],
-
-        'sanctum-sysadmin' => [
-            'driver' => 'sanctum',
-            'provider' => 'system_administrators',
         ],
 
         'api' => [

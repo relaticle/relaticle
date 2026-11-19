@@ -36,6 +36,7 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Laravel\Cashier\Events\WebhookHandled;
+use Laravel\Mcp\Facades\Mcp;
 use Laravel\Pennant\Feature;
 use Livewire\Livewire;
 use Relaticle\Cloud\Admin\CloudAdminPlugin;
@@ -65,6 +66,7 @@ use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\Cloud\Commands\BlogMcpCommand;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
 use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
@@ -74,6 +76,7 @@ use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
 use Relaticle\Cloud\Marketing\Services\DiscordService;
 use Relaticle\Cloud\Marketing\Services\DockerHubService;
 use Relaticle\Cloud\Marketing\Services\GitHubService;
+use Relaticle\Ink\Mcp\BlogServer;
 
 final class CloudServiceProvider extends ServiceProvider
 {
@@ -123,7 +126,8 @@ final class CloudServiceProvider extends ServiceProvider
         Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
         Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
-        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
+        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class, BlogMcpCommand::class]);
+        Mcp::local(BlogMcpCommand::HANDLE, BlogServer::class);
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('billing:process-trials')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
@@ -174,7 +178,7 @@ final class CloudServiceProvider extends ServiceProvider
         // read the config key App\Features\Blog resolves from.
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
-            'ink.features.mcp' => true,
+            'ink.features.mcp' => false,
             'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class])),
             'ink.views' => [
                 'index' => 'cloud::blog.index',
