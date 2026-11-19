@@ -42,11 +42,15 @@ final readonly class MergedActivityRenderer implements TimelineRenderer
 
     private function outcome(ActivityLogSummary $summary, TimelineEntry $entry): ?string
     {
+        if (! $summary->operation instanceof ActivityLogOperation) {
+            return __('workspaces.activity.outcome.other', ['subject' => $this->subjectName($entry)]);
+        }
+
         if (in_array($summary->operation, [ActivityLogOperation::Created, ActivityLogOperation::Deleted, ActivityLogOperation::Restored], true)) {
             return __("workspaces.activity.outcome.{$summary->operation->value}", ['subject' => $this->subjectName($entry)]);
         }
 
-        return $summary->operation === null ? __('workspaces.activity.outcome.other', ['subject' => $this->subjectName($entry)]) : null;
+        return null;
     }
 
     private function subjectName(TimelineEntry $entry): string
