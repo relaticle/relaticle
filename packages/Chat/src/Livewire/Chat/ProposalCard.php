@@ -1874,16 +1874,7 @@ final class ProposalCard extends BaseLivewireComponent
     {
         report($exception);
 
-        $this->reportResolveFailure($pendingAction, $this->labelledFailure($pendingAction, ApprovalFailureMessage::forDelivery()));
-    }
-
-    /**
-     * On a batch step the earlier rows have committed, so the message names the row
-     * that stopped the run: the first one still undecided.
-     */
-    private function labelledFailure(PendingAction $step, string $message): string
-    {
-        return $this->prefixRecord($this->failingRowSummary($step), $message);
+        $this->reportResolveFailure($pendingAction, $this->prefixRecord($this->failingRowSummary($pendingAction), ApprovalFailureMessage::forDelivery()));
     }
 
     private function prefixRecord(?string $record, string $message): string
