@@ -27,10 +27,33 @@
                 ],
             ],
         ],
+        'salesforce' => [
+            'badge' => __('Alternative'),
+            'opening' => __('Relaticle is an open-source CRM with built-in AI. Host it on your own server for free, or run it on a hosted plan priced per workspace with unlimited users. Salesforce Sales Cloud has no self-hosting option and prices each edition per user, from its Free Suite up to Max. If your team already builds on AppExchange and MuleSoft, weigh that work before you switch.'),
+            'sections' => [
+                [
+                    'heading' => __('License & pricing'),
+                    'body' => __('Salesforce is closed-source and prices each edition per user. Salesforce pricing: :salesforcePricing. Relaticle is AGPL-3.0, and its hosted plans are priced per workspace. Relaticle pricing: :relaticlePricing.', ['salesforcePricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                ],
+                [
+                    'heading' => __('AI capabilities'),
+                    'body' => __('Salesforce\'s AI: :salesforceAi. Relaticle\'s AI: :relaticleAi.', ['salesforceAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                ],
+                [
+                    'heading' => __('Data ownership & deployment'),
+                    'body' => __('Salesforce: :salesforceSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['salesforceSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                ],
+                [
+                    'heading' => __('Extensibility'),
+                    'body' => __('Salesforce\'s extensibility: :salesforceExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['salesforceExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
+                ],
+            ],
+        ],
     ][$competitorSlug];
 
     $titles = [
         'hubspot' => __('HubSpot Alternative'),
+        'salesforce' => __('Salesforce Alternative'),
     ];
 
     /*
@@ -41,6 +64,7 @@
      */
     $metaTitles = [
         'hubspot' => __('Open Source HubSpot Alternative, Self-Hosted | Relaticle'),
+        'salesforce' => __('Open Source Salesforce Alternative, Self-Hosted | Relaticle'),
     ];
 
     /*
@@ -49,6 +73,7 @@
      */
     $descriptions = [
         'hubspot' => __('HubSpot is closed-source with no self-hosting option. Relaticle is AGPL-3.0, self-hostable free, flat-priced for unlimited users, with built-in AI and MCP.'),
+        'salesforce' => __('Salesforce has no self-hosting option. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
     ];
 
     $title = $titles[$competitorSlug];
