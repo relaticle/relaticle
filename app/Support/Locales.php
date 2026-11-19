@@ -23,11 +23,16 @@ final readonly class Locales
         Number::useLocale($locale);
     }
 
+    public static function isListed(?string $locale): bool
+    {
+        return in_array($locale, config('app.available_locales'), true);
+    }
+
     public static function fromRequest(Request $request): ?string
     {
         $cookie = $request->cookie(self::COOKIE);
 
-        if (is_string($cookie) && in_array($cookie, config('app.available_locales'), true)) {
+        if (is_string($cookie) && self::isListed($cookie)) {
             return $cookie;
         }
 
@@ -49,7 +54,7 @@ final readonly class Locales
                 ? (float) $match[1]
                 : 1.0;
 
-            if ($weight > 0 && $weight <= 1 && in_array($primary, config('app.available_locales'), true)) {
+            if ($weight > 0 && $weight <= 1 && self::isListed($primary)) {
                 $weights[$primary] = max($weights[$primary] ?? 0.0, $weight);
             }
         }

@@ -20,6 +20,7 @@ use App\Notifications\Auth\ResetPassword;
 use App\Notifications\Auth\VerifyEmail;
 use App\Observers\UserObserver;
 use App\Support\EmailAddress;
+use App\Support\Locales;
 use Carbon\CarbonImmutable;
 use Database\Factories\UserFactory;
 use DateTimeZone;
@@ -201,7 +202,7 @@ final class User extends Authenticatable implements FilamentUser, HasAvatar, Has
 
     public function effectiveLocale(): string
     {
-        return in_array($this->locale, config('app.available_locales'), true)
+        return Locales::isListed($this->locale)
             ? $this->locale
             : (string) config('app.default_locale');
     }

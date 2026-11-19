@@ -60,7 +60,7 @@ final class UpdateProfileInformation extends BaseLivewireComponent
 
         return [
             ...$user->only(['name', 'email', 'timezone']),
-            'locale' => in_array($user->locale, config('app.available_locales'), true) ? $user->locale : null,
+            'locale' => Locales::isListed($user->locale) ? $user->locale : null,
         ];
     }
 
