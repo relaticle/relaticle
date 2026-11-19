@@ -19,6 +19,7 @@ use App\Models\CustomFieldOption;
 use App\Models\SavedView;
 use App\Models\TablePreference;
 use App\Models\User;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Livewire\Features\SupportTesting\Testable;
 use Symfony\Component\DomCrawler\Crawler;
@@ -956,4 +957,15 @@ it('offers no Add column button to a member when every attribute is already show
 
     expect($page->filter('[data-add-column-trigger]')->count())->toBe(0)
         ->and($page->filter('[data-add-column]')->count())->toBe(0);
+});
+
+it('words the Add column search in the noun as the language spells it', function (): void {
+    $this->user->forceFill(['locale' => 'de'])->save();
+    Locales::apply('de');
+    Filament::bootCurrentPanel();
+    Company::factory()->recycle($this->user)->create();
+
+    $search = new Crawler(openList(ListCompanies::class)->html())->filter('[data-add-column] [data-add-column-search]');
+
+    expect($search->attr('placeholder'))->toBe('Attribute für Unternehmen suchen…');
 });

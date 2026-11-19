@@ -23,7 +23,6 @@ use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 trait HasCustomFieldColumns
@@ -119,7 +118,7 @@ trait HasCustomFieldColumns
         return [
             'hidden' => $hidden,
             'types' => $canCreate ? $this->tableAttributeTypes() : [],
-            'entityLabel' => Str::lower(static::getResource()::getModelLabel()),
+            'entityLabel' => static::getResource()::getModelLabel(),
         ];
     }
 
