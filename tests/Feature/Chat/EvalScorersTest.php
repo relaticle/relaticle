@@ -19,7 +19,7 @@ use Tests\Evals\Scorers\NoRawUlid;
 use Tests\Evals\Scorers\NotCalledOrReplyMatches;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\RendersTable;
-use Tests\Evals\Scorers\ReplayedBytesUnder;
+use Tests\Evals\Scorers\ReplayedBytesPerRowUnder;
 use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Scorers\ToolArgumentEquals;
 use Tests\Evals\Scorers\ToolCalledAtLeast;
@@ -126,12 +126,15 @@ it('counts a question mark that ends a sentence after a URL', function (): void 
         ->and($scorer->score('', scorerEnvelope('Is it https://a.com?'))->score)->toBe(1.0);
 });
 
-it('fails replayed bytes at or above the limit', function (): void {
-    $scorer = new ReplayedBytesUnder(10000);
+it('fails replayed bytes per rendered row at or above the limit', function (): void {
+    $scorer = new ReplayedBytesPerRowUnder(1000);
+    $tenRows = [array_map(fn (int $row): string => "row-{$row}", range(1, 10))];
 
-    expect($scorer->score('', scorerEnvelope('x', bytes: 147399))->score)->toBe(0.0)
-        ->and($scorer->score('', scorerEnvelope('x', bytes: 10000))->score)->toBe(0.0)
-        ->and($scorer->score('', scorerEnvelope('x', bytes: 9999))->score)->toBe(1.0);
+    expect($scorer->score('', scorerEnvelope('x', bytes: 11617, rowIds: $tenRows))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('x', bytes: 10000, rowIds: $tenRows))->score)->toBe(0.0)
+        ->and($scorer->score('', scorerEnvelope('x', bytes: 9990, rowIds: $tenRows))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('x', bytes: 14069, rowIds: [array_map(fn (int $row): string => "row-{$row}", range(1, 19))]))->score)->toBe(1.0)
+        ->and($scorer->score('', scorerEnvelope('x', bytes: 500))->score)->toBe(0.0);
 });
 
 it('requires a lookup read before a write', function (): void {
@@ -243,7 +246,7 @@ it('fails every scorer on a failed turn', function (Scorer $scorer): void {
     'NoEmDash' => fn (): Scorer => new NoEmDash,
     'OneClosingQuestionAtMost' => fn (): Scorer => new OneClosingQuestionAtMost,
     'NoContactWord' => fn (): Scorer => new NoContactWord,
-    'ReplayedBytesUnder' => fn (): Scorer => new ReplayedBytesUnder(10000),
+    'ReplayedBytesPerRowUnder' => fn (): Scorer => new ReplayedBytesPerRowUnder(1000),
     'UsesLookupBeforeWrite' => fn (): Scorer => new UsesLookupBeforeWrite,
     'NoDuplicateRowSet' => fn (): Scorer => new NoDuplicateRowSet,
     'NoNarration' => fn (): Scorer => new NoNarration,

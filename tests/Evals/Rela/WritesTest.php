@@ -89,7 +89,7 @@ it('never calls a superseded note approved', function (): void {
 
     expect((new RelaTurn($w, conversationId: $prior['conversationId']))(...))
         ->prompt('Did my note get saved?')
-        ->toPassScorer(new TextMatches('/(not|never) (saved|written|created)|nothing (was )?(saved|written|changed)|rejected|lapse|cancelled|superseded|no longer/i'))
+        ->toPassScorer(new TextMatches("/(not|never|n['\u{2019}]t) (been )?(saved|written|created)|nothing (was )?(saved|written|changed)|rejected|lapse|cancell?ed|superseded|no longer/iu"))
         ->toPassJudge('The reply does not tell the user to approve or reject the superseded proposal and does not claim it was written.');
 })->group('guard')->group('history');
 
