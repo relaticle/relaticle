@@ -1377,6 +1377,28 @@
         }))
     }
 
+    // Filament answers a page change by scrolling the table container into view, which never moves the rows' own
+    // scroll box. The footer sits after the last row, so without this the next page opens at its end.
+    function registerPaginationFooter() {
+        window.Alpine.data('tablePaginationFooter', () => {
+            const listeners = new AbortController()
+
+            return {
+                init() {
+                    this.$wire.$el.addEventListener(
+                        'scrollToTopOfTable',
+                        () => this.$el.closest('.fi-ta-content-ctn')?.scrollTo({ top: 0 }),
+                        { signal: listeners.signal },
+                    )
+                },
+
+                destroy() {
+                    listeners.abort()
+                },
+            }
+        })
+    }
+
     // `morphed` fires once per component after the morph settles. `morph.updated` fires per node
     // mid-morph, and the rest of the same pass strips what it adds.
     document.addEventListener('livewire:init', () => window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph))
@@ -1387,11 +1409,13 @@
         registerColumnMenu()
         registerViewSettings()
         registerAddColumn()
+        registerPaginationFooter()
     } else {
         document.addEventListener('alpine:init', registerDragAnimation)
         document.addEventListener('alpine:init', registerResizableColumn)
         document.addEventListener('alpine:init', registerColumnMenu)
         document.addEventListener('alpine:init', registerViewSettings)
         document.addEventListener('alpine:init', registerAddColumn)
+        document.addEventListener('alpine:init', registerPaginationFooter)
     }
 })()

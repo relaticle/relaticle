@@ -267,6 +267,11 @@ body.reordering-column .column-resize-handle-bar::before {
     @apply sm:block sm:truncate;
 }
 
+/* Phones keep Filament's own pagination below the stacked cards. */
+.fi-ta-table > tfoot:has(.fi-ta-pagination-footer) {
+    @apply hidden;
+}
+
 /* The five list pages fill the screen below the topbar, so the table scrolls inside itself and its horizontal
    scrollbar sits at the bottom edge. Phones keep page scroll, where the table stacks into cards. */
 @media (width >= 40rem) {
@@ -297,12 +302,34 @@ body.reordering-column .column-resize-handle-bar::before {
             @apply flex min-h-0 flex-col;
         }
 
-        .fi-ta-main > :is(.fi-ta-header-ctn, .fi-pagination, .fi-ta-filters-below-content) {
+        .fi-ta-main > :is(.fi-ta-header-ctn, .fi-ta-filters-below-content) {
             @apply shrink-0;
         }
 
         .fi-ta-content-ctn:not(.fi-modal *) {
             @apply min-h-0 flex-1 overscroll-contain;
+            container-type: inline-size;
+        }
+
+        /* The pagination rides in the table footer, so it follows the last row. A caption spans every column
+           without a colspan, and the bar keeps the visible width while the rows scroll sideways. */
+        .fi-ta-main > .fi-pagination {
+            @apply hidden;
+        }
+
+        .fi-ta-table > tfoot:has(.fi-ta-pagination-footer) {
+            @apply bg-transparent dark:bg-transparent;
+            display: table-caption;
+            caption-side: bottom;
+
+            & > tr,
+            & .fi-ta-pagination-footer {
+                @apply block p-0;
+            }
+
+            & .fi-pagination {
+                @apply sticky start-0 w-[100cqw] border-t-0;
+            }
         }
 
         .fi-ta-content-ctn:not(.fi-modal *) thead {

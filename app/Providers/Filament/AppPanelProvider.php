@@ -112,6 +112,8 @@ final class AppPanelProvider extends PanelProvider
 
     private const int DEFAULT_PAGINATION_PAGE_OPTION = 25;
 
+    private const array LIST_PAGES = [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class];
+
     /**
      * Perform post-registration booting of components.
      */
@@ -186,6 +188,10 @@ final class AppPanelProvider extends PanelProvider
                 ->columnManager(! $table->getLivewire() instanceof RelationManager)
                 ->defaultPaginationPageOption(self::DEFAULT_PAGINATION_PAGE_OPTION)
                 ->paginationPageOptions(fn (HasTable $livewire): array => $this->paginationPageOptions($livewire))
+                ->contentFooter(fn (HasTable $livewire, Table $table): ?View => $this->isListPage($livewire)
+                    ? view('filament.app.tables.pagination-footer', ['table' => $table])
+                    : null)
+                ->scrollToTopOnPageChange(fn (HasTable $livewire): bool => $this->isListPage($livewire))
                 ->persistColumnsInSession(false)
             : $table);
     }
@@ -225,6 +231,11 @@ final class AppPanelProvider extends PanelProvider
                 return day === date && focusedMonth === month - 1 && focusedYear === year;
             }
             JS;
+    }
+
+    private function isListPage(HasTable $livewire): bool
+    {
+        return in_array($livewire::class, self::LIST_PAGES, true);
     }
 
     /** @return list<int> */
@@ -410,28 +421,26 @@ final class AppPanelProvider extends PanelProvider
 
     private function registerTableHooks(Panel $panel): void
     {
-        $listPages = [ListCompanies::class, ListPeople::class, ListOpportunities::class, ManageTasks::class, ManageNotes::class];
-
         $panel
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
                 fn (): string => '<span class="fi-ta-fill-screen" hidden></span>',
-                scopes: $listPages,
+                scopes: self::LIST_PAGES,
             )
             ->renderHook(
                 TablesRenderHook::TOOLBAR_BEFORE,
                 fn (): View|Factory => view('filament.app.tables.filter-bar'),
-                scopes: $listPages,
+                scopes: self::LIST_PAGES,
             )
             ->renderHook(
                 TablesRenderHook::TOOLBAR_BEFORE,
                 fn (): View|Factory => view('filament.app.tables.column-menu'),
-                scopes: $listPages,
+                scopes: self::LIST_PAGES,
             )
             ->renderHook(
                 TablesRenderHook::TOOLBAR_BEFORE,
                 fn (): View|Factory => view('filament.app.tables.add-column-menu-hook'),
-                scopes: $listPages,
+                scopes: self::LIST_PAGES,
             );
     }
 
