@@ -110,14 +110,6 @@ final class AppPanelProvider extends PanelProvider
 {
     public const string SIDEBAR_FOOTER_ACTIONS = 'app::sidebar.footer.actions';
 
-    /**
-     * The datetime format of this panel is the `formats.date_time` lang key, the only place
-     * it is decided. Columns and entries call `->dateTime()` with no argument so they
-     * resolve to it; a resource that passes its own literal instead is drift.
-     *
-     * No seconds and no zone suffix: every timestamp here is already in the reader's own
-     * zone. Sysadmin keeps its seconds on purpose, to line rows up against server logs.
-     */
     private const int DEFAULT_PAGINATION_PAGE_OPTION = 25;
 
     /**

@@ -84,8 +84,6 @@ final class UpdateProfileInformation extends BaseLivewireComponent
     }
 
     /**
-     * Each language is named in itself, so a reader can find theirs in any interface language.
-     *
      * @return array<string, string>
      */
     private function localeOptions(): array

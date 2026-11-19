@@ -129,8 +129,6 @@ final readonly class UpdateUserProfileInformation implements UpdatesUserProfileI
     }
 
     /**
-     * Same contract as the timezone: an empty value clears it, an absent key leaves it alone.
-     *
      * @param  array<string, mixed>  $input
      * @return array<string, string|null>
      */
