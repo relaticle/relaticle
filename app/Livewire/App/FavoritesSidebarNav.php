@@ -23,10 +23,8 @@ use Filament\Forms\Components\TextInput;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 
-/**
- * Listens to nothing, like ChatSidebarNav: nested in Filament's sidebar, its own
- * re-render never reaches the DOM, so every change dispatches `refresh-sidebar`.
- */
+// Listens to nothing, like ChatSidebarNav: nested in Filament's sidebar, its own
+// re-render never reaches the DOM, so every change dispatches `refresh-sidebar`.
 final class FavoritesSidebarNav extends BaseLivewireComponent
 {
     public function removeFavorite(string $favoriteId, RemoveFavoriteRecord $removeFavoriteRecord): void
