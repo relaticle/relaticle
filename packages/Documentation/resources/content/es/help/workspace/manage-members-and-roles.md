@@ -1,8 +1,8 @@
 ---
 title: Administre miembros y roles
-description: Qué puede hacer cada rol (Propietario, Administrador, Miembro y Lector), además de invitaciones, enlaces de acceso y cómo quitar miembros.
+description: Qué puede hacer cada rol (Propietario, Administrador, Miembro y Lector), además de invitaciones por correo y cómo quitar miembros.
 order: 1
-updated: "2026-09-22"
+updated: "2026-11-19"
 related: [help/getting-started/invite-your-team, help/workspace/rename-or-delete-your-workspace]
 ---
 
@@ -52,9 +52,8 @@ El propietario no es un rol que usted asigne. Quien posee el espacio de trabajo
 siempre aparece con una insignia de **Propietario**, no tiene un rol que cambiar
 y no puede salir ni ser quitado.
 
-Dondequiera que elija un rol, en **Invitar miembros del espacio de trabajo**,
-**Cambiar rol** o **Enlace de invitación**, **Comparar roles** aparece junto a la
-opción. Abre esta tabla en la aplicación, y siempre coincide con lo que cada rol
+Dondequiera que elija un rol, en **Invitar miembros del espacio de trabajo** o
+**Cambiar rol**, **Comparar roles** aparece junto a la opción. Abre esta tabla en la aplicación, y siempre coincide con lo que cada rol
 puede hacer realmente.
 
 ## Invitaciones
@@ -74,27 +73,6 @@ Una invitación dura 48 horas. Después, la fila indica **Invitación vencida**,
 **Reenviar** emite una nueva.
 
 ![La lista de Miembros con un correo invitado marcado como Invitación pendiente encima de las personas que ya se unieron](/help-assets/workspace/manage-members-and-roles-1.png)
-
-## El enlace del espacio de trabajo
-
-**Enlace de invitación**, junto a **Invitar miembros del espacio de trabajo**,
-contiene un único enlace con el que cualquiera puede unirse. Cópielo para
-compartirlo directamente, y defina el rol que reciben las personas al unirse con
-él, Miembro de forma predeterminada. El rol se guarda en cuanto lo elige. El
-enlace dura 7 días y puede otorgar Miembro o Lector. Los administradores se
-invitan por correo, así que la persona siempre está identificada por nombre.
-
-El cuadro de diálogo muestra cuánto tiempo le queda al enlace. Cuando vence,
-nadie puede unirse con él, y el cuadro de diálogo ofrece **Generar un enlace
-nuevo** en su lugar.
-
-Debajo hay dos controles:
-
-- **Generar un enlace nuevo** reemplaza el enlace si el actual se filtró. El
-  anterior deja de funcionar de inmediato.
-- **Desactivar el enlace** lo elimina por completo, y deja las invitaciones por
-  correo como la única forma de entrar. Al volver a activarlo se emite un enlace
-  distinto, así que el que desactivó sigue sin funcionar.
 
 ## Cambie y quite miembros
 

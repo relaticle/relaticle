@@ -99,9 +99,6 @@ return [
             'emails_placeholder' => 'maya@acme.com, leo@acme.com',
             'helper' => 'Pegue varias a la vez. Todos reciben el mismo rol.',
             'invalid_emails' => 'Revise estas direcciones: :emails',
-            'link_label' => 'O comparta un enlace de invitación',
-            'copy_link' => 'Copiar enlace',
-            'create_link' => 'Crear enlace',
             'send_and_start' => 'Enviar invitaciones y comenzar',
             'not_sent' => [
                 'title' => 'Algunas invitaciones no se enviaron',

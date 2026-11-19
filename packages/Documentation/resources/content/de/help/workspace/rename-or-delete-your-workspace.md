@@ -26,7 +26,7 @@ Der Arbeitsbereich-Umschalter oben in der Seitenleiste listet jeden Arbeitsberei
 in dem Sie Mitglied sind, und das Wechseln geht sofort. **Arbeitsbereich erstellen** im
 selben Menü startet einen kurzen Assistenten: Sie benennen ihn, wählen seine
 URL-Kennung, sagen Relaticle, wofür Sie ihn nutzen, und laden Ihre ersten Mitglieder
-ein, per E-Mail oder durch Kopieren des 7 Tage gültigen Beitrittslinks.
+per E-Mail ein.
 
 Getrennte Kunden, getrennte Geschäftsfelder oder eine Sandbox zum Ausprobieren: Jeder
 Arbeitsbereich hält seine Daten, Attribute und seinen Tarif vollständig für sich.
