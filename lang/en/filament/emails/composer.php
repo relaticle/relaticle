@@ -82,6 +82,10 @@ return [
             'title' => 'Some files were too large',
             'body' => 'Not attached: :files. Each file must be under :max, and all attachments together under :total.',
         ],
+        'attachment_empty' => [
+            'title' => 'Some files were empty',
+            'body' => 'Not attached: :files. An empty file has nothing to send.',
+        ],
         'attachment_type_not_allowed' => [
             'title' => 'Some files could not be attached',
             'body' => 'Not attached: :files. Attach a PDF, Office or OpenDocument file, CSV, text, calendar invite, image or zip.',

@@ -37,7 +37,7 @@ final readonly class UploadAllowlist
         'csv' => ['text/csv', 'application/csv', 'text/plain'],
         'txt' => ['text/plain'],
         'rtf' => ['text/rtf', 'application/rtf'],
-        'ics' => ['text/calendar', 'text/plain'],
+        'ics' => ['text/calendar', 'text/x-vcalendar', 'text/plain'],
         'jpg' => ['image/jpeg'],
         'jpeg' => ['image/jpeg'],
         'png' => ['image/png'],
@@ -46,6 +46,9 @@ final readonly class UploadAllowlist
         'heic' => ['image/heic', 'image/heif'],
         'zip' => ['application/zip', 'application/x-zip-compressed'],
     ];
+
+    /** finfo reports plain text that looks like code (a leading `#include`) as text/x-*. */
+    private const array SOURCE_LIKE_TEXT_EXTENSIONS = ['txt', 'csv'];
 
     public static function maxBytes(): int
     {
@@ -83,9 +86,10 @@ final readonly class UploadAllowlist
             return false;
         }
 
-        $detected = new finfo(FILEINFO_MIME_TYPE)->buffer((string) $file->get());
+        $detected = (string) new finfo(FILEINFO_MIME_TYPE)->buffer((string) $file->get());
 
-        return in_array($detected, $mimes, true);
+        return in_array($detected, $mimes, true)
+            || (in_array($extension, self::SOURCE_LIKE_TEXT_EXTENSIONS, true) && str_starts_with($detected, 'text/x-'));
     }
 
     public static function emailAccept(): string

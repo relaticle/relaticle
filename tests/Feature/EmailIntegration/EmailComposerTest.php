@@ -683,6 +683,34 @@ it('accepts a real pdf', function (): void {
         ->assertCount('attachments', 1);
 });
 
+it('accepts each allowed file family', function (string $name, string $kind): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('attachments', [UploadedFile::fake()->createWithContent($name, emailAttachmentFixture($kind))])
+        ->assertCount('attachments', 1);
+})->with([
+    'docx' => ['brief.docx', 'docx'],
+    'xlsx' => ['sheet.xlsx', 'xlsx'],
+    'doc' => ['legacy.doc', 'doc'],
+    'odt' => ['brief.odt', 'odt'],
+    'csv' => ['contacts.csv', 'csv'],
+    'txt' => ['notes.txt', 'txt'],
+    'txt that reads like source' => ['notes.txt', 'txt-source-like'],
+    'ics' => ['invite.ics', 'ics'],
+    'png' => ['pixel.png', 'png'],
+    'jpg' => ['pixel.jpg', 'jpg'],
+    'zip' => ['bundle.zip', 'zip'],
+    'uppercase extension' => ['QUOTE.PDF', 'pdf'],
+]);
+
+it('refuses an empty attachment', function (): void {
+    Livewire::test(EmailComposer::class)
+        ->dispatch('composer:open')
+        ->set('attachments', [UploadedFile::fake()->createWithContent('empty.txt', '')])
+        ->assertCount('attachments', 0)
+        ->assertNotified(__('filament/emails/composer.notifications.attachment_empty.title'));
+});
+
 it('refuses an attachment that is not an allowed type', function (string $name, string $content): void {
     Livewire::test(EmailComposer::class)
         ->dispatch('composer:open')
@@ -693,6 +721,8 @@ it('refuses an attachment that is not an allowed type', function (string $name, 
     'svg' => ['logo.svg', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
     'html' => ['page.html', '<html><body><script>alert(1)</script></body></html>'],
     'exe' => ['setup.exe', "MZ\x90\x00\x03\x00\x00\x00\x04\x00\x00\x00\xFF\xFF\x00\x00"],
+    'html renamed to txt' => ['notes.txt', '<!doctype html><html><body><script>alert(1)</script></body></html>'],
+    'svg renamed to csv' => ['data.csv', '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>'],
     'pdf renamed to png' => ['photo.png', "%PDF-1.4\n1 0 obj\n<<>>\nendobj\ntrailer\n<<>>\n%%EOF\n"],
 ]);
 

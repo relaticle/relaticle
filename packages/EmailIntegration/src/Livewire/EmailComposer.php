@@ -31,6 +31,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Number;
+use Illuminate\Validation\ValidationException;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\Locked;
 use Livewire\Component;
@@ -966,16 +967,12 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         $this->showBcc = ! $this->showBcc;
     }
 
-    /**
-     * Enforce the size caps and the type allowlist as files arrive, dropping (and
-     * deleting) anything over them. An invalid attachment left in `$attachments`
-     * would still be stored and sent by {@see self::send()}, which does not re-check.
-     */
     public function updatedAttachments(): void
     {
         $kept = [];
         $tooLarge = [];
         $wrongType = [];
+        $empty = [];
         $total = array_sum(array_column($this->savedAttachments, 'size'));
 
         foreach ($this->attachments as $file) {
@@ -987,6 +984,13 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
             if ($size > ForwardAttachmentCopyService::MAX_ATTACHMENT_BYTES || $total + $size > ForwardAttachmentCopyService::MAX_ATTACHMENTS_TOTAL_BYTES) {
                 $tooLarge[] = $file->getClientOriginalName();
+                $file->delete();
+
+                continue;
+            }
+
+            if ($size === 0) {
+                $empty[] = $file->getClientOriginalName();
                 $file->delete();
 
                 continue;
@@ -1005,27 +1009,29 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
 
         $this->attachments = $kept;
 
-        if ($tooLarge !== []) {
-            Notification::make()
-                ->warning()
-                ->title(__('filament/emails/composer.notifications.attachment_too_large.title'))
-                ->body(__('filament/emails/composer.notifications.attachment_too_large.body', [
-                    'files' => implode(', ', $tooLarge),
-                    'max' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENT_BYTES),
-                    'total' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENTS_TOTAL_BYTES),
-                ]))
-                ->send();
+        $this->notifyRejected('attachment_too_large', $tooLarge, [
+            'max' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENT_BYTES),
+            'total' => Number::fileSize(ForwardAttachmentCopyService::MAX_ATTACHMENTS_TOTAL_BYTES),
+        ]);
+        $this->notifyRejected('attachment_empty', $empty);
+        $this->notifyRejected('attachment_type_not_allowed', $wrongType);
+    }
+
+    /**
+     * @param  list<string>  $files
+     * @param  array<string, string>  $replace
+     */
+    private function notifyRejected(string $key, array $files, array $replace = []): void
+    {
+        if ($files === []) {
+            return;
         }
 
-        if ($wrongType !== []) {
-            Notification::make()
-                ->warning()
-                ->title(__('filament/emails/composer.notifications.attachment_type_not_allowed.title'))
-                ->body(__('filament/emails/composer.notifications.attachment_type_not_allowed.body', [
-                    'files' => implode(', ', $wrongType),
-                ]))
-                ->send();
-        }
+        Notification::make()
+            ->warning()
+            ->title(__("filament/emails/composer.notifications.{$key}.title"))
+            ->body(__("filament/emails/composer.notifications.{$key}.body", ['files' => implode(', ', $files), ...$replace]))
+            ->send();
     }
 
     public function removeAttachment(int $index): void
@@ -1670,6 +1676,12 @@ final class EmailComposer extends Component implements HasActions, HasSchemas
         foreach ($this->attachments as $file) {
             if (! $file instanceof TemporaryUploadedFile) {
                 continue;
+            }
+
+            if (! UploadAllowlist::isAllowedEmailAttachment($file)) {
+                throw ValidationException::withMessages([
+                    'attachments' => __('filament/emails/composer.notifications.attachment_type_not_allowed.body', ['files' => $file->getClientOriginalName()]),
+                ]);
             }
 
             $path = (string) $file->store('email-attachments', EmailAttachment::DISK);
