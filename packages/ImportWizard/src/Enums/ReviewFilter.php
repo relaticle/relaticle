@@ -17,10 +17,10 @@ enum ReviewFilter: string implements HasIcon, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::All => 'All',
-            self::NeedsReview => 'Needs Review',
-            self::Modified => 'Modified',
-            self::Skipped => 'Skipped',
+            self::All => __('enums/review-filter.all'),
+            self::NeedsReview => __('enums/review-filter.needs_review'),
+            self::Modified => __('enums/review-filter.modified'),
+            self::Skipped => __('enums/review-filter.skipped'),
         };
     }
 

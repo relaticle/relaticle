@@ -44,6 +44,11 @@ enum AppEventPalette: string implements HasIcon, HasLabel
         };
     }
 
+    public function inlineLabel(): string
+    {
+        return (string) __("activity-log.events.{$this->value}.inline");
+    }
+
     public function badge(): null
     {
         return null;

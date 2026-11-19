@@ -57,7 +57,7 @@ final class NoteCardColumn extends Column
             $createdAt === null => '',
             $createdAt->isToday() => __('filament/resources/note.cards.today'),
             $createdAt->isYesterday() => __('filament/resources/note.cards.yesterday'),
-            default => $createdAt->translatedFormat('F j, Y'),
+            default => $createdAt->isoFormat('LL'),
         };
     }
 

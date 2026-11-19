@@ -129,6 +129,13 @@ return [
                 'quarters' => 'quarter',
                 'years' => 'year',
             ],
+            'this_period' => [
+                'days' => 'day',
+                'weeks' => 'week',
+                'months' => 'month',
+                'quarters' => 'quarter',
+                'years' => 'year',
+            ],
             'fields' => [
                 'title' => 'Title',
                 'created_at' => 'Created at',
@@ -257,7 +264,7 @@ return [
     ],
 
     'record_chips' => [
-        'show_all' => 'Show all :count :label',
+        'show_all_assignees' => 'Show all :count assignees',
     ],
 
     'restore_blocked' => [

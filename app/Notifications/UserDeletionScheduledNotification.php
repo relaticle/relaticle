@@ -30,7 +30,7 @@ final class UserDeletionScheduledNotification extends Notification implements Sh
 
     public function toMail(object $notifiable): MailMessage
     {
-        $date = $this->user->scheduled_deletion_at?->copy()->setTimezone($this->user->effectiveTimezone())->format('M j, Y') ?? '';
+        $date = $this->user->scheduled_deletion_at?->copy()->setTimezone($this->user->effectiveTimezone())->settings(['locale' => app()->getLocale()])->isoFormat('ll') ?? '';
 
         return (new MailMessage)
             ->subject(__('mail.account_deletion_scheduled.subject'))

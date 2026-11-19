@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $assistantName = (string) config('chat.assistant_name');
     $emailActive = \Relaticle\EmailIntegration\EmailIntegrationServiceProvider::enabled();
@@ -40,7 +41,7 @@
             __('The built-in assistant'),
             $aiProviders->isEmpty()
                 ? __('A request to :name, a voice message or an email summary sends the content needed to answer it to an AI provider. :name proposes every change as a card and waits for your approval.', ['name' => $assistantName])
-                : __('A request to :name, a voice message or an email summary sends the content needed to answer it to an AI provider: :providers. :name proposes every change as a card and waits for your approval.', ['name' => $assistantName, 'providers' => $aiProviders->join(', ', ' or ')]),
+                : __('A request to :name, a voice message or an email summary sends the content needed to answer it to an AI provider: :providers. :name proposes every change as a card and waits for your approval.', ['name' => $assistantName, 'providers' => $aiProviders->join(', ', ' '.__('or').' ')]),
         ],
         [
             'lucide-plug',
@@ -68,7 +69,7 @@
     $ownership = [
         ['lucide-download', __('Export'), __('Download every record type as CSV or Excel, custom attributes included. The REST API reads the same records. Export works while the workspace is active.')],
         ['lucide-trash', __('Delete'), __('Ask for deletion at privacy@relaticle.com. An account scheduled for deletion is removed after a 30-day grace period. Records in shared workspaces remain. We delete a paused trial workspace that no one signs in to for 60 days, after two emails to the owner.')],
-        ['lucide-server', __('Leave'), __('Relaticle is open source under AGPL-3.0. Move to your own server whenever you want.')],
+        ['lucide-server', __('cloud::marketing.security.leave'), __('Relaticle is open source under AGPL-3.0. Move to your own server whenever you want.')],
     ];
 
     $glance = [
@@ -78,7 +79,7 @@
         ['lucide-git-fork', __('Open source'), __('AGPL-3.0. Read the code, or run it on your own server.'), '#data'],
     ];
 
-    $policyLink = [route('policy.show'), __('Read the privacy policy for sharing settings, deletion and the Google Limited Use commitment.')];
+    $policyLink = [LocalizedUrl::route('policy.show'), __('Read the privacy policy for sharing settings, deletion and the Google Limited Use commitment.')];
 
     $sections = array_filter([
         ['account', __('Your account'), __('How you sign in, and what protects the account.'), $account, null],
@@ -101,7 +102,8 @@
         ['Fathom Analytics', __('Counts page views and intentional events on the website and in the app'), __('Normalized page paths and events, without query strings, account identifiers or CRM content')],
         $aiProviders->isEmpty() ? null : [$aiProviders->join(', '), __('Run the AI models behind the assistant, voice input and email summaries'), __('The content of that request')],
         $signupChallenge ? ['Cloudflare', __('Checks that a new account is created by a person'), __('Signals from your browser on the create-account step')] : null,
-        ['Google, DuckDuckGo', __('Look up a company logo'), __('The company domain')],
+        ['Cloudflare Workers', __('Look up a company logo'), __('The company domain')],
+        ['Brandfetch', __('Serves company logos, which your browser loads from its CDN'), __('The company domains on screen, sent by your browser')],
         ['Maxforms', __('Hosts the support and feedback forms'), __('What you type into the form')],
         ['Oh Dear', __('Watches uptime and health checks'), __('No customer data')],
     ]));
@@ -149,7 +151,7 @@
             </p>
 
             <div class="mt-7 flex w-full max-w-sm flex-col gap-3 sm:w-auto sm:max-w-none sm:flex-row">
-                <x-cloud::marketing.button href="{{ route('policy.show') }}">
+                <x-cloud::marketing.button href="{{ LocalizedUrl::route('policy.show') }}">
                     {{ __('Read the privacy policy') }}
                 </x-cloud::marketing.button>
                 <x-cloud::marketing.button variant="secondary" href="#report">
@@ -199,7 +201,7 @@
         <x-cloud::marketing.frame-header :label="__('Service providers')" :lead="$hosted ? __('Who handles data for Relaticle Cloud.') : __('Run by its own operator.')">
             {{ $hosted
                 ? __('And what each one receives.')
-                : __('This install is run by its own operator. It uses only the company logo lookup, which sends a company domain to Google and DuckDuckGo, unless the operator configures other providers.') }}
+                : __('This install is run by its own operator. Logos stored before an upgrade stay. It finds new ones only if the operator sets LOGO_FINDER_URL, and shows a Brandfetch logo only with a Brandfetch client ID, which each browser then loads from Brandfetch.') }}
         </x-cloud::marketing.frame-header>
 
         @if($hosted)
@@ -249,7 +251,7 @@
                     <h2 class="type-title text-gray-950 dark:text-white">{{ __('Security questions, answered') }}</h2>
                     <p class="mt-4 text-sm leading-relaxed text-gray-500 dark:text-gray-400">
                         {{ __('Something else on your mind?') }}
-                        <a href="{{ route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
+                        <a href="{{ LocalizedUrl::route('contact') }}" class="{{ $linkClass }}">{{ __('Get in touch') }}</a>
                     </p>
                 </div>
             </div>
@@ -264,7 +266,7 @@
         <x-cloud::marketing.button href="https://github.com/relaticle/relaticle" icon="ri-github-fill" external>
             {{ __('View on GitHub') }}
         </x-cloud::marketing.button>
-        <x-cloud::marketing.button variant="secondary" href="{{ route('contact') }}">
+        <x-cloud::marketing.button variant="secondary" href="{{ LocalizedUrl::route('contact') }}">
             {{ __('Get in touch') }}
         </x-cloud::marketing.button>
     </x-cloud::marketing.closing-band>
@@ -274,15 +276,15 @@
             ->webPage(fn ($webPage) => $webPage
                 ->name($title)
                 ->description($description)
-                ->url(route('security')))
+                ->url(LocalizedUrl::route('security')))
             ->fAQPage(fn ($faqPage) => $faqPage
                 ->mainEntity(collect($faqs)->map(fn (array $faq) => \Spatie\SchemaOrg\Schema::question()
                     ->name($faq[0])
                     ->acceptedAnswer(\Spatie\SchemaOrg\Schema::answer()->text($faq[1])))->all()))
             ->breadcrumbList(fn ($list) => $list
                 ->itemListElement([
-                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(url('/')),
-                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Security'))->item(route('security')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(1)->name('Relaticle')->item(LocalizedUrl::route('home')),
+                    \Spatie\SchemaOrg\Schema::listItem()->position(2)->name(__('Security'))->item(LocalizedUrl::route('security')),
                 ]));
     @endphp
 

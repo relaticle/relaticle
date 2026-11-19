@@ -32,12 +32,12 @@ final readonly class CompleteTask
                 ->where('code', TaskField::STATUS)
                 ->first();
 
-            $done = $status?->options->firstWhere('name', TaskField::DONE_STATUS);
+            $done = $status instanceof CustomField ? TaskField::doneOption($status->options) : null;
 
             abort_unless(
                 $status instanceof CustomField && $done instanceof CustomFieldOption,
                 422,
-                __('This workspace has no Done task status.'),
+                __('This workspace has no :done task status.', ['done' => __(TaskField::DONE_LABEL_KEY)]),
             );
 
             $task->saveCustomFieldValue($status, $done->getKey());

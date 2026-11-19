@@ -35,7 +35,7 @@ final class WorkspaceDeletionReminderNotification extends Notification implement
     {
         $days = (int) config('relaticle.deletion.reminder_days_before');
         $timezone = $notifiable instanceof User ? $notifiable->effectiveTimezone() : (string) config('app.timezone');
-        $date = $this->workspace->scheduled_deletion_at?->copy()->setTimezone($timezone)->format('M j, Y') ?? '';
+        $date = $this->workspace->scheduled_deletion_at?->copy()->setTimezone($timezone)->settings(['locale' => app()->getLocale()])->isoFormat('ll') ?? '';
 
         return (new MailMessage)
             ->subject(trans_choice('mail.workspace_deletion_reminder.subject', $days, ['workspace' => $this->workspace->name, 'days' => $days]))

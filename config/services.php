@@ -102,4 +102,13 @@ return [
             'bulk' => ['price' => env('STRIPE_PRICE_CREDITS_20K'), 'credits' => 20_000],
         ],
     ],
+
+    'logo_finder' => [
+        'url' => env('LOGO_FINDER_URL'),
+        'key' => env('LOGO_FINDER_KEY'),
+    ],
+
+    'brandfetch' => [
+        'client_id' => env('BRANDFETCH_CLIENT_ID'),
+    ],
 ];

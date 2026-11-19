@@ -1,0 +1,8 @@
+title: Envoyer la proposition à Tim
+assigned_people:
+  - tim
+custom_fields:
+  description: Préparez et envoyez la proposition définitive pour le partenariat développeurs avec Apple.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: Medium

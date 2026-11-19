@@ -94,14 +94,14 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
 
         $fields = [];
         if (array_key_exists('title', $payload)) {
-            $fields[] = ['label' => 'Title', 'old' => $model->getAttribute('title'), 'new' => $payload['title']];
+            $fields[] = ['label' => __('Title'), 'old' => $model->getAttribute('title'), 'new' => $payload['title']];
         }
 
         foreach ([
-            ['people_ids', 'Linked people', 'people', People::class, $workspace],
-            ['company_ids', 'Linked companies', 'companies', Company::class, $workspace],
-            ['opportunity_ids', 'Linked opportunities', 'opportunities', Opportunity::class, $workspace],
-            ['assignee_ids', 'Assignees', 'assignees', User::class, null],
+            ['people_ids', __('Linked people'), 'people', People::class, $workspace],
+            ['company_ids', __('Linked companies'), 'companies', Company::class, $workspace],
+            ['opportunity_ids', __('Linked opportunities'), 'opportunities', Opportunity::class, $workspace],
+            ['assignee_ids', __('Assignees'), 'assignees', User::class, null],
         ] as [$key, $label, $relation, $modelClass, $scope]) {
             $ids = $this->idListOrNull($request, $key);
 
@@ -119,8 +119,8 @@ final class UpdateTaskTool extends BaseWriteUpdateTool
         }
 
         return [
-            'title' => 'Update Task',
-            'summary' => "Update task \"{$model->getAttribute('title')}\"",
+            'title' => __('Update Task'),
+            'summary' => __('Update task ":name"', ['name' => $model->getAttribute('title')]),
             'fields' => $fields,
         ];
     }

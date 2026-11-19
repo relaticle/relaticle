@@ -1,0 +1,41 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'events' => [
+        'email_sent' => [
+            'label' => 'Correo electrónico enviado',
+            'inline' => 'correo electrónico enviado',
+            'badge' => 'Enviado',
+        ],
+        'email_received' => [
+            'label' => 'Correo electrónico recibido',
+            'inline' => 'correo electrónico recibido',
+            'badge' => 'Recibido',
+        ],
+        'note_created' => [
+            'label' => 'Nota',
+            'inline' => 'nota',
+        ],
+        'task_created' => [
+            'label' => 'Tarea',
+            'inline' => 'tarea',
+        ],
+        'record_merged' => [
+            'label' => 'Fusionado',
+            'description' => 'El registro :name se fusionó en este registro',
+            'description_by' => ':causer fusionó el registro :name en este registro',
+            'description_into' => 'Este registro se fusionó en :name',
+            'description_into_by' => ':causer fusionó este registro en :name',
+        ],
+        'meeting.created' => [
+            'label' => 'Reunión programada',
+            'inline' => 'reunión programada',
+        ],
+        'meeting.cancelled' => [
+            'label' => 'Reunión cancelada',
+            'inline' => 'reunión cancelada',
+        ],
+    ],
+];

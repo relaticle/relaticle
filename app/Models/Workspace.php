@@ -14,7 +14,6 @@ use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Enums\StripeSubscriptionStatus;
 use App\Enums\SubscriptionType;
-use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
 use App\Events\WorkspaceCreated;
 use App\Events\WorkspaceDeleted;
@@ -65,8 +64,6 @@ use Spatie\Sluggable\SlugOptions;
  * @property bool $auto_create_companies
  * @property AiSettings $ai_settings
  * @property Plan $plan
- * @property ?string $invite_link_token
- * @property ?CarbonImmutable $invite_link_token_expires_at
  * @property ?OnboardingUseCase $onboarding_use_case
  * @property ?string $onboarding_other_use_case
  * @property ?list<string> $onboarding_context
@@ -87,7 +84,6 @@ use Spatie\Sluggable\SlugOptions;
  * @property CarbonImmutable|null $trial_reminded_for
  * @property CarbonImmutable|null $pro_trial_used_at
  * @property CarbonImmutable|null $hosted_free_grandfathered_at
- * @property string $invite_link_default_role
  * @property-read Membership|null $membership the `workspace_user` row, populated only when the workspace was
  *     loaded through `User::workspaces()`; null on a workspace reached any other way
  */
@@ -106,7 +102,6 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_referral_detail',
     'onboarding_referral_prompt',
     'onboarding_step',
-    'invite_link_default_role',
 ])]
 #[Hidden([
     'invite_link_token',
@@ -165,6 +160,9 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'api-tokens', 'import-history', 'profile', 'scheduled-deletion',
         'opportunities-board', 'tasks-board', 'chat', 'r',
 
+        // Public site language prefixes, one per entry in config('app.available_locales') but English
+        'de', 'es', 'fr',
+
         // Content & info pages
         'about', 'blog', 'docs', 'documentation', 'faq', 'help', 'support',
         'privacy-policy', 'terms-of-service', 'legal', 'security', 'changelog',
@@ -200,11 +198,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'email-accounts', 'email-attachments', 'email-compose-images',
     ];
 
-    /**
-     * How many days an invite-link token stays valid after creation/rotation.
-     */
-    public const int INVITE_LINK_TTL_DAYS = 7;
-
     public const int PRO_TRIAL_DAYS = 14;
 
     public const int TRIAL_EXTENSION_DAYS = 7;
@@ -221,15 +214,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'created' => WorkspaceCreated::class,
         'updated' => WorkspaceUpdated::class,
         'deleted' => WorkspaceDeleted::class,
-    ];
-
-    /**
-     * The model's default attribute values.
-     *
-     * @var array<string, string|bool>
-     */
-    protected $attributes = [
-        'invite_link_default_role' => WorkspaceRole::Member->value,
     ];
 
     /**
@@ -252,7 +236,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'onboarding_step' => WorkspaceSetupStep::class,
             'activation_checklist_dismissed_at' => 'datetime',
             'setup_nudge_sent_at' => 'datetime',
-            'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
             'deletion_reason' => DeletionReason::class,
             'paused_at' => 'datetime',
@@ -264,51 +247,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'pro_trial_used_at' => 'datetime',
             'hosted_free_grandfathered_at' => 'datetime',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        self::creating(function (Workspace $workspace): void {
-            if ($workspace->invite_link_token === null) {
-                $workspace->invite_link_token = Str::random(40);
-                $workspace->invite_link_token_expires_at = now()->addDays(self::INVITE_LINK_TTL_DAYS);
-            }
-        });
-    }
-
-    public function rotateInviteLink(): void
-    {
-        $this->forceFill([
-            'invite_link_token' => Str::random(40),
-            'invite_link_token_expires_at' => now()->addDays(self::INVITE_LINK_TTL_DAYS),
-        ])->save();
-    }
-
-    /**
-     * Clearing the token is what turns the link off: every lookup matches on the
-     * column, and no request token can equal null, so the link stops resolving
-     * without a second flag that could disagree with it.
-     */
-    public function disableInviteLink(): void
-    {
-        $this->forceFill([
-            'invite_link_token' => null,
-            'invite_link_token_expires_at' => null,
-        ])->save();
-    }
-
-    public function hasInviteLink(): bool
-    {
-        return $this->invite_link_token !== null;
-    }
-
-    public function isInviteLinkTokenExpired(): bool
-    {
-        if ($this->invite_link_token_expires_at === null) {
-            return true;
-        }
-
-        return $this->invite_link_token_expires_at->isPast();
     }
 
     /**

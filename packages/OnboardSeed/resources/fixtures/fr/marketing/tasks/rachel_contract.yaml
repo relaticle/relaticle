@@ -1,0 +1,8 @@
+title: Finaliser l'accord de co-marketing avec Rachel
+assigned_people:
+  - rachel
+custom_fields:
+  description: Finalisez les conditions du partenariat de co-marketing avec HubSpot et envoyez l'accord définitif à Rachel pour validation.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

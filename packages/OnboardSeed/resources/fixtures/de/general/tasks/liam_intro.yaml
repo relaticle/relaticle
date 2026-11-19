@@ -1,0 +1,8 @@
+title: Kennenlerngespräch mit Liam
+assigned_people:
+  - liam
+custom_fields:
+  description: Vereinbaren Sie ein 30-minütiges Kennenlerngespräch mit Liam, um Möglichkeiten einer Medienpartnerschaft und die gegenseitige Passung zu klären.
+  due_date: '{{ +7d }}'
+  status: To do
+  priority: Medium

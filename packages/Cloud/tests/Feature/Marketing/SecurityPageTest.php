@@ -58,7 +58,7 @@ it('names each service provider on a hosted install', function (string $provider
     withHostedBilling();
 
     $this->get('/security')->assertOk()->assertSee($provider);
-})->with(['Hetzner', 'Laravel Forge', 'Mailcoach', 'Postmark', 'Stripe', 'Sentry', 'Fathom Analytics', 'Anthropic, OpenAI', 'Google, DuckDuckGo', 'Maxforms', 'Oh Dear']);
+})->with(['Hetzner', 'Laravel Forge', 'Mailcoach', 'Postmark', 'Stripe', 'Sentry', 'Fathom Analytics', 'Anthropic, OpenAI', 'Cloudflare Workers', 'Brandfetch', 'Maxforms', 'Oh Dear']);
 
 it('says which country the hosted data lives in', function (): void {
     withHostedBilling();
@@ -74,6 +74,19 @@ it('names the operator instead of a provider table where hosted billing is off',
         ->assertSee('This install is run by its own operator.')
         ->assertDontSee('Hetzner')
         ->assertDontSee('Laravel Forge');
+});
+
+it('joins the AI provider names with the conjunction of the page language', function (): void {
+    withHostedBilling();
+    config()->set('chat.models', [
+        ChatCatalog::entry(),
+        ChatCatalog::entry(['label' => 'Gemini 3 Flash', 'provider' => 'gemini', 'model' => 'gemini-3-flash']),
+    ]);
+    app()->forgetInstance(ModelRegistry::class);
+
+    foreach (['de' => 'Anthropic oder Google', 'es' => 'Anthropic o Google', 'fr' => 'Anthropic ou Google'] as $locale => $joined) {
+        expect(securityPageText($this->get("/{$locale}/security")->assertOk()->getContent()))->toContain($joined);
+    }
 });
 
 it('names the AI providers of the models the product offers', function (): void {

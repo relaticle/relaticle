@@ -42,12 +42,12 @@ final class PasskeyLoginController extends Controller
         $panel = Filament::getPanel('sysadmin');
 
         if (! $passkey->user->canAccessPanel($panel)) {
-            throw InvalidPasskeyException::make('Unable to sign in with this account.');
+            throw InvalidPasskeyException::make(__('Unable to sign in with this account.'));
         }
 
         $intended = $request->session()->pull('url.intended', $panel->getUrl());
 
-        $guard->login($passkey->user, $request->remember());
+        $guard->login($passkey->user);
 
         $request->session()->regenerate();
 

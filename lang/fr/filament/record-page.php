@@ -19,11 +19,11 @@ return [
         'new_note' => 'Nouvelle note',
         'new_task' => 'Nouvelle tâche',
         'open_preview' => "Ouvrir l'aperçu",
-        'open_record' => 'Ouvrir la fiche',
+        'open_record' => "Ouvrir l'enregistrement",
     ],
     'preview' => [
-        'previous' => 'Fiche précédente',
-        'next' => 'Fiche suivante',
+        'previous' => 'Enregistrement précédent',
+        'next' => 'Enregistrement suivant',
         'position' => ':position sur :total dans :label',
     ],
     'overview' => [

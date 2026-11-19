@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
     $footerLink = 'transition hover:text-gray-950 dark:hover:text-white';
 @endphp
@@ -55,7 +56,7 @@
                         <div class="mt-8 flex flex-col gap-3">
                             @if($lapsedPlan)
                                 <x-filament::button size="lg" tag="a" icon="lucide-headset" class="w-full justify-center"
-                                    :href="url()->getPublicUrl(route('contact', ['plan' => $lapsedPlan->value], absolute: false))">
+                                    :href="url()->getPublicUrl(LocalizedUrl::route('contact', ['plan' => $lapsedPlan->value], absolute: false))">
                                     {{ __('cloud::billing.paused.restart_managed', ['plan' => $lapsedPlan->marketingLabel()]) }}
                                 </x-filament::button>
                             @endif
@@ -94,7 +95,7 @@
                             </x-filament::button>
                         @endif
                         <x-filament::button tag="a" color="gray" icon="lucide-headset" class="w-full justify-center"
-                            :href="url()->getPublicUrl(route('contact', absolute: false))">
+                            :href="url()->getPublicUrl(LocalizedUrl::route('contact', absolute: false))">
                             {{ __('cloud::billing.paused.contact') }}
                         </x-filament::button>
                     </div>
@@ -104,7 +105,7 @@
 
         <footer class="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pb-8 text-sm text-gray-500 dark:text-gray-400">
             <span>{{ __('cloud::billing.paused.copyright', ['year' => now()->year]) }}</span>
-            <a href="{{ url()->getPublicUrl(route('policy.show', absolute: false)) }}" class="{{ $footerLink }}">{{ __('cloud::billing.paused.privacy') }}</a>
+            <a href="{{ url()->getPublicUrl(LocalizedUrl::route('policy.show', absolute: false)) }}" class="{{ $footerLink }}">{{ __('cloud::billing.paused.privacy') }}</a>
             <form method="post" action="{{ filament()->getLogoutUrl() }}">
                 @csrf
                 <button type="submit" class="{{ $footerLink }}">{{ __('cloud::billing.paused.sign_out') }}</button>

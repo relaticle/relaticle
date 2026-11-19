@@ -11,6 +11,8 @@
 /public/storage
 /public/sitemap.xml
 /storage/*.key
+/storage/*.key.*
+/.env.fetch.*
 /vendor
 .env
 .env.backup

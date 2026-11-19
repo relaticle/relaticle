@@ -17,7 +17,7 @@
                 type="button"
                 @click="open = false; $refs.video && $refs.video.pause()"
                 class="absolute top-3 right-3 z-10 inline-flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white hover:bg-white/20 transition"
-                aria-label="Close demo"
+                aria-label="{{ __('Close demo') }}"
             >
                 <x-lucide-x class="w-4 h-4"/>
             </button>

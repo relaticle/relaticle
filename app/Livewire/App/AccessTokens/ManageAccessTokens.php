@@ -89,8 +89,8 @@ final class ManageAccessTokens extends BaseLivewireComponent implements HasTable
             ->label(__('access-tokens.modals.permissions.action_label'))
             ->icon('lucide-lock')
             ->iconButton()
-            ->tooltip('Edit Permissions')
-            ->modalHeading(fn (PersonalAccessToken $record): string => "Permissions: {$record->name}")
+            ->tooltip(__('access-tokens.modals.permissions.tooltip'))
+            ->modalHeading(fn (PersonalAccessToken $record): string => __('access-tokens.modals.permissions.heading', ['name' => $record->name]))
             ->modalWidth(Width::Large)
             ->fillForm(
                 fn (PersonalAccessToken $record): array => [

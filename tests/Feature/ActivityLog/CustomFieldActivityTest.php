@@ -8,9 +8,11 @@ use App\Models\CustomField;
 use App\Models\CustomFieldSection;
 use App\Models\User;
 use App\Support\ActivityLog\ActivityValue;
+use App\Support\Locales;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 
 beforeEach(function (): void {
@@ -235,3 +237,34 @@ it('never writes the plaintext of an encrypted field value', function (): void {
         ->and($changes[1]['old']['label'])->toBe(ActivityValue::REDACTED)
         ->and($changes[1]['new']['label'])->toBe(ActivityValue::REDACTED);
 });
+
+it('shows a toggle change in the reader language, whatever language wrote it', function (string $locale, string $yes): void {
+    $toggle = CustomField::query()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'custom_field_section_id' => $this->field->custom_field_section_id,
+        'entity_type' => 'company',
+        'code' => 'is_customer',
+        'name' => 'Is customer',
+        'type' => 'toggle',
+        'sort_order' => 2,
+        'active' => true,
+        'validation_rules' => [],
+    ]);
+    $company = Company::factory()->for($this->workspace)->create();
+    Activity::withoutGlobalScopes()->delete();
+    $company->saveCustomFieldValue($toggle, true);
+
+    Locales::apply($locale);
+
+    livewire(ActivityLogLivewire::class, [
+        'subjectClass' => $company::class,
+        'subjectKey' => $company->getKey(),
+        'perPage' => 20,
+    ])
+        ->assertSeeText($yes)
+        ->assertDontSeeText('Yes');
+})->with([
+    'de' => ['de', 'Ja'],
+    'es' => ['es', 'Sí'],
+    'fr' => ['fr', 'Oui'],
+]);

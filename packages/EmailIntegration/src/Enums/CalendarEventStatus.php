@@ -16,9 +16,9 @@ enum CalendarEventStatus: string implements HasColor, HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::CONFIRMED => 'Confirmed',
-            self::TENTATIVE => 'Tentative',
-            self::CANCELLED => 'Cancelled',
+            self::CONFIRMED => __('enums/calendar-event-status.confirmed'),
+            self::TENTATIVE => __('enums/calendar-event-status.tentative'),
+            self::CANCELLED => __('enums/calendar-event-status.cancelled'),
         };
     }
 

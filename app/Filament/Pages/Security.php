@@ -44,6 +44,11 @@ final class Security extends Page
         ]);
     }
 
+    public function getTitle(): string
+    {
+        return __('profile.security');
+    }
+
     public function getHeading(): string
     {
         return __('profile.security');

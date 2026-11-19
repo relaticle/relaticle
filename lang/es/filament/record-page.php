@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'sections' => [
+        'details' => 'Detalles',
+        'record_info' => 'Información del registro',
+    ],
+    'fields' => [
+        'created_by' => 'Creado por',
+        'created_at' => 'Creado',
+        'updated_at' => 'Última actualización',
+    ],
+    'actions' => [
+        'copy_page_url' => 'Copiar URL de la página',
+        'copy_record_id' => 'Copiar ID del registro',
+        'merge_record' => 'Fusionar registro',
+        'new_note' => 'Nueva nota',
+        'new_task' => 'Nueva tarea',
+        'open_preview' => 'Abrir vista previa',
+        'open_record' => 'Abrir registro',
+    ],
+    'preview' => [
+        'previous' => 'Registro anterior',
+        'next' => 'Registro siguiente',
+        'position' => ':position de :total en :label',
+    ],
+    'overview' => [
+        'label' => 'Resumen',
+        'highlights' => 'Destacados',
+        'activity' => 'Actividad',
+        'view_all' => 'Ver todo',
+        'notes' => 'Notas',
+        'tasks' => 'Tareas',
+        'emails' => 'Correos electrónicos',
+        'next_task' => 'Próxima tarea por vencer',
+        'no_next_task' => 'Sin tareas abiertas',
+        'today' => 'Hoy',
+        'tomorrow' => 'Mañana',
+        'last_interaction' => 'Última interacción',
+        'no_interaction' => 'Aún sin interacción',
+    ],
+    'notifications' => [
+        'url_copied' => 'URL copiada al portapapeles',
+        'id_copied' => 'ID del registro copiado al portapapeles',
+        'records_merged' => 'Registros fusionados',
+    ],
+    'merge' => [
+        'heading' => 'Fusionar',
+        'notice' => 'La fusión crea un registro nuevo. Si ambos registros tienen un valor, se conserva el del registro de la derecha.',
+        'search' => 'Buscar',
+        'swap' => 'Intercambiar registros',
+        'submit' => 'Fusionar registros',
+        'unavailable' => 'Ese registro ya no está disponible para fusionar.',
+        'over_limit' => ':field admite como máximo :max. Juntos, estos registros tienen más. Elimine algunos primero.',
+        'pick' => 'Elegir un registro',
+        'clear' => 'Elegir otro registro',
+        'duplicate' => [
+            'checking' => 'Buscando duplicados…',
+            'count' => '{1} 1 posible duplicado|[2,*] :count posibles duplicados',
+            'count_over' => ':count+ posibles duplicados',
+            'shares' => 'Comparte :value',
+            'merge_with' => 'Fusionar con :name',
+            'action' => 'Fusionar',
+        ],
+        'search_placeholder' => [
+            'company' => 'Buscar por nombre o dominio',
+            'people' => 'Buscar por nombre o correo electrónico',
+        ],
+        'no_results' => 'No se encontraron registros',
+        'no_domains' => 'Sin dominios',
+        'no_emails' => 'Sin correos electrónicos',
+        'record' => 'registro',
+        'counts' => [
+            'people' => '{0} Sin personas relacionadas|{1} :count persona|[2,*] :count personas',
+            'opportunities' => '{0} Sin oportunidades relacionadas|{1} :count oportunidad|[2,*] :count oportunidades',
+            'contact_opportunities' => '{0} Sin oportunidades como persona de contacto|{1} :count oportunidad como persona de contacto|[2,*] :count oportunidades como persona de contacto',
+            'notes' => '{0} Sin notas relacionadas|{1} :count nota|[2,*] :count notas',
+            'tasks' => '{0} Sin tareas relacionadas|{1} :count tarea|[2,*] :count tareas',
+        ],
+    ],
+    'empty' => '—',
+    'view_all' => 'Ver todo',
+    'show_less' => 'Ver menos',
+    'resize_details' => 'Cambiar el tamaño del panel de detalles',
+];

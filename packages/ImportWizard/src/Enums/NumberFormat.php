@@ -20,8 +20,8 @@ enum NumberFormat: string implements HasLabel
     public function getLabel(): string
     {
         return match ($this) {
-            self::POINT => 'Point',
-            self::COMMA => 'Comma',
+            self::POINT => __('enums/number-format.point'),
+            self::COMMA => __('enums/number-format.comma'),
         };
     }
 

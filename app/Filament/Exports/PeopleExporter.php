@@ -7,7 +7,6 @@ namespace App\Filament\Exports;
 use App\Models\People;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Models\Export;
-use Illuminate\Support\Number;
 use Relaticle\CustomFields\Facades\CustomFields;
 
 final class PeopleExporter extends BaseExporter
@@ -36,13 +35,6 @@ final class PeopleExporter extends BaseExporter
 
     public static function getCompletedNotificationBody(Export $export): string
     {
-        $successfulRows = $export->successful_rows ?? 0;
-        $body = 'Your people export has completed and '.Number::format($successfulRows).' '.str('row')->plural($successfulRows).' exported.';
-
-        if (($failedRowsCount = $export->getFailedRowsCount()) !== 0) {
-            $body .= ' '.Number::format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to export.';
-        }
-
-        return $body;
+        return self::completedBody($export, 'people');
     }
 }

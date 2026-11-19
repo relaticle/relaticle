@@ -9,7 +9,6 @@ use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Services\WorkspaceActivationFacts;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
-use Illuminate\Support\Str;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
 use Relaticle\Chat\Enums\PendingActionOperation;
@@ -21,6 +20,8 @@ use Relaticle\Chat\Tools\Concerns\WithConversationContext;
 
 final class RemoveSampleDataTool implements Tool
 {
+    private const array RESOURCE_LANG_FILES = ['companies' => 'company', 'people' => 'person', 'tasks' => 'task', 'notes' => 'note', 'opportunities' => 'opportunity'];
+
     use LimitsPlanSteps;
     use WithConversationContext;
 
@@ -49,13 +50,13 @@ final class RemoveSampleDataTool implements Tool
         }
 
         if (! $user->hasWorkspaceCapability($workspace?->getKey(), WorkspaceCapability::WorkspaceManage)) {
-            return $this->error(__('Only the workspace owner can remove the sample data. Tell the user to ask the owner, and do not link to any page.'));
+            return $this->error('Only the workspace owner can remove the sample data. Tell the user to ask the owner, and do not link to any page.');
         }
 
         $counts = array_filter(resolve(WorkspaceActivationFacts::class)->sampleRecordCounts($workspace));
 
         if ($counts === []) {
-            return $this->error(__('This workspace has no sample records left to remove.'));
+            return $this->error('This workspace has no sample records left to remove.');
         }
 
         $total = array_sum($counts);
@@ -71,7 +72,7 @@ final class RemoveSampleDataTool implements Tool
                 'title' => __('Remove sample data'),
                 'summary' => trans_choice('Delete :count sample record|Delete :count sample records', $total, ['count' => $total]),
                 'fields' => array_map(
-                    static fn (string $table, int $count): array => ['label' => Str::headline($table), 'value' => (string) $count],
+                    static fn (string $table, int $count): array => ['label' => __('filament/resources/'.self::RESOURCE_LANG_FILES[$table].'.navigation_label'), 'value' => (string) $count],
                     array_keys($counts),
                     array_values($counts),
                 ),

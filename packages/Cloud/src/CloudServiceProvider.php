@@ -17,6 +17,7 @@ use App\Models\Workspace;
 use App\Providers\Filament\AppPanelProvider;
 use App\Services\NoBilling;
 use App\Services\SelfHostedEntitlements;
+use App\Support\Locales;
 use App\Support\Mail\MailPreview;
 use Carbon\CarbonImmutable;
 use Filament\Auth\Events\Registered;
@@ -65,15 +66,19 @@ use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\Cloud\Blog\BlogMcpStreams;
+use Relaticle\Cloud\Commands\BlogMcpCommand;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
 use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
 use Relaticle\Cloud\Marketing\Http\Controllers\AssistantPagesController;
 use Relaticle\Cloud\Marketing\Http\Middleware\AddVaryAcceptHeader;
+use Relaticle\Cloud\Marketing\Http\Middleware\SetPublicLocale;
 use Relaticle\Cloud\Marketing\Mail\NewContactSubmissionMail;
 use Relaticle\Cloud\Marketing\Services\DiscordService;
 use Relaticle\Cloud\Marketing\Services\DockerHubService;
 use Relaticle\Cloud\Marketing\Services\GitHubService;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 
 final class CloudServiceProvider extends ServiceProvider
 {
@@ -81,6 +86,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->bind(BlogMcpStreams::class, static fn (): BlogMcpStreams => new BlogMcpStreams(STDIN, STDOUT));
         $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
             ? $app->make(PlanEntitlements::class)
             : $app->make(SelfHostedEntitlements::class));
@@ -107,6 +113,7 @@ final class CloudServiceProvider extends ServiceProvider
     {
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'cloud');
         $this->loadTranslationsFrom(__DIR__.'/../lang', 'cloud');
+        $this->loadJsonTranslationsFrom(__DIR__.'/../lang');
         $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
         $this->configureAnalytics();
         $this->loadRoutesFrom(__DIR__.'/../routes/webhooks.php');
@@ -114,6 +121,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->registerDocsRoutes();
 
         Blade::componentNamespace('Relaticle\\Cloud\\Marketing\\View\\Components', 'cloud');
+        $this->speakTheLanguageOfALocalizedNotFound();
 
         Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
@@ -123,7 +131,8 @@ final class CloudServiceProvider extends ServiceProvider
         Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
         Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
-        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
+        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class, BlogMcpCommand::class]);
+        $this->registerBlogPreviewRoute();
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('billing:process-trials')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
@@ -174,8 +183,10 @@ final class CloudServiceProvider extends ServiceProvider
         // read the config key App\Features\Blog resolves from.
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
-            'ink.features.mcp' => true,
-            'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class])),
+            'ink.features.mcp' => false,
+            'ink.locales' => config('app.available_locales'),
+            'ink.default_locale' => LocalizedUrl::DEFAULT_LOCALE,
+            'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class, SetPublicLocale::class])),
             'ink.views' => [
                 'index' => 'cloud::blog.index',
                 'show' => 'cloud::blog.show',
@@ -187,11 +198,28 @@ final class CloudServiceProvider extends ServiceProvider
         ]);
     }
 
+    private function registerBlogPreviewRoute(): void
+    {
+        if (! config('ink.features.public_routes')) {
+            $this->loadRoutesFrom(base_path('vendor/relaticle/ink/routes/preview.php'));
+        }
+    }
+
+    private function speakTheLanguageOfALocalizedNotFound(): void
+    {
+        View::composer('errors::404', static function (): void {
+            $locale = LocalizedUrl::localeOfPath(request()->path());
+
+            if ($locale !== null) {
+                Locales::apply($locale);
+            }
+        });
+    }
+
     private function registerMarketingRoutes(): void
     {
-        Route::middleware('web')->group(function (): void {
-            $this->loadRoutesFrom(__DIR__.'/../routes/marketing.php');
-        });
+        $this->registerGlobalRoutes();
+        $this->registerLocalizedRoutes(__DIR__.'/../routes/marketing.php');
     }
 
     private function registerDocsRoutes(): void
@@ -200,9 +228,30 @@ final class CloudServiceProvider extends ServiceProvider
             return;
         }
 
+        $this->registerLocalizedRoutes(__DIR__.'/../routes/docs.php');
+    }
+
+    private function registerGlobalRoutes(): void
+    {
         Route::middleware('web')->group(function (): void {
-            $this->loadRoutesFrom(__DIR__.'/../routes/docs.php');
+            $this->loadRoutesFrom(__DIR__.'/../routes/global.php');
         });
+    }
+
+    private function registerLocalizedRoutes(string $file): void
+    {
+        Route::middleware(['web', SetPublicLocale::class.':'.LocalizedUrl::DEFAULT_LOCALE])->group(function () use ($file): void {
+            $this->loadRoutesFrom($file);
+        });
+
+        foreach (array_diff(config('app.available_locales'), [LocalizedUrl::DEFAULT_LOCALE]) as $locale) {
+            Route::middleware(['web', SetPublicLocale::class.':'.$locale])
+                ->prefix($locale)
+                ->name("{$locale}.")
+                ->group(function () use ($file): void {
+                    $this->loadRoutesFrom($file);
+                });
+        }
     }
 
     private function linkWebsiteFromCore(): void

@@ -11,6 +11,7 @@ use App\Notifications\InboxNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as FilamentNotification;
 use Illuminate\Support\Facades\URL;
+use Illuminate\Support\Number;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
 use Relaticle\ImportWizard\Enums\ImportOutcome;
 use Relaticle\ImportWizard\Filament\Pages\ImportHistory;
@@ -80,7 +81,7 @@ final class ImportFinishedNotification extends InboxNotification
         $parts = collect(self::COUNTS)
             ->filter(fn (string $key): bool => (int) data_get($row->data, $key) > 0)
             ->map(fn (string $key): string => __("import-wizard-new::notifications.finished.counts.{$key}", [
-                'count' => number_format((int) data_get($row->data, $key)),
+                'count' => Number::format((int) data_get($row->data, $key)),
             ]));
 
         return $parts->isEmpty() ? null : $parts->implode(', ');

@@ -13,6 +13,8 @@ mutates(Blog::class);
 it('serves the blog when the feature is active', function (): void {
     $this->get(route('blog.index'))
         ->assertOk();
+
+    expect(Route::has('blog.preview'))->toBeTrue();
 });
 
 it('does not register blog routes when the feature is inactive', function (): void {
@@ -29,6 +31,8 @@ it('does not register blog routes when the feature is inactive', function (): vo
 
     $this->get('/blog/feed')
         ->assertNotFound();
+
+    expect(Route::has('blog.preview'))->toBeTrue();
 
     putenv('RELATICLE_FEATURE_BLOG=true');
     $_ENV['RELATICLE_FEATURE_BLOG'] = $_SERVER['RELATICLE_FEATURE_BLOG'] = 'true';

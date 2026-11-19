@@ -6,6 +6,7 @@ namespace Relaticle\Cloud\Marketing\Http\Controllers;
 
 use Illuminate\Support\Str;
 use Illuminate\View\View;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 
 final readonly class TermsOfServiceController
 {
@@ -14,7 +15,7 @@ final readonly class TermsOfServiceController
         $termsFile = dirname(__DIR__, 4).'/resources/markdown/terms.md';
 
         return view('cloud::marketing.terms', [
-            'terms' => Str::markdown(file_get_contents($termsFile) ?: ''),
+            'terms' => LocalizedUrl::localizeLinks(Str::markdown(file_get_contents($termsFile) ?: '')),
         ]);
     }
 }

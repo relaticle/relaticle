@@ -1,0 +1,8 @@
+title: Due-Diligence-Unterlagen für Sequoia vorbereiten
+assigned_people:
+  - alfred
+custom_fields:
+  description: Stellen Sie Finanzzahlen, Cap Table und Produktkennzahlen für die Due-Diligence-Prüfung von Sequoia zusammen.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

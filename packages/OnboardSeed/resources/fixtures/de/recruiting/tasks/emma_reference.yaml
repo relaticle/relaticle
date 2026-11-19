@@ -1,0 +1,8 @@
+title: Referenzen für Emma prüfen
+assigned_people:
+  - emma
+custom_fields:
+  description: Kontaktieren Sie die Referenzen von Emma Thompson aus ihren früheren Engineering-Management-Positionen. Achten Sie auf Führungsstil, Erfolge beim Teamaufbau und technische Entscheidungen.
+  due_date: '{{ +5d }}'
+  status: To do
+  priority: High

@@ -26,6 +26,7 @@ use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Services\Favicon\Drivers\LogoFinderDriver;
 use App\Support\CurrentSource;
 use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
@@ -163,6 +164,10 @@ final class ResetDemoAccountCommand extends Command
     /** @param  EloquentCollection<int, Company>  $companies */
     private function fetchCompanyLogos(EloquentCollection $companies): void
     {
+        if (! resolve(LogoFinderDriver::class)->isConfigured()) {
+            return;
+        }
+
         $companies->each(function (Company $company): void {
             dispatch(new FetchFaviconForCompany($company));
         });
@@ -172,11 +177,13 @@ final class ResetDemoAccountCommand extends Command
     {
         $attributes = [
             'name' => 'Relaticle Demo',
+            'locale' => null,
             'email_verified_at' => now(),
             'scheduled_deletion_at' => null,
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,
+            'two_factor_last_used_step' => null,
         ];
 
         if ($password !== null) {

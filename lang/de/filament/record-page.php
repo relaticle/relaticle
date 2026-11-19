@@ -1,0 +1,87 @@
+<?php
+
+declare(strict_types=1);
+
+return [
+    'sections' => [
+        'details' => 'Details',
+        'record_info' => 'Eintragsinfo',
+    ],
+    'fields' => [
+        'created_by' => 'Erstellt von',
+        'created_at' => 'Erstellt',
+        'updated_at' => 'Zuletzt aktualisiert',
+    ],
+    'actions' => [
+        'copy_page_url' => 'Seiten-URL kopieren',
+        'copy_record_id' => 'Eintrags-ID kopieren',
+        'merge_record' => 'Eintrag zusammenführen',
+        'new_note' => 'Neue Notiz',
+        'new_task' => 'Neue Aufgabe',
+        'open_preview' => 'Vorschau öffnen',
+        'open_record' => 'Eintrag öffnen',
+    ],
+    'preview' => [
+        'previous' => 'Vorheriger Eintrag',
+        'next' => 'Nächster Eintrag',
+        'position' => ':position von :total in :label',
+    ],
+    'overview' => [
+        'label' => 'Übersicht',
+        'highlights' => 'Auf einen Blick',
+        'activity' => 'Aktivität',
+        'view_all' => 'Alle anzeigen',
+        'notes' => 'Notizen',
+        'tasks' => 'Aufgaben',
+        'emails' => 'E-Mails',
+        'next_task' => 'Nächste fällige Aufgabe',
+        'no_next_task' => 'Keine offenen Aufgaben',
+        'today' => 'Heute',
+        'tomorrow' => 'Morgen',
+        'last_interaction' => 'Letzte Interaktion',
+        'no_interaction' => 'Noch keine Interaktion',
+    ],
+    'notifications' => [
+        'url_copied' => 'URL in die Zwischenablage kopiert',
+        'id_copied' => 'Eintrags-ID in die Zwischenablage kopiert',
+        'records_merged' => 'Einträge zusammengeführt',
+    ],
+    'merge' => [
+        'heading' => 'Zusammenführen',
+        'notice' => 'Beim Zusammenführen entsteht ein neuer Eintrag. Haben beide Einträge einen Wert, gilt der Wert des rechten Eintrags.',
+        'search' => 'Suchen',
+        'swap' => 'Einträge tauschen',
+        'submit' => 'Einträge zusammenführen',
+        'unavailable' => 'Dieser Eintrag kann nicht mehr zusammengeführt werden.',
+        'over_limit' => ':field kann höchstens :max enthalten. Zusammen haben diese Einträge mehr. Entfernen Sie zuerst einige.',
+        'pick' => 'Eintrag auswählen',
+        'clear' => 'Anderen Eintrag auswählen',
+        'duplicate' => [
+            'checking' => 'Suche nach Duplikaten…',
+            'count' => '{1} 1 mögliches Duplikat|[2,*] :count mögliche Duplikate',
+            'count_over' => ':count+ mögliche Duplikate',
+            'shares' => 'Gemeinsam: :value',
+            'merge_with' => 'Mit :name zusammenführen',
+            'action' => 'Zusammenführen',
+        ],
+        'search_placeholder' => [
+            'company' => 'Nach Name oder Domain suchen',
+            'people' => 'Nach Name oder E-Mail suchen',
+        ],
+        'no_results' => 'Keine Einträge gefunden',
+        'no_domains' => 'Keine Domains',
+        'no_emails' => 'Keine E-Mails',
+        'record' => 'Eintrag',
+        'counts' => [
+            'people' => '{0} Keine verknüpften Personen|{1} :count Person|[2,*] :count Personen',
+            'opportunities' => '{0} Keine verknüpften Verkaufschancen|{1} :count Verkaufschance|[2,*] :count Verkaufschancen',
+            'contact_opportunities' => '{0} Keine Verkaufschancen als Ansprechpartner|{1} :count Verkaufschance als Ansprechpartner|[2,*] :count Verkaufschancen als Ansprechpartner',
+            'notes' => '{0} Keine verknüpften Notizen|{1} :count Notiz|[2,*] :count Notizen',
+            'tasks' => '{0} Keine verknüpften Aufgaben|{1} :count Aufgabe|[2,*] :count Aufgaben',
+        ],
+    ],
+    'empty' => '—',
+    'view_all' => 'Alle anzeigen',
+    'show_less' => 'Weniger anzeigen',
+    'resize_details' => 'Größe des Detailbereichs ändern',
+];

@@ -1,0 +1,8 @@
+title: 'Revisar la hoja de términos de Benchmark'
+assigned_people:
+  - peter
+custom_fields:
+  description: 'Revisar y marcar cambios en la hoja de términos recibida de Benchmark para la ronda semilla.'
+  due_date: '{{ +3d }}'
+  status: In progress
+  priority: High

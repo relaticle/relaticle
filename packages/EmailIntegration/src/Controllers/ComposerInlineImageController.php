@@ -33,7 +33,7 @@ final readonly class ComposerInlineImageController
             'Content-Type' => is_string($mimeType) ? $mimeType : 'application/octet-stream',
             'X-Content-Type-Options' => 'nosniff',
             'Content-Security-Policy' => "default-src 'none'; sandbox",
-            'Cache-Control' => 'private, max-age=3600',
+            'Cache-Control' => 'private, no-store',
         ]);
     }
 }

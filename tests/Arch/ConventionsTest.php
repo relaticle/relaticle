@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Scope;
 use Illuminate\Database\Query\Builder as QueryBuilder;
+use Illuminate\Filesystem\Filesystem;
 use Illuminate\Mail\Mailable;
 use Illuminate\Notifications\Notification;
 use Illuminate\Queue\Attributes\Backoff;
@@ -89,6 +90,87 @@ function declaresQueueAttribute(ReflectionClass $class, string $attribute): bool
     } while ($class = $class->getParentClass());
 
     return false;
+}
+
+function isEnglishCopy(string $relativePath): bool
+{
+    static $pattern = null;
+
+    if ($pattern === null) {
+        $config = require dirname(__DIR__, 2).'/config/app.php';
+        $others = implode('|', array_diff($config['available_locales'], ['en']));
+        $pattern = "#(^|/)({$others})(/|\\.json\$)#";
+    }
+
+    return preg_match($pattern, $relativePath) !== 1;
+}
+
+/**
+ * @param  list<string>  $directories
+ * @return list<string>
+ */
+function retiredRecordWordOffenders(string $root, array $directories): array
+{
+    $labelPathsNamingSomethingElse = [
+        'packages/Cloud/src/Marketing/Support/MarketingNavigation.php',
+        'packages/Cloud/resources/views/marketing/alternatives/',
+    ];
+
+    $labelLinesNamingSomethingElse = [
+        'packages/Cloud/lang/en.json' => ['"Contact": "Contact",', '"Deals": "Deals",'],
+    ];
+
+    $emailParticipantPaths = [
+        'lang/en/filament/pages/email-privacy-settings.php',
+        'packages/Cloud/resources/markdown/policy.md',
+        'packages/Documentation/resources/content/help/email-and-calendar/set-workspace-email-privacy.md',
+    ];
+
+    $offenders = [];
+
+    foreach ($directories as $directory) {
+        $files = new RegexIterator(
+            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory)),
+            '/\.(php|md|js|json)$/',
+        );
+
+        /** @var SplFileInfo $file */
+        foreach ($files as $file) {
+            $relativePath = str_replace($root.'/', '', $file->getPathname());
+
+            if (! isEnglishCopy($relativePath)) {
+                continue;
+            }
+
+            $checksLabels = ! array_any($labelPathsNamingSomethingElse, fn (string $path): bool => str_starts_with($relativePath, $path));
+            $checksProse = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
+                && ! in_array($relativePath, $emailParticipantPaths, true);
+
+            foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $index => $line) {
+                $retired = [];
+
+                $namesSomethingElse = in_array(trim($line), $labelLinesNamingSomethingElse[$relativePath] ?? [], true);
+
+                if ($checksLabels && ! $namesSomethingElse && preg_match('/([\'"])(?:Contacts?|Deals?)\1/', $line, $label) === 1) {
+                    $retired[] = $label[0];
+                }
+
+                if ($checksProse && preg_match('/\bcontacts\b|\ba contact\b(?! form)/i', $line, $recordNoun) === 1) {
+                    $retired[] = $recordNoun[0];
+                }
+
+                if ($checksProse && preg_match('/\b[Yy]our people\b(?! export)/', $line, $possessive) === 1) {
+                    $retired[] = $possessive[0];
+                }
+
+                foreach ($retired as $word) {
+                    $offenders[] = $relativePath.':'.($index + 1).' '.$word;
+                }
+            }
+        }
+    }
+
+    return $offenders;
 }
 
 it('keeps migrations forward-only (no down methods)', function (): void {
@@ -631,7 +713,6 @@ it('reads workspace authorization only through the capability map', function ():
         'app/Enums/WorkspaceRole.php',
         'app/Actions/Jetstream/RemoveWorkspaceMember.php',
         'tests/Feature/CRM/WorkspaceAuthorizationTest.php',
-        'tests/Feature/Workspaces/InviteLinkTokenTest.php',
         'tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php',
         'tests/Feature/Workspaces/UpdateWorkspaceMemberRoleTest.php',
         'tests/Feature/Workspaces/WorkspaceMembersCrossTenantTest.php',
@@ -719,6 +800,7 @@ it('keeps the retired editor role key out of everything but its historic migrati
         'database/migrations/2026_08_18_100000_',
         'database/migrations/2026_09_01_203744_',
         'database/migrations/2026_09_18_000000_',
+        'lang/vendor/filament-forms/',
     ];
 
     $directories = [
@@ -845,56 +927,10 @@ it('keeps the retired team word out of identifiers', function (): void {
 });
 
 it('keeps the retired contact and deal words out of record copy', function (): void {
-    $root = dirname(__DIR__, 2);
-
-    $labelPathsNamingSomethingElse = [
-        'packages/Cloud/src/Marketing/Support/MarketingNavigation.php',
-        'packages/Cloud/resources/views/marketing/alternatives/',
-    ];
-
-    $emailParticipantPaths = [
-        'lang/en/filament/pages/email-privacy-settings.php',
-        'packages/Cloud/resources/markdown/policy.md',
-        'packages/Documentation/resources/content/help/email-and-calendar/set-workspace-email-privacy.md',
-    ];
-
-    $offenders = [];
-
-    foreach (['app', 'config', 'database/factories', 'database/seeders', 'lang', 'packages', 'resources', 'routes'] as $directory) {
-        $files = new RegexIterator(
-            new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory)),
-            '/\.(php|md|js|json)$/',
-        );
-
-        /** @var SplFileInfo $file */
-        foreach ($files as $file) {
-            $relativePath = str_replace($root.'/', '', $file->getPathname());
-
-            $checksLabels = ! array_any($labelPathsNamingSomethingElse, fn (string $path): bool => str_starts_with($relativePath, $path));
-            $checksProse = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
-                && ! in_array($relativePath, $emailParticipantPaths, true);
-
-            foreach (explode("\n", (string) file_get_contents($file->getPathname())) as $index => $line) {
-                $retired = [];
-
-                if ($checksLabels && preg_match('/([\'"])(?:Contacts?|Deals?)\1/', $line, $label) === 1) {
-                    $retired[] = $label[0];
-                }
-
-                if ($checksProse && preg_match('/\bcontacts\b|\ba contact\b(?! form)/i', $line, $recordNoun) === 1) {
-                    $retired[] = $recordNoun[0];
-                }
-
-                if ($checksProse && preg_match('/\b[Yy]our people\b(?! export)/', $line, $possessive) === 1) {
-                    $retired[] = $possessive[0];
-                }
-
-                foreach ($retired as $word) {
-                    $offenders[] = $relativePath.':'.($index + 1).' '.$word;
-                }
-            }
-        }
-    }
+    $offenders = retiredRecordWordOffenders(
+        dirname(__DIR__, 2),
+        ['app', 'config', 'database/factories', 'database/seeders', 'lang', 'packages', 'resources', 'routes'],
+    );
 
     expect($offenders)->toBe(
         [],
@@ -902,6 +938,28 @@ it('keeps the retired contact and deal words out of record copy', function (): v
         'Business language). "Your people" reads as the reader\'s staff (.ai/guidelines/relaticle/writing.md). '.
         'Offending lines: '.implode(', ', array_slice($offenders, 0, 40)),
     );
+});
+
+it('applies the English retired-word checks to English copy only', function (): void {
+    $root = sys_get_temp_dir().'/'.uniqid('english-copy-', true);
+
+    foreach (['lang/en', 'lang/fr'] as $directory) {
+        mkdir("{$root}/{$directory}", 0777, true);
+        file_put_contents("{$root}/{$directory}/people.php", "<?php\n\nreturn ['list' => 'Vos contacts'];\n");
+    }
+
+    file_put_contents("{$root}/lang/fr.json", '{"list": "Vos contacts"}');
+    file_put_contents("{$root}/lang/en.json", '{"list": "Your contacts"}');
+
+    $offenders = retiredRecordWordOffenders($root, ['lang']);
+    sort($offenders);
+
+    (new Filesystem)->deleteDirectory($root);
+
+    expect($offenders)->toBe([
+        'lang/en.json:1 contacts',
+        'lang/en/people.php:3 contacts',
+    ]);
 });
 
 it('keeps the retired custom field words out of published copy', function (): void {
@@ -930,7 +988,8 @@ it('keeps the retired custom field words out of published copy', function (): vo
         foreach ($files as $file) {
             $relativePath = str_replace($root.'/', '', $file->getPathname());
 
-            $isPublishedCopy = preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
+            $isPublishedCopy = isEnglishCopy($relativePath)
+                && preg_match('#^(lang|resources/views|resources/js|packages/\w+/(resources|lang))/#', $relativePath) === 1
                 && ! in_array($relativePath, $filesCarryingTheSynonym, true);
 
             if (! $isPublishedCopy) {
@@ -966,14 +1025,14 @@ it('names the assistant one way and keeps the documented MCP tool count true', f
     foreach (['lang', 'resources/views', 'resources/data', 'packages'] as $directory) {
         $files = new RegexIterator(
             new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root.'/'.$directory)),
-            '/\.(php|md|js)$/',
+            '/\.(php|md|js|json)$/',
         );
 
         /** @var SplFileInfo $file */
         foreach ($files as $file) {
             $relativePath = str_replace($root.'/', '', $file->getPathname());
 
-            if ($directory !== 'packages' || preg_match('#^packages/\w+/resources/#', $relativePath) === 1) {
+            if ($directory !== 'packages' || preg_match('#^packages/\w+/(resources|lang)/#', $relativePath) === 1) {
                 $paths[] = $file->getPathname();
             }
         }
@@ -987,7 +1046,7 @@ it('names the assistant one way and keeps the documented MCP tool count true', f
         foreach (explode("\n", (string) file_get_contents($path)) as $index => $line) {
             $location = $relativePath.':'.($index + 1).' ';
 
-            if (preg_match('/\bAI chat\b/i', $line, $retiredName) === 1) {
+            if (isEnglishCopy($relativePath) && preg_match('/\bAI chat\b/i', $line, $retiredName) === 1) {
                 $offenders[] = $location.$retiredName[0];
             }
 
@@ -1026,7 +1085,7 @@ it('keeps published copy and source free of em-dashes', function (): void {
     foreach ($directories as $directory) {
         $files = new RegexIterator(
             new RecursiveIteratorIterator(new RecursiveDirectoryIterator($directory)),
-            '/\.(php|md|js|css)$/',
+            '/\.(php|md|js|css|json)$/',
         );
 
         /** @var SplFileInfo $file */

@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Support\Locales;
 use Relaticle\Documentation\Support\DocsRepository;
 
 mutates(DocsRepository::class);
@@ -47,3 +48,10 @@ it('redirects the bare legacy documentation urls to the developers index', funct
     '/documentation',
     '/docs',
 ]);
+
+it('redirects a legacy doc slug by the English guides whatever the visitor language', function (): void {
+    $this->withUnencryptedCookie(Locales::COOKIE, 'de')
+        ->get('/docs/mcp')
+        ->assertRedirect('/developers/mcp')
+        ->assertStatus(301);
+});

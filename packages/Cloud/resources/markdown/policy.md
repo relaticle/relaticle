@@ -54,6 +54,7 @@ The Cloud service uses the following third-party providers:
 - **AI providers:** For AI features you use, such as the assistant and email thread summaries. They receive only the content needed to answer that request.
 - **Payments:** For Cloud plan billing. Card details go to the payment provider directly
 - **Analytics:** Fathom receives normalized page paths and intentional events. We omit query strings, raw referrer URLs, account identifiers, and CRM content
+- **Company logos:** Your browser loads a company's logo from Brandfetch's CDN, so Brandfetch receives the company domains shown on your screen. Our own logo service receives a company domain when it looks up a logo
 - **Product updates:** For the update emails described in section 2
 
 The [Security page](/security#providers) names each provider and what it receives.

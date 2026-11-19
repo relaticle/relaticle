@@ -16,10 +16,12 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\Attributes\Backoff;
 use Illuminate\Queue\Attributes\Tries;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Relaticle\Cloud\Billing\Queries\TrialUsageQuery;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 
 #[Tries(3)]
 #[Backoff(60, 300)]
@@ -71,7 +73,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
                 'preheader' => $this->preheader(),
                 'isTrial' => $this->isTrial(),
                 'usage' => $this->isTrial() ? resolve(TrialUsageQuery::class)->forWorkspace($this->workspace) : null,
-                'credits' => number_format(Plan::Pro->credits()),
+                'credits' => Number::format(Plan::Pro->credits()),
                 'offersExtension' => $this->offersExtension(),
                 'billingUrl' => Billing::getUrl(panel: 'app', tenant: $this->workspace),
                 'ctaUrl' => $this->ctaUrl(),
@@ -119,7 +121,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
             return null;
         }
 
-        return $this->keptUntil->setTimezone($this->workspace->ownerTimezone())->format('M j, Y');
+        return $this->keptUntil->setTimezone($this->workspace->ownerTimezone())->settings(['locale' => app()->getLocale()])->isoFormat('ll');
     }
 
     private function isGrandfathered(): bool
@@ -130,7 +132,7 @@ final class ProEndedMail extends Mailable implements ShouldQueue
     private function ctaUrl(): string
     {
         return $this->plan instanceof Plan
-            ? route('contact', ['plan' => $this->plan->value])
+            ? LocalizedUrl::route('contact', ['plan' => $this->plan->value])
             : Billing::getUrl(panel: 'app', tenant: $this->workspace);
     }
 

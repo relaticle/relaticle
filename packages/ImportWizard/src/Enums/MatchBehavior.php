@@ -13,9 +13,9 @@ enum MatchBehavior: string
     public function description(): string
     {
         return match ($this) {
-            self::MatchOnly => 'Only update existing records. Skip if not found.',
-            self::MatchOrCreate => 'Find existing record or create new if not found.',
-            self::Create => 'Always create a new record (no lookup).',
+            self::MatchOnly => __('enums/match-behavior.descriptions.match_only'),
+            self::MatchOrCreate => __('enums/match-behavior.descriptions.match_or_create'),
+            self::Create => __('enums/match-behavior.descriptions.create'),
         };
     }
 

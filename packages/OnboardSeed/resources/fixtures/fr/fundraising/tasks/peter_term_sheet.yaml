@@ -1,0 +1,8 @@
+title: Relire le term sheet de Benchmark
+assigned_people:
+  - peter
+custom_fields:
+  description: Relisez et annotez le term sheet reçu de Benchmark pour le tour d'amorçage.
+  due_date: '{{ +3d }}'
+  status: In progress
+  priority: High

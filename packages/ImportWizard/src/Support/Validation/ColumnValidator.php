@@ -33,7 +33,7 @@ final class ColumnValidator
         $format = $column->dateFormat ?? DateFormat::ISO;
 
         if (! $format->parse($value, $column->getType()->isTimestamp()) instanceof CarbonImmutable) {
-            return ValidationError::message("Invalid date format. Expected: {$format->getLabel()}");
+            return ValidationError::message(__('import-wizard-new::validation.expected_date_format', ['format' => $format->getLabel()]));
         }
 
         return null;
@@ -44,7 +44,7 @@ final class ColumnValidator
         $format = $column->numberFormat ?? NumberFormat::POINT;
 
         if ($format->parse($value) === null) {
-            return ValidationError::message("Invalid number format. Expected: {$format->getLabel()}");
+            return ValidationError::message(__('import-wizard-new::validation.expected_number_format', ['format' => $format->getLabel()]));
         }
 
         return null;
@@ -68,7 +68,7 @@ final class ColumnValidator
 
         $errors = $this->parseCommaSeparated($value)
             ->reject(fn (string $item): bool => in_array(mb_strtolower($item), $lowercasedValues, true))
-            ->mapWithKeys(fn (string $item): array => [$item => 'Not a valid option'])
+            ->mapWithKeys(fn (string $item): array => [$item => __('import-wizard-new::validation.not_a_valid_option')])
             ->all();
 
         if ($errors !== []) {
@@ -87,7 +87,7 @@ final class ColumnValidator
         }
 
         $errors = $this->parseCommaSeparated($value)
-            ->mapWithKeys(fn (string $item): array => [$item => $this->runValidator($item, $rules)])
+            ->mapWithKeys(fn (string $item): array => [$item => $this->runValidator($item, $rules, $column->getLabel())])
             ->filter()
             ->all();
 
@@ -106,7 +106,7 @@ final class ColumnValidator
             return null;
         }
 
-        return ValidationError::message('The value must be true or false (accepted: true, false, 1, 0, yes, no).');
+        return ValidationError::message(__('import-wizard-new::validation.invalid_boolean'));
     }
 
     private function validateText(ColumnData $column, string $value): ?ValidationError
@@ -117,7 +117,7 @@ final class ColumnValidator
             return null;
         }
 
-        $error = $this->runValidator($value, $rules);
+        $error = $this->runValidator($value, $rules, $column->getLabel());
 
         if ($error !== null) {
             return ValidationError::message($error);
@@ -159,7 +159,7 @@ final class ColumnValidator
         $preview = collect($validValues)->take(5)->implode(', ');
         $suffix = count($validValues) > 5 ? '...' : '';
 
-        return "Invalid choice. Must be one of: {$preview}{$suffix}";
+        return __('import-wizard-new::validation.invalid_choice_list', ['options' => $preview.$suffix]);
     }
 
     /** @return array<int, string> */
@@ -172,9 +172,9 @@ final class ColumnValidator
     }
 
     /** @param array<int, string> $rules */
-    private function runValidator(string $value, array $rules): ?string
+    private function runValidator(string $value, array $rules, string $label): ?string
     {
-        $validator = Validator::make(['value' => $value], ['value' => $rules]);
+        $validator = Validator::make(['value' => $value], ['value' => $rules], [], ['value' => $label]);
 
         if ($validator->passes()) {
             return null;

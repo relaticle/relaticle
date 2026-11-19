@@ -206,7 +206,7 @@ final class EntityLinkValidator
             $validator = Validator::make(['value' => $item], ['value' => $rules]);
 
             if ($validator->fails()) {
-                return "Invalid format: '{$item}'";
+                return __('import-wizard-new::validation.invalid_item_format', ['item' => $item]);
             }
         }
 
@@ -215,6 +215,6 @@ final class EntityLinkValidator
 
     private function buildErrorMessage(EntityLink $link, MatchableField $matcher, string $value): string
     {
-        return "No {$link->label} found matching '{$value}' by {$matcher->label}";
+        return __('import-wizard-new::validation.no_match', ['entity' => $link->label, 'value' => $value, 'field' => $matcher->label]);
     }
 }

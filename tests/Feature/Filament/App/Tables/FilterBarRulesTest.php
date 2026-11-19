@@ -372,7 +372,7 @@ it('reads only the columns and the logo collection a company option needs', func
     DB::disableQueryLog();
 
     expect($queries->first(fn (string $query): bool => str_contains($query, 'from "companies"')))
-        ->toContain('select "companies"."id", "companies"."name", "companies"."deleted_at" from "companies"')
+        ->toContain('select "companies"."id", "companies"."name", "companies"."deleted_at", "companies"."workspace_id" from "companies"')
         ->and($queries->first(fn (string $query): bool => str_contains($query, 'from "media"')))
         ->toContain('"collection_name" = ?');
 });

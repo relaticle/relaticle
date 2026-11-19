@@ -115,6 +115,7 @@ final class CompanyResource extends Resource
                 ->visibleFrom('sm')
                 ->getStateUsing(fn (Company $record): string => $record->created_by),
             TextColumn::make('deleted_at')
+                ->label(__('filament/resources/company.fields.deleted_at.label'))
                 ->dateTime()
                 ->sortable()
                 ->toggleable()
@@ -197,13 +198,13 @@ final class CompanyResource extends Resource
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return parent::getGlobalSearchEloquentQuery()->with('media');
+        return parent::getGlobalSearchEloquentQuery()->with(['media', 'domainValue']);
     }
 
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
-            ->with(['accountOwner', 'media', 'customFieldValues.customField.options'])
+            ->with(['accountOwner', 'media', 'domainValue', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

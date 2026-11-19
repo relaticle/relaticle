@@ -13,6 +13,10 @@ final readonly class EnsureAuthenticationContext
 {
     public function handle(Request $request, Closure $next): Response
     {
+        foreach (['web', 'sysadmin'] as $name) {
+            $request->cookies->remove(Auth::guard($name)->getRecallerName());
+        }
+
         if (config('app.sysadmin_domain')) {
             if (IsolateAuthenticationSession::context($request) === 'sysadmin') {
                 abort_unless(
@@ -33,7 +37,6 @@ final readonly class EnsureAuthenticationContext
             }
 
             $guard = Auth::guard(IsolateAuthenticationSession::context($request) === 'sysadmin' ? 'web' : 'sysadmin');
-            $request->cookies->remove($guard->getRecallerName());
             $request->session()->forget($guard->getName());
             $guard->forgetUser();
         }

@@ -1,0 +1,8 @@
+title: Examiner la proposition d'intégration Clearbit
+assigned_people:
+  - alex
+custom_fields:
+  description: Examinez la proposition d'intégration d'enrichissement de données de Clearbit et préparez vos retours pour le prochain point.
+  due_date: '{{ +3d }}'
+  status: To do
+  priority: High

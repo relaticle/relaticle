@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Actions;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Number;
 use Illuminate\Support\Str;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
@@ -87,7 +88,7 @@ final readonly class StoreImportHandoff
 
     private function reply(ChatAttachment $attachment): string
     {
-        return __("That's :count rows. The import wizard handles files this size, with your columns already mapped.", ['count' => number_format($attachment->rowCount())])
+        return __("That's :count rows. The import wizard handles files this size, with your columns already mapped.", ['count' => Number::format($attachment->rowCount())])
             ."\n\n[".__('Import as people').']('.$attachment->importUrl(ImportEntityType::People).') · ['.__('Import as companies').']('.$attachment->importUrl(ImportEntityType::Company).')';
     }
 }
