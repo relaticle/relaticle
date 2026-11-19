@@ -11,11 +11,10 @@ use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
-use Relaticle\Documentation\Support\DocCategory;
-use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\Ink\BlogSitemapGenerator;
@@ -60,7 +59,9 @@ final class GenerateSitemapCommand extends Command
                     return false;
                 }
 
-                if (preg_match($this->explicitSectionsPattern(), $path) === 1) {
+                $name = LocalizedUrl::baseRouteNameOf($path);
+
+                if ($name !== null && Str::startsWith($name, ['help.', 'documentation.', 'blog.'])) {
                     return false;
                 }
 
@@ -71,13 +72,6 @@ final class GenerateSitemapCommand extends Command
                 return pathinfo($path, PATHINFO_EXTENSION) === '';
             })
             ->getSitemap();
-    }
-
-    private function explicitSectionsPattern(): string
-    {
-        $locales = implode('|', array_diff(config('app.available_locales'), [LocalizedUrl::DEFAULT_LOCALE]));
-
-        return "#^/(?:(?:{$locales})/)?(?:blog|help|developers(?!/api\\b))(?:/|\$)#";
     }
 
     private function addMarketingUrls(Sitemap $sitemap): void
@@ -110,41 +104,26 @@ final class GenerateSitemapCommand extends Command
     /** @param  array<string, string>  $parameters */
     private function addLocalizedPage(Sitemap $sitemap, string $name, array $parameters): void
     {
-        $alternates = LocalizedUrl::alternatesOf($name, $parameters);
+        $alternates = array_diff_key(LocalizedUrl::alternatesOf($name, $parameters), ['x-default' => true]);
 
-        foreach (array_diff_key($alternates, ['x-default' => true]) as $url) {
-            $tag = $this->ensureUrl($sitemap, $url);
-
-            foreach ($alternates as $hreflang => $href) {
-                $tag->addAlternate($href, $hreflang);
-            }
-        }
+        $this->addAlternateSet($sitemap, array_map(fn (string $url): array => [$url, null], $alternates));
     }
 
-    /**
-     * The crawler usually discovers the documentation pages itself (they're
-     * linked from the marketing nav), but a crawl-found entry carries no
-     * <lastmod> -- and Sitemap::add() keeps the first tag per URL, so adding
-     * again would be silently ignored. Merge instead: stamp lastmod onto the
-     * existing tag, or add the URL when the crawl missed it. Only a page's
-     * own front-matter `updated:` produces a <lastmod>; a missing one is
-     * left out entirely rather than falling back to a file timestamp.
-     */
     private function addDocumentationUrls(Sitemap $sitemap, DocsRepository $docsRepository): void
     {
         $versions = [];
 
         foreach (config('app.available_locales') as $locale) {
             Locales::within($locale, function () use ($docsRepository, $locale, &$versions): void {
-                $docsRepository->categories($locale)
-                    ->filter(fn (DocCategory $category): bool => $category->area === DocUrl::HELP)
-                    ->each(function (DocCategory $category) use ($locale, &$versions): void {
+                foreach ($docsRepository->categories($locale) as $category) {
+                    if ($category->area === DocUrl::HELP) {
                         $versions[$category->path][$locale] = [DocUrl::category($category), null];
-                    });
+                    }
+                }
 
-                $docsRepository->pages($locale)->each(function (DocPage $page) use ($locale, &$versions): void {
+                foreach ($docsRepository->pages($locale) as $page) {
                     $versions[$page->path][$locale] = [DocUrl::page($page), $page->updated];
-                });
+                }
             });
         }
 
