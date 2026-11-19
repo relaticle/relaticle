@@ -21,6 +21,7 @@ it('renders each declared comparison page with a facts table and dates', functio
     ['/alternatives/salesforce', 'Salesforce'],
     ['/alternatives/pipedrive', 'Pipedrive'],
     ['/alternatives/zoho', 'Zoho CRM'],
+    ['/alternatives/dynamics', 'Dynamics 365 Sales'],
 ]);
 
 it('404s for undeclared competitors', function (): void {
@@ -74,6 +75,7 @@ it('gives each page a search title that leads with open source and stays under 6
     ['/alternatives/salesforce', 'Open Source Salesforce Alternative, Self-Hosted | Relaticle'],
     ['/alternatives/pipedrive', 'Open Source Pipedrive Alternative, Self-Hosted | Relaticle'],
     ['/alternatives/zoho', 'Open Source Zoho CRM Alternative, Self-Hosted | Relaticle'],
+    ['/alternatives/dynamics', 'Open Source Microsoft Dynamics 365 Alternative | Relaticle'],
 ]);
 
 it('keeps the on-page heading short and distinct from the longer search title', function (string $url, string $heading): void {
@@ -105,6 +107,7 @@ it('keeps competitor prices out of meta descriptions so the facts file stays the
     '/alternatives/salesforce',
     '/alternatives/pipedrive',
     '/alternatives/zoho',
+    '/alternatives/dynamics',
 ]);
 
 it('does not lowercase the leading acronym of an extensibility fact in alternatives prose', function (): void {

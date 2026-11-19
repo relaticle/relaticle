@@ -94,6 +94,28 @@
                 ],
             ],
         ],
+        'dynamics' => [
+            'badge' => __('Alternative'),
+            'opening' => __('Microsoft Dynamics 365 Sales prices each plan per user, from Professional to Premium. Its sales agents come on every plan, and Copilot starts at Enterprise. Microsoft sells it as a cloud service. Relaticle is an open-source CRM. Run it on your own server for free, or on a hosted plan priced per workspace with unlimited users. Its built-in AI assistant and its MCP server for Claude and ChatGPT both work self-hosted.'),
+            'sections' => [
+                [
+                    'heading' => __('License & pricing'),
+                    'body' => __('Dynamics 365 Sales is closed-source. Dynamics 365 Sales pricing: :dynamicsPricing. Relaticle is AGPL-3.0 and charges per workspace for its hosted plans. Relaticle pricing: :relaticlePricing.', ['dynamicsPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                ],
+                [
+                    'heading' => __('AI capabilities'),
+                    'body' => __('Dynamics 365 Sales AI: :dynamicsAi. Relaticle\'s AI: :relaticleAi.', ['dynamicsAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                ],
+                [
+                    'heading' => __('Data ownership & deployment'),
+                    'body' => __('Dynamics 365 Sales: :dynamicsSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['dynamicsSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                ],
+                [
+                    'heading' => __('Extensibility'),
+                    'body' => __('Dynamics 365 Sales extensibility: :dynamicsExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['dynamicsExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
+                ],
+            ],
+        ],
     ][$competitorSlug];
 
     $titles = [
@@ -101,6 +123,7 @@
         'salesforce' => __('Salesforce Alternative'),
         'pipedrive' => __('Pipedrive Alternative'),
         'zoho' => __('Zoho CRM Alternative'),
+        'dynamics' => __('Microsoft Dynamics 365 Alternative'),
     ];
 
     /*
@@ -114,6 +137,7 @@
         'salesforce' => __('Open Source Salesforce Alternative, Self-Hosted | Relaticle'),
         'pipedrive' => __('Open Source Pipedrive Alternative, Self-Hosted | Relaticle'),
         'zoho' => __('Open Source Zoho CRM Alternative, Self-Hosted | Relaticle'),
+        'dynamics' => __('Open Source Microsoft Dynamics 365 Alternative | Relaticle'),
     ];
 
     /*
@@ -125,6 +149,7 @@
         'salesforce' => __('Salesforce has no self-hosting option. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
         'pipedrive' => __('Pipedrive lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
         'zoho' => __('Zoho CRM lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
+        'dynamics' => __('Dynamics 365 Sales charges per user. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
     ];
 
     $title = $titles[$competitorSlug];

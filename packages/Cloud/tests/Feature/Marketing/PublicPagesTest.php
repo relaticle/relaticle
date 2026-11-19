@@ -518,6 +518,7 @@ describe('Page metadata', function () {
         ['/alternatives/salesforce', true],
         ['/alternatives/pipedrive', true],
         ['/alternatives/zoho', true],
+        ['/alternatives/dynamics', true],
         ['/privacy-policy', true],
         ['/terms-of-service', true],
     ]);
@@ -557,6 +558,7 @@ describe('Page metadata', function () {
         '/alternatives/salesforce',
         '/alternatives/pipedrive',
         '/alternatives/zoho',
+        '/alternatives/dynamics',
         '/privacy-policy',
         '/terms-of-service',
     ]);
