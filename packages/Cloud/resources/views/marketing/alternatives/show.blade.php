@@ -72,12 +72,35 @@
                 ],
             ],
         ],
+        'zoho' => [
+            'badge' => __('Alternative'),
+            'opening' => __('Zoho CRM is free for up to three users. Zoho bills each of its four paid editions per user. It lists no self-hosted plan. Relaticle is an open-source CRM. Run it on your own server for free, or on a hosted plan priced per workspace with unlimited users. Its built-in AI assistant and its MCP server for Claude and ChatGPT both work self-hosted.'),
+            'sections' => [
+                [
+                    'heading' => __('License & pricing'),
+                    'body' => __('Zoho CRM is closed-source. Zoho CRM pricing: :zohoPricing. Relaticle is AGPL-3.0, and its hosted plans are priced per workspace. Relaticle pricing: :relaticlePricing.', ['zohoPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                ],
+                [
+                    'heading' => __('AI capabilities'),
+                    'body' => __('Zoho CRM\'s AI: :zohoAi. Relaticle\'s AI: :relaticleAi.', ['zohoAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                ],
+                [
+                    'heading' => __('Data ownership & deployment'),
+                    'body' => __('Zoho CRM: :zohoSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['zohoSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                ],
+                [
+                    'heading' => __('Extensibility'),
+                    'body' => __('Zoho CRM\'s extensibility: :zohoExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['zohoExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
+                ],
+            ],
+        ],
     ][$competitorSlug];
 
     $titles = [
         'hubspot' => __('HubSpot Alternative'),
         'salesforce' => __('Salesforce Alternative'),
         'pipedrive' => __('Pipedrive Alternative'),
+        'zoho' => __('Zoho CRM Alternative'),
     ];
 
     /*
@@ -90,6 +113,7 @@
         'hubspot' => __('Open Source HubSpot Alternative, Self-Hosted | Relaticle'),
         'salesforce' => __('Open Source Salesforce Alternative, Self-Hosted | Relaticle'),
         'pipedrive' => __('Open Source Pipedrive Alternative, Self-Hosted | Relaticle'),
+        'zoho' => __('Open Source Zoho CRM Alternative, Self-Hosted | Relaticle'),
     ];
 
     /*
@@ -100,6 +124,7 @@
         'hubspot' => __('HubSpot is closed-source with no self-hosting option. Relaticle is AGPL-3.0, self-hostable free, flat-priced for unlimited users, with built-in AI and MCP.'),
         'salesforce' => __('Salesforce has no self-hosting option. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
         'pipedrive' => __('Pipedrive lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
+        'zoho' => __('Zoho CRM lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
     ];
 
     $title = $titles[$competitorSlug];
