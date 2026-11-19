@@ -317,9 +317,7 @@ body.reordering-column .column-resize-handle-bar::before {
         }
 
         .fi-ta-table > tfoot:has(.fi-ta-pagination-footer) {
-            @apply bg-transparent dark:bg-transparent;
-            display: table-caption;
-            caption-side: bottom;
+            @apply table-caption caption-bottom bg-transparent dark:bg-transparent;
 
             & > tr,
             & .fi-ta-pagination-footer {
