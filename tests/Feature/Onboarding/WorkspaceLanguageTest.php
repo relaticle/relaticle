@@ -21,7 +21,6 @@ use App\Support\CustomFieldOptionPlan;
 use App\Support\Locales;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
-use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 use Laravel\Pennant\Feature;
@@ -32,17 +31,6 @@ use Relaticle\OnboardSeed\Support\FixtureLoader;
 mutates(CreateWorkspaceCustomFields::class, OnboardSeedManager::class, TaskField::class, OpportunityField::class, FixtureLoader::class, CompleteTask::class);
 
 beforeEach(function (): void {
-    Lang::addLines([
-        'enums/custom-fields.opportunity.stage.name' => 'Phase',
-        'enums/custom-fields.opportunity.stage.options.prospecting' => 'Akquise',
-        'enums/custom-fields.opportunity.stage.options.closed_won' => 'Gewonnen',
-        'enums/custom-fields.task.status.name' => 'Status',
-        'enums/custom-fields.task.status.options.to_do' => 'Zu erledigen',
-        'enums/custom-fields.task.status.options.in_progress' => 'In Arbeit',
-        'enums/custom-fields.task.status.options.done' => 'Erledigt',
-        'enums/custom-fields.task.priority.options.high' => 'Hoch',
-    ], 'de');
-
     $this->fixtures = sys_get_temp_dir().'/'.Str::uuid()->toString();
 });
 
@@ -110,9 +98,9 @@ it('creates built-in attributes and stages in the creator language', function ()
 
     expect($stage->name)->toBe('Phase')
         ->and($stageNames->first())->toBe('Akquise')
-        ->and($stageNames->last())->toBe('Closed Lost')
+        ->and($stageNames->last())->toBe('Verloren')
         ->and($stageNames)->toHaveCount(10)
-        ->and(collect(wlOptionsOf($workspace, 'task', 'status'))->pluck('name')->all())->toBe(['Zu erledigen', 'In Arbeit', 'Erledigt']);
+        ->and(collect(wlOptionsOf($workspace, 'task', 'status'))->pluck('name')->all())->toBe(['Zu erledigen', 'In Bearbeitung', 'Erledigt']);
 });
 
 it('keeps stage colours in every language', function (): void {
@@ -290,15 +278,6 @@ it('names the workspace done option when it refuses to rename it', function (): 
 
 it('gives a German creator the fundraising stages in German and seeds against them', function (): void {
     Feature::define(OnboardSeed::class, true);
-    Lang::addLines([
-        'enums/onboarding-use-case.stages.fundraising.target' => 'Ziel',
-        'enums/onboarding-use-case.stages.fundraising.intro' => 'Kontakt',
-        'enums/onboarding-use-case.stages.fundraising.first_meeting' => 'Erstes Treffen',
-        'enums/onboarding-use-case.stages.fundraising.partner_meeting' => 'Partnertreffen',
-        'enums/onboarding-use-case.stages.fundraising.term_sheet' => 'Term Sheet',
-        'enums/onboarding-use-case.stages.fundraising.closed' => 'Abgeschlossen',
-        'enums/onboarding-use-case.stages.fundraising.passed' => 'Abgesagt',
-    ], 'de');
     $user = User::factory()->create(['locale' => 'de']);
 
     $workspace = onboardWorkspace($user, ['name' => 'Fonds'], ['onboarding_use_case' => OnboardingUseCase::Fundraising->value, 'onboarding_context' => ['early_stage']]);
@@ -307,7 +286,7 @@ it('gives a German creator the fundraising stages in German and seeds against th
     $partner = $names->sole(fn (CustomFieldOption $option): bool => $option->name === 'Partnertreffen');
     $stored = DB::table('custom_field_values')->where('custom_field_id', $partner->custom_field_id)->pluck('string_value')->all();
 
-    expect($names->pluck('name')->first())->toBe('Ziel')
+    expect($names->pluck('name')->first())->toBe('Zielinvestor')
         ->and($partner->settings->color)->toBe(OptionColor::Amber->value)
         ->and($stored)->toContain($partner->id)
         ->and(Locales::within('de', fn (): array => array_keys(OnboardingUseCase::Fundraising->pipelineStages())))->toContain('Partnertreffen');
