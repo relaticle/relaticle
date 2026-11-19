@@ -217,6 +217,10 @@ it('keeps English grouping on the English pricing page', function (): void {
     $this->get('/pricing')->assertOk()->assertSee('2,000 credits each month', false);
 });
 
+it('words the own-your-data heading of the security page as moving away, not leaving a workspace', function (string $locale, string $heading): void {
+    $this->get("/{$locale}/security")->assertOk()->assertSeeInOrder([$heading, 'AGPL-3.0'], false);
+})->with([['de', '>Wechseln<'], ['es', '>Migrar<'], ['fr', '>Partir<']]);
+
 it('sets the locale cookie', function (): void {
     $this->get('/de/pricing')->assertCookie(Locales::COOKIE, 'de', false);
     $this->get('/pricing')->assertCookie(Locales::COOKIE, 'en', false);
