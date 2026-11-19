@@ -16,6 +16,7 @@ use App\Filament\Resources\PeopleResource;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Services\WorkspaceActivationFacts;
+use App\Support\Auth\LoginDestination;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Collection;
@@ -65,7 +66,18 @@ final class ActivationChecklist extends Component
 
         resolve(RemoveSampleData::class)->execute($this->user(), $workspace);
 
-        $this->redirect(request()->header('Referer') ?? Dashboard::getUrl(), navigate: true);
+        $this->redirect($this->returnUrl(), navigate: true);
+    }
+
+    private function returnUrl(): string
+    {
+        $referer = request()->header('Referer');
+
+        if (is_string($referer) && resolve(LoginDestination::class)->isAccessible($this->user(), $referer)) {
+            return $referer;
+        }
+
+        return Dashboard::getUrl();
     }
 
     public function render(): View
