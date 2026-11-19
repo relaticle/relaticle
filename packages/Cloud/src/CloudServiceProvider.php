@@ -66,6 +66,8 @@ use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\Cloud\Blog\BlogMcpStreams;
+use Relaticle\Cloud\Commands\BlogMcpCommand;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
 use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
@@ -84,6 +86,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->bind(BlogMcpStreams::class, static fn (): BlogMcpStreams => new BlogMcpStreams(STDIN, STDOUT));
         $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
             ? $app->make(PlanEntitlements::class)
             : $app->make(SelfHostedEntitlements::class));
@@ -128,7 +131,8 @@ final class CloudServiceProvider extends ServiceProvider
         Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
         Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
-        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
+        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class, BlogMcpCommand::class]);
+        $this->registerBlogPreviewRoute();
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('billing:process-trials')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
@@ -179,7 +183,7 @@ final class CloudServiceProvider extends ServiceProvider
         // read the config key App\Features\Blog resolves from.
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
-            'ink.features.mcp' => true,
+            'ink.features.mcp' => false,
             'ink.locales' => config('app.available_locales'),
             'ink.default_locale' => LocalizedUrl::DEFAULT_LOCALE,
             'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class, SetPublicLocale::class])),
@@ -192,6 +196,13 @@ final class CloudServiceProvider extends ServiceProvider
                 'feed' => 'cloud::blog.feed',
             ],
         ]);
+    }
+
+    private function registerBlogPreviewRoute(): void
+    {
+        if (! config('ink.features.public_routes')) {
+            $this->loadRoutesFrom(base_path('vendor/relaticle/ink/routes/preview.php'));
+        }
     }
 
     private function speakTheLanguageOfALocalizedNotFound(): void
