@@ -27,7 +27,7 @@ final readonly class ApprovalFailureMessage
 
     public static function shown(Throwable $exception): string
     {
-        return $exception instanceof ProposalNotResolvable ? $exception->userMessage() : self::for($exception);
+        return $exception instanceof ProposalNotResolvable ? $exception->userMessage : self::for($exception);
     }
 
     public static function forDelivery(): string
