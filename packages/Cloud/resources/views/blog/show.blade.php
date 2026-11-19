@@ -32,7 +32,7 @@
         @if($post->category)
             <meta property="article:section" content="{{ BlogCategoryName::of($post->category) }}" />
         @endif
-        <x-ink::feed-link />
+        <x-cloud::blog.feed-link />
     @endpush
 
     <x-ink::structured-data :post="$post" />
