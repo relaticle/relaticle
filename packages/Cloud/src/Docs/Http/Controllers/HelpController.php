@@ -302,10 +302,9 @@ final readonly class HelpController
             );
         }
 
-        /** @var array{title: string, url: string, description: string} $apiReference */
-        $apiReference = config('documentation.api_reference');
+        $apiReference = $this->navigation->apiReference();
 
-        $entries[] = sprintf('- [%s](%s): %s', $apiReference['title'], url($apiReference['url']), $apiReference['description']);
+        $entries[] = sprintf('- [%s](%s): %s', $apiReference['title'], $apiReference['url'], $apiReference['description']);
         $entries[] = sprintf('- [%s](%s): %s', __('OpenAPI Specification'), route('openapi.json'), __('Machine-readable OpenAPI 3.1 spec for the REST API, also available as YAML at /openapi.yaml.'));
         $entries[] = sprintf('- [%s](%s): %s', __('MCP Endpoint'), url()->getMcpUrl(), __('Streamable HTTP MCP server with OAuth; connect it from Claude, ChatGPT, or any MCP client.'));
 
