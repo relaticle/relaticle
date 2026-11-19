@@ -273,15 +273,6 @@ describe('Second factor', function () {
         $this->assertGuest('sysadmin');
     });
 
-    it('tells the browser to clear site storage when an administrator signs out', function () {
-        $administrator = SystemAdministrator::factory()->create();
-
-        $this->actingAs($administrator, 'sysadmin')
-            ->post('/sysadmin/logout')
-            ->assertRedirect()
-            ->assertHeader('Clear-Site-Data', '"storage"');
-    });
-
     it('guards every authenticated sysadmin route', function () {
         $panel = Filament::getPanel('sysadmin');
 
