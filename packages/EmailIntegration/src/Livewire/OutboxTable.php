@@ -72,46 +72,7 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                     ->visible(fn (): bool => $this->isShowingFailed())
                     ->wrap(),
             ])
-            ->recordActions([
-                Action::make('cancel')
-                    ->label(__('filament/pages/email-outbox.actions.cancel'))
-                    ->icon('lucide-x')
-                    ->color('danger')
-                    ->requiresConfirmation()
-                    ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
-                    ->action(function (Email $record): void {
-                        resolve(CancelQueuedEmailAction::class)->execute($record);
-                        $this->dispatch('outbox:changed');
-                        Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
-                    }),
-                Action::make('reschedule')
-                    ->label(__('filament/pages/email-outbox.actions.reschedule'))
-                    ->icon('lucide-clock')
-                    ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
-                    ->schema([
-                        DateTimePicker::make('scheduled_for')
-                            ->label(__('filament/pages/email-outbox.actions.reschedule_field'))
-                            ->native(false)
-                            ->seconds(false)
-                            ->minDate(now())
-                            ->required(),
-                    ])
-                    ->fillForm(fn (Email $record): array => ['scheduled_for' => $record->scheduled_for])
-                    ->action(function (Email $record, array $data): void {
-                        resolve(RescheduleQueuedEmailAction::class)->execute($record, Date::parse((string) $data['scheduled_for']));
-                        Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
-                    }),
-                Action::make('retry')
-                    ->label(__('filament/pages/email-outbox.actions.retry'))
-                    ->icon('lucide-refresh-cw')
-                    ->color('warning')
-                    ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)
-                    ->action(function (Email $record): void {
-                        resolve(RetryFailedEmailAction::class)->execute($record);
-                        $this->dispatch('outbox:changed');
-                        Notification::make()->title(__('filament/pages/email-outbox.notifications.retry_queued'))->success()->send();
-                    }),
-            ])
+            ->recordActions($this->rowActions())
             ->toolbarActions([
                 BulkAction::make('bulkCancel')
                     ->label(__('filament/pages/email-outbox.actions.bulk_cancel'))
@@ -147,6 +108,53 @@ final class OutboxTable extends Component implements HasActions, HasSchemas, Has
                         Notification::make()->title($title)->success()->send();
                     }),
             ]);
+    }
+
+    /**
+     * @return list<Action>
+     */
+    private function rowActions(): array
+    {
+        return [
+            Action::make('cancel')
+                ->label(__('filament/pages/email-outbox.actions.cancel'))
+                ->icon('lucide-x')
+                ->color('danger')
+                ->requiresConfirmation()
+                ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
+                ->action(function (Email $record): void {
+                    resolve(CancelQueuedEmailAction::class)->execute($record);
+                    $this->dispatch('outbox:changed');
+                    Notification::make()->title(__('filament/pages/email-outbox.notifications.cancelled'))->success()->send();
+                }),
+            Action::make('reschedule')
+                ->label(__('filament/pages/email-outbox.actions.reschedule'))
+                ->icon('lucide-clock')
+                ->visible(fn (Email $record): bool => $record->status === EmailStatus::QUEUED)
+                ->schema([
+                    DateTimePicker::make('scheduled_for')
+                        ->label(__('filament/pages/email-outbox.actions.reschedule_field'))
+                        ->native(false)
+                        ->seconds(false)
+                        ->minDate(now())
+                        ->required(),
+                ])
+                ->fillForm(fn (Email $record): array => ['scheduled_for' => $record->scheduled_for])
+                ->action(function (Email $record, array $data): void {
+                    resolve(RescheduleQueuedEmailAction::class)->execute($record, Date::parse((string) $data['scheduled_for']));
+                    Notification::make()->title(__('filament/pages/email-outbox.notifications.rescheduled'))->success()->send();
+                }),
+            Action::make('retry')
+                ->label(__('filament/pages/email-outbox.actions.retry'))
+                ->icon('lucide-refresh-cw')
+                ->color('warning')
+                ->visible(fn (Email $record): bool => $record->status === EmailStatus::FAILED)
+                ->action(function (Email $record): void {
+                    resolve(RetryFailedEmailAction::class)->execute($record);
+                    $this->dispatch('outbox:changed');
+                    Notification::make()->title(__('filament/pages/email-outbox.notifications.retry_queued'))->success()->send();
+                }),
+        ];
     }
 
     /**
