@@ -4,7 +4,7 @@
     use Illuminate\Contracts\Pagination\Paginator;
 @endphp
 
-@if ($table->isPaginated() && ($records instanceof Paginator || $records instanceof CursorPaginator))
+@if ($records instanceof Paginator || $records instanceof CursorPaginator)
     <td class="fi-ta-pagination-footer" wire:ignore.self x-data="tablePaginationFooter">
         <x-filament::pagination
             :extreme-links="$table->hasExtremePaginationLinks()"
