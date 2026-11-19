@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Tests\Evals\Scorers\AnsweredTurn;
+use Tests\Evals\Scorers\CalledAnyOf;
 use Tests\Evals\Scorers\NoCodeFence;
 use Tests\Evals\Scorers\NoEmDash;
 use Tests\Evals\Scorers\NoHeadingLine;
@@ -59,12 +60,12 @@ it('never narrates what it is about to do', function (): void {
         ->toPassScorer(new RendersTable);
 })->group('train');
 
-it('counts with the summary tool when asked how many', function (): void {
+it('counts with a count tool, never a list, when asked how many', function (): void {
     $w = EvalWorkspace::seed();
 
     expect((new RelaTurn($w))(...))
         ->prompt('How many tasks are in this workspace?')
-        ->toHaveToolCalls(['GetCrmSummaryTool' => []])
+        ->toPassScorer(new CalledAnyOf(['GetCrmSummaryTool', 'AggregateCrmTool']))
         ->not->toMatch('/"name":"List/');
 })->group('test');
 
