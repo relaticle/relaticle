@@ -457,9 +457,14 @@ it('chains the pointers through a second merge', function (): void {
 });
 
 it('refuses to restore a merged record', function (): void {
-    foreach (mergeHistoryEntities() as [$page, $make]) {
-        $current = $make($this->workspace, $this->user);
-        $picked = $make($this->workspace, $this->user);
+    $entities = [
+        [ViewCompany::class, fn (): Company|People => mergeCompanyRecord($this->workspace, $this->user, [], ['domains' => ['held.com']]), fn (): Company|People => mergeCompanyRecord($this->workspace, $this->user)],
+        [ViewPeople::class, fn (): Company|People => mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['held@x.com']]), fn (): Company|People => mergePersonRecord($this->workspace, $this->user)],
+    ];
+
+    foreach ($entities as [$page, $makeCurrent, $makePicked]) {
+        $current = $makeCurrent();
+        $picked = $makePicked();
         mergeHistoryRun($page, $current, $picked, false);
 
         $original = $current::withTrashed()->findOrFail($current->getKey());

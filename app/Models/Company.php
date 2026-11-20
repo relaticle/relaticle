@@ -239,6 +239,11 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         return $this->morphToMany(Task::class, 'taskable')->using(Taskable::class);
     }
 
+    protected static function booting(): void
+    {
+        self::restoring(fn (self $record): bool => $record->merged_into_id === null);
+    }
+
     /**
      * @return BelongsTo<Company, $this>
      */

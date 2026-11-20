@@ -93,6 +93,11 @@ final class People extends Model implements HasCustomFields, HasMedia, HasTimeli
         ];
     }
 
+    protected static function booting(): void
+    {
+        self::restoring(fn (self $record): bool => $record->merged_into_id === null);
+    }
+
     /**
      * @return BelongsTo<Company, $this>
      */

@@ -17,11 +17,6 @@ final readonly class CompanyObserver
 
     public function __construct(private ScheduleAssistantArrivalTurn $scheduleAssistantArrival) {}
 
-    public function restoring(Company $record): bool
-    {
-        return $record->merged_into_id === null;
-    }
-
     public function created(Company $company): void
     {
         $this->tagFirstCrmDataIfNeeded($company);
