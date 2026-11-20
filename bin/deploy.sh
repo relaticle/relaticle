@@ -139,8 +139,9 @@ release() {
     local compiled_views="$PWD/$COMPILED_VIEWS_ROOT/release-${commit:0:12}"
     mkdir -p "$compiled_views"
 
-    # config:cache stores the release and the views folder, so web requests and queue workers use both.
-    ( umask 077; SENTRY_RELEASE="$commit" VIEW_COMPILED_PATH="$compiled_views" $PHP artisan optimize )
+    # config:cache stores the release and the views folder. Until PHP-FPM reloads, it keeps the old classes in
+    # opcache, so it must keep the old compiled views too instead of recompiling templates the checkout changed.
+    ( umask 077; SENTRY_RELEASE="$commit" VIEW_COMPILED_PATH="$compiled_views" VIEW_CHECK_CACHE_TIMESTAMPS=false $PHP artisan optimize )
     chmod 600 bootstrap/cache/config.php
 
     # PHP-FPM serves the previous code from opcache until this reload. Nothing slow may run
