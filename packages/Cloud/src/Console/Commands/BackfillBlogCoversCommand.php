@@ -17,7 +17,7 @@ final class BackfillBlogCoversCommand extends Command
 {
     public function handle(): int
     {
-        $sources = Post::query()->whereNotNull('featured_image')->select('featured_image')->distinct()->toBase();
+        $sources = Post::query()->where('featured_image', '!=', '')->select('featured_image')->distinct()->toBase();
         if (! $this->option('force')) {
             $this->info($sources->count('featured_image').' distinct covers. Use --force to process them.');
 
@@ -26,14 +26,15 @@ final class BackfillBlogCoversCommand extends Command
 
         $failed = false;
         foreach ($sources->lazyById(50, 'featured_image') as $post) {
+            $job = new GenerateBlogCover($post->featured_image);
             if ($this->option('queue')) {
-                dispatch(new GenerateBlogCover($post->featured_image));
+                dispatch($job);
 
                 continue;
             }
 
             try {
-                dispatch_sync(new GenerateBlogCover($post->featured_image));
+                dispatch($job)->onConnection('sync');
             } catch (Throwable $exception) {
                 $this->error("{$post->featured_image}: {$exception->getMessage()}");
                 $failed = true;

@@ -228,3 +228,16 @@ it('queues the next committed edit after an attempted cover change rolls back', 
     Queue::assertPushed(GenerateBlogCover::class, 1);
     Queue::assertPushedOn('imports', GenerateBlogCover::class, fn (GenerateBlogCover $job): bool => $job->source === $source);
 });
+
+it('keeps a queued cover unique while an operator runs a synchronous backfill', function (): void {
+    config(['queue.default' => 'database']);
+    $source = 'ink/shared.png';
+    $this->disk->put($source, UploadedFile::fake()->image('cover.png', 320, 160)->getContent());
+    $this->post->updateQuietly(['featured_image' => $source]);
+
+    $this->artisan('blog:backfill-covers --force --queue')->assertSuccessful();
+    $this->artisan('blog:backfill-covers --force')->assertSuccessful();
+    $this->artisan('blog:backfill-covers --force --queue')->assertSuccessful();
+
+    expect(DB::table('jobs')->where('queue', 'imports')->count())->toBe(1);
+});
