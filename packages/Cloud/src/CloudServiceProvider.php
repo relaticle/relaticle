@@ -56,7 +56,6 @@ use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
 use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
-use Relaticle\Cloud\Billing\Livewire\CreditUsage;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
@@ -125,7 +124,6 @@ final class CloudServiceProvider extends ServiceProvider
         $this->speakTheLanguageOfALocalizedNotFound();
 
         Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
-        Livewire::component('app.billing.credit-usage', CreditUsage::class);
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);

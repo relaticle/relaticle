@@ -44,16 +44,6 @@
     @endphp
 
     <div class="w-full max-w-2xl space-y-5">
-        @if($canManageBilling)
-            <x-filament::tabs :contained="false" class="-mb-1">
-                <x-filament::tabs.item :active="! $showsUsage" wire:click="$set('tab', '{{ \Relaticle\Cloud\Billing\Filament\Billing::OVERVIEW_TAB }}')">{{ __('cloud::billing.usage_tab.overview') }}</x-filament::tabs.item>
-                <x-filament::tabs.item :active="$showsUsage" wire:click="$set('tab', '{{ \Relaticle\Cloud\Billing\Filament\Billing::USAGE_TAB }}')">{{ __('cloud::billing.usage_tab.tab') }}</x-filament::tabs.item>
-            </x-filament::tabs>
-        @endif
-
-        @if($showsUsage)
-            <livewire:app.billing.credit-usage lazy />
-        @else
         @if($activating)
             <x-cloud::billing.activating :card="$card" />
         @endif
@@ -321,7 +311,6 @@
                 </div>
                 <p class="mt-4 text-sm leading-6 text-gray-600 dark:text-gray-400">{{ __('cloud::billing.enterprise.tagline') }} {{ __('cloud::billing.enterprise.terms') }}</p>
             </section>
-        @endif
         @endif
     </div>
 </x-filament-panels::page>

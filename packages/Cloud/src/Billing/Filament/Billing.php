@@ -56,10 +56,6 @@ final class Billing extends Page
 
     public const string KEEP_SUBSCRIPTION_ACTION = 'keepSubscription';
 
-    public const string OVERVIEW_TAB = 'overview';
-
-    public const string USAGE_TAB = 'usage';
-
     private const string CHECKOUT_SESSION_PREFIX = 'cs_';
 
     #[Url]
@@ -67,9 +63,6 @@ final class Billing extends Page
 
     #[Url]
     public ?string $credits = null;
-
-    #[Url]
-    public string $tab = self::OVERVIEW_TAB;
 
     #[Override]
     public static function shouldRegisterNavigation(): bool
@@ -279,7 +272,6 @@ final class Billing extends Page
             'activating' => in_array($this->checkout, [self::CHECKOUT_SUCCESS, self::CHECKOUT_REOPENED], true) && ! $workspace->subscribed() && ! $workspace->plan->isManaged(),
             'creditsFulfilling' => $this->creditsFulfilling($workspace),
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
-            'showsUsage' => $this->tab === self::USAGE_TAB && $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             ...($hasHostedAccess ? [] : $this->pausedViewData($workspace)),
         ];
     }

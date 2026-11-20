@@ -29,7 +29,6 @@ use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Data\Renewal;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
-use Relaticle\Cloud\Billing\Livewire\CreditUsage;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Tests\Helpers\StripeRecorder;
@@ -1621,31 +1620,4 @@ it('states what a past-due subscription owes', function (): void {
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.status.past_due'))
         ->assertSee(__('cloud::billing.summary.payment_failed', ['amount' => '$29']));
-});
-
-it('opens credit usage on its own tab for someone who manages billing', function (): void {
-    withHostedBilling();
-
-    billingPageOwner();
-
-    livewire(Billing::class)
-        ->assertSee(__('cloud::billing.usage_tab.tab'))
-        ->set('tab', 'usage')
-        ->assertSeeLivewire(CreditUsage::class)
-        ->assertDontSee(__('cloud::billing.usage.title'));
-});
-
-it('keeps the usage tab from a member who cannot manage billing', function (): void {
-    withHostedBilling();
-
-    [, $workspace] = billingPageOwner();
-    $member = User::factory()->create();
-    $workspace->users()->attach($member, ['role' => 'admin']);
-    $this->actingAs($member);
-
-    livewire(Billing::class)
-        ->assertDontSee(__('cloud::billing.usage_tab.tab'))
-        ->set('tab', 'usage')
-        ->assertDontSeeLivewire(CreditUsage::class)
-        ->assertSee(__('cloud::billing.usage.title'));
 });

@@ -7,9 +7,7 @@ namespace Relaticle\Chat\Models;
 use App\Models\Concerns\HasWorkspace;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\WithoutTimestamps;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -63,20 +61,6 @@ final class AiCreditTransaction extends Model
             'metadata' => 'array',
             'created_at' => 'datetime',
         ];
-    }
-
-    /** @param  Builder<self>  $query */
-    #[Scope]
-    protected function periodGrants(Builder $query): void
-    {
-        $query->whereIn('metadata->action', ['seed_initial_balance', 'reset_period']);
-    }
-
-    /** @param  Builder<self>  $query */
-    #[Scope]
-    protected function spending(Builder $query): void
-    {
-        $query->whereIn('type', AiCreditType::spending());
     }
 
     /** @return BelongsTo<User, $this> */
