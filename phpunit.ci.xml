@@ -63,6 +63,7 @@
         <env name="OPENAI_API_KEY" value="fake-openai-key"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="CACHE_STORE" value="array"/>
+        <env name="REDIS_MAX_RETRIES" value="0"/>
         <env name="IMPORT_STORE_DISK" value=""/>
         <env name="AUTH_TIMEBOX_DURATION" value="1000"/>
         <env name="DB_CONNECTION" value="pgsql"/>

@@ -61,6 +61,7 @@ use App\Support\Migrations\TenantMigration;
 use App\Support\PanelIcons;
 use App\Support\Passport\ClientRepository;
 use App\Support\Passport\WorkspaceBearerTokenResponse;
+use App\Support\Redis\RetryingPhpRedisConnector;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\Exports\ExportColumn;
@@ -94,6 +95,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery as BasePreventRe
 use Illuminate\Http\Request;
 use Illuminate\Log\Context\Repository as ContextRepository;
 use Illuminate\Notifications\Channels\DatabaseChannel;
+use Illuminate\Redis\RedisManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Config;
@@ -215,6 +217,9 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->app->bind(BasePreventRequestForgery::class, PreventRequestForgery::class);
         $this->app->bind(BaseOAuthRegisterController::class, OAuthRegisterController::class);
+        $this->callAfterResolving('redis', function (RedisManager $redis): void {
+            $redis->extend('phpredis', fn (): RetryingPhpRedisConnector => new RetryingPhpRedisConnector);
+        });
     }
 
     private function registerNotificationBindings(): void
