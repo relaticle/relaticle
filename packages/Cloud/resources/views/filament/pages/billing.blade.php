@@ -23,7 +23,7 @@
             && ! $onLegacyFree
             && $workspace->plan !== \App\Enums\Plan::Free);
         $showEnterpriseOffer = $canManageBilling && ! $isEnterprise && ! $pastDue && ! $onGrace && ! $activating;
-        $trialDaysLeft = $onTrial ? max(0, (int) ceil(now()->floatDiffInDays($workspace->trial_ends_at))) : 0;
+        $showsPlanAction = $canManageBilling && $canManageSubscription && ! $pastDue && ! $showsManagedCard;
 
         $planLabel = $summary->plan;
         $statusClasses = match ($summary->tone) {
@@ -59,68 +59,73 @@
 
         <section class="{{ $card }} overflow-hidden" aria-label="{{ __('billing.title') }}">
             <div class="grid gap-px bg-gray-200/60 sm:grid-cols-5 dark:bg-white/[0.06]">
-                <div class="bg-white p-6 sm:col-span-3 dark:bg-transparent">
-                    <div class="flex items-center gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/[0.08] dark:bg-primary/[0.15]">
-                            <x-lucide-zap class="h-5 w-5 text-primary dark:text-primary-400" />
+                <div class="flex flex-col bg-white p-6 sm:col-span-3 dark:bg-transparent">
+                    <div class="flex items-start gap-3">
+                        <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/[0.08] dark:bg-primary/[0.15]">
+                            <x-lucide-zap class="size-5 text-primary dark:text-primary-400" />
                         </div>
-                        <div>
+                        <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2">
-                                <h2 class="font-display text-2xl font-semibold leading-none text-gray-900 dark:text-white">
-                                    {{ $planLabel }}
-                                </h2>
-                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-micro font-semibold {{ $statusClasses }}">
-                                    {{ $summary->status }}
-                                </span>
+                                <h2 class="font-display text-2xl font-semibold leading-tight text-gray-950 dark:text-white">{{ $planLabel }}</h2>
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-micro font-semibold {{ $statusClasses }}">{{ $summary->status }}</span>
                             </div>
-
-                            <p class="mt-1.5 text-sm text-gray-500 dark:text-gray-400">{{ $summary->headline }}</p>
+                            <p class="mt-1.5 text-sm text-gray-600 dark:text-gray-300">{{ $summary->headline }}</p>
                             @if($summary->card)
-                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ $summary->card }}</p>
+                                <p class="mt-1 flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400">
+                                    <x-lucide-credit-card class="size-4 shrink-0" />
+                                    {{ $summary->card }}
+                                </p>
                             @endif
                         </div>
                     </div>
+
+                    @if($showsPlanAction)
+                        <div class="mt-6 sm:mt-auto sm:pt-6">
+                            <x-filament::button color="gray" size="sm" icon="lucide-external-link" wire:click="managePortal">{{ __('cloud::billing.manage.button') }}</x-filament::button>
+                        </div>
+                    @endif
                 </div>
 
                 <div class="bg-white p-6 sm:col-span-2 dark:bg-transparent">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.title') }}</span>
-                        <span class="text-xs text-gray-500 dark:text-gray-400">{{ $usedPercent }}%</span>
-                    </div>
-
-                    <div class="mt-2.5 flex items-baseline gap-1.5">
-                        <span class="font-display text-xl font-semibold text-gray-900 dark:text-white">{{ Number::format($monthlyUsed) }}</span>
-                        <span class="text-sm text-gray-500 dark:text-gray-400">/ {{ Number::format($allowance) }}</span>
-                    </div>
-
-                    <div role="progressbar" aria-label="{{ __('cloud::billing.usage.title') }}" aria-valuenow="{{ $usedPercent }}" aria-valuemin="0" aria-valuemax="100" class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
-                        <div class="h-full rounded-full {{ $meterColor }} transition-all duration-500" style="width: {{ $usedPercent }}%"></div>
-                    </div>
+                    <p class="text-sm font-medium text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.title') }}</p>
 
                     @if($balance)
-                        <p class="mt-3 text-sm font-medium text-gray-900 dark:text-white">{{ __('cloud::billing.usage.available', ['credits' => Number::format($remaining)]) }}</p>
+                        <p class="mt-2 flex flex-wrap items-baseline gap-x-1.5">
+                            <span class="font-display text-3xl font-semibold tracking-tight text-gray-950 dark:text-white">{{ Number::format($remaining) }}</span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.available_label') }}</span>
+                        </p>
+
+                        <div role="progressbar" aria-label="{{ __('cloud::billing.usage.monthly_used', ['used' => Number::format($monthlyUsed), 'allowance' => Number::format($allowance)]) }}" aria-valuenow="{{ $usedPercent }}" aria-valuemin="0" aria-valuemax="100" class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-gray-200/80 dark:bg-white/[0.08]">
+                            <div class="h-full rounded-full {{ $meterColor }} transition-all duration-500" style="width: {{ $usedPercent }}%"></div>
+                        </div>
+                        <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.monthly_used', ['used' => Number::format($monthlyUsed), 'allowance' => Number::format($allowance)]) }}</p>
                         @if($used > $allowance)
                             <p class="mt-1 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.total_used', ['credits' => Number::format($used)]) }}</p>
                         @endif
+                        @if($balance->period_ends_at)
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.resets', ['date' => $balance->period_ends_at->isoFormat('ll')]) }}</p>
+                        @endif
+                        @if($purchased > 0)
+                            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.packs.balance_split', ['purchased' => Number::format($purchased)]) }}</p>
+                        @endif
                     @else
-                        <p class="mt-3 text-xs text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.empty') }}</p>
-                    @endif
-
-                    @if($balance?->period_ends_at)
-                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.usage.resets', ['date' => $balance->period_ends_at->isoFormat('ll')]) }}</p>
-                    @endif
-
-                    @if($purchased > 0)
-                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">{{ __('cloud::billing.packs.balance_split', ['purchased' => Number::format($purchased)]) }}</p>
+                        <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">{{ __('cloud::billing.usage.empty') }}</p>
                     @endif
 
                     @if($canManageBilling && $availablePacks !== [])
-                        <div class="mt-4 flex flex-wrap gap-2">
-                            @foreach($availablePacks as $key => $pack)
-                                <x-filament::button size="xs" color="gray" wire:click="buyCredits('{{ $key }}')">
-                                    {{ __('cloud::billing.packs.buy', ['credits' => Number::format($pack['credits'])]) }}
-                                </x-filament::button>
-                            @endforeach
+                        <div class="mt-5">
+                            <x-filament::dropdown placement="bottom-start">
+                                <x-slot name="trigger">
+                                    <x-filament::button color="gray" size="sm" icon="lucide-plus">{{ __('cloud::billing.packs.buy_more') }}</x-filament::button>
+                                </x-slot>
+                                <x-filament::dropdown.list>
+                                    @foreach($availablePacks as $key => $pack)
+                                        <x-filament::dropdown.list.item wire:click="buyCredits('{{ $key }}')">
+                                            {{ __('cloud::billing.packs.buy', ['credits' => Number::format($pack['credits'])]) }}
+                                        </x-filament::dropdown.list.item>
+                                    @endforeach
+                                </x-filament::dropdown.list>
+                            </x-filament::dropdown>
                         </div>
                     @endif
                 </div>
@@ -200,22 +205,6 @@
             </div>
         @elseif($pastDue)
         @elseif($canManageSubscription)
-            <div class="{{ $card }} p-6">
-                <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex flex-1 items-start gap-3">
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-success-50 text-success-600 dark:bg-success-400/10 dark:text-success-400">
-                            <x-lucide-circle-check class="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h3 class="font-display text-lg font-semibold text-gray-900 dark:text-white">{{ __('cloud::billing.manage.title', ['plan' => $planLabel]) }}</h3>
-                            <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.manage.body') }}</p>
-                        </div>
-                    </div>
-                    <x-filament::button size="lg" icon="lucide-external-link" wire:click="managePortal" class="shrink-0 whitespace-nowrap">
-                        {{ __('cloud::billing.manage.button') }}
-                    </x-filament::button>
-                </div>
-            </div>
         @else
             @if($onLegacyFree)
                 <div class="{{ $card }} flex items-start gap-3 p-5">

@@ -12,9 +12,10 @@ return [
         'managed' => 'Géré',
     ],
     'usage' => [
-        'title' => 'Allocation d\'IA pour cette période',
+        'title' => 'Crédits IA',
         'resets' => 'Réinitialisation le :date',
-        'available' => ':credits crédits disponibles',
+        'available_label' => 'crédits disponibles',
+        'monthly_used' => ':used crédits mensuels utilisés sur :allowance',
         'total_used' => ':credits crédits utilisés sur cette période',
         'empty' => 'Votre solde de crédits apparaîtra lorsque votre allocation commencera.',
     ],

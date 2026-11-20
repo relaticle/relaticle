@@ -164,7 +164,7 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
         ->assertSee(__('cloud::billing.paused.sign_out'))
         ->assertDontSee('Delete workspace')
         ->assertDontSee('fi-sidebar', false)
-        ->assertDontSee(__('cloud::billing.usage.title'));
+        ->assertDontSee(__('cloud::billing.usage.available_label'));
 });
 
 it('opens the upgrade modal from the paused screen instead of a review page', function (): void {
@@ -426,8 +426,8 @@ it('meters an extended trial against the Free allowance', function (): void {
     expect($workspace->refresh()->onExtendedTrial())->toBeTrue();
 
     livewire(Billing::class)
-        ->assertSeeHtml('/ '.number_format(Plan::Free->credits()))
-        ->assertDontSeeHtml('/ '.number_format(Plan::Pro->credits()));
+        ->assertSee(' of '.number_format(Plan::Free->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used');
 });
 
 it('hides the extension once it was used', function (): void {
@@ -650,8 +650,8 @@ it('meters a running trial against the trial allowance', function (): void {
     resolve(StartProTrial::class)->execute($user, $workspace);
 
     livewire(Billing::class)
-        ->assertSeeHtml('/ '.number_format(Plan::trialCredits()))
-        ->assertDontSeeHtml('/ '.number_format(Plan::Pro->credits()));
+        ->assertSee(' of '.number_format(Plan::trialCredits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used');
 });
 
 it('shows manage state for an active subscription', function (): void {
@@ -747,8 +747,8 @@ it('meters a past-due workspace against the allowance it will be refilled with',
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format(Plan::Free->credits()))
-        ->assertDontSee('/ '.number_format(Plan::Pro->credits()))
+        ->assertSee(' of '.number_format(Plan::Free->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used')
         ->assertSee('100%');
 });
 
@@ -783,7 +783,7 @@ it('shows Enterprise as a managed plan with its allowance and no upgrade actions
     livewire(Billing::class)
         ->assertSee(__('billing.plans.enterprise'))
         ->assertSee(__('cloud::billing.enterprise.title'))
-        ->assertSee('/ '.number_format(Plan::Enterprise->credits()))
+        ->assertSee(' of '.number_format(Plan::Enterprise->credits()).' monthly credits used')
         ->assertDontSee(__('billing.plans.cloud_pro'))
         ->assertDontSee(__('billing.plans.cloud_scale'))
         ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']));
@@ -969,9 +969,9 @@ it('uses the plan allowance as the meter denominator, not remaining plus used', 
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format(Plan::Pro->credits()))
-        ->assertDontSee('/ '.number_format(575))
-        ->assertDontSee('/ '.number_format(375));
+        ->assertSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(575).' monthly credits used')
+        ->assertDontSee(' of '.number_format(375).' monthly credits used');
 });
 
 it('keeps the plan allowance as the denominator once the monthly allowance is exhausted and purchased credits are being spent', function (): void {
@@ -991,8 +991,8 @@ it('keeps the plan allowance as the denominator once the monthly allowance is ex
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format(Plan::Pro->credits()))
-        ->assertDontSee('/ '.number_format(2050));
+        ->assertSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(2050).' monthly credits used');
 });
 
 it('offers owners an Enterprise conversation without changing their plan', function (): void {
@@ -1098,7 +1098,7 @@ it('keeps the managed allowance when an older Pro subscription is past due', fun
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format($plan->credits()))
+        ->assertSee(' of '.number_format($plan->credits()).' monthly credits used')
         ->assertSee('Your previous subscription has a payment issue.')
         ->assertDontSee(__('cloud::billing.manage.past_due_body'));
 })->with([Plan::Enterprise]);
@@ -1126,7 +1126,7 @@ it('shows spendable credits separately after the monthly allowance is exhausted'
     ]);
 
     livewire(Billing::class)
-        ->assertSee('150 credits available')
+        ->assertSeeInOrder(['150', __('cloud::billing.usage.available_label')])
         ->assertSee('2,050 credits used this period')
         ->assertSee('100%');
 });
@@ -1620,4 +1620,54 @@ it('states what a past-due subscription owes', function (): void {
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.status.past_due'))
         ->assertSee(__('cloud::billing.summary.payment_failed', ['amount' => '$29']));
+});
+
+it('names a subscriber\'s plan once, with its one manage action beside it', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+    rememberRenewal('sub_summary');
+
+    $html = livewire(Billing::class)
+        ->assertDontSee(__('cloud::billing.manage.title', ['plan' => Plan::Pro->marketingLabel()]))
+        ->assertSee(__('cloud::billing.manage.button'))
+        ->html();
+
+    expect(substr_count($html, 'wire:click="managePortal"'))->toBe(1);
+});
+
+it('leads the credits with what is available and states the monthly allowance in one line', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+    rememberRenewal('sub_summary');
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'credits_remaining' => 2360,
+        'credits_used' => 640,
+        'purchased_credits' => 1000,
+        'period_starts_at' => now()->subDays(10),
+        'period_ends_at' => now()->addDays(20),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSeeInOrder(['2,360', __('cloud::billing.usage.available_label'), __('cloud::billing.usage.monthly_used', ['used' => '640', 'allowance' => '2,000'])])
+        ->assertDontSeeHtml('>32%<');
+});
+
+it('offers every credit pack from one buy menu', function (): void {
+    withHostedBilling();
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_small_test', 'credits' => 1000]);
+    config()->set('services.stripe.credit_packs.large', ['price' => 'price_large_test', 'credits' => 5000]);
+
+    billingPageOwner();
+
+    $html = livewire(Billing::class)
+        ->assertSeeInOrder([__('cloud::billing.packs.buy_more'), __('cloud::billing.packs.buy', ['credits' => '1,000']), __('cloud::billing.packs.buy', ['credits' => '5,000'])])
+        ->html();
+
+    expect(substr_count($html, 'fi-dropdown-trigger'))->toBeGreaterThanOrEqual(1)
+        ->and($html)->toContain("buyCredits('small')")
+        ->and($html)->toContain("buyCredits('large')");
 });

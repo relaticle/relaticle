@@ -12,9 +12,10 @@ return [
         'managed' => 'Managed',
     ],
     'usage' => [
-        'title' => 'AI allowance this period',
+        'title' => 'AI credits',
         'resets' => 'Resets :date',
-        'available' => ':credits credits available',
+        'available_label' => 'credits available',
+        'monthly_used' => ':used of :allowance monthly credits used',
         'total_used' => ':credits credits used this period',
         'empty' => 'Your credit balance will appear when your allowance starts.',
     ],

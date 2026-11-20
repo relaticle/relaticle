@@ -12,9 +12,10 @@ return [
         'managed' => 'Administrado',
     ],
     'usage' => [
-        'title' => 'Asignación de IA de este período',
+        'title' => 'Créditos de IA',
         'resets' => 'Se restablece el :date',
-        'available' => ':credits créditos disponibles',
+        'available_label' => 'créditos disponibles',
+        'monthly_used' => ':used de :allowance créditos mensuales usados',
         'total_used' => ':credits créditos usados en este período',
         'empty' => 'Su saldo de créditos aparecerá cuando comience su asignación.',
     ],

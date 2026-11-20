@@ -12,9 +12,10 @@ return [
         'managed' => 'Verwaltet',
     ],
     'usage' => [
-        'title' => 'KI-Kontingent in diesem Zeitraum',
+        'title' => 'KI-Credits',
         'resets' => 'Wird am :date zurückgesetzt',
-        'available' => ':credits Credits verfügbar',
+        'available_label' => 'Credits verfügbar',
+        'monthly_used' => ':used von :allowance monatlichen Credits verbraucht',
         'total_used' => ':credits Credits in diesem Zeitraum verbraucht',
         'empty' => 'Ihr Credit-Stand erscheint, sobald Ihr Kontingent beginnt.',
     ],
