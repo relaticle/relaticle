@@ -50,6 +50,7 @@ it('registers a client that redirects to a known connector host', function (stri
     'mistral' => 'https://console.mistral.ai/oauth/callback',
     'perplexity' => 'https://www.perplexity.ai/rest/connections/oauth_callback',
     'perplexity enterprise' => 'https://enterprise.perplexity.ai/rest/connections/oauth_callback',
+    'maxforms' => 'https://app.maxforms.com/integrations/connections/oauth/callback',
     'localhost on any port' => 'http://localhost:33418/callback',
     'ipv4 loopback' => 'http://127.0.0.1:52100/callback',
     'cursor' => 'cursor://anysphere.cursor-mcp/oauth/callback',
