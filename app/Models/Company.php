@@ -241,7 +241,7 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
 
     protected static function booting(): void
     {
-        self::restoring(fn (self $record): bool => $record->merged_into_id === null);
+        self::restoring(fn (self $record): ?bool => $record->merged_into_id === null ? null : false);
     }
 
     /**
