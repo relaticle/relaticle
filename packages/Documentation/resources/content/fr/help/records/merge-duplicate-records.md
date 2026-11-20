@@ -29,7 +29,7 @@ administrateurs peuvent fusionner. Les lecteurs ne le peuvent pas.
 L'enregistrement de droite l'emporte partout où les deux ont une valeur. Les vides sont
 comblés par l'autre. Les domaines, les e-mails et tout attribut qui contient une liste
 sont combinés, ceux du gagnant en premier. Cela couvre la sélection multiple, la liste de
-cases à cocher, les étiquettes et les attributs dont « allow multiple » est activé.
+cases à cocher, les étiquettes et les attributs dont l’option **Autoriser plusieurs valeurs** est activée.
 
 ## Ce que vous obtenez
 
@@ -51,9 +51,9 @@ bouton **Aller à la fiche** qui mène au nouvel enregistrement.
 ## Fusionner depuis l'API, MCP et Rela
 
 Vous pouvez fusionner sans la boîte de dialogue. L'API REST propose un point d'accès de
-fusion pour les entreprises et un pour les personnes, le serveur MCP offre un outil pour
-chacune, et Rela, l'assistant IA intégré, propose des fusions que vous approuvez. La
-même règle que dans la boîte de dialogue s'applique.
+fusion pour les entreprises et un pour les personnes. Le serveur MCP offre un outil pour
+chacune. Rela, l'assistant IA intégré, propose des fusions que vous approuvez. Partout,
+la même règle que dans la boîte de dialogue s'applique.
 
 ## Bon à savoir
 

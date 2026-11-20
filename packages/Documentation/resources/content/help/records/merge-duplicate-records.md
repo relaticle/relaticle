@@ -27,7 +27,7 @@ either of them. Members and Admins can merge. Viewers cannot.
 The record on the right wins wherever both records hold a value. Gaps are
 filled from the other record. Domains, emails, and any attribute that holds a
 list are combined, with the winner's first. That covers multi-select, checkbox
-list, tags, and attributes with "allow multiple" on.
+list, tags, and attributes with **Allow Multiple Values** turned on.
 
 ## What you get
 

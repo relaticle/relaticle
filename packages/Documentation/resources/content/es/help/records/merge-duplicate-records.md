@@ -28,8 +28,8 @@ fusionar. Los lectores no.
 El registro de la derecha gana siempre que ambos tengan un valor. Los huecos se
 completan con el otro registro. Los dominios, los correos electrónicos y cualquier
 atributo que contenga una lista se combinan, primero los del ganador. Eso incluye la
-selección múltiple, la lista de casillas, las etiquetas y los atributos con «permitir
-varios» activado.
+selección múltiple, la lista de casillas, las etiquetas y los atributos con la opción
+**Permitir varios valores** activada.
 
 ## Qué obtiene
 
@@ -51,9 +51,9 @@ al registro** que lleva al registro nuevo.
 ## Fusionar desde la API, MCP y Rela
 
 Puede fusionar sin el cuadro de diálogo. La API REST tiene un punto de conexión de
-fusión para empresas y otro para personas, el servidor MCP ofrece una herramienta para
-cada una, y Rela, el asistente de IA integrado, propone fusiones para que usted las
-apruebe. Se aplica la misma regla que en el cuadro de diálogo.
+fusión para empresas y otro para personas. El servidor MCP ofrece una herramienta para
+cada una. Rela, el asistente de IA integrado, propone fusiones para que usted las
+apruebe. En todos los casos se aplica la misma regla que en el cuadro de diálogo.
 
 ## Conviene saber
 

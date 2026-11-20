@@ -29,7 +29,7 @@ Administratoren können zusammenführen. Betrachter nicht.
 Der Eintrag rechts gewinnt überall dort, wo beide einen Wert haben. Lücken werden aus
 dem anderen Eintrag aufgefüllt. Domains, E-Mails und jedes Attribut, das eine Liste
 enthält, werden kombiniert, die des Gewinners zuerst. Dazu zählen Mehrfachauswahl,
-Checkbox-Liste, Tags und Attribute mit aktivierter Mehrfachauswahl („allow multiple“).
+Checkbox-Liste, Tags und Attribute mit aktivierter Option **Mehrere Werte zulassen**.
 
 ## Was Sie erhalten
 
@@ -52,9 +52,9 @@ zusammengeführt** und die Schaltfläche **Zum Eintrag**, die zum neuen Eintrag 
 ## Zusammenführen per API, MCP und Rela
 
 Sie können auch ohne den Dialog zusammenführen. Die REST-API hat einen
-Zusammenführen-Endpunkt für Unternehmen und für Personen, der MCP-Server bietet je ein
-Tool dafür, und Rela, der integrierte KI-Assistent, schlägt Zusammenführungen zur
-Freigabe vor. Es gilt dieselbe Regel wie im Dialog.
+Zusammenführen-Endpunkt für Unternehmen und einen für Personen. Der MCP-Server bietet
+für beide ein Tool. Rela, der integrierte KI-Assistent, schlägt Zusammenführungen zur
+Freigabe vor. Überall gilt dieselbe Regel wie im Dialog.
 
 ## Gut zu wissen
 
