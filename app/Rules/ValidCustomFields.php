@@ -190,7 +190,7 @@ final readonly class ValidCustomFields implements ValidationRule
      */
     private function loadedCustomFields(EloquentCollection $definitions, array $submittedCodes): EloquentCollection
     {
-        $required = fn (CustomField $field): bool => $field->validation_rules?->get('required') === true;
+        $required = fn (CustomField $field): bool => collect($field->validation_rules)->get('required') === true;
 
         return $definitions
             ->filter(fn (CustomField $field): bool => in_array($field->code, $submittedCodes, true) || (! $this->isUpdate && $required($field)))
