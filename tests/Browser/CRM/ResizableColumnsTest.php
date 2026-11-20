@@ -367,6 +367,19 @@ it('keeps the pagination on a page past the last record', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
+it('leaves the page where it is when a sort changes on a phone', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
+
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 390, 844)
+        ->assertScript('Math.round(window.scrollY)', 0);
+
+    $page->script('(() => { const table = document.querySelector(".fi-ta-ctn"); Livewire.all().filter((component) => component.el.contains(table)).pop().$wire.call("sortTable", "created_at"); })()');
+
+    $page->wait(1.5)
+        ->assertScript('Math.round(window.scrollY)', 0)
+        ->assertNoJavaScriptErrors();
+});
+
 it('keeps the pagination below the stacked cards on a phone', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
 

@@ -1377,11 +1377,11 @@
         }))
     }
 
-    // Filament answers a page change by scrolling the table container into view, which never moves the rows' own
-    // scroll box, and the footer that was clicked sits after the last row.
+    // A new page starts the rows' scroll box at the top, since the footer that was clicked sits after the last row.
+    // Not Filament's scrollToTopOnPageChange: it also fires on every sort and filter, and jumps the page on phones.
     function registerPaginationFooter() {
         window.Alpine.data('tablePaginationFooter', () => {
-            const listeners = new AbortController()
+            let unwatchPage = null
             let resizeObserver = null
 
             return {
@@ -1389,7 +1389,7 @@
                     const box = this.$el.closest('.fi-ta-content-ctn')
                     if (!box) return
 
-                    this.$wire.$el.addEventListener('scrollToTopOfTable', () => box.scrollTo({ top: 0 }), { signal: listeners.signal })
+                    unwatchPage = this.$wire.$watch('paginators', () => box.scrollTo({ top: 0 }))
 
                     // Not a container query: containment on the box makes Floating UI flip the popovers in its cells.
                     resizeObserver = new ResizeObserver(() => this.$el.style.setProperty('--table-visible-width', `${box.clientWidth}px`))
@@ -1397,7 +1397,7 @@
                 },
 
                 destroy() {
-                    listeners.abort()
+                    unwatchPage?.()
                     resizeObserver?.disconnect()
                 },
             }

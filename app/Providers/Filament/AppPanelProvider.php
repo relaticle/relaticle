@@ -191,7 +191,6 @@ final class AppPanelProvider extends PanelProvider
                 ->contentFooter(fn (HasTable $livewire, Table $table): ?View => $this->isListPage($livewire)
                     ? view('filament.app.tables.pagination-footer', ['table' => $table])
                     : null)
-                ->scrollToTopOnPageChange(fn (HasTable $livewire): bool => $this->isListPage($livewire))
                 ->persistColumnsInSession(false)
             : $table);
     }
