@@ -170,12 +170,12 @@ final readonly class MergeRecords
         $message = Arr::first($mergedValues->overLimit);
 
         if ($message !== null) {
-            throw ValidationException::withMessages(['picked_id' => $message]);
+            throw ValidationException::withMessages(['records' => $message]);
         }
     }
 
     private function unavailable(): ValidationException
     {
-        return ValidationException::withMessages(['picked_id' => __('filament/record-page.merge.unavailable')]);
+        return ValidationException::withMessages(['records' => __('filament/record-page.merge.unavailable')]);
     }
 }
