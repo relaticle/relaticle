@@ -53,7 +53,7 @@ it('rejects an Opus request from a grandfathered Free user with a 403', function
 
     $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
         'document' => ChatDocument::fromText('hi'),
-        'model' => 'claude-opus-5',
+        'model' => 'claude-opus-5-5',
     ]);
 
     $response->assertStatus(403);
@@ -74,12 +74,12 @@ it('lets a self-hosted workspace send with a Pro-only model', function (): void 
 
     $this->actingAs($user)->postJson('/chat/'.seedGateConversation($user), [
         'document' => ChatDocument::fromText('hi'),
-        'model' => 'claude-opus-5',
+        'model' => 'claude-opus-5-5',
     ])->assertSuccessful();
 
     Queue::assertPushed(
         ProcessChatMessage::class,
-        fn (ProcessChatMessage $job): bool => (fn (): array => $this->resolved)->call($job)['id'] === 'claude-opus-5',
+        fn (ProcessChatMessage $job): bool => (fn (): array => $this->resolved)->call($job)['id'] === 'claude-opus-5-5',
     );
 });
 
@@ -122,7 +122,7 @@ it('allows an Opus request from a Pro user', function (): void {
 
     $response = $this->actingAs($user)->postJson("/chat/{$conversationId}", [
         'document' => ChatDocument::fromText('hi'),
-        'model' => 'claude-opus-5',
+        'model' => 'claude-opus-5-5',
     ]);
 
     $response->assertStatus(200);
@@ -342,7 +342,7 @@ it('refuses a premium model during a trial while the workspace holds only sample
 
     $response = $this->actingAs($user)->postJson('/chat/'.seedGateConversation($user), [
         'document' => ChatDocument::fromText('hi'),
-        'model' => 'claude-opus-5',
+        'model' => 'claude-opus-5-5',
     ]);
 
     $response->assertStatus(403)->assertJson([
@@ -387,7 +387,7 @@ it('unlocks premium models once the trial workspace creates its own record throu
 
     $this->actingAs($user)->postJson('/chat/'.seedGateConversation($user), [
         'document' => ChatDocument::fromText('hi'),
-        'model' => 'claude-opus-5',
+        'model' => 'claude-opus-5-5',
     ])->assertOk();
 
     Queue::assertPushed(ProcessChatMessage::class);

@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\BlogCategoryName)
 @php
     // The panel's SEO section writes title/description to the post's `seo` row and
     // wins when set. Ink's own renderer can't honour it, because getDynamicSEOData()
@@ -29,9 +30,9 @@
             <meta property="article:author" content="{{ $post->author->name }}" />
         @endif
         @if($post->category)
-            <meta property="article:section" content="{{ $post->category->name }}" />
+            <meta property="article:section" content="{{ BlogCategoryName::of($post->category) }}" />
         @endif
-        <x-ink::feed-link />
+        <x-cloud::blog.feed-link />
     @endpush
 
     <x-ink::structured-data :post="$post" />

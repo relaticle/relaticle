@@ -113,7 +113,7 @@ final readonly class LocalizedUrl
 
     private static function routeNameOf(string $path): ?string
     {
-        $request = Request::create((string) parse_url($path, PHP_URL_PATH));
+        $request = Request::create(url((string) parse_url($path, PHP_URL_PATH)));
         $fallback = null;
 
         foreach (Route::getRoutes()->get($request->getMethod()) as $route) {

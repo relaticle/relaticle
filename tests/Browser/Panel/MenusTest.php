@@ -46,6 +46,8 @@ const CHIP_RULES = "js:Livewire.all().find((component) => component.name.include
 
 const REGION_CHIP_RULES = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setFilterRules', [{ field: 'custom_fields.region', condition: 'is_any_of', value: ['%option%'] }])";
 
+const ADD_COLUMN_IN_VIEW = 'js:document.querySelector("[data-add-column-trigger]").scrollIntoView({ inline: "end" })';
+
 const DELETED_CHIP = "js:Livewire.all().find((component) => component.name.includes('ListCompanies')).\$wire.\$call('setDeletedRecordsFilter', 'included')";
 
 function addCompanyRegionField(User $user): void
@@ -105,6 +107,7 @@ it('draws every menu with the shared row, icon and corner spec', function (strin
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '.fi-filter-item', '.fi-filter-item > svg'],
     'import and export' => ['.fi-header button.fi-ac-btn-group:visible', '.fi-header .fi-dropdown-panel:not([style*="display: none"])', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg'],
     'column header' => ["th[x-data^=\"resizableColumn('created_at'\"] [data-column-menu-trigger]", '.fi-ta-column-menu', '.fi-dropdown-list-item', '.fi-dropdown-list-item > svg'],
+    'add column' => ['[data-add-column-trigger]', '.fi-ta-add-column-menu', '.fi-ta-add-column-menu .fi-dropdown-list-item', '.fi-ta-add-column-menu .fi-dropdown-list-item > svg', 'companies', [ADD_COLUMN_IN_VIEW]],
     'board filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '.fi-filter-item', '.fi-filter-item > svg', 'opportunities/board'],
     'board sort menu' => ['[data-filter-sort]', '[data-sort-pop]', '.fi-filter-item', '.fi-filter-item > svg', 'opportunities/board'],
     'board view settings' => ['.fi-view-settings-trigger', '[data-board-view-settings]', BOARD_MAIN_ROWS, BOARD_MAIN_ICONS, 'opportunities/board'],
@@ -220,6 +223,7 @@ it('keeps a long menu above the window edge and scrolls only its list', function
 })->with([
     'views' => ['.fi-view-switcher .fi-dropdown-trigger button', '.fi-ta-views-panel', '.fi-ta-views-scroll'],
     'view settings' => ['.fi-view-settings-trigger', '.fi-view-settings-panel', '.fi-view-settings-scroll'],
+    'add column' => ['[data-add-column-trigger]', '.fi-ta-add-column-menu', '.fi-ta-add-column-menu .fi-view-settings-scroll', [ADD_COLUMN_IN_VIEW]],
     'filter field picker' => ['[data-filter-add]', '.fi-filter-pop-picker', '[role=listbox]'],
     'filter chip value checklist' => ['[data-filter-chip] [data-filter-segment="value"]', '[data-filter-chip] .fi-filter-pop', '.fi-filter-options', [REGION_CHIP_RULES], true],
     'merge record picker' => ['[data-merge-picker]', '.fi-merge-pop', '.fi-merge-pop ul', MERGE_PICKER_STEPS, false, 'companies/%company%'],

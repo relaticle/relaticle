@@ -288,6 +288,13 @@ it('serves the German Markdown response under /de', function (): void {
         ->and($english)->not->toContain('Unternehmen');
 });
 
+it('serves a localized page while the app panel has its own domain and only known hosts are trusted', function (string $path): void {
+    Route::domain('app.relaticle.test')->get('/{tenant}', fn (): string => '');
+    Request::setTrustedHosts(['^'.preg_quote((string) parse_url((string) config('app.url'), PHP_URL_HOST)).'$', '^app\.relaticle\.test$']);
+
+    $this->get("/de{$path}")->assertOk();
+})->with(['/privacy-policy', '/terms-of-service', '/developers/rest-api']);
+
 it('links to the English URL when a route has no localized sibling', function (): void {
     expect(LocalizedUrl::route('login', locale: 'de'))->toBe(route('login'))
         ->and(LocalizedUrl::route('pricing', locale: 'de'))->toBe(url('/de/pricing'))

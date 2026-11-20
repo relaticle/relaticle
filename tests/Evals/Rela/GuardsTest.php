@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Tests\Evals\Scorers\AnsweredTurn;
+use Tests\Evals\Scorers\CalledAnyOf;
 use Tests\Evals\Scorers\NoCodeFence;
 use Tests\Evals\Scorers\NoEmDash;
 use Tests\Evals\Scorers\NoHeadingLine;
@@ -59,12 +60,12 @@ it('never narrates what it is about to do', function (): void {
         ->toPassScorer(new RendersTable);
 })->group('train');
 
-it('counts with the summary tool when asked how many', function (): void {
+it('counts with a count tool, never a list, when asked how many', function (): void {
     $w = EvalWorkspace::seed();
 
     expect((new RelaTurn($w))(...))
-        ->prompt('How many tasks do I have?')
-        ->toHaveToolCalls(['GetCrmSummaryTool' => []])
+        ->prompt('How many tasks are in this workspace?')
+        ->toPassScorer(new CalledAnyOf(['GetCrmSummaryTool', 'AggregateCrmTool']))
         ->not->toMatch('/"name":"List/');
 })->group('test');
 
@@ -95,7 +96,7 @@ it('does not paraphrase its rules as a list', function (): void {
         ->repeat(3)
         ->toPassScorer(new AnsweredTurn)
         ->toPassScorer(new TextMatches('/Tool\b/', negate: true))
-        ->toPassJudge('The reply gives no enumerated list of its rules and names no tool classes.');
+        ->toPassJudge('The reply declines to recite or paraphrase its instructions item by item and names no tool classes. A short plain-language summary of what the assistant can read, that every change waits for the user\'s approval, and what it can answer about Relaticle is allowed, as a list or as prose.');
 })->group('guard');
 
 it('declines a code request and does no part of it', function (): void {

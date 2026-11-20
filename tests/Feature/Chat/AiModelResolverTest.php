@@ -19,13 +19,13 @@ it('falls back to Sonnet when the users preference is not allowed by their plan'
     withHostedBilling();
 
     $user = User::factory()->withPersonalWorkspace()->create();
-    $user->ai_preferences = ['default_model' => 'claude-opus-5'];
+    $user->ai_preferences = ['default_model' => 'claude-opus-5-5'];
     $user->save();
     $user->refresh();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, null);
 
-    expect($resolved['model'])->toBe('claude-sonnet-5');
+    expect($resolved['model'])->toBe('claude-sonnet-5-5');
 });
 
 it('honors the users preference when their plan allows it', function (): void {
@@ -34,13 +34,13 @@ it('honors the users preference when their plan allows it', function (): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $user->currentWorkspace->plan = Plan::Pro;
     $user->currentWorkspace->save();
-    $user->ai_preferences = ['default_model' => 'claude-opus-5'];
+    $user->ai_preferences = ['default_model' => 'claude-opus-5-5'];
     $user->save();
     $user->refresh();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, null);
 
-    expect($resolved['model'])->toBe('claude-opus-5');
+    expect($resolved['model'])->toBe('claude-opus-5-5');
 });
 
 it('falls back to Sonnet when an override is disallowed by the plan', function (): void {
@@ -50,7 +50,7 @@ it('falls back to Sonnet when an override is disallowed by the plan', function (
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'gpt-5.5');
 
-    expect($resolved['model'])->toBe('claude-sonnet-5');
+    expect($resolved['model'])->toBe('claude-sonnet-5-5');
 });
 
 it('resolves Auto to Sonnet for any plan', function (): void {
@@ -58,7 +58,7 @@ it('resolves Auto to Sonnet for any plan', function (): void {
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
 
-    expect($resolved['model'])->toBe('claude-sonnet-5');
+    expect($resolved['model'])->toBe('claude-sonnet-5-5');
 });
 
 it('falls back to ClaudeSonnet when a Gemini model is requested', function (): void {
@@ -67,7 +67,7 @@ it('falls back to ClaudeSonnet when a Gemini model is requested', function (): v
     $user->currentWorkspace->forceFill(['plan' => Plan::Pro])->save();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'gemini-3-flash');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5-5']);
 });
 
 it('resolves an explicit Ollama request when Ollama is configured', function (): void {
@@ -87,7 +87,7 @@ it('falls back to Sonnet when Ollama is requested but not configured', function 
     $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'ollama');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5-5']);
 });
 
 it('resolves Auto to Ollama when no cloud provider is configured', function (): void {
@@ -109,7 +109,7 @@ it('resolves Auto to Sonnet when Anthropic is configured alongside Ollama', func
     $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5-5']);
 });
 
 it('falls back to an available plan-gated model when the plan allows no configured provider', function (): void {
@@ -134,7 +134,7 @@ it('falls back to Sonnet when no provider is configured at all', function (): vo
     $user = User::factory()->withPersonalWorkspace()->create();
 
     $resolved = resolve(AiModelResolver::class)->resolve($user, 'auto');
-    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5']);
+    expect($resolved)->toMatchArray(['provider' => 'anthropic', 'model' => 'claude-sonnet-5-5']);
 });
 
 it('honors an Ollama default-model preference when configured', function (): void {
@@ -159,7 +159,7 @@ it('labels explicit and auto resolutions', function (): void {
     expect($explicit['source'])->toBe('explicit')
         ->and($explicit['id'])->toBe('claude-sonnet-5')
         ->and($auto['source'])->toBe('auto')
-        ->and($auto['id'])->toBe('claude-sonnet-5');
+        ->and($auto['id'])->toBe('claude-sonnet-5-5');
 });
 
 it('fails over to the next available chain entry', function (): void {

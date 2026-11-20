@@ -7,7 +7,7 @@
     $proCredits = \Illuminate\Support\Number::format(\App\Enums\Plan::Pro->credits());
     $trialDays = \App\Models\Workspace::PRO_TRIAL_DAYS;
 
-    $title = __('AI-native CRM: MCP, chat and self-hosting').' - Relaticle';
+    $title = __('What is an AI-native CRM? Five checks to run').' - Relaticle';
     $description = __(
         'What makes a CRM AI-native, five checks to run before you buy one, and how Relaticle passes each of them on your own server.'
     );
@@ -104,6 +104,10 @@
     ];
 
     $faqs = [
+        [
+            __('What is an AI-native CRM?'),
+            __('In an AI-native CRM, AI works on the records themselves rather than through a separate AI add-on. The CRM\'s own assistant and outside agents read and change companies, people, opportunities, tasks and notes with the permissions of the user they act for. Relaticle works this way. Claude, ChatGPT and your own agents connect through its MCP server and write directly in one workspace. :name, the built-in AI assistant, proposes each change as a card you approve.', ['name' => $assistantName]),
+        ],
         [
             __('Is an AI-native CRM the same as an agentic CRM?'),
             __('No. Agentic describes what the AI does: it takes multi-step actions toward a goal. AI-native describes how the CRM is built: the data model, permissions, and review step are designed for AI to work in. A CRM can be agentic without being AI-native, and the difference shows the first time an agent writes something wrong.'),

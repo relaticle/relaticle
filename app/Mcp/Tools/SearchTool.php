@@ -12,6 +12,7 @@ use App\Models\Workspace;
 use App\Support\CanonicalRecordUrl;
 use App\Support\LikePattern;
 use App\Support\PhoneSearch;
+use App\Support\RichTextSearch;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -39,7 +40,6 @@ final class SearchTool extends Tool
         'radio',
         'checkbox-list',
         'tags-input',
-        'rich-editor',
     ];
 
     public function __construct(private readonly CanonicalRecordUrl $urls) {}
@@ -47,7 +47,7 @@ final class SearchTool extends Tool
     public function schema(JsonSchema $schema): array
     {
         return [
-            'query' => $schema->string()->description('Search query (case-insensitive substring match across names, titles, and the values of text, long text, email, phone, link, domain, and color custom attributes, also called custom fields). Max 255 chars.')->required(),
+            'query' => $schema->string()->description('Search query (case-insensitive substring match across names, titles, and the values of text, long text, rich text, email, phone, link, domain, and color custom attributes, also called custom fields, so note bodies and task descriptions match). Max 255 chars.')->required(),
             'limit' => $schema->integer()->description('Max results per entity (default 5, max 20). Total payload up to 5×limit across companies, people, opportunities, tasks, and notes.')->default(5),
         ];
     }
@@ -154,7 +154,8 @@ final class SearchTool extends Tool
                 ->where('cf.active', true)
                 ->whereNotIn('cf.type', self::EXCLUDED_CUSTOM_FIELD_TYPES)
                 ->where(function (QueryBuilder $values) use ($query, $phonePattern): void {
-                    $values->where('cfv.text_value', 'ilike', "%{$query}%")
+                    $values->where(fn (QueryBuilder $plain): QueryBuilder => $plain->where('cf.type', '!=', 'rich-editor')->where('cfv.text_value', 'ilike', "%{$query}%"))
+                        ->orWhereRaw(RichTextSearch::ELEMENT_CONDITION, ["%{$query}%"])
                         ->orWhere('cfv.string_value', 'ilike', "%{$query}%")
                         ->orWhereRaw(
                             "cfv.json_value is not null and json_typeof(cfv.json_value) = 'array' and exists (select 1 from json_array_elements_text(cfv.json_value) as elem(val) where elem.val ilike ?)",

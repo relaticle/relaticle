@@ -26,7 +26,7 @@ final class FilteredEmptyState
     {
         return Action::make('clearFilterBar')
             ->label(__('filament/panel.tables.filters.clear'))
-            ->color('gray')
+            ->icon('lucide-funnel-x')
             ->visible(fn (HasTable $livewire): bool => self::isFilteredByBar($livewire))
             ->action(function (HasTable $livewire): void {
                 if (method_exists($livewire, 'clearFilterBar')) {

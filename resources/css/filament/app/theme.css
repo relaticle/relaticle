@@ -1159,6 +1159,22 @@ a.fi-linked-records-chip {
 /* The head cells already rule off an empty table. */
 .fi-ta-ctn .fi-ta-empty-state {
     @apply border-t-0;
+
+    & .fi-ta-empty-state-icon-bg {
+        @apply mb-4 flex size-10 items-center justify-center bg-white p-0 shadow-xs ring-1 ring-gray-950/10 dark:bg-white/5 dark:ring-white/10;
+
+        & :is(.fi-icon, .fi-loading-indicator) {
+            @apply size-5 text-primary-600 dark:text-primary-400;
+        }
+    }
+
+    & .fi-ta-empty-state-description {
+        @apply max-w-xs text-balance;
+    }
+
+    & .fi-ta-actions {
+        @apply mt-5;
+    }
 }
 
 /* Table header actions */

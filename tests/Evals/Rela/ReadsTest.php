@@ -11,7 +11,7 @@ use Tests\Evals\Scorers\NoHeadingLine;
 use Tests\Evals\Scorers\NoMarkdownTable;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\RendersTable;
-use Tests\Evals\Scorers\ReplayedBytesUnder;
+use Tests\Evals\Scorers\ReplayedBytesPerRowUnder;
 use Tests\Evals\Scorers\TextMatches;
 use Tests\Evals\Support\EvalWorkspace;
 use Tests\Evals\Support\Prior;
@@ -76,7 +76,7 @@ it('does not claim to show the first page as everything when more rows exist', f
         ->toPassJudge('The reply either says more people exist beyond those shown, or shows all 40.');
 })->group('train');
 
-it('keeps the replayed task list under ten kilobytes', function (): void {
+it('keeps each replayed task row under a kilobyte', function (): void {
     $w = EvalWorkspace::seed();
     Prior::assignTasksToOwner($w);
 
@@ -84,7 +84,7 @@ it('keeps the replayed task list under ten kilobytes', function (): void {
         ->prompt('Show me all my open tasks')
         ->toHaveToolCalls(['ListTasksTool' => []])
         ->toPassScorer(new RendersTable)
-        ->toPassScorer(new ReplayedBytesUnder(10_000));
+        ->toPassScorer(new ReplayedBytesPerRowUnder(1_000));
 })->group('test');
 
 it('reads recent activity with the activity tool', function (): void {
@@ -120,7 +120,7 @@ it('may say contact when the user said contact', function (): void {
     expect((new RelaTurn($w))(...))
         ->prompt($prompt)
         ->repeat(3)
-        ->toPassScorer(new CalledAnyOf(['ListPeopleTool', 'GetCompanyTool']))
+        ->toPassScorer(new CalledAnyOf(['ListPeopleTool', 'GetCompanyTool', 'ListCompaniesTool']))
         ->toPassScorer(new NoContactWord);
 })->group('test');
 

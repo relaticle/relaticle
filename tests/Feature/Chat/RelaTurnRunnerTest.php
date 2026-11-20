@@ -395,7 +395,7 @@ it('reads a stored error row as a failed turn', function (): void {
 it('fails loudly when the provider served another model, and still records the turn', function (): void {
     CrmAssistant::fake(['Fine.']);
     RelaTurn::forget();
-    $turn = new RelaTurn(EvalWorkspace::seed(), model: 'claude-opus-5');
+    $turn = new RelaTurn(EvalWorkspace::seed(), model: 'claude-opus-5-5');
     $rewriting = false;
     DB::listen(function (QueryExecuted $query) use (&$rewriting): void {
         if ($rewriting || ! str_starts_with($query->sql, 'insert into "agent_conversation_messages"')) {
@@ -414,16 +414,16 @@ it('fails loudly when the provider served another model, and still records the t
         $served = $e->getMessage();
     }
 
-    expect($served)->toBe('Asked for claude-opus-5, served by claude-sonnet-5')
+    expect($served)->toBe('Asked for claude-opus-5-5, served by claude-sonnet-5')
         ->and(RelaTurn::$last)->toBeInstanceOf(TurnEnvelope::class);
 });
 
 it('resolves a candidate model the catalog does not offer', function (): void {
-    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5-5'))->toBeNull();
+    expect(resolve(ModelRegistry::class)->find('claude-haiku-5-5'))->toBeNull();
 
     EvalModels::register();
 
-    expect(resolve(ModelRegistry::class)->find('claude-sonnet-5-5')?->provider)->toBe('anthropic')
+    expect(resolve(ModelRegistry::class)->find('claude-haiku-5-5')?->provider)->toBe('anthropic')
         ->and(resolve(ModelRegistry::class)->find('gpt-6-luna')?->provider)->toBe('openai')
         ->and(resolve(ModelRegistry::class)->find('claude-sonnet-5')?->provider)->toBe('anthropic');
 });
