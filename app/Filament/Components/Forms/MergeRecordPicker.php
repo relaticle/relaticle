@@ -16,6 +16,7 @@ use App\Models\CustomFieldValue;
 use App\Models\People;
 use App\Support\CustomFields\WorkspaceCustomFields;
 use App\Support\LikePattern;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\Field;
 use Filament\Models\Contracts\HasAvatar;
 use Filament\Schemas\Components\Utilities\Set;
@@ -133,6 +134,34 @@ final class MergeRecordPicker extends Field
     public function getOverLimitMessages(): array
     {
         return array_values($this->pairing()['values']->overLimit ?? []);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getRaiseNotices(): array
+    {
+        $raises = $this->pairing()['values']->raises ?? [];
+
+        if ($raises === []) {
+            return [];
+        }
+
+        $subject = $this->subject();
+        $entity = Str::ucfirst(Filament::getModelResource($subject)::getPluralModelLabel());
+        $fields = resolve(WorkspaceCustomFields::class)
+            ->forEntity($subject->loadMissing('workspace')->workspace, $subject->getMorphClass())
+            ->keyBy('code');
+
+        return array_map(
+            fn (int $count, string $code): string => __('filament/record-page.merge.raised', [
+                'entity' => $entity,
+                'count' => $count,
+                'field' => mb_strtolower($fields[$code]->name),
+            ]),
+            $raises,
+            array_keys($raises),
+        );
     }
 
     public function getSearchPlaceholder(): string

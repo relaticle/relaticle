@@ -248,18 +248,7 @@ it('refuses the current record, a trashed record and another workspace\'s record
         ->and(Company::withTrashed()->withoutGlobalScopes()->find($forged->getKey())->trashed())->toBe($case === 'trashed');
 })->with(['itself', 'trashed', 'other workspace']);
 
-it('blocks a merge that would give a company more than five domains', function (): void {
-    $kept = mergeCompanyRecord($this->workspace, $this->user, [], ['domains' => ['a1.com', 'a2.com', 'a3.com']]);
-    $duplicate = mergeCompanyRecord($this->workspace, $this->user, [], ['domains' => ['b1.com', 'b2.com', 'b3.com']]);
-
-    mergeWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
-
-    expect(Company::query()->whereKey($duplicate->getKey())->exists())->toBeTrue()
-        ->and(Company::query()->count())->toBe(2)
-        ->and(mergeCompanyValue($kept, 'domains'))->toHaveCount(3);
-});
-
-it('blocks a merge over a field\'s own maximum and says one value when the limit is one', function (): void {
+it('raises a custom multi-value field\'s own maximum to the combined count', function (): void {
     $field = CustomField::factory()->create([
         'tenant_id' => $this->workspace->getKey(),
         'entity_type' => 'company',
@@ -279,11 +268,10 @@ it('blocks a merge over a field\'s own maximum and says one value when the limit
     $kept->saveCustomFieldValue($field, [$options[0]]);
     $duplicate->saveCustomFieldValue($field, [$options[1]]);
 
-    mergeWith($kept, $duplicate)->assertHasActionErrors([
-        'picked_id' => 'Regions can hold at most 1. Together these records have more. Remove some first.',
-    ]);
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(Company::query()->whereKey($duplicate->getKey())->exists())->toBeTrue();
+    expect(mergeCompanyValue(mergedRecord(), 'regions'))->toHaveCount(2)
+        ->and($field->fresh()->settings->max_values)->toBe(2);
 });
 
 it('leaves another workspace\'s rows alone even when they point at an original', function (): void {

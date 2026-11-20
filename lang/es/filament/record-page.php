@@ -53,6 +53,7 @@ return [
         'swap' => 'Intercambiar registros',
         'submit' => 'Fusionar registros',
         'unavailable' => 'Ese registro ya no está disponible para fusionar.',
+        'raised' => ':entity ahora pueden contener :count :field',
         'over_limit' => ':field admite como máximo :max. Juntos, estos registros tienen más. Elimine algunos primero.',
         'pick' => 'Elegir un registro',
         'clear' => 'Elegir otro registro',

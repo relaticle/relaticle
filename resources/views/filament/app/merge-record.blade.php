@@ -79,6 +79,10 @@
         @enderror
     @endif
 
+    @foreach ($getRaiseNotices() as $raiseNotice)
+        <x-filament::callout color="info" icon="lucide-info" :heading="$raiseNotice" data-merge-raise />
+    @endforeach
+
     @foreach ($getOverLimitMessages() as $overLimitMessage)
         <x-filament::callout color="danger" icon="lucide-circle-alert" :heading="$overLimitMessage" role="alert" data-merge-over-limit />
     @endforeach

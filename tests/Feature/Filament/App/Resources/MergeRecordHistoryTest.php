@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 use App\Actions\Merge\MergeRecords;
 use App\Actions\Merge\MoveRecordHistory;
+use App\Actions\Merge\RaiseFieldLimits;
 use App\ActivityLog\AppEventPalette;
 use App\Enums\CreationSource;
+use App\Enums\WorkspaceRole;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
@@ -14,14 +16,16 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Support\CustomFieldSettingsSchema;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\CustomFields\Services\TenantContextService;
+use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergeRecords::class, MoveRecordHistory::class, AppEventPalette::class, ActivityLog::class);
+mutates(RaiseFieldLimits::class, MergeRecords::class, MoveRecordHistory::class, AppEventPalette::class, ActivityLog::class);
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -233,5 +237,135 @@ it('lists the merge on the workspace activity page and filters by it', function 
             ->filterTable('event', 'record_merged')
             ->assertCanSeeTableRecords([$entry])
             ->assertSee(AppEventPalette::RecordMerged->getLabel());
+    }
+});
+
+/**
+ * @return array<string, array{0: class-string, 1: Closure, 2: string, 3: string, 4: Closure}>
+ */
+function mergeListEntities(): array
+{
+    $value = fn (string $prefix, int $number, string $suffix): string => $prefix.$number.$suffix;
+
+    return [
+        'company' => [ViewCompany::class, fn (Workspace $workspace, User $owner, array $values): Company|People => mergeCompanyRecord($workspace, $owner, [], ['domains' => $values]), 'company', 'domains', fn (string $prefix, int $number): string => $value($prefix, $number, '.com')],
+        'person' => [ViewPeople::class, fn (Workspace $workspace, User $owner, array $values): Company|People => mergePersonRecord($workspace, $owner, [], ['emails' => $values]), 'people', 'emails', fn (string $prefix, int $number): string => $value($prefix, $number, '@x.com')],
+    ];
+}
+
+/**
+ * @return list<string>
+ */
+function mergeListValues(Closure $name, string $prefix, int $count): array
+{
+    return array_map(fn (int $number): string => $name($prefix, $number), range(1, $count));
+}
+
+function mergeFieldMax(Workspace $workspace, string $entityType, string $code): int
+{
+    return WorkspaceCustomField::byCode($workspace->getKey(), $entityType, $code)->settings->max_values;
+}
+
+function mergeSetFieldMax(Workspace $workspace, string $entityType, string $code, int $max): void
+{
+    $field = WorkspaceCustomField::byCode($workspace->getKey(), $entityType, $code);
+    $field->update(['settings' => CustomFieldSettingsSchema::apply($field, ['max_values' => $max])]);
+}
+
+it('keeps every value of a merge past the limit and raises the workspace field to the combined count', function (): void {
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        $current = $make($this->workspace, $this->user, mergeListValues($name, 'a', 4));
+        $picked = $make($this->workspace, $this->user, mergeListValues($name, 'b', 4));
+
+        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(5);
+
+        $merged = mergeHistoryRun($page, $current, $picked, false);
+
+        expect($merged->load('customFieldValues.customField')->getCustomFieldValue(WorkspaceCustomField::byCode($this->workspace->getKey(), $entityType, $code)))->toHaveCount(8)
+            ->and(mergeFieldMax($this->workspace, $entityType, $code))->toBe(8);
+    }
+});
+
+it('lets a member without the fields manage capability merge past the limit', function (): void {
+    $member = User::factory()->create();
+    $this->workspace->users()->attach($member, ['role' => WorkspaceRole::Member->value]);
+    $member->switchWorkspace($this->workspace);
+    $this->actingAs($member);
+
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        $current = $make($this->workspace, $this->user, mergeListValues($name, 'a', 4));
+        $picked = $make($this->workspace, $this->user, mergeListValues($name, 'b', 4));
+
+        mergeHistoryRun($page, $current, $picked, false);
+
+        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(8);
+    }
+});
+
+it('leaves the limit alone when the combined values fit', function (): void {
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        mergeHistoryRun($page, $make($this->workspace, $this->user, mergeListValues($name, 'a', 2)), $make($this->workspace, $this->user, mergeListValues($name, 'b', 3)), false);
+
+        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(5);
+    }
+});
+
+it('never lowers a limit that is already above the combined count', function (): void {
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        mergeSetFieldMax($this->workspace, $entityType, $code, 12);
+
+        mergeHistoryRun($page, $make($this->workspace, $this->user, mergeListValues($name, 'a', 4)), $make($this->workspace, $this->user, mergeListValues($name, 'b', 4)), false);
+
+        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(12);
+    }
+});
+
+it('keeps an earlier raise when a later merge needs fewer values', function (): void {
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        mergeHistoryRun($page, $make($this->workspace, $this->user, mergeListValues($name, 'a', 4)), $make($this->workspace, $this->user, mergeListValues($name, 'b', 4)), false);
+        mergeHistoryRun($page, $make($this->workspace, $this->user, mergeListValues($name, 'c', 3)), $make($this->workspace, $this->user, mergeListValues($name, 'd', 3)), false);
+
+        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(8);
+    }
+});
+
+it('logs the raise on the field', function (): void {
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        mergeHistoryRun($page, $make($this->workspace, $this->user, mergeListValues($name, 'a', 4)), $make($this->workspace, $this->user, mergeListValues($name, 'b', 4)), false);
+
+        $field = WorkspaceCustomField::byCode($this->workspace->getKey(), $entityType, $code);
+        $logged = Activity::query()->where('subject_type', $field->getMorphClass())->where('subject_id', $field->getKey())->where('event', 'updated')->latest('id')->firstOrFail();
+
+        expect(json_encode($logged->attribute_changes))->toContain('max_values');
+    }
+});
+
+it('refuses a merge past the ceiling and changes nothing', function (): void {
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        $current = $make($this->workspace, $this->user, mergeListValues($name, 'a', 11));
+        $picked = $make($this->workspace, $this->user, mergeListValues($name, 'b', 10));
+
+        livewire($page, ['record' => $current->getKey()])
+            ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => false])
+            ->assertHasActionErrors(['picked_id']);
+
+        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(5)
+            ->and($picked->fresh())->not->toBeNull();
+    }
+});
+
+it('shows the raise in the dialog and keeps merging enabled', function (): void {
+    foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
+        $current = $make($this->workspace, $this->user, mergeListValues($name, 'a', 4));
+        $picked = $make($this->workspace, $this->user, mergeListValues($name, 'b', 4));
+        $label = $entityType === 'company' ? 'Companies can now hold 8 domains' : 'People can now hold 8 emails';
+
+        $dialog = livewire($page, ['record' => $current->getKey()])
+            ->mountAction(mergeRecordAction())
+            ->setActionData(['picked_id' => $picked->getKey(), 'keep_picked' => false]);
+        $html = implode('', $dialog->effects['partials'] ?? []);
+
+        expect($html)->toContain($label)
+            ->not->toContain('can hold at most');
     }
 });

@@ -12,6 +12,7 @@ use App\Models\People;
 use App\Models\Scopes\WorkspaceScope;
 use App\Support\CustomFields\CanonicalValue;
 use App\Support\CustomFields\WorkspaceCustomFields;
+use App\Support\CustomFieldSettingsSchema;
 use App\Support\EmailAddress;
 use App\Support\Media\MediaLookup;
 
@@ -29,6 +30,7 @@ final readonly class CombineRecordValues
 
         $customFields = [];
         $overLimit = [];
+        $raises = [];
         $attachmentUuids = [];
 
         foreach ($this->activeFields($priority) as $field) {
@@ -44,12 +46,20 @@ final readonly class CombineRecordValues
 
             $limit = $this->limit($field);
 
-            if ($limit !== null && is_array($value) && count($value) > $limit) {
-                $overLimit[$field->code] = __('filament/record-page.merge.over_limit', ['field' => $field->name, 'max' => $limit]);
+            if ($limit === null || ! is_array($value) || count($value) <= $limit) {
+                continue;
             }
+
+            if (count($value) > CustomFieldSettingsSchema::MAX_MAX_VALUES) {
+                $overLimit[$field->code] = __('filament/record-page.merge.over_limit', ['field' => $field->name, 'max' => CustomFieldSettingsSchema::MAX_MAX_VALUES]);
+
+                continue;
+            }
+
+            $raises[$field->code] = count($value);
         }
 
-        return new MergedValues($this->attributes($priority, $other), $customFields, $overLimit, array_values(array_unique($attachmentUuids)));
+        return new MergedValues($this->attributes($priority, $other), $customFields, $overLimit, $raises, array_values(array_unique($attachmentUuids)));
     }
 
     /**

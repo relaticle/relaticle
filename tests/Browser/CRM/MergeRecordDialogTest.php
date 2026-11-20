@@ -81,14 +81,26 @@ it('lets the other company win when the member swaps the two', function (): void
         ->and(Company::withTrashed()->find($other->getKey())?->trashed())->toBeTrue();
 });
 
-it('disables merging and names the list over its limit', function (): void {
+it('names the raised limit and keeps merging enabled when the lists pass it', function (): void {
     $current = mergeDialogCompany($this->workspace, $this->user, 'Acme', ['a1.com', 'a2.com', 'a3.com']);
     mergeDialogCompany($this->workspace, $this->user, 'Acme Holdings', ['b1.com', 'b2.com', 'b3.com']);
 
     $page = openMergeDialog($this->user, $this->workspace, $current);
 
     pickInMergeDialog($page, 'Holdings', 'Acme Holdings')
-        ->assertSeeIn('[data-merge-over-limit]', 'Domains can hold at most 5')
+        ->assertSeeIn('[data-merge-raise]', 'Companies can now hold 6 domains')
+        ->assertScript(MERGE_SUBMIT_DISABLED, false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('disables merging and names the list over the ceiling', function (): void {
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Acme', array_map(fn (int $number): string => "a{$number}.com", range(1, 11)));
+    mergeDialogCompany($this->workspace, $this->user, 'Acme Holdings', array_map(fn (int $number): string => "b{$number}.com", range(1, 10)));
+
+    $page = openMergeDialog($this->user, $this->workspace, $current);
+
+    pickInMergeDialog($page, 'Holdings', 'Acme Holdings')
+        ->assertSeeIn('[data-merge-over-limit]', 'Domains can hold at most 20')
         ->assertScript(MERGE_SUBMIT_DISABLED, true)
         ->assertNoJavaScriptErrors();
 });

@@ -53,6 +53,7 @@ return [
         'swap' => 'Einträge tauschen',
         'submit' => 'Einträge zusammenführen',
         'unavailable' => 'Dieser Eintrag kann nicht mehr zusammengeführt werden.',
+        'raised' => ':entity können jetzt :count :field enthalten',
         'over_limit' => ':field kann höchstens :max enthalten. Zusammen haben diese Einträge mehr. Entfernen Sie zuerst einige.',
         'pick' => 'Eintrag auswählen',
         'clear' => 'Anderen Eintrag auswählen',

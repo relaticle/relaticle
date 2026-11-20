@@ -26,6 +26,7 @@ final readonly class MergeRecords
         private CombineRecordValues $combine,
         private MoveRecordLinks $moveLinks,
         private MoveRecordHistory $moveHistory,
+        private RaiseFieldLimits $raiseLimits,
         private UpdateCompany $updateCompany,
         private UpdatePeople $updatePeople,
     ) {}
@@ -46,6 +47,7 @@ final readonly class MergeRecords
             $mergedValues = $this->combine->execute($priority, $other, $merged);
 
             $this->assertWithinLimits($mergedValues);
+            $this->raiseLimits->execute($merged, $mergedValues);
 
             foreach ([$priority, $other] as $original) {
                 $this->moveLinks->execute($merged, $original, $mergedValues);

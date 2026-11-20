@@ -53,6 +53,7 @@ return [
         'swap' => 'Inverser les fiches',
         'submit' => 'Fusionner les fiches',
         'unavailable' => "Cette fiche n'est plus disponible pour la fusion.",
+        'raised' => ':entity peuvent désormais contenir :count :field',
         'over_limit' => ":field peut contenir au plus :max. Ensemble, ces fiches en ont davantage. Supprimez-en d'abord.",
         'pick' => 'Choisir une fiche',
         'clear' => 'Choisir une autre fiche',

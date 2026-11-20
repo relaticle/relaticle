@@ -53,6 +53,7 @@ return [
         'swap' => 'Swap records',
         'submit' => 'Merge records',
         'unavailable' => 'That record is no longer available to merge.',
+        'raised' => ':entity can now hold :count :field',
         'over_limit' => ':field can hold at most :max. Together these records have more. Remove some first.',
         'pick' => 'Choose a record',
         'clear' => 'Choose a different record',

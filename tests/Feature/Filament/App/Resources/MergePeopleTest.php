@@ -123,17 +123,6 @@ it('combines tags without repeating one that differs only in letter case or spac
     expect(mergePersonValue(mergedRecord(), 'segments'))->toBe(['VIP', 'Enterprise', 'Partner']);
 });
 
-it('blocks a merge that would give a person more than five emails', function (): void {
-    $kept = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['a1@x.com', 'a2@x.com', 'a3@x.com']]);
-    $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['emails' => ['b1@x.com', 'b2@x.com', 'b3@x.com']]);
-
-    mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
-
-    expect(People::query()->whereKey($duplicate->getKey())->exists())->toBeTrue()
-        ->and(People::query()->count())->toBe(2)
-        ->and(mergePersonValue($kept, 'emails'))->toHaveCount(3);
-});
-
 it('keeps the current person\'s phone number where both hold one', function (): void {
     $kept = mergePersonRecord($this->workspace, $this->user, [], ['phone_number' => ['+14155550101']]);
     $duplicate = mergePersonRecord($this->workspace, $this->user, [], ['phone_number' => ['+14155550199'], 'job_title' => 'VP Sales']);
