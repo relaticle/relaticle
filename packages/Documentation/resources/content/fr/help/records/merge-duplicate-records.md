@@ -29,7 +29,7 @@ administrateurs peuvent fusionner. Les lecteurs ne le peuvent pas.
 L'enregistrement de droite l'emporte partout où les deux ont une valeur. Les vides sont
 comblés par l'autre. Les domaines, les e-mails et tout attribut qui contient une liste
 sont combinés, ceux du gagnant en premier. Cela couvre la sélection multiple, la liste de
-cases à cocher, les étiquettes et les attributs dont l’option **Autoriser plusieurs valeurs** est activée.
+cases à cocher, les étiquettes et les attributs dont l'option **Autoriser plusieurs valeurs** est activée.
 
 ## Ce que vous obtenez
 
