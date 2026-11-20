@@ -178,7 +178,7 @@ it('keeps the article readable when storage cannot look up the cover metadata', 
     config(['ink.uploads.disk' => 'unavailable']);
     $disk = Mockery::mock(FilesystemAdapter::class);
     $disk->allows('url')->with('ink/offline.png')->andReturn('https://cdn.example.test/ink/offline.png');
-    $disk->allows('exists')->andThrow(UnableToCheckFileExistence::forLocation('blog-covers'));
+    $disk->allows('fileExists')->andThrow(UnableToCheckFileExistence::forLocation('blog-covers'));
     Storage::set('unavailable', $disk);
     $this->post->updateQuietly(['featured_image' => 'ink/offline.png']);
 
@@ -197,6 +197,17 @@ it('serves covers above the worker pixel budget at their original measured size'
         ->assertSee('property="og:image:width" content="4100"', false)
         ->assertSee('property="og:image:height" content="2300"', false)
         ->assertDontSee('srcset=');
+});
+
+it('publishes only heights the WebP format can encode', function (): void {
+    $source = 'ink/tall.png';
+    $this->disk->put($source, UploadedFile::fake()->image('tall.png', 400, 18000)->getContent());
+    $this->post->update(['featured_image' => $source]);
+
+    $this->get($this->post->getUrl())->assertOk()
+        ->assertSee('property="og:image:height" content="18000"', false)
+        ->assertSee('320.webp 320w')
+        ->assertDontSee('400.webp 400w');
 });
 
 it('queues each distinct source once when the deployment coordinator retries', function (): void {

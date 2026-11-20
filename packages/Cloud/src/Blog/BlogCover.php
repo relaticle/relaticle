@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Blog;
 
+use Illuminate\Filesystem\AwsS3V3Adapter;
 use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -38,7 +39,7 @@ final readonly class BlogCover
     /** @return Manifest|array{} */
     public function manifest(): array
     {
-        return Cache::remember($this->cacheKey, now()->addMinutes(5), function (): array {
+        return Cache::memo()->remember($this->cacheKey, now()->addMinutes(5), function (): array {
             try {
                 return $this->storedManifest();
             } catch (FilesystemException $exception) {
@@ -54,13 +55,13 @@ final readonly class BlogCover
         $manifest = $this->storedManifest();
 
         return ($manifest['version'] ?? null) === $version
-            && array_all($manifest['widths'], fn (int $width): bool => $this->disk->exists($this->variantPath($version, $width)));
+            && array_all($manifest['widths'], fn (int $width): bool => $this->disk->fileExists($this->variantPath($version, $width)));
     }
 
     /** @return Manifest|array{} */
     private function storedManifest(): array
     {
-        return $this->disk->exists($this->manifestPath) ? ($this->disk->json($this->manifestPath) ?? []) : [];
+        return $this->disk->fileExists($this->manifestPath) ? ($this->disk->json($this->manifestPath) ?? []) : [];
     }
 
     public function srcset(): string
@@ -84,6 +85,12 @@ final readonly class BlogCover
 
     public function write(string $path, string $contents): void
     {
+        if ($this->disk instanceof AwsS3V3Adapter) {
+            throw_unless($this->disk->put($path, $contents), RuntimeException::class, "Could not publish {$path}.");
+
+            return;
+        }
+
         $temporary = $path.'.'.Str::uuid().'.tmp';
 
         try {
@@ -97,6 +104,6 @@ final readonly class BlogCover
     public function publish(array $manifest): void
     {
         $this->write($this->manifestPath, json_encode($manifest, JSON_THROW_ON_ERROR));
-        Cache::forever($this->cacheKey, $manifest);
+        Cache::memo()->forever($this->cacheKey, $manifest);
     }
 }
