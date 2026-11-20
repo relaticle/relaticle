@@ -30,6 +30,21 @@ final readonly class ChatAttachment
         return $media instanceof Media ? new self($media) : null;
     }
 
+    /** @return list<self> */
+    public static function sentIn(User $user, string $conversationId): array
+    {
+        return array_values(Media::query()
+            ->where('workspace_id', $user->current_workspace_id)
+            ->where('collection_name', AgentConversation::ATTACHMENTS_MEDIA_COLLECTION)
+            ->whereNotNull('custom_properties->sent_at')
+            ->whereHasMorph('model', [AgentConversation::class], fn (Builder $query) => $query->ownedBy($user)->whereKey($conversationId))
+            ->orderBy('id')
+            ->get()
+            ->map(fn (Media $media): self => new self($media))
+            ->reject(fn (self $attachment): bool => $attachment->isText())
+            ->all());
+    }
+
     public function id(): string
     {
         return (string) $this->media->uuid;

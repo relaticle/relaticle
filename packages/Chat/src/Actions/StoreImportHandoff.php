@@ -13,6 +13,7 @@ use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Services\TipTapDocumentParser;
+use Relaticle\Chat\Support\AttachedRows;
 use Relaticle\Chat\Support\ChatAttachment;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\ImportWizard\Enums\ImportEntityType;
@@ -88,7 +89,7 @@ final readonly class StoreImportHandoff
 
     private function reply(ChatAttachment $attachment): string
     {
-        return __("That's :count rows. The import wizard handles files this size, with your columns already mapped.", ['count' => Number::format($attachment->rowCount())])
+        return __("That's :count rows. The import wizard handles files this size, with your columns already mapped. Or ask me to add them here, :size at a time.", ['count' => Number::format($attachment->rowCount()), 'size' => AttachedRows::INLINE_ROW_LIMIT])
             ."\n\n[".__('Import as people').']('.$attachment->importUrl(ImportEntityType::People).') · ['.__('Import as companies').']('.$attachment->importUrl(ImportEntityType::Company).')';
     }
 }

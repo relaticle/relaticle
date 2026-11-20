@@ -166,6 +166,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'list_custom_fields' => __('Reading custom attributes…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
+            'read_attachment_rows' => __('Reading the attached file…'),
             'get_credit_balance' => __('Checking your AI credits…'),
             'request_web_access' => __('Asking to search the web…'),
             'web_search' => __('Searching the web…'),
