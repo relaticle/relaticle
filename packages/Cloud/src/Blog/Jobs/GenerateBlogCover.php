@@ -121,8 +121,8 @@ final class GenerateBlogCover implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @param positive-int $width
-     * @param positive-int $height
+     * @param  positive-int  $width
+     * @param  positive-int  $height
      */
     private function encode(Imagick|GdImage $source, int $width, int $height): string
     {
