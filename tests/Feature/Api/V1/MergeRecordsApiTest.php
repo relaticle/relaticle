@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Actions\Merge\MergeRecords;
 use App\Http\Controllers\Api\V1\CompaniesMergeController;
 use App\Http\Controllers\Api\V1\PeopleMergeController;
 use App\Http\Requests\Api\V1\MergeRecordsRequest;
@@ -161,4 +162,25 @@ it('refuses a combined count above the ceiling of 20 on records', function (stri
         ->assertJsonValidationErrors(['records']);
 
     expect($primary->fresh())->not->toBeNull()->and($secondary->fresh())->not->toBeNull();
+})->with('mergeApiEntities');
+
+it('refuses on records when a record vanishes after validation', function (string $path): void {
+    Sanctum::actingAs($this->user, ['create', 'update', 'delete']);
+    $primary = mergeApiMake($path, $this->user);
+    $secondary = mergeApiMake($path, $this->user);
+    $this->app->resolving(MergeRecords::class, fn () => $secondary->delete());
+
+    $this->postJson("/api/v1/{$path}/merge", mergeApiBody($primary, $secondary))
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['records']);
+
+    expect($primary->fresh())->not->toBeNull();
+})->with('mergeApiEntities');
+
+it('refuses malformed ids with a 422', function (string $path): void {
+    Sanctum::actingAs($this->user, ['create', 'update', 'delete']);
+
+    $this->postJson("/api/v1/{$path}/merge", ['primary_record_id' => [['x']], 'secondary_record_id' => 123])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['primary_record_id', 'secondary_record_id']);
 })->with('mergeApiEntities');

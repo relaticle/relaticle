@@ -17,8 +17,8 @@ final class MergeRecordsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'primary_record_id' => ['required', 'string', 'ulid', $this->mergeable()],
-            'secondary_record_id' => ['required', 'string', 'ulid', 'different:primary_record_id', $this->mergeable()],
+            'primary_record_id' => ['bail', 'required', 'string', 'ulid', $this->mergeable()],
+            'secondary_record_id' => ['bail', 'required', 'string', 'ulid', 'different:primary_record_id', $this->mergeable()],
         ];
     }
 
