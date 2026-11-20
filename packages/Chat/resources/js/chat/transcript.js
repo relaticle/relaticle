@@ -217,6 +217,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // it. Layout changes above the anchor move both, until the reader scrolls away.
     _anchorScrollTarget: null,
     _anchorRestTop: null,
+    // Whether the anchor rests on a tall sent row's tail, decided when the row first lands.
+    _anchorOnTail: null,
     _anchorObserver: null,
 
     // Stable identity for the x-for key: server id when persisted, otherwise a
@@ -1835,6 +1837,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
         this.anchorKey = msg.clientKey;
         this._anchorScrollPending = true;
+        this._anchorOnTail = null;
 
         // Edit, regenerate and next-step sends render the row a tick later, so the
         // first sync that finds it scrolls: this frame's, or the observer's.
@@ -1848,6 +1851,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         this._anchorScrollPending = false;
         this._anchorScrollTarget = null;
         this._anchorRestTop = null;
+        this._anchorOnTail = null;
         this.setAnchorReserve(0);
     },
 
@@ -1860,7 +1864,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     anchorScrollTop(el) {
         const scroller = this.$refs.messages;
         const rect = el.getBoundingClientRect();
-        const edge = rect.height > ANCHOR_TALL_ROW_PX ? rect.bottom - ANCHOR_TALL_ROW_TAIL_PX : rect.top;
+        // A reply is read from its start. Deciding from a growing reply's live height
+        // would scroll after its tail on every delta.
+        this._anchorOnTail ??= rect.height > ANCHOR_TALL_ROW_PX
+            && this.messages.find((m) => m.clientKey === this.anchorKey)?.role === 'user';
+        const edge = this._anchorOnTail ? rect.bottom - ANCHOR_TALL_ROW_TAIL_PX : rect.top;
 
         const offset = edge - scroller.getBoundingClientRect().top + scroller.scrollTop;
 
