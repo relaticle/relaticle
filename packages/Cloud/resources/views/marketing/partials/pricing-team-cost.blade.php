@@ -19,7 +19,7 @@
     ];
 
     $bars = [
-        ['key' => 'seat', 'label' => __('Per-seat CRM'), 'fill' => 'bg-gray-400 dark:bg-gray-500'],
+        ['key' => 'seat', 'label' => __('Per-seat CRM'), 'fill' => 'bg-gray-500'],
         ['key' => 'pro', 'label' => Plan::Pro->marketingLabel(), 'fill' => 'bg-primary dark:bg-primary-400'],
         ['key' => 'scale', 'label' => Plan::Scale->marketingLabel(), 'fill' => 'bg-primary dark:bg-primary-400'],
     ];
