@@ -8,12 +8,14 @@ use App\Enums\CrmEntity;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Infolists\RecordDetails;
 use App\Filament\Components\Infolists\RecordOverview;
 use App\Filament\Components\RecordChip;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Livewire\App\Records\DuplicateRecordsPrompt;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
@@ -29,6 +31,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -93,6 +96,7 @@ trait HasRecordPageLayout
                 ->verticallyAlignCenter()
                 ->extraAttributes(['class' => 'fi-record-header']),
             $this->quickActions(),
+            $this->duplicatePrompt(),
             RecordDetails::section($this->crmRecord(), static::nativeDetailEntries()),
             CommunicationIntelligenceInfolist::section()
                 ->contained(false)
@@ -238,6 +242,30 @@ trait HasRecordPageLayout
             ->extraAttributes(['class' => 'fi-record-rail-quick-actions']);
     }
 
+    #[On('merge-duplicate')]
+    public function mergeDuplicate(string $duplicate): void
+    {
+        $this->mountAction('mergeDuplicate', ['duplicate' => $duplicate]);
+    }
+
+    public function mergeDuplicateAction(): MergeRecordAction
+    {
+        return MergeRecordAction::make('mergeDuplicate')
+            ->record($this->getRecord())
+            ->fillForm(fn (array $arguments): array => ['picked_id' => $arguments['duplicate'] ?? null, 'keep_picked' => false]);
+    }
+
+    private function duplicatePrompt(): Livewire
+    {
+        $record = $this->crmRecord();
+
+        return Livewire::make(DuplicateRecordsPrompt::class)
+            ->data(['lazy' => 'on-load'])
+            ->key('duplicatePrompt')
+            ->extraAttributes(['class' => 'fi-record-duplicates'])
+            ->visible(fn (): bool => MergeRecordAction::canMerge($record));
+    }
+
     private function quickCreateAction(CreateAction $action, string $label): CreateAction
     {
         return $action
@@ -319,6 +347,7 @@ trait HasRecordPageLayout
                 }),
             ActionGroup::make([
                 ActionGroup::make([
+                    MergeRecordAction::make(),
                     CopyToClipboardAction::make('copyPageUrl')
                         ->label(__('filament/record-page.actions.copy_page_url'))
                         ->copies(

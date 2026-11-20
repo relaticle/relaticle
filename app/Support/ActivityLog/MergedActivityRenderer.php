@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace App\Support\ActivityLog;
 
+use App\ActivityLog\AppEventPalette;
+use App\ActivityLog\AppEventRenderer;
 use App\Enums\CreationSource;
 use App\Models\ActivityLog\Activity;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\Str;
 use Relaticle\ActivityLog\Contracts\TimelineRenderer;
 use Relaticle\ActivityLog\Support\ActivityLogOperation;
@@ -24,8 +27,14 @@ use Relaticle\ActivityLog\Timeline\TimelineEntry;
  */
 final readonly class MergedActivityRenderer implements TimelineRenderer
 {
-    public function render(TimelineEntry $entry): View
+    public function __construct(private AppEventRenderer $appEvents) {}
+
+    public function render(TimelineEntry $entry): View|HtmlString
     {
+        if (AppEventPalette::tryFrom($entry->event) instanceof AppEventPalette) {
+            return $this->appEvents->render($entry);
+        }
+
         $summary = ActivityLogSummary::from($entry);
 
         $importFile = $entry->properties['import_file'] ?? null;

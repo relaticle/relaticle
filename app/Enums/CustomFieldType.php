@@ -178,6 +178,12 @@ enum CustomFieldType: string
         };
     }
 
+    /** Whether a value is always a list, whatever the field's allow_multiple setting says. */
+    public function holdsList(): bool
+    {
+        return in_array($this, [self::MULTI_SELECT, self::CHECKBOX_LIST, self::TAGS_INPUT], true);
+    }
+
     public function makesBoardColumns(): bool
     {
         return in_array($this, [self::SELECT, self::RADIO, self::TOGGLE_BUTTONS], true);

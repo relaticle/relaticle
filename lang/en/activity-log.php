@@ -22,6 +22,11 @@ return [
             'label' => 'Task',
             'inline' => 'task',
         ],
+        'record_merged' => [
+            'label' => 'Merged',
+            'description' => '2 records were merged into this record',
+            'description_by' => ':causer merged 2 records into this record',
+        ],
         'meeting.created' => [
             'label' => 'Meeting scheduled',
             'inline' => 'meeting scheduled',

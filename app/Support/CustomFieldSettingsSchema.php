@@ -29,7 +29,7 @@ final readonly class CustomFieldSettingsSchema
 
     private const int MIN_MAX_VALUES = 1;
 
-    private const int MAX_MAX_VALUES = 20;
+    public const int MAX_MAX_VALUES = 20;
 
     private const array LABEL_KEYS = [
         'visible_in_list' => 'custom-fields::custom-fields.field.form.visible_in_list',

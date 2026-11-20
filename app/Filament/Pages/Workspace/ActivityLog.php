@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Pages\Workspace;
 
+use App\ActivityLog\AppEventPalette;
 use App\Enums\CreationSource;
 use App\Enums\CrmEntity;
 use App\Enums\WorkspaceCapability;
@@ -674,6 +675,7 @@ final class ActivityLog extends Page implements HasTable
             'restored' => 'lucide-undo-2',
             ExecuteImportJob::IMPORTED_EVENT => 'lucide-upload',
             ExecuteImportJob::FAILED_EVENT => 'lucide-triangle-exclamation-point',
+            AppEventPalette::RecordMerged->value => AppEventPalette::RecordMerged->getIcon(),
             default => 'lucide-square-pen',
         };
     }
@@ -719,6 +721,7 @@ final class ActivityLog extends Page implements HasTable
             'restored' => __('workspaces.activity.events.restored'),
             ExecuteImportJob::IMPORTED_EVENT => __('workspaces.activity.events.imported'),
             ExecuteImportJob::FAILED_EVENT => __('workspaces.activity.events.import_failed'),
+            AppEventPalette::RecordMerged->value => AppEventPalette::RecordMerged->getLabel(),
         ];
     }
 

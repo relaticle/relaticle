@@ -14,6 +14,11 @@ final readonly class PeopleObserver
 
     public function __construct(private ScheduleAssistantArrivalTurn $scheduleAssistantArrival) {}
 
+    public function restoring(People $record): bool
+    {
+        return $record->merged_into_id === null;
+    }
+
     public function created(People $people): void
     {
         $this->tagFirstCrmDataIfNeeded($people);

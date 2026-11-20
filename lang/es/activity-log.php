@@ -22,6 +22,11 @@ return [
             'label' => 'Tarea',
             'inline' => 'tarea',
         ],
+        'record_merged' => [
+            'label' => 'Fusionado',
+            'description' => '2 registros se fusionaron en este registro',
+            'description_by' => ':causer fusionó 2 registros en este registro',
+        ],
         'meeting.created' => [
             'label' => 'Reunión programada',
             'inline' => 'reunión programada',

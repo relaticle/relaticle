@@ -1652,6 +1652,16 @@ html.fi-record-stacked .fi-record-layout {
     }
 }
 
+/* With no duplicates found, the deferred section's slot takes no grid row, so it adds no gap. */
+.fi-grid-col:has(> .fi-sc-component > .fi-record-duplicates):not(:has([data-duplicate-prompt], [data-duplicate-checking])) {
+    &,
+    & .fi-sc-component,
+    & .fi-record-duplicates,
+    & .fi-record-duplicates > div {
+        @apply contents;
+    }
+}
+
 .fi-record-header {
     @apply max-sm:flex-wrap max-sm:gap-y-2;
 
@@ -2071,8 +2081,8 @@ html.fi-record-stacked .fi-record-layout {
     @apply outline-2 outline-solid outline-primary-500;
 }
 
-/* The search row every menu opens with: the filter pickers, the view switcher and View settings. */
-:is(.fi-filter-find, .fi-ta-views-search, .fi-view-settings-search) {
+/* The search row every menu opens with: the filter pickers, the view switcher, View settings and the merge picker. */
+:is(.fi-filter-find, .fi-ta-views-search, .fi-view-settings-search, .fi-merge-search) {
     @apply flex h-10 shrink-0 items-center border-b border-gray-100 text-gray-400 dark:border-white/5 dark:text-gray-500;
 
     & > svg {
