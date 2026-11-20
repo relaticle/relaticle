@@ -52,6 +52,17 @@ it('renders question-shaped headings and primary source links on comparison page
         ->and($html)->toContain('https://github.com/twentyhq/twenty');
 });
 
+it('keeps editorial pricing citations followable in each language', function (string $path): void {
+    foreach (config('app.available_locales') as $locale) {
+        $prefix = $locale === 'en' ? '' : '/'.$locale;
+        $html = $this->get($prefix.$path)->assertOk()->getContent();
+        $link = (new Crawler($html))->filter('a[href="https://relaticle.com/pricing"][target="_blank"]');
+
+        expect($link->count())->toBe(1)
+            ->and($link->attr('rel'))->toBe('noopener');
+    }
+})->with(['/compare/relaticle-vs-twenty', '/alternatives/hubspot']);
+
 it('marks comparison pages with dateModified and about entities in the JSON-LD graph', function (): void {
     $html = $this->get('/compare/relaticle-vs-espocrm')->assertOk()->getContent();
 

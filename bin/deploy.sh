@@ -131,15 +131,10 @@ generate_api_docs() {
 build_assets() {
     $PNPM install --frozen-lockfile
 
-    rm -rf public/build-next public/build-previous
+    rm -rf public/build-next
     $PNPM exec vite build --outDir public/build-next --emptyOutDir
-
-    if [[ -d public/build ]]; then
-        mv public/build public/build-previous
-    fi
-
-    mv public/build-next public/build
-    rm -rf public/build-previous
+    $PHP bin/publish-vite-build.php
+    rm -rf public/build-next
 }
 
 if [[ ! -f artisan ]]; then

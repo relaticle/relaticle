@@ -586,10 +586,11 @@ describe('Canonical', function () {
         // The page-aware canonical belongs to the blog listing, not to the shared
         // guest layout: a crawler-discovered ?page=N on pricing or the homepage
         // used to self-canonicalise into an indexable duplicate.
-        $this->get($path.'?page=7')
+        $this->get($path.'?page=7&plan=enterprise&utm_source=search')
             ->assertStatus(200)
-            ->assertSee('<link rel="canonical" href="'.url($path).'" />', false);
-    })->with(['/pricing', '/terms-of-service', '/privacy-policy']);
+            ->assertSee('<link rel="canonical" href="'.url($path).'" />', false)
+            ->assertSee('<meta property="og:url" content="'.url($path).'"/>', false);
+    })->with(['/pricing', '/terms-of-service', '/privacy-policy', '/contact', '/de/contact', '/es/contact', '/fr/contact']);
 });
 
 describe('Signup attribution', function () {

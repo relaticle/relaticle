@@ -127,7 +127,9 @@
             </nav>
         @endif
 
-        <article id="documentation-content" data-copy-label="{{ __('cloud::docs.copy_code') }}" class="prose-docs mt-9">{!! $body !!}</article>
+        <article id="documentation-content" data-copy-label="{{ __('cloud::docs.copy_code') }}" class="prose-docs mt-9">
+            <x-cloud::markdown-body :html="$body" />
+        </article>
 
         @if($related->isNotEmpty())
             <nav aria-label="{{ __('Related articles') }}" class="mt-14 border-t border-gray-200/80 pt-8 dark:border-white/[0.06]">

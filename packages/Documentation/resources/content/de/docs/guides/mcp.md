@@ -397,6 +397,7 @@ Die flachen Namen des früheren Filters gibt es nicht mehr. Innerhalb von `filte
 
 ---
 
+{#schema-resources}
 ## Schema-Ressourcen
 
 Der Server stellt fünf Schema-Ressourcen bereit, die die Felder jeder Entität beschreiben, einschließlich der benutzerdefinierten Attribute, die Ihr Arbeitsbereich eingerichtet hat, dazu eine Zusammenfassungs-Ressource mit der Anzahl der Einträge:

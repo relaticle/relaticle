@@ -397,6 +397,7 @@ The flat names of the earlier filter no longer exist. Inside `filter`, keys such
 
 ---
 
+{#schema-resources}
 ## Schema Resources
 
 The server exposes five schema resources that describe each entity's fields, including any custom attributes your workspace has configured, plus a summary resource with record counts:

@@ -33,6 +33,7 @@ final class GenerateSitemapCommand extends Command
     {
         $sitemap = $this->crawlMarketingSitemap();
 
+        $this->ensureUrl($sitemap, route('scribe'));
         $this->addMarketingUrls($sitemap);
         $this->addDocumentationUrls($sitemap, $docsRepository);
 
@@ -71,6 +72,7 @@ final class GenerateSitemapCommand extends Command
 
                 return pathinfo($path, PATHINFO_EXTENSION) === '';
             })
+            ->hasCrawled(fn (Url $tag): ?Url => rtrim($tag->url, '/') === rtrim(route('home'), '/') ? null : $tag)
             ->getSitemap();
     }
 

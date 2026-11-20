@@ -30,8 +30,8 @@
                    placeholder="{{ __('Search help articles and guides') }}"
                    aria-label="{{ __('Search the docs') }}"
                    autocomplete="off"
-                   class="w-full border-0 bg-transparent py-3.5 text-sm text-gray-900 placeholder-gray-400 focus:ring-0 focus:outline-none dark:text-white dark:placeholder-gray-500">
-            <kbd class="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-pico font-medium text-gray-500 dark:bg-white/10 dark:text-gray-400">esc</kbd>
+                   class="w-full border-0 bg-transparent py-3.5 text-sm text-gray-900 placeholder-gray-600 focus:ring-0 focus:outline-none dark:text-white dark:placeholder-gray-400">
+            <kbd class="shrink-0 rounded bg-gray-100 px-1.5 py-0.5 text-pico font-medium text-gray-600 dark:bg-white/10 dark:text-gray-400">esc</kbd>
         </div>
 
         <span class="sr-only" aria-live="polite"
@@ -48,7 +48,7 @@
                        x-on:mouseenter="active = index"
                        :class="index === active ? 'bg-primary-50 dark:bg-primary-500/10' : ''"
                        class="block rounded-lg px-3 py-2.5 transition-colors">
-                        <span class="block text-pico font-semibold tracking-[0.06em] text-gray-400 uppercase dark:text-gray-500">
+                        <span class="block text-pico font-semibold tracking-[0.06em] text-gray-600 uppercase dark:text-gray-400">
                             <span x-text="result.crumb"></span>
                             <template x-if="result.section">
                                 <span> › <span x-text="result.title"></span></span>
@@ -56,7 +56,7 @@
                         </span>
                         <span class="mt-0.5 block text-[13px] font-medium text-gray-900 dark:text-white"
                               x-text="result.section || result.title"></span>
-                        <span class="mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400">
+                        <span class="mt-0.5 block truncate text-xs text-gray-600 dark:text-gray-300">
                             <template x-for="(segment, part) in result.snippet" :key="part">
                                 <span x-text="segment.text" :class="segment.mark && 'docs-search-mark'"></span>
                             </template>
@@ -76,7 +76,7 @@
                class="font-medium text-primary-600 underline underline-offset-4 dark:text-primary-400">{{ __('Ask in Discord') }}</a>
         </p>
 
-        <div class="flex items-center gap-4 border-t border-gray-200/70 px-4 py-2.5 text-pico text-gray-400 dark:border-white/[0.06] dark:text-gray-500">
+        <div class="flex items-center gap-4 border-t border-gray-200/70 px-4 py-2.5 text-pico text-gray-600 dark:border-white/[0.06] dark:text-gray-400">
             <span class="flex items-center gap-1">
                 <kbd class="rounded bg-gray-100 px-1 py-0.5 font-medium dark:bg-white/10">↑</kbd>
                 <kbd class="rounded bg-gray-100 px-1 py-0.5 font-medium dark:bg-white/10">↓</kbd>

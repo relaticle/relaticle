@@ -27,7 +27,7 @@
                 <div class="flex min-w-0 items-center gap-2">
                     <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: {{ $stageColors[$column['stage']] ?? 'currentColor' }}" aria-hidden="true"></span>
                     <h4 class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ $column['label'] }}</h4>
-                    <span class="grid text-sm tabular-nums text-gray-500 dark:text-gray-400" @if($column['count'][0] !== $column['count'][1]) data-board-count @endif>
+                    <span class="grid text-sm tabular-nums text-gray-600 dark:text-gray-400" @if($column['count'][0] !== $column['count'][1]) data-board-count @endif>
                         <span class="col-start-1 row-start-1" data-count-before>{{ $column['count'][0] }}</span>
                         @if($column['count'][0] !== $column['count'][1])
                             <span class="invisible col-start-1 row-start-1" data-count-after>{{ $column['count'][1] }}</span>
@@ -62,7 +62,7 @@
                     <div class="rounded-xl opacity-0 outline-dashed outline-[1.5px] -outline-offset-[1.5px] outline-primary-500" data-board-slot aria-hidden="true"></div>
                 @endif
 
-                <p class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 dark:text-gray-400" data-board-add>
+                <p class="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-600 dark:text-gray-400" data-board-add>
                     <x-lucide-plus class="size-4 shrink-0"/>
                     {{ __('Add opportunity') }}
                 </p>

@@ -3,18 +3,25 @@
 declare(strict_types=1);
 
 use App\Support\DetectsPublicMarkdownRequest;
+use Dom\HTMLDocument;
 use Relaticle\Cloud\Docs\Http\Controllers\DocumentationController;
+use Relaticle\Cloud\Docs\Support\DocHeadingRenderer;
 use Relaticle\Cloud\Docs\Support\DocsNavigation;
 use Relaticle\Cloud\Docs\Support\RenderDocMarkdown;
+use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\HeadingAnchors;
+use Relaticle\Documentation\Support\PageSections;
+use Spatie\LaravelMarkdown\MarkdownRenderer;
 
 mutates(
     DetectsPublicMarkdownRequest::class,
     DocumentationController::class,
+    DocHeadingRenderer::class,
     DocsNavigation::class,
     DocsRepository::class,
     HeadingAnchors::class,
+    PageSections::class,
     RenderDocMarkdown::class,
 );
 
@@ -40,6 +47,57 @@ it('points every on-this-page link at a heading id that exists in the rendered a
         // The rail only lists h2s; every one of them must resolve to a real
         // anchor, or "on this page" scrolls nowhere.
         ->and(array_diff($tocAnchors[1], $rendered[1]))->toBeEmpty();
+});
+
+it('resolves section links from each localized landing page and guide contents', function (): void {
+    config()->set('markdown.code_highlighting.enabled', false);
+
+    foreach (config('app.available_locales') as $locale) {
+        $fragments = [];
+
+        foreach (['selfHosted', 'aiNativeCrm'] as $route) {
+            $html = $this->get(LocalizedUrl::route($route, locale: $locale))->assertOk()->getContent();
+            $landing = HTMLDocument::createFromString($html, LIBXML_NOERROR);
+
+            foreach ($landing->querySelectorAll('a[href*="/developers/"][href*="#"]') as $link) {
+                $url = $link->getAttribute('href');
+                $fragment = parse_url($url, PHP_URL_FRAGMENT);
+                $path = parse_url($url, PHP_URL_PATH);
+                $fragments[] = $fragment;
+
+                expect($path)->toStartWith($locale === 'en' ? '/developers/' : "/{$locale}/developers/");
+
+                $guide = HTMLDocument::createFromString($this->get($path)->assertOk()->getContent(), LIBXML_NOERROR);
+                expect($guide->querySelectorAll("[id=\"{$fragment}\"]")->length)->toBe(1, $url);
+
+                foreach ($guide->querySelectorAll('#docs-toc a') as $item) {
+                    $anchor = substr($item->getAttribute('href'), 1);
+                    expect($guide->getElementById($anchor)?->closest('h2')?->textContent)->toBe(trim($item->textContent));
+                }
+            }
+        }
+
+        expect(array_unique($fragments))->toContain('ai-assistant', 'reverse-proxy-and-ssl', 'schema-resources');
+    }
+});
+
+it('keeps an alias beside a renamed heading and accepts only documentation IDs', function (): void {
+    $markdown = "{#schema-resources .unexpected-class}\n## Ressources renommées";
+    $html = app(RenderDocMarkdown::class)($markdown);
+    $guide = HTMLDocument::createFromString($html, LIBXML_NOERROR);
+
+    expect($guide->getElementById('schema-resources')?->querySelector('a')?->getAttribute('href'))->toBe('#ressources-renommées')
+        ->and($guide->getElementById('ressources-renommées')?->closest('h2')?->textContent)->toBe('Ressources renommées')
+        ->and($html)->not->toContain('unexpected-class')
+        ->and(app(MarkdownRenderer::class)->toHtml($markdown))->not->toContain('id="schema-resources"');
+});
+
+it('keeps guide aliases out of the preceding section in search results', function (): void {
+    $records = $this->get('/fr/help/search-index.json')->assertOk()->json('records');
+    $sections = collect($records)->where('path', 'docs/guides/mcp');
+
+    expect($sections->pluck('anchor'))->toContain('ressources-de-schéma')
+        ->and($sections->pluck('content')->implode(' '))->not->toContain('schema-resources');
 });
 
 it('states the actual MCP rate limits in the rendered guide as :format', function (array $headers, string $contentType): void {

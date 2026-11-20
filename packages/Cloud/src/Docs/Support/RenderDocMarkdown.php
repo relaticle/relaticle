@@ -4,12 +4,22 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Docs\Support;
 
+use League\CommonMark\Extension\Attributes\AttributesExtension;
+use League\CommonMark\Extension\CommonMark\Node\Block\Heading;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Spatie\LaravelMarkdown\MarkdownRenderer;
 
 final readonly class RenderDocMarkdown
 {
-    public function __construct(private MarkdownRenderer $renderer) {}
+    private MarkdownRenderer $renderer;
+
+    public function __construct(MarkdownRenderer $renderer)
+    {
+        $this->renderer = (clone $renderer)
+            ->commonmarkOptions([...config('markdown.commonmark_options'), 'attributes' => ['allow' => ['id']]])
+            ->addExtension(new AttributesExtension)
+            ->addBlockRenderer(Heading::class, new DocHeadingRenderer, priority: 1);
+    }
 
     /**
      * Article images live below the fold behind a text-first layout, so

@@ -397,6 +397,7 @@ Les noms à plat de l'ancien filtre n'existent plus. Dans `filter`, des clés co
 
 ---
 
+{#schema-resources}
 ## Ressources de schéma
 
 Le serveur expose cinq ressources de schéma qui décrivent les champs de chaque entité, y compris les attributs personnalisés configurés dans votre espace de travail, ainsi qu'une ressource de synthèse avec le nombre d'enregistrements :

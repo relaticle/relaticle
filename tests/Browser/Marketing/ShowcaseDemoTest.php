@@ -219,6 +219,15 @@ it('switches the record between its emails and its meetings', function (): void 
     expect($page->script($panels))->toBe(['hidden', 'visible'])
         ->and($page->script('document.querySelector(\'#email [role="tab"][aria-selected="true"]\').textContent.trim()'))->toStartWith('Meetings');
 
+    $page->keys('#email [role="tab"][aria-selected="true"]', 'Tab');
+    expect($page->script('document.querySelectorAll(\'#email [role="tabpanel"]:focus > ul > li\').length'))->toBe(4);
+
+    $page->keys('#email [role="tab"][aria-selected="true"]', 'ArrowLeft')
+        ->keys('#email [role="tab"][aria-selected="true"]', 'Tab');
+
+    expect($page->script('document.activeElement.id'))->toEndWith('-emails-panel')
+        ->and($page->script('document.querySelectorAll(\'#email [role="tabpanel"]:focus > ul > li\').length'))->toBe(4);
+
     $page->assertNoJavaScriptErrors();
 });
 

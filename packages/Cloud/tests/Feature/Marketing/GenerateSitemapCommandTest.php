@@ -198,7 +198,7 @@ it('excludes auth and utility redirect urls from the sitemap', function (): void
 
     $xml = Storage::disk('public')->get('sitemap.xml');
 
-    expect($xml)->toContain('<loc>'.url('/').'/</loc>')
+    expect($xml)->toContain('<loc>'.route('home').'</loc>')
         ->and($xml)->not->toContain('<loc>'.url('/login').'</loc>')
         ->and($xml)->not->toContain('<loc>'.url('/register').'</loc>')
         ->and($xml)->not->toContain('<loc>'.url('/discord').'</loc>');
@@ -271,15 +271,43 @@ it('keeps the blog entry of a post the crawl also found', function (): void {
         ->and($xml)->toMatch('#<loc>'.preg_quote($url, '#').'</loc>(?:(?!</url>).)*?<priority>0.7#s');
 });
 
-it('keeps the api reference in the crawl', function (): void {
+it('includes the standalone api reference once regardless of crawl discovery', function (bool $linked): void {
+    $reference = route('scribe');
     fakeSitemapCrawl([
-        config('app.url') => '<html><body><a href="'.url('/developers/api').'">API</a></body></html>',
-        url('/developers/api') => '<html><body></body></html>',
+        config('app.url') => $linked ? '<a href="'.$reference.'">API</a>' : '<p>Home</p>',
+        $reference => '<p>API</p>',
     ]);
 
     $this->artisan('app:generate-sitemap')->assertSuccessful();
 
-    expect(Storage::disk('public')->get('sitemap.xml'))->toContain('<loc>'.url('/developers/api').'</loc>');
+    expect(substr_count(Storage::disk('public')->get('sitemap.xml'), '<loc>'.$reference.'</loc>'))->toBe(1);
+})->with([true, false]);
+
+it('discovers links from the homepage and publishes one root with language alternates', function (): void {
+    $root = rtrim(route('home'), '/');
+    $child = url('/only-linked-from-home');
+
+    fakeSitemapCrawl([
+        config('app.url') => '<a href="'.$child.'">Child</a>',
+        $child => '<p>Child</p>',
+    ]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = simplexml_load_string(Storage::disk('public')->get('sitemap.xml'));
+    $xml->registerXPathNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+    $homes = $xml->xpath('//s:url[s:loc="'.$root.'" or s:loc="'.$root.'/"]');
+    expect($homes)->toHaveCount(1)
+        ->and($xml->xpath('//s:url[s:loc="'.$child.'"]'))->toHaveCount(1);
+
+    $alternates = [];
+    foreach ($homes[0]->children('http://www.w3.org/1999/xhtml')->link as $alternate) {
+        $alternates[(string) $alternate->attributes()['hreflang']] = (string) $alternate->attributes()['href'];
+    }
+    foreach (config('app.available_locales') as $locale) {
+        expect($alternates[$locale])->toBe(route($locale === 'en' ? 'home' : $locale.'.home'));
+    }
+    expect($alternates['x-default'])->toBe(route('home'));
 });
 
 it('lists a translated post with its alternates and leaves out a language with no post', function (): void {
