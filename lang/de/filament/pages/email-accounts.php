@@ -105,6 +105,7 @@ return [
         'heading' => 'Einige Elemente konnten nicht synchronisiert werden',
         'reasons' => [
             'google_mail_disabled' => 'Gmail ist für dieses Google-Workspace-Konto nicht aktiviert. Bitten Sie Ihren Google-Administrator, es zu aktivieren, und verbinden Sie das Postfach dann neu.',
+            'microsoft_mailbox_not_enabled' => 'Dieses Microsoft-Konto hat kein Postfach, das Relaticle lesen kann. Verbinden Sie stattdessen das Konto, das Ihr Outlook-Postfach enthält.',
         ],
     ],
     'importing' => 'Synchronisierung läuft',

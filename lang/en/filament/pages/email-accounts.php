@@ -105,6 +105,7 @@ return [
         'heading' => 'Some items could not be synced',
         'reasons' => [
             'google_mail_disabled' => "Gmail isn't enabled for this Google Workspace account. Ask your Google admin to turn it on, then reconnect.",
+            'microsoft_mailbox_not_enabled' => 'This Microsoft account has no mailbox Relaticle can read. Connect the account that holds your Outlook mailbox instead.',
         ],
     ],
     'importing' => 'Syncing',
