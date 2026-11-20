@@ -25,7 +25,7 @@ use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(RaiseFieldLimits::class, MergeRecords::class, MoveRecordHistory::class, AppEventPalette::class, ActivityLog::class);
+mutates(RaiseFieldLimits::class, MergeRecords::class, MoveRecordHistory::class, AppEventPalette::class, ActivityLog::class, Company::class, People::class);
 
 beforeEach(function (): void {
     Storage::fake('local');
@@ -392,5 +392,50 @@ it('shows the raise in the dialog and keeps merging enabled', function (): void 
 
         expect($html)->toContain($label)
             ->not->toContain('can hold at most');
+    }
+});
+
+it('points both originals at the new record', function (): void {
+    foreach (mergeHistoryEntities() as [$page, $make]) {
+        $current = $make($this->workspace, $this->user);
+        $picked = $make($this->workspace, $this->user);
+
+        $merged = mergeHistoryRun($page, $current, $picked, false);
+
+        foreach ([$current, $picked] as $original) {
+            $reloaded = $original::withTrashed()->findOrFail($original->getKey());
+
+            expect($reloaded->merged_into_id)->toBe($merged->getKey())
+                ->and($reloaded->trashed())->toBeTrue();
+        }
+        expect($merged->merged_into_id)->toBeNull();
+    }
+});
+
+it('chains the pointers through a second merge', function (): void {
+    foreach (mergeHistoryEntities() as [$page, $make]) {
+        $first = $make($this->workspace, $this->user);
+        $second = $make($this->workspace, $this->user);
+        $third = $make($this->workspace, $this->user);
+
+        $middle = mergeHistoryRun($page, $first, $second, false);
+        $last = mergeHistoryRun($page, $middle, $third, false);
+
+        expect($first::withTrashed()->findOrFail($first->getKey())->merged_into_id)->toBe($middle->getKey())
+            ->and($middle::withTrashed()->findOrFail($middle->getKey())->merged_into_id)->toBe($last->getKey())
+            ->and($last->fresh()->merged_into_id)->toBeNull();
+    }
+});
+
+it('refuses to restore a merged record', function (): void {
+    foreach (mergeHistoryEntities() as [$page, $make]) {
+        $current = $make($this->workspace, $this->user);
+        $picked = $make($this->workspace, $this->user);
+        mergeHistoryRun($page, $current, $picked, false);
+
+        $original = $current::withTrashed()->findOrFail($current->getKey());
+
+        expect($original->restore())->toBeFalse()
+            ->and($current::withTrashed()->findOrFail($current->getKey())->trashed())->toBeTrue();
     }
 });

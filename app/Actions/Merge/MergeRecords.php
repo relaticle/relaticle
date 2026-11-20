@@ -55,6 +55,8 @@ final readonly class MergeRecords
                 event(new RecordMerged($merged, $original));
             }
 
+            $this->markMergedInto($merged, $priority, $other);
+
             $merged = activity()->withoutLogging(function () use ($user, $merged, $mergedValues, $priority, $other): Company|People {
                 $priority->delete();
                 $other->delete();
@@ -65,6 +67,14 @@ final readonly class MergeRecords
 
             return $merged;
         });
+    }
+
+    private function markMergedInto(Company|People $merged, Company|People $priority, Company|People $other): void
+    {
+        $priority->newQueryWithoutRelationships()
+            ->where('workspace_id', $merged->workspace_id)
+            ->whereKey([$priority->getKey(), $other->getKey()])
+            ->update(['merged_into_id' => $merged->getKey()]);
     }
 
     private function origin(Company|People $priority, Company|People $other): Company|People
