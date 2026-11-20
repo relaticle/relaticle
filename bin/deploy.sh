@@ -129,12 +129,25 @@ generate_api_docs() {
 }
 
 build_assets() {
-    $PNPM install --frozen-lockfile
+    local staged=storage/framework/cache/vite-next published=storage/framework/cache/vite-published
+    local prune=false
 
-    rm -rf public/build-next
-    $PNPM exec vite build --outDir public/build-next --emptyOutDir
-    $PHP bin/publish-vite-build.php
-    rm -rf public/build-next
+    $PNPM install --frozen-lockfile
+    $PNPM exec vite build --outDir "$staged" --emptyOutDir
+    test -s "$staged/manifest.json"
+
+    # Keep the last build's chunks for open tabs. Retry an identical build without aging them out.
+    if cmp -s "$published/manifest.json" public/build/manifest.json && ! cmp -s "$staged/manifest.json" public/build/manifest.json; then
+        prune=true
+    fi
+
+    rsync -a --exclude=/manifest.json "$staged/" public/build/
+    rsync -a --checksum "$staged/manifest.json" public/build/
+    if "$prune"; then
+        rsync -a --delete-after "$staged/assets/" "$published/assets/" public/build/assets/
+    fi
+    rm -rf "$published"
+    mv "$staged" "$published"
 }
 
 if [[ ! -f artisan ]]; then
