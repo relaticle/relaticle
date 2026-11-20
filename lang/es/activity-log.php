@@ -24,10 +24,8 @@ return [
         ],
         'record_merged' => [
             'label' => 'Fusionado',
-            'description' => 'El registro :name se fusionó en este registro',
-            'description_by' => ':causer fusionó el registro :name en este registro',
-            'description_into' => 'Este registro se fusionó en :name',
-            'description_into_by' => ':causer fusionó este registro en :name',
+            'description' => '2 registros se fusionaron en este registro',
+            'description_by' => ':causer fusionó 2 registros en este registro',
         ],
         'meeting.created' => [
             'label' => 'Reunión programada',

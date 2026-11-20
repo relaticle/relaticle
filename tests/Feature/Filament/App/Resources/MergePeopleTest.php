@@ -3,9 +3,9 @@
 declare(strict_types=1);
 
 use App\Actions\Merge\CombineRecordValues;
-use App\Actions\Merge\LogRecordMerge;
 use App\Actions\Merge\MergeRecords;
 use App\Actions\Merge\MoveMorphPivot;
+use App\Actions\Merge\MoveRecordHistory;
 use App\Actions\Merge\MoveRecordLinks;
 use App\Actions\Onboarding\RemoveSampleData;
 use App\ActivityLog\AppEventPalette;
@@ -37,13 +37,12 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
-use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, LogRecordMerge::class, MoveMorphPivot::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
+mutates(MergeRecords::class, CombineRecordValues::class, MoveRecordLinks::class, MoveRecordHistory::class, MoveMorphPivot::class, MergeRecordAction::class, MergeRecordPicker::class, RecordIdentity::class, CrmEntity::class, MergedActivityRenderer::class, AppEventPalette::class);
 
 beforeEach(function (): void {
     Queue::fake();
@@ -80,7 +79,7 @@ it('rolls back the new person and every moved link when the final write fails va
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $duplicate->tasks()->attach($task->getKey());
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
-    activity()->performedOn($kept)->event('record_merged')->withProperties(['merged_name' => 'Dana'])->log('record_merged');
+    activity()->performedOn($kept)->event('record_merged')->withProperties(['merged_names' => ['Dana', 'Dana W.']])->log('record_merged');
 
     Event::listen(RecordMerged::class, fn (): int => DB::table('companies')->where('id', $company->getKey())->update(['deleted_at' => now()]));
     mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
@@ -258,29 +257,6 @@ it('moves the opportunities either person is the point of contact for', function
         ->and($other->refresh()->contact_id)->toBe($bystander->getKey());
 });
 
-it('keeps each person\'s own history and records the merge on all three people', function (): void {
-    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
-    $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.']);
-    $kept->update(['name' => 'Dana']);
-    $kept->update(['name' => 'Dana Whitfield']);
-    $duplicate->update(['name' => 'Dana W']);
-    $keptRows = Activity::query()->where('subject_id', $kept->getKey())->where('event', 'updated')->pluck('id');
-    $duplicateRows = Activity::query()->where('subject_id', $duplicate->getKey())->where('event', 'updated')->pluck('id');
-
-    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
-
-    $entries = Activity::query()->where('event', 'record_merged')->orderBy('id')->get();
-    $entryOn = fn (string $subjectId): array => $entries->where('subject_id', $subjectId)->map(fn (Activity $entry): array => $entry->properties->all())->values()->all();
-
-    expect($keptRows)->toHaveCount(2)
-        ->and(Activity::query()->whereKey($keptRows)->pluck('subject_id')->unique()->all())->toBe([$kept->getKey()])
-        ->and(Activity::query()->whereKey($duplicateRows)->pluck('subject_id')->unique()->all())->toBe([$duplicate->getKey()])
-        ->and(array_column($entryOn(mergedRecord()->getKey()), 'merged_name'))->toBe(['Dana W'])
-        ->and(array_column($entryOn($kept->getKey()), 'merged_into_name'))->toBe(['Dana Whitfield'])
-        ->and(array_column($entryOn($duplicate->getKey()), 'merged_into_name'))->toBe(['Dana Whitfield'])
-        ->and(Activity::query()->where('subject_id', $duplicate->getKey())->orderBy('id')->pluck('event')->all())->toBe(['created', 'updated', 'deleted', 'record_merged']);
-});
-
 it('gives the new person the current person\'s creator and source, and no onboarding turn', function (): void {
     $creator = User::factory()->create();
     $this->workspace->users()->attach($creator, ['role' => WorkspaceRole::Member->value]);
@@ -293,17 +269,6 @@ it('gives the new person the current person\'s creator and source, and no onboar
     expect(mergedRecord()->creator_id)->toBe($creator->getKey())
         ->and(mergedRecord()->creation_source)->toBe(CreationSource::MCP)
         ->and(Cache::has("chat:assistant-arrival-scheduled:{$this->workspace->getKey()}"))->toBeFalse();
-});
-
-it('shows only the merge on the new person\'s timeline', function (): void {
-    $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
-    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield', 'company_id' => null], ['emails' => ['dana@brightline.com']]);
-    $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.', 'company_id' => $company->getKey()], ['emails' => ['dana@gmail.com']]);
-
-    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
-
-    expect(Activity::query()->where('subject_id', mergedRecord()->getKey())->pluck('event')->all())->toBe(['record_merged'])
-        ->and(mergedRecord()->company_id)->toBe($company->getKey());
 });
 
 it('repoints record-type attributes on other records to the new person', function (): void {
@@ -387,17 +352,6 @@ it('copies a rich-text value with its image from the duplicate', function (): vo
     expect(mergePersonValue($merged, 'brief'))->toContain($image->uuid)
         ->and($image->model_id)->toBe($merged->getKey())
         ->and($image->collection_name)->toBe(MediaCollection::Attachments->value);
-});
-
-it('shows who merged the two people on the new person\'s timeline', function (): void {
-    $kept = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana Whitfield']);
-    $duplicate = mergePersonRecord($this->workspace, $this->user, ['name' => 'Dana W.']);
-
-    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
-
-    livewire(ActivityLogLivewire::class, ['subjectClass' => People::class, 'subjectKey' => mergedRecord()->getKey()])
-        ->assertSee(e($this->user->name.' merged Dana W. into this record'), escape: false)
-        ->assertSeeHtml('data-event="record_merged"');
 });
 
 it('makes the new person real data when the other person was real', function (): void {

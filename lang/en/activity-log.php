@@ -24,10 +24,8 @@ return [
         ],
         'record_merged' => [
             'label' => 'Merged',
-            'description' => ':name was merged into this record',
-            'description_by' => ':causer merged :name into this record',
-            'description_into' => 'This record was merged into :name',
-            'description_into_by' => ':causer merged this record into :name',
+            'description' => '2 records were merged into this record',
+            'description_by' => ':causer merged 2 records into this record',
         ],
         'meeting.created' => [
             'label' => 'Meeting scheduled',

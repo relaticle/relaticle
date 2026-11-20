@@ -24,10 +24,8 @@ return [
         ],
         'record_merged' => [
             'label' => 'Zusammengeführt',
-            'description' => 'Der Eintrag :name wurde in diesen Eintrag zusammengeführt',
-            'description_by' => ':causer hat den Eintrag :name in diesen Eintrag zusammengeführt',
-            'description_into' => 'Dieser Eintrag wurde in :name zusammengeführt',
-            'description_into_by' => ':causer hat diesen Eintrag in :name zusammengeführt',
+            'description' => '2 Einträge wurden in diesen Eintrag zusammengeführt',
+            'description_by' => ':causer hat 2 Einträge in diesen Eintrag zusammengeführt',
         ],
         'meeting.created' => [
             'label' => 'Meeting angesetzt',

@@ -25,7 +25,7 @@ final readonly class MergeRecords
     public function __construct(
         private CombineRecordValues $combine,
         private MoveRecordLinks $moveLinks,
-        private LogRecordMerge $logMerge,
+        private MoveRecordHistory $moveHistory,
         private UpdateCompany $updateCompany,
         private UpdatePeople $updatePeople,
     ) {}
@@ -41,7 +41,8 @@ final readonly class MergeRecords
         return DB::transaction(function () use ($user, $priority, $other): Company|People {
             [$priority, $other] = $this->lock($priority, $other);
 
-            $merged = $this->createMergedRecord($priority, $other);
+            $origin = $this->origin($priority, $other);
+            $merged = $this->createMergedRecord($priority, $origin);
             $mergedValues = $this->combine->execute($priority, $other, $merged);
 
             $this->assertWithinLimits($mergedValues);
@@ -52,20 +53,25 @@ final readonly class MergeRecords
                 event(new RecordMerged($merged, $original));
             }
 
-            $priority->delete();
-            $other->delete();
+            $merged = activity()->withoutLogging(function () use ($user, $merged, $mergedValues, $priority, $other): Company|People {
+                $priority->delete();
+                $other->delete();
 
-            $merged = activity()->withoutLogging(fn (): Company|People => $this->saveMergedValues($user, $merged, $mergedValues));
-            $this->logMerge->execute($user, $merged, $priority, $other);
+                return $this->saveMergedValues($user, $merged, $mergedValues);
+            });
+            $this->moveHistory->execute($user, $merged, $origin, $priority, $other);
 
             return $merged;
         });
     }
 
-    private function createMergedRecord(Company|People $priority, Company|People $other): Company|People
+    private function origin(Company|People $priority, Company|People $other): Company|People
     {
-        $origin = $priority->creation_source === CreationSource::SAMPLE && $other->creation_source !== CreationSource::SAMPLE ? $other : $priority;
+        return $priority->creation_source === CreationSource::SAMPLE && $other->creation_source !== CreationSource::SAMPLE ? $other : $priority;
+    }
 
+    private function createMergedRecord(Company|People $priority, Company|People $origin): Company|People
+    {
         // Muted so the new record gets no `created` row, no favicon fetch before it has domains, and no onboarding turn for an `mcp` source.
         return Model::withoutEvents(fn (): Company|People => $priority->newQueryWithoutRelationships()->forceCreate([
             'name' => $priority->name,
