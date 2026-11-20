@@ -64,6 +64,11 @@ updates:
       # serversideup rebuilds its tags in place, and no digest bump reached a PR under this cooldown.
       exclude:
         - "serversideup/php"
+    # A PHP minor moves with CI's setup-php version and every extension the image compiles.
+    # 8.6.0 broke the imagick build.
+    ignore:
+      - dependency-name: "serversideup/php"
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       docker:
         applies-to: version-updates
