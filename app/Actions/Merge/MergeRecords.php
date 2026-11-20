@@ -72,6 +72,7 @@ final readonly class MergeRecords
             'workspace_id' => $priority->workspace_id,
             'creator_id' => $origin->creator_id,
             'creation_source' => $origin->creation_source,
+            'created_at' => $origin->created_at,
         ]));
     }
 
