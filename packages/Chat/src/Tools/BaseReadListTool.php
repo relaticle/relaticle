@@ -511,12 +511,8 @@ abstract class BaseReadListTool implements Tool
             // sorted field to the FRONT, so the first column is routinely not
             // the record's own name. This is the column the row links from.
             'core' => $coreKey,
-            'columns' => [
-                ...$this->fieldColumns($promoted),
-                ['key' => $coreKey, 'label' => Str::headline($coreKey)],
-                ...$this->fieldColumns($derived),
-                ...$this->includeColumns($includes),
-            ],
+            'columns' => $this->blockColumns($coreKey, $promoted, $derived, $includes),
+            'sort' => $this->requestedSort($request),
             'rows' => $this->blockRows($records, [...$promoted, ...$derived], $coreKey, $includes, $user->effectiveTimezone()),
             'total' => $results->total(),
             // The rows are this PAGE's, not the result set's. Without the offset
@@ -545,6 +541,22 @@ abstract class BaseReadListTool implements Tool
         $url = resolve(RecordReferenceResolver::class)->indexUrlFor($this->citationType(), $user->currentWorkspace);
 
         return $url === null ? [] : ['open_url' => $url];
+    }
+
+    /**
+     * @param  list<CustomField>  $promoted
+     * @param  list<CustomField>  $derived
+     * @param  list<string>  $includes
+     * @return list<array{key: string, label: string}>
+     */
+    private function blockColumns(string $coreKey, array $promoted, array $derived, array $includes): array
+    {
+        return [
+            ...$this->fieldColumns($promoted),
+            ['key' => $coreKey, 'label' => Str::headline($coreKey)],
+            ...$this->fieldColumns($derived),
+            ...$this->includeColumns($includes),
+        ];
     }
 
     /**
@@ -651,9 +663,9 @@ abstract class BaseReadListTool implements Tool
 
         $codes = is_array($filter) ? FilterTree::customFieldCodes($filter) : [];
 
-        $sort = $request['sort'] ?? null;
+        $sort = $this->requestedSort($request);
 
-        if (is_string($sort) && $sort !== '') {
+        if ($sort !== null) {
             $codes[] = ltrim($sort, '-');
         }
 
@@ -695,14 +707,20 @@ abstract class BaseReadListTool implements Tool
         return $ordered;
     }
 
-    private function listQuery(Request $request, User $user): ListQuery
+    private function requestedSort(Request $request): ?string
     {
         $sort = $request['sort'] ?? null;
+
+        return is_string($sort) && $sort !== '' ? $sort : null;
+    }
+
+    private function listQuery(Request $request, User $user): ListQuery
+    {
         $page = $request['page'] ?? null;
 
         return new ListQuery(
             filter: FilterTree::trimmed($request['filter'] ?? null),
-            sort: is_string($sort) && $sort !== '' ? $sort : null,
+            sort: $this->requestedSort($request),
             perPage: $this->perPageFor($request),
             page: is_numeric($page) ? (int) min($page, ListQuery::MAX_PAGE) : null,
             viewerZone: ViewerZone::strict($user->effectiveTimezone()),

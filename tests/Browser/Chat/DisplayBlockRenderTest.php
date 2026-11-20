@@ -610,6 +610,29 @@ it('expands two records_table blocks in one message independently', function ():
         ->and($shape[0]['scrollRegionId'])->not->toBe($shape[1]['scrollRegionId']);
 });
 
+it('names how each table was sorted so two tables of one record type read apart', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $conversationId = ChatBrowser::seedConversation($user, $workspace->getKey(), 'sorted tables');
+
+    displayBlockInsertAssistantMessage($conversationId, $user, 'Here are your companies.', [
+        [...displayBlockLongTableFixture(3, 38), 'sort' => 'name'],
+        [...displayBlockLongTableFixture(3, 38), 'sort' => '-created_at'],
+        [...displayBlockTableFixture(), 'sort' => '-deal_source'],
+        displayBlockLongTableFixture(3, 3),
+    ], 60);
+
+    $page = ChatBrowser::logIn($user, $workspace->slug, $conversationId)
+        ->assertSourceHas('Here are your companies.');
+
+    $headers = json_decode((string) $page->script(<<<'JS'
+        (() => JSON.stringify(Array.from(document.querySelectorAll('[data-block="records_table"]')).map((table) =>
+            table.querySelector('[data-block-sort]')?.textContent.trim() ?? null)))();
+    JS), true, 512, JSON_THROW_ON_ERROR);
+
+    expect($headers)->toBe(['· A to Z', '· Newest first', '· By Deal Source, descending', null]);
+});
+
 it('keeps a table expanded across a second stream-end reconcile that replaces the block object', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();

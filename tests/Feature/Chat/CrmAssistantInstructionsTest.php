@@ -113,7 +113,7 @@ it('scopes the block claim to the read tools that emit one', function (): void {
     expect($instructions)
         ->toContain('rendered as a table or card block')
         ->toContain('SearchCrmTool, ListWorkspaceMembersTool and ListCustomFieldsTool are the exceptions: they render no block')
-        ->toContain('neither do AggregateCrmTool, GetCrmSummaryTool, GetCreditBalanceTool, SearchDocsTool, GuideToPageTool, ListEmailsTool, GetEmailTool or ListEmailAccountsTool')
+        ->toContain('neither do AggregateCrmTool, GetCrmSummaryTool, GetCreditBalanceTool, SearchDocsTool, GuideToPageTool, ListEmailsTool, GetEmailTool, ListEmailAccountsTool or ReadAttachmentRowsTool')
         ->toContain('A list with zero results renders no block either')
         ->toContain('ONE short lead-in sentence');
 });
@@ -1087,6 +1087,12 @@ it('carries the setup mode instructions in the cached static block', function ()
         ->toContain('deleting happens on the record page')
         ->not->toContain('edits happen on the record page or in a new conversation')
         ->toContain('Never answer that it is unsupported');
+});
+
+it('tells the assistant to read an attached file a batch at a time and to propose it the same way', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('ReadAttachmentRowsTool reads any CSV the user sent in this conversation, 25 rows a call')
+        ->toContain('propose the next 25 unread rows each turn, say how many remain, and offer the file\'s import link for the rest at once');
 });
 
 it('tells the model outside setup mode which files the composer takes and how they arrive', function (): void {

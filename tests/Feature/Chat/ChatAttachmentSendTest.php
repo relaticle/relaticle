@@ -280,6 +280,7 @@ it('stores a handoff reply for a large file sent alone without running the model
         ->and(json_decode((string) $rows[0]->meta, true)['attachment']['row_count'])->toBe(26)
         ->and($rows[1]->role)->toBe('assistant')
         ->and($rows[1]->content)->toContain("That's 26 rows.")
+        ->and($rows[1]->content)->toContain('Or ask me to add them here, 25 at a time.')
         ->and($rows[1]->content)->toContain('[Import as people]('.route('chat.attachments.import', ['attachment' => $attachmentId, 'entity' => 'people']).')')
         ->and($rows[1]->content)->toContain('[Import as companies]('.route('chat.attachments.import', ['attachment' => $attachmentId, 'entity' => 'company']).')');
 
