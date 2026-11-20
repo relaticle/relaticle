@@ -3,13 +3,17 @@
     so the header button, the mobile icon, and the hub's search field all open
     the same dialog.
 --}}
-<nav x-cloak x-show="searchOpen" class="fixed inset-0 z-[60]" aria-label="{{ __('Search the docs') }}">
+<dialog x-ref="searchDialog"
+        x-on:cancel.prevent="closeSearch()"
+        class="fixed inset-0 m-0 h-full max-h-none w-full max-w-none bg-transparent text-inherit backdrop:bg-transparent"
+        aria-label="{{ __('Search the docs') }}">
     <div x-show="searchOpen"
          x-transition.opacity.duration.150ms
          class="fixed inset-0 bg-gray-950/40 backdrop-blur-[2px] dark:bg-black/60"
          x-on:click="closeSearch()"></div>
 
-    <div x-show="searchOpen"
+    <nav x-show="searchOpen"
+         aria-label="{{ __('Search the docs') }}"
          x-transition:enter="transition ease-out duration-150"
          x-transition:enter-start="scale-[0.98] opacity-0"
          x-transition:enter-end="scale-100 opacity-100"
@@ -21,9 +25,10 @@
                    x-on:input="active = 0"
                    x-on:keydown.arrow-down.prevent="move(1)"
                    x-on:keydown.arrow-up.prevent="move(-1)"
-                   x-on:keydown.enter.prevent="go()"
+                   x-on:keydown.enter.prevent="document.getElementById($el.getAttribute('aria-activedescendant'))?.click()"
                    type="text"
                    role="combobox"
+                   aria-autocomplete="list"
                    aria-controls="docs-search-results"
                    :aria-expanded="results.length > 0"
                    :aria-activedescendant="results.length > 0 ? 'docs-search-result-' + active : null"
@@ -37,14 +42,19 @@
         <span class="sr-only" aria-live="polite"
               x-text="query.trim() === '' || records === null ? '' : results.length + ' {{ __('results') }}'"></span>
 
-        <ul x-ref="searchResults"
-            id="docs-search-results"
+        <ul id="docs-search-results"
             x-show="results.length > 0"
             role="listbox"
+            aria-label="{{ __('Search the docs') }}"
             class="docs-scroll max-h-[22rem] overflow-y-auto p-2">
             <template x-for="(result, index) in results" :key="result.id">
-                <li role="option" :id="'docs-search-result-' + index" :aria-selected="index === active">
+                <li role="none">
                     <a :href="result.url"
+                       role="option"
+                       tabindex="-1"
+                       :id="'docs-search-result-' + index"
+                       :aria-selected="index === active"
+                       x-on:click="if ($event.button === 0 && !$event.ctrlKey && !$event.metaKey && !$event.shiftKey && !$event.altKey) closeSearch()"
                        x-on:mouseenter="active = index"
                        :class="index === active ? 'bg-primary-50 dark:bg-primary-500/10' : ''"
                        class="block rounded-lg px-3 py-2.5 transition-colors">
@@ -88,5 +98,5 @@
             </span>
             <span class="ml-auto hidden sm:block">{{ __('Searching help and developer docs') }}</span>
         </div>
-    </div>
-</nav>
+    </nav>
+</dialog>
