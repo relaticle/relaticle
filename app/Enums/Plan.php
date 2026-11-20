@@ -68,7 +68,7 @@ enum Plan: string implements HasColor, HasLabel
      * The billing interval a Stripe price id sells the plan at (`monthly`,
      * `yearly`), read from the same map. Null when the id is not in it.
      */
-    private static function intervalFromStripePrice(?string $priceId): ?string
+    public static function intervalFromStripePrice(?string $priceId): ?string
     {
         $key = self::stripePriceKey($priceId);
 

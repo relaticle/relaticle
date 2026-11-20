@@ -26,6 +26,16 @@ return [
         'fulfilling_delayed_title' => 'L\'ajout de vos crédits prend plus de temps que d\'habitude',
         'fulfilling_delayed_body' => 'Votre paiement a bien été effectué. Rechargez cette page dans quelques minutes et contactez le support si vos crédits n\'apparaissent toujours pas.',
     ],
+    'keep' => [
+        'button' => 'Conserver :plan',
+        'heading' => 'Conserver :plan ?',
+        'dismiss' => 'Pas maintenant',
+        'terms_monthly' => ':plan se renouvelle le :date pour :price par mois. Nous débiterons alors la carte enregistrée. Vous pouvez de nouveau résilier à tout moment avant cette date.',
+        'terms_yearly' => ':plan se renouvelle le :date pour :price par an. Nous débiterons alors la carte enregistrée. Vous pouvez de nouveau résilier à tout moment avant cette date.',
+        'kept' => ':plan se renouvelle le :date',
+        'failed' => 'Nous n\'avons pas pu mettre à jour votre abonnement pour le moment. Veuillez réessayer dans un instant.',
+        'ending_notice' => 'Votre abonnement :plan prend toujours fin le :date.',
+    ],
     'sidebar' => [
         'trial_days_left' => ':days jour d\'essai restant !|:days jours d\'essai restants !',
         'keep_pro' => 'Garder Pro',

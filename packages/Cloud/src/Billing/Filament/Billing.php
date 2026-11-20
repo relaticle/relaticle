@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Filament;
 
+use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
+use App\Data\SubscriptionEnding;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Enums\WorkspaceCapability;
@@ -12,6 +14,7 @@ use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
@@ -30,6 +33,7 @@ use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Actions\CreateCreditPackCheckout;
 use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
+use Relaticle\Cloud\Billing\Actions\KeepWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
@@ -51,6 +55,8 @@ final class Billing extends Page
     public const string CHECKOUT_SUCCESS = 'success';
 
     public const string CHECKOUT_REOPENED = 'reopened';
+
+    public const string KEEP_SUBSCRIPTION_ACTION = 'keepSubscription';
 
     private const string CHECKOUT_SESSION_PREFIX = 'cs_';
 
@@ -178,6 +184,50 @@ final class Billing extends Page
             report($exception);
             $this->notifyCheckoutFailed();
         }
+    }
+
+    public function keepSubscriptionAction(): Action
+    {
+        return Action::make(self::KEEP_SUBSCRIPTION_ACTION)
+            ->label(fn (): string => $this->subscriptionEnding()->keepLabel ?? '')
+            ->visible(fn (): bool => $this->subscriptionEnding() instanceof SubscriptionEnding
+                && $this->user()->hasWorkspaceCapability($this->workspace()->getKey(), WorkspaceCapability::BillingManage))
+            ->requiresConfirmation()
+            ->modalIcon('lucide-rotate-ccw')
+            ->modalIconColor('primary')
+            ->modalHeading(fn (): string => $this->subscriptionEnding()->heading ?? '')
+            ->modalDescription(fn (): string => $this->subscriptionEnding()->terms ?? '')
+            ->modalSubmitActionLabel(fn (): string => $this->subscriptionEnding()->keepLabel ?? '')
+            ->modalSubmitAction(fn (Action $action): Action => $action->color('primary'))
+            ->modalCancelActionLabel(__('cloud::billing.keep.dismiss'))
+            ->action(fn () => $this->keepSubscription());
+    }
+
+    private function keepSubscription(): void
+    {
+        $ending = $this->subscriptionEnding();
+
+        try {
+            $kept = resolve(KeepWorkspaceSubscription::class)->execute($this->user(), $this->workspace());
+        } catch (AuthorizationException) {
+            return;
+        } catch (Throwable $exception) {
+            report($exception);
+            $kept = false;
+        }
+
+        if (! $kept || ! $ending instanceof SubscriptionEnding) {
+            Notification::make()->title(__('cloud::billing.keep.failed'))->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title($ending->keptMessage)->success()->send();
+    }
+
+    private function subscriptionEnding(): ?SubscriptionEnding
+    {
+        return resolve(BillingContract::class)->subscriptionEnding($this->workspace());
     }
 
     public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): void

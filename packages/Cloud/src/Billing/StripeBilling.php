@@ -5,9 +5,13 @@ declare(strict_types=1);
 namespace Relaticle\Cloud\Billing;
 
 use App\Contracts\Billing;
+use App\Data\SubscriptionEnding;
+use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
 use App\Models\Workspace;
+use Illuminate\Support\Number;
+use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Actions\CancelWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
@@ -64,5 +68,31 @@ final readonly class StripeBilling implements Billing
     public function inactivityDeletionStands(Workspace $workspace): bool
     {
         return $workspace->inactivity_reminded_at !== null && $this->inactive->stillDue($workspace);
+    }
+
+    public function subscriptionEnding(Workspace $workspace): ?SubscriptionEnding
+    {
+        $subscription = $workspace->subscription();
+        $plan = Plan::fromStripePrice($subscription?->stripe_price);
+
+        if (! Feature::active(BillingFeature::class) || $workspace->plan->isManaged() || ! $subscription instanceof Subscription || ! $subscription->onGracePeriod() || ! $plan instanceof Plan || $subscription->ends_at === null) {
+            return null;
+        }
+
+        $yearly = Plan::intervalFromStripePrice($subscription->stripe_price) === 'yearly';
+        $replace = [
+            'plan' => $plan->marketingLabel(),
+            'date' => $subscription->ends_at->isoFormat('ll'),
+            'price' => '$'.Number::format((int) ($yearly ? $plan->yearlyPrice() : $plan->monthlyPrice())),
+        ];
+
+        return new SubscriptionEnding(
+            notice: __('cloud::billing.keep.ending_notice', $replace),
+            keepLabel: __('cloud::billing.keep.button', $replace),
+            heading: __('cloud::billing.keep.heading', $replace),
+            keepUrl: BillingPage::getUrl(['action' => BillingPage::KEEP_SUBSCRIPTION_ACTION], panel: 'app', tenant: $workspace),
+            terms: __($yearly ? 'cloud::billing.keep.terms_yearly' : 'cloud::billing.keep.terms_monthly', $replace),
+            keptMessage: __('cloud::billing.keep.kept', $replace),
+        );
     }
 }

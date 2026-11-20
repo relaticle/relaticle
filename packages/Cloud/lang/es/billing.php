@@ -26,6 +26,16 @@ return [
         'fulfilling_delayed_title' => 'Añadir sus créditos está tardando más de lo habitual',
         'fulfilling_delayed_body' => 'Su pago se procesó. Vuelva a cargar esta página en unos minutos y comuníquese con soporte si los créditos siguen sin aparecer.',
     ],
+    'keep' => [
+        'button' => 'Mantener :plan',
+        'heading' => '¿Mantener :plan?',
+        'dismiss' => 'Ahora no',
+        'terms_monthly' => ':plan se renueva el :date por :price al mes. Ese día cobraremos la tarjeta registrada. Puede volver a cancelar en cualquier momento antes.',
+        'terms_yearly' => ':plan se renueva el :date por :price al año. Ese día cobraremos la tarjeta registrada. Puede volver a cancelar en cualquier momento antes.',
+        'kept' => ':plan se renueva el :date',
+        'failed' => 'No pudimos actualizar su suscripción en este momento. Inténtelo de nuevo en unos instantes.',
+        'ending_notice' => 'Su suscripción a :plan sigue terminando el :date.',
+    ],
     'sidebar' => [
         'trial_days_left' => '¡Queda :days día de prueba!|¡Quedan :days días de prueba!',
         'keep_pro' => 'Conservar Pro',

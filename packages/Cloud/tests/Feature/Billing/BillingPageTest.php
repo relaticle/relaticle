@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Locales;
 use Carbon\CarbonImmutable;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Http\UploadedFile;
@@ -1456,4 +1457,76 @@ it('tells a trialing owner on the plan cards when the card is first charged', fu
 
     livewire(Billing::class)
         ->assertSee(__('cloud::billing.upgrade.trial_notice', ['date' => now()->addDays(9)->isoFormat('ll')]));
+});
+
+function graceSubscriptionOwner(): Workspace
+{
+    config()->set('cashier.secret', 'sk_test_fake');
+    config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
+
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['plan' => Plan::Pro, 'stripe_id' => 'cus_grace'])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_grace',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => now()->addDays(12),
+    ]);
+
+    return $workspace;
+}
+
+it('keeps a subscription set to cancel once the owner confirms its renewal terms', function (): void {
+    withHostedBilling();
+
+    $workspace = graceSubscriptionOwner();
+    $recorder = StripeRecorder::install()->respondTo('/v1/subscriptions/sub_grace', ['id' => 'sub_grace', 'object' => 'subscription', 'status' => 'active', 'cancel_at_period_end' => false]);
+    $renewal = now()->addDays(12)->isoFormat('ll');
+
+    livewire(Billing::class)
+        ->assertActionVisible('keepSubscription')
+        ->assertActionExists('keepSubscription', fn (Action $action): bool => $action->getModalHeading() === __('cloud::billing.keep.heading', ['plan' => Plan::Pro->marketingLabel()])
+            && str_contains((string) $action->getModalDescription(), $renewal)
+            && str_contains((string) $action->getModalDescription(), '$'.Plan::Pro->monthlyPrice()))
+        ->callAction('keepSubscription')
+        ->assertNotified(__('cloud::billing.keep.kept', ['plan' => Plan::Pro->marketingLabel(), 'date' => $renewal]));
+
+    $updates = $recorder->allParamsFor('POST /v1/subscriptions/sub_grace');
+
+    expect($workspace->subscription()->refresh()->ends_at)->toBeNull()
+        ->and($updates[0]['cancel_at_period_end'])->toBe('false')
+        ->and(collect($updates)->pluck('metadata.kept_by_user_id')->filter()->first())->toBe((string) auth()->id());
+});
+
+it('opens the keep confirmation from the link in the deletion email', function (): void {
+    withHostedBilling();
+
+    graceSubscriptionOwner();
+
+    livewire(Billing::class, ['defaultAction' => 'keepSubscription'])
+        ->call('mountDefaultActions')
+        ->assertMountedActionModalSee(__('cloud::billing.keep.heading', ['plan' => Plan::Pro->marketingLabel()]))
+        ->assertMountedActionModalSee(__('cloud::billing.keep.dismiss'));
+});
+
+it('does not offer to keep a subscription to a member who cannot manage billing', function (): void {
+    withHostedBilling();
+
+    $workspace = graceSubscriptionOwner();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'admin']);
+    $this->actingAs($member);
+
+    livewire(Billing::class)->assertActionHidden('keepSubscription');
+});
+
+it('does not offer to keep a subscription that is not set to cancel', function (): void {
+    withHostedBilling();
+
+    $workspace = graceSubscriptionOwner();
+    $workspace->subscription()->update(['ends_at' => null]);
+
+    livewire(Billing::class)->assertActionHidden('keepSubscription');
 });

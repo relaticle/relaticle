@@ -26,6 +26,16 @@ return [
         'fulfilling_delayed_title' => 'Adding your credits is taking longer than usual',
         'fulfilling_delayed_body' => 'Your payment went through. Reload this page in a few minutes, and contact support if the credits still have not arrived.',
     ],
+    'keep' => [
+        'button' => 'Keep :plan',
+        'heading' => 'Keep :plan?',
+        'dismiss' => 'Not now',
+        'terms_monthly' => ':plan renews on :date at :price a month. We charge the card on file then. You can cancel again anytime before.',
+        'terms_yearly' => ':plan renews on :date at :price a year. We charge the card on file then. You can cancel again anytime before.',
+        'kept' => ':plan renews on :date',
+        'failed' => 'We couldn\'t update your subscription just now. Please try again in a moment.',
+        'ending_notice' => 'Your :plan subscription still ends on :date.',
+    ],
     'sidebar' => [
         'trial_days_left' => ':days day left on trial!|:days days left on trial!',
         'keep_pro' => 'Keep Pro',

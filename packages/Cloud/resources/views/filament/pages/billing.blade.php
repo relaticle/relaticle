@@ -197,6 +197,9 @@
                                 ? __('cloud::billing.manage.cancel_scheduled_legacy_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])
                                 : __('cloud::billing.manage.cancel_scheduled_body', ['plan' => $planLabel, 'date' => $subscription?->ends_at?->isoFormat('ll')])) }}
                         </p>
+                        @if($this->keepSubscriptionAction->isVisible())
+                            <div class="mt-3">{{ $this->keepSubscriptionAction }}</div>
+                        @endif
                     </div>
                 </div>
             </div>

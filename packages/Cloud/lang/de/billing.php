@@ -26,6 +26,16 @@ return [
         'fulfilling_delayed_title' => 'Das Gutschreiben Ihrer Credits dauert länger als üblich',
         'fulfilling_delayed_body' => 'Ihre Zahlung ist durchgegangen. Laden Sie diese Seite in einigen Minuten neu und wenden Sie sich an den Support, falls die Credits dann immer noch fehlen.',
     ],
+    'keep' => [
+        'button' => ':plan behalten',
+        'heading' => ':plan behalten?',
+        'dismiss' => 'Nicht jetzt',
+        'terms_monthly' => ':plan verlängert sich am :date für :price pro Monat. Dann belasten wir die hinterlegte Karte. Bis dahin können Sie jederzeit wieder kündigen.',
+        'terms_yearly' => ':plan verlängert sich am :date für :price pro Jahr. Dann belasten wir die hinterlegte Karte. Bis dahin können Sie jederzeit wieder kündigen.',
+        'kept' => ':plan verlängert sich am :date',
+        'failed' => 'Ihr Abonnement konnte gerade nicht aktualisiert werden. Bitte versuchen Sie es gleich noch einmal.',
+        'ending_notice' => 'Ihr :plan-Abonnement endet weiterhin am :date.',
+    ],
     'sidebar' => [
         'trial_days_left' => 'Noch :days Tag in der Testphase!|Noch :days Tage in der Testphase!',
         'keep_pro' => 'Pro behalten',
