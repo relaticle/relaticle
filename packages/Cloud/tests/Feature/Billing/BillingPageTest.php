@@ -22,6 +22,7 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
+use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Filament\Billing;
@@ -881,14 +882,65 @@ it('shows the purchased portion of the balance', function (): void {
     livewire(Billing::class)->assertSee(__('cloud::billing.packs.balance_split', ['purchased' => number_format(200)]));
 });
 
-it('shows a fulfilment-pending notice after a credit pack checkout', function (): void {
+function grantCreditPackSession(Workspace $workspace, string $sessionId): void
+{
+    AiCreditTransaction::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'type' => AiCreditType::Purchase,
+        'idempotency_key' => GrantPurchasedCredits::IDEMPOTENCY_PREFIX.$sessionId,
+    ]);
+}
+
+it('shows a fulfilment-pending notice while the returned checkout session is not granted yet', function (): void {
     withHostedBilling();
 
     billingPageOwner();
 
-    livewire(Billing::class)
-        ->set('credits', 'success')
+    livewire(Billing::class, ['credits' => 'cs_test_pending'])
         ->assertSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('hides the fulfilment-pending notice once the checkout session was granted', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    grantCreditPackSession($workspace, 'cs_test_paid');
+
+    livewire(Billing::class, ['credits' => 'cs_test_paid'])
+        ->assertDontSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('clears the fulfilment-pending notice on the next poll after the grant lands', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+
+    $page = livewire(Billing::class, ['credits' => 'cs_test_arriving'])
+        ->assertSee(__('cloud::billing.packs.fulfilling_title'));
+
+    grantCreditPackSession($workspace, 'cs_test_arriving');
+
+    $page->call('$refresh')
+        ->assertDontSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('keeps the notice when only another workspace was granted that session', function (): void {
+    withHostedBilling();
+
+    billingPageOwner();
+    grantCreditPackSession(Workspace::factory()->create(), 'cs_test_elsewhere');
+
+    livewire(Billing::class, ['credits' => 'cs_test_elsewhere'])
+        ->assertSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('shows no fulfilment-pending notice on a return url that carries no checkout session', function (): void {
+    withHostedBilling();
+
+    billingPageOwner();
+
+    livewire(Billing::class, ['credits' => 'success'])
+        ->assertDontSee(__('cloud::billing.packs.fulfilling_title'));
 });
 
 it('does not show the fulfilment-pending notice without the credits query param', function (): void {

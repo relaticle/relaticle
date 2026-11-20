@@ -11,6 +11,8 @@ use Relaticle\Cloud\Billing\CreditPackCatalog;
 
 final readonly class GrantPurchasedCredits
 {
+    public const string IDEMPOTENCY_PREFIX = 'pack-';
+
     public function __construct(private CreditService $credits, private CreditPackCatalog $catalog) {}
 
     /**
@@ -31,7 +33,7 @@ final readonly class GrantPurchasedCredits
             return false;
         }
 
-        return $this->credits->addPurchasedCredits($workspace, $credits, "pack-{$sessionId}", [
+        return $this->credits->addPurchasedCredits($workspace, $credits, self::IDEMPOTENCY_PREFIX.$sessionId, [
             'price_id' => $priceId,
             'session_id' => $sessionId,
         ]);

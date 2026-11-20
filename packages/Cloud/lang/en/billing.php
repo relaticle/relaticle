@@ -23,7 +23,8 @@ return [
         'balance_split' => 'Includes :purchased purchased credits that never expire',
         'buy_more' => 'Buy more credits',
         'fulfilling_title' => 'Payment received. Credits are on their way',
-        'fulfilling_body' => 'It can take a minute for your new credits to appear. Refresh this page if the balance below still looks unchanged shortly.',
+        'fulfilling_delayed_title' => 'Adding your credits is taking longer than usual',
+        'fulfilling_delayed_body' => 'Your payment went through. Reload this page in a few minutes, and contact support if the credits still have not arrived.',
     ],
     'sidebar' => [
         'trial_days_left' => ':days day left on trial!|:days days left on trial!',

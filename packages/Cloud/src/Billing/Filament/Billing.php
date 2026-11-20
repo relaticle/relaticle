@@ -25,9 +25,11 @@ use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Actions\CreateCreditPackCheckout;
 use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
+use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
@@ -47,6 +49,8 @@ final class Billing extends Page
     public const string CHECKOUT_SUCCESS = 'success';
 
     public const string CHECKOUT_REOPENED = 'reopened';
+
+    private const string CHECKOUT_SESSION_PREFIX = 'cs_';
 
     #[Url]
     public ?string $checkout = null;
@@ -224,10 +228,22 @@ final class Billing extends Page
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first(),
             'activating' => in_array($this->checkout, [self::CHECKOUT_SUCCESS, self::CHECKOUT_REOPENED], true) && ! $workspace->subscribed() && ! $workspace->plan->isManaged(),
-            'creditsFulfilling' => $this->credits === 'success',
+            'creditsFulfilling' => $this->creditsFulfilling($workspace),
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
             ...($hasHostedAccess ? [] : $this->pausedViewData($workspace)),
         ];
+    }
+
+    private function creditsFulfilling(Workspace $workspace): bool
+    {
+        if ($this->credits === null || ! str_starts_with($this->credits, self::CHECKOUT_SESSION_PREFIX)) {
+            return false;
+        }
+
+        return AiCreditTransaction::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->where('idempotency_key', GrantPurchasedCredits::IDEMPOTENCY_PREFIX.$this->credits)
+            ->doesntExist();
     }
 
     private function renewalLabel(?Subscription $managedSubscription): ?string

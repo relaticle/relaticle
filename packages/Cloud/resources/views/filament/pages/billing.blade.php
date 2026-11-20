@@ -57,13 +57,12 @@
         @endif
 
         @if($creditsFulfilling)
-            <div class="{{ $card }} flex items-center gap-3 p-5">
-                <x-filament::loading-indicator class="h-5 w-5 text-primary" />
-                <div>
-                    <h3 class="text-sm font-semibold text-gray-700 dark:text-gray-200">{{ __('cloud::billing.packs.fulfilling_title') }}</h3>
-                    <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">{{ __('cloud::billing.packs.fulfilling_body') }}</p>
-                </div>
-            </div>
+            <x-cloud::billing.activating
+                :card="$card"
+                :title="__('cloud::billing.packs.fulfilling_title')"
+                :delayed-title="__('cloud::billing.packs.fulfilling_delayed_title')"
+                :delayed-body="__('cloud::billing.packs.fulfilling_delayed_body')"
+            />
         @endif
 
         <section class="{{ $card }} overflow-hidden" aria-label="{{ __('billing.title') }}">

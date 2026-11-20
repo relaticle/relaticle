@@ -23,7 +23,8 @@ return [
         'balance_split' => 'Incluye :purchased créditos comprados que nunca vencen',
         'buy_more' => 'Comprar más créditos',
         'fulfilling_title' => 'Pago recibido. Sus créditos están en camino',
-        'fulfilling_body' => 'Sus nuevos créditos pueden tardar un minuto en aparecer. Actualice esta página si el saldo de abajo sigue sin cambios en unos momentos.',
+        'fulfilling_delayed_title' => 'Añadir sus créditos está tardando más de lo habitual',
+        'fulfilling_delayed_body' => 'Su pago se procesó. Vuelva a cargar esta página en unos minutos y comuníquese con soporte si los créditos siguen sin aparecer.',
     ],
     'sidebar' => [
         'trial_days_left' => '¡Queda :days día de prueba!|¡Quedan :days días de prueba!',

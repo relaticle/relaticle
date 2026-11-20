@@ -23,7 +23,8 @@ return [
         'balance_split' => 'Comprend :purchased crédits achetés qui n\'expirent jamais',
         'buy_more' => 'Acheter plus de crédits',
         'fulfilling_title' => 'Paiement reçu. Vos crédits arrivent',
-        'fulfilling_body' => 'L\'apparition de vos nouveaux crédits peut prendre une minute. Actualisez cette page si le solde ci-dessous reste inchangé dans quelques instants.',
+        'fulfilling_delayed_title' => 'L\'ajout de vos crédits prend plus de temps que d\'habitude',
+        'fulfilling_delayed_body' => 'Votre paiement a bien été effectué. Rechargez cette page dans quelques minutes et contactez le support si vos crédits n\'apparaissent toujours pas.',
     ],
     'sidebar' => [
         'trial_days_left' => ':days jour d\'essai restant !|:days jours d\'essai restants !',

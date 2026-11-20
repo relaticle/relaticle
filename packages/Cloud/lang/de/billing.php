@@ -23,7 +23,8 @@ return [
         'balance_split' => 'Enthält :purchased gekaufte Credits, die nie verfallen',
         'buy_more' => 'Weitere Credits kaufen',
         'fulfilling_title' => 'Zahlung eingegangen. Die Credits sind unterwegs',
-        'fulfilling_body' => 'Es kann eine Minute dauern, bis Ihre neuen Credits erscheinen. Laden Sie diese Seite neu, falls der Credit-Stand unten kurz darauf unverändert aussieht.',
+        'fulfilling_delayed_title' => 'Das Gutschreiben Ihrer Credits dauert länger als üblich',
+        'fulfilling_delayed_body' => 'Ihre Zahlung ist durchgegangen. Laden Sie diese Seite in einigen Minuten neu und wenden Sie sich an den Support, falls die Credits dann immer noch fehlen.',
     ],
     'sidebar' => [
         'trial_days_left' => 'Noch :days Tag in der Testphase!|Noch :days Tage in der Testphase!',
