@@ -10,6 +10,8 @@ use Laravel\Mcp\Server\Transport\StdioTransport;
 
 final class LocalStdioTransport extends StdioTransport
 {
+    private bool $clientConnected = true;
+
     /**
      * @param  resource  $input
      * @param  resource  $output
@@ -32,7 +34,12 @@ final class LocalStdioTransport extends StdioTransport
 
     public function send(string $message): void
     {
-        fwrite($this->output, $message.PHP_EOL);
+        if (! $this->clientConnected) {
+            return;
+        }
+
+        // A client that hung up turns this write into an EPIPE notice; that is the session ending, not an error.
+        $this->clientConnected = @fwrite($this->output, $message.PHP_EOL) !== false;
     }
 
     public function run(): void
@@ -41,7 +48,7 @@ final class LocalStdioTransport extends StdioTransport
 
         $buffer = '';
 
-        while (! feof($this->input)) {
+        while ($this->clientConnected && ! feof($this->input)) {
             $chunk = fgets($this->input);
 
             if ($chunk === false) {
@@ -58,7 +65,9 @@ final class LocalStdioTransport extends StdioTransport
             }
         }
 
-        $this->handle($buffer);
+        if ($this->clientConnected) {
+            $this->handle($buffer);
+        }
     }
 
     private function handle(string $line): void
