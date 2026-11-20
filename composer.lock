@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "a97effc93225d4f05a95a4eb49421f8e",
+    "content-hash": "7558089420005d6cb3283c49c2b5902c",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10539,16 +10539,16 @@
         },
         {
             "name": "relaticle/custom-fields",
-            "version": "v3.18.4",
+            "version": "v3.18.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/custom-fields.git",
-                "reference": "c4df1279d7b9393b3ffcf7369834112760509a29"
+                "reference": "755081510f6b7402d4431d1a3609e0059468a1ec"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/c4df1279d7b9393b3ffcf7369834112760509a29",
-                "reference": "c4df1279d7b9393b3ffcf7369834112760509a29",
+                "url": "https://api.github.com/repos/relaticle/custom-fields/zipball/755081510f6b7402d4431d1a3609e0059468a1ec",
+                "reference": "755081510f6b7402d4431d1a3609e0059468a1ec",
                 "shasum": ""
             },
             "require": {
@@ -10634,8 +10634,8 @@
                 "issues": "https://github.com/relaticle/custom-fields/issues",
                 "source": "https://github.com/relaticle/custom-fields"
             },
-            "time": "2026-11-13T12:30:27+00:00",
-            "published-time": "2026-11-13T12:36:47+00:00"
+            "time": "2026-11-20T19:03:11+00:00",
+            "published-time": "2026-11-20T21:22:42+00:00"
         },
         {
             "name": "relaticle/flowforge",
