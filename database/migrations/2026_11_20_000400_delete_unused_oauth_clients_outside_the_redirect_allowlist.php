@@ -33,6 +33,7 @@ return new class extends Migration
                 }
 
                 DB::table('oauth_auth_codes')->where('client_id', $client->id)->delete();
+                DB::table('oauth_device_codes')->where('client_id', $client->id)->delete();
                 DB::table('oauth_clients')->where('id', $client->id)->delete();
             }, self::CHUNK_SIZE);
     }
@@ -56,23 +57,37 @@ return new class extends Migration
      */
     private function isAllowed(string $uri, array $domains): bool
     {
-        $parts = parse_url($uri);
-        $scheme = strtolower((string) ($parts['scheme'] ?? ''));
+        $parts = parse_url($uri) ?: [];
+
+        if (isset($parts['user']) || isset($parts['pass'])) {
+            return false;
+        }
+
+        $scheme = (string) ($parts['scheme'] ?? '');
         $host = strtolower((string) ($parts['host'] ?? ''));
 
         if (in_array($scheme, (array) config('mcp.custom_schemes', []), true)) {
-            return true;
+            return $host !== '';
         }
 
         if ($scheme === 'http') {
-            return in_array($host, self::LOOPBACK_HOSTS, true);
+            return $this->isLoopback($host) && array_any($domains, fn (string $domain): bool => $this->isLoopback($this->hostOf($domain)));
         }
 
         if ($scheme !== 'https' || ($parts['port'] ?? 443) !== 443) {
             return false;
         }
 
-        return array_any($domains, fn (string $domain): bool => strtolower((string) parse_url($domain, PHP_URL_SCHEME)) === 'https'
-            && strtolower((string) parse_url($domain, PHP_URL_HOST)) === $host);
+        return array_any($domains, fn (string $domain): bool => parse_url($domain, PHP_URL_SCHEME) === 'https' && $this->hostOf($domain) === $host);
+    }
+
+    private function isLoopback(string $host): bool
+    {
+        return in_array($host, self::LOOPBACK_HOSTS, true);
+    }
+
+    private function hostOf(string $domain): string
+    {
+        return strtolower((string) parse_url($domain, PHP_URL_HOST));
     }
 };
