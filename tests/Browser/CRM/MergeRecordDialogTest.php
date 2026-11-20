@@ -88,7 +88,7 @@ it('names the raised limit and keeps merging enabled when the lists pass it', fu
     $page = openMergeDialog($this->user, $this->workspace, $current);
 
     pickInMergeDialog($page, 'Holdings', 'Acme Holdings')
-        ->assertSeeIn('[data-merge-raise]', 'Companies can now hold 6 domains')
+        ->assertSeeIn('[data-merge-raise]', 'Companies can now hold 6 Domains')
         ->assertScript(MERGE_SUBMIT_DISABLED, false)
         ->assertNoJavaScriptErrors();
 });

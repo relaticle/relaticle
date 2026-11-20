@@ -13,6 +13,7 @@ use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
 use App\Filament\Resources\PeopleResource\Pages\ViewPeople;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
@@ -22,6 +23,7 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Relaticle\ActivityLog\Filament\Livewire\ActivityLogLivewire;
+use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Tests\Helpers\WorkspaceCustomField;
 
@@ -323,8 +325,34 @@ it('lets a member without the fields manage capability merge past the limit', fu
 
         mergeHistoryRun($page, $current, $picked, false);
 
-        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(8);
+        $field = WorkspaceCustomField::byCode($this->workspace->getKey(), $entityType, $code);
+        $logged = Activity::query()->where('subject_type', $field->getMorphClass())->where('subject_id', $field->getKey())->where('event', 'updated')->latest('id')->firstOrFail();
+
+        expect(mergeFieldMax($this->workspace, $entityType, $code))->toBe(8)
+            ->and($logged->causer_id)->toBe($member->getKey());
     }
+});
+
+it('never raises a record-type field however many values the two records hold', function (): void {
+    $field = CustomField::factory()->create([
+        'tenant_id' => $this->workspace->getKey(),
+        'entity_type' => 'company',
+        'code' => 'partners',
+        'name' => 'Partners',
+        'type' => 'record',
+        'lookup_type' => 'company',
+        'settings' => new CustomFieldSettingsData(allow_multiple: true, max_values: 1),
+    ]);
+    $partners = collect(range(1, 2))->map(fn (): Company => mergeCompanyRecord($this->workspace, $this->user));
+    $current = mergeCompanyRecord($this->workspace, $this->user);
+    $picked = mergeCompanyRecord($this->workspace, $this->user);
+    $current->saveCustomFieldValue($field, [$partners[0]->getKey()]);
+    $picked->saveCustomFieldValue($field, [$partners[1]->getKey()]);
+
+    $merged = mergeHistoryRun(ViewCompany::class, $current, $picked, false);
+
+    expect($merged->load('customFieldValues.customField')->getCustomFieldValue($field))->toHaveCount(2)
+        ->and($field->fresh()->settings->max_values)->toBe(1);
 });
 
 it('leaves the limit alone when the combined values fit', function (): void {
@@ -361,7 +389,8 @@ it('logs the raise on the field', function (): void {
         $field = WorkspaceCustomField::byCode($this->workspace->getKey(), $entityType, $code);
         $logged = Activity::query()->where('subject_type', $field->getMorphClass())->where('subject_id', $field->getKey())->where('event', 'updated')->latest('id')->firstOrFail();
 
-        expect(json_encode($logged->attribute_changes))->toContain('max_values');
+        expect(json_encode($logged->attribute_changes))->toContain('max_values')
+            ->and($logged->causer_id)->toBe($this->user->getKey());
     }
 });
 
@@ -383,7 +412,7 @@ it('shows the raise in the dialog and keeps merging enabled', function (): void 
     foreach (mergeListEntities() as [$page, $make, $entityType, $code, $name]) {
         $current = $make($this->workspace, $this->user, mergeListValues($name, 'a', 4));
         $picked = $make($this->workspace, $this->user, mergeListValues($name, 'b', 4));
-        $label = $entityType === 'company' ? 'Companies can now hold 8 domains' : 'People can now hold 8 emails';
+        $label = $entityType === 'company' ? 'Companies can now hold 8 Domains' : 'People can now hold 8 Emails';
 
         $dialog = livewire($page, ['record' => $current->getKey()])
             ->mountAction(mergeRecordAction())

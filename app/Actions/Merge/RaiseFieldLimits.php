@@ -23,11 +23,13 @@ final readonly class RaiseFieldLimits
                 ->lockForUpdate()
                 ->first();
 
-            if ($field === null || $field->settings->max_values >= $count) {
+            $target = min($count, CustomFieldSettingsSchema::MAX_MAX_VALUES);
+
+            if ($field === null || $field->settings->max_values >= $target) {
                 continue;
             }
 
-            $field->update(['settings' => CustomFieldSettingsSchema::apply($field, ['max_values' => $count])]);
+            $field->update(['settings' => CustomFieldSettingsSchema::apply($field, ['max_values' => $target])]);
         }
     }
 }

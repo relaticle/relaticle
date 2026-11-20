@@ -157,7 +157,7 @@ final class MergeRecordPicker extends Field
             fn (int $count, string $code): string => __('filament/record-page.merge.raised', [
                 'entity' => $entity,
                 'count' => $count,
-                'field' => mb_strtolower($fields[$code]->name),
+                'field' => $fields[$code]->name,
             ]),
             $raises,
             array_keys($raises),

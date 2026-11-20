@@ -445,7 +445,8 @@ it('counts emails case-insensitively before applying the limit', function (): vo
 
     mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergePersonValue(mergedRecord(), 'emails'))->toBe(['a1@x.com', 'a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com']);
+    expect(mergePersonValue(mergedRecord(), 'emails'))->toBe(['a1@x.com', 'a2@x.com', 'a3@x.com', 'b1@x.com', 'b2@x.com'])
+        ->and(WorkspaceCustomField::byCode($this->workspace->getKey(), 'people', 'emails')->settings->max_values)->toBe(5);
 });
 
 it('locks both people with one select in id order, whichever one is kept', function (): void {

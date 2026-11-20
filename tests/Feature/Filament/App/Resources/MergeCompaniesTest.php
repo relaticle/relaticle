@@ -687,7 +687,8 @@ it('counts domains the way the field stores them before applying the limit', fun
 
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
-    expect(mergeCompanyValue(mergedRecord(), 'domains'))->toBe(['a1.com', 'a2.com', 'a3.com', 'b1.com', 'b2.com']);
+    expect(mergeCompanyValue(mergedRecord(), 'domains'))->toBe(['a1.com', 'a2.com', 'a3.com', 'b1.com', 'b2.com'])
+        ->and(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains')->settings->max_values)->toBe(5);
 });
 
 it('locks both companies with one select in id order, whichever one is kept', function (): void {
