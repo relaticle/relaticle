@@ -38,10 +38,11 @@ Relaticle ne peut pas le récupérer. Au moindre doute,
 - Un enregistrement fusionné n'est pas dans la corbeille et ne peut pas être restauré.
   La fusion est définitive, voir
   [Fusionner des enregistrements en double](/fr/help/records/merge-duplicate-records).
-- La page d'un enregistrement supprimé affiche **Cette fiche a été supprimée** et un
-  bouton **Retour** : la restauration part donc du filtre des enregistrements supprimés de
-  la liste. Les lignes supprimées de ce filtre n'ouvrent rien au clic. Cochez-les et
-  utilisez **Restaurer la sélection**.
+- Pour les entreprises, les personnes et les opportunités, la page d'un enregistrement
+  supprimé affiche **Cette fiche a été supprimée** et un bouton **Retour**. La restauration
+  part du filtre **Enregistrements supprimés** de la liste. Là, une ligne supprimée
+  n'ouvre rien au clic. Cochez-la et utilisez **Restaurer la sélection**. Les tâches et
+  les notes ne changent pas.
 - Les enregistrements supprimés n'apparaissent pas dans les listes, la
   recherche, le board ni les réponses de l'assistant IA.
 - Supprimer une entreprise ne supprime pas les personnes, tâches ou notes qui

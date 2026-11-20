@@ -32,9 +32,10 @@ no way for Relaticle support to bring it back. If there's any doubt,
 
 - A merged record is not in the trash and cannot be restored. A merge is final, see
   [merge duplicate records](/help/records/merge-duplicate-records).
-- A deleted record's page shows **This record was deleted** and a **Go back**
-  button, so restoring starts from the list's trash filter. Deleted rows in the
-  filter open nothing when clicked. Tick them and use **Restore selected**.
+- For companies, people, and opportunities, a deleted record's page shows **This
+  record was deleted** and a **Go back** button. Restoring starts from the list's
+  **Deleted records** filter. There, a deleted row opens nothing when clicked.
+  Tick it and use **Restore selected**. Tasks and notes behave as before.
 - Deleted records don't appear in lists, search, the board, or the AI
   assistant's answers.
 - Deleting a company doesn't delete the people, tasks, or notes attached to

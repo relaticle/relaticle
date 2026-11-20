@@ -13,32 +13,35 @@ fusionar. Los lectores no.
 
 ## Iniciar una fusión
 
-- **Desde el aviso de duplicados.** La página de un registro con posibles duplicados
-  muestra una sección con su número. Despliéguela y haga clic en **Fusionar** junto al
-  registro que quiera. El cuadro de diálogo se abre con ese registro ya elegido.
+- **Desde la sección de posibles duplicados.** La página de un registro con posibles
+  duplicados muestra una sección con su número. Despliéguela y haga clic en **Fusionar**
+  junto al registro que quiera. El cuadro de diálogo se abre con ese registro ya elegido.
 - **Desde el menú.** Abra el registro, haga clic en el menú **⋯** y elija **Fusionar
   registro**.
 
 ## En el cuadro de diálogo
 
 1. Busque el otro registro por nombre, dominio o correo electrónico y elíjalo.
-2. Revise las dos tarjetas. Con **Intercambiar registros** cambia cuál gana.
+2. Revise las dos tarjetas. Con el botón **⇄** entre ellas cambia cuál gana.
 3. Haga clic en **Fusionar registros**.
 
 El registro de la derecha gana siempre que ambos tengan un valor. Los huecos se
-completan con el otro registro. Los dominios, los correos electrónicos y los valores de
-selección múltiple se combinan, primero los del ganador.
+completan con el otro registro. Los dominios, los correos electrónicos y cualquier
+atributo que contenga una lista se combinan, primero los del ganador. Eso incluye la
+selección múltiple, la lista de casillas, las etiquetas y los atributos con «permitir
+varios» activado.
 
 ## Qué obtiene
 
-La fusión crea un registro nuevo. Los dos originales se retiran y todo lo vinculado a
+La fusión crea un registro nuevo. Los dos originales se retiran. Todo lo vinculado a
 cualquiera de ellos pasa al nuevo: notas, tareas, correos, reuniones, personas y
 oportunidades, y el historial de actividad. El historial muestra una sola creación y una
 entrada que indica quién fusionó los registros.
 
-Una lista que supera su límite conserva todos sus valores. La fusión sube el límite del
-espacio de trabajo para ese atributo personalizado hasta el número combinado, con un
-máximo de 20. Después, cada registro de ese tipo puede contener tantos valores.
+Si una lista combinada supera el límite del campo, el límite sube hasta el número
+combinado. Esto vale para todo el espacio de trabajo, así que cada registro de ese tipo
+puede contener tantos valores. Se rechaza una fusión cuya lista combinada pasaría de 20.
+El cuadro de diálogo le pide que elimine antes algunos valores.
 
 ## Enlaces antiguos
 

@@ -13,8 +13,8 @@ administrateurs peuvent fusionner. Les lecteurs ne le peuvent pas.
 
 ## Lancer une fusion
 
-- **Depuis l'alerte de doublons.** La page d'un enregistrement qui a des doublons
-  probables affiche une section avec leur nombre. Dépliez-la et cliquez sur
+- **Depuis la section des doublons possibles.** La page d'un enregistrement qui a des
+  doublons possibles affiche une section avec leur nombre. Dépliez-la et cliquez sur
   **Fusionner** à côté de celui que vous voulez. La boîte de dialogue s'ouvre avec cet
   enregistrement déjà choisi.
 - **Depuis le menu.** Ouvrez l'enregistrement, cliquez sur le menu **⋯** et choisissez
@@ -23,23 +23,25 @@ administrateurs peuvent fusionner. Les lecteurs ne le peuvent pas.
 ## Dans la boîte de dialogue
 
 1. Recherchez l'autre enregistrement par nom, domaine ou e-mail, puis choisissez-le.
-2. Vérifiez les deux cartes. **Inverser les fiches** change celui qui l'emporte.
+2. Vérifiez les deux cartes. Le bouton **⇄** entre elles change celui qui l'emporte.
 3. Cliquez sur **Fusionner les fiches**.
 
 L'enregistrement de droite l'emporte partout où les deux ont une valeur. Les vides sont
-comblés par l'autre. Les domaines, les e-mails et les valeurs de sélection multiple sont
-combinés, ceux du gagnant en premier.
+comblés par l'autre. Les domaines, les e-mails et tout attribut qui contient une liste
+sont combinés, ceux du gagnant en premier. Cela couvre la sélection multiple, la liste de
+cases à cocher, les étiquettes et les attributs dont « allow multiple » est activé.
 
 ## Ce que vous obtenez
 
-La fusion crée un nouvel enregistrement. Les deux originaux sont retirés, et tout ce qui
+La fusion crée un nouvel enregistrement. Les deux originaux sont retirés. Tout ce qui
 était lié à l'un ou à l'autre passe au nouveau : notes, tâches, e-mails, réunions,
 personnes et opportunités, ainsi que l'historique d'activité. L'historique montre une
 seule création et une entrée indiquant qui a fusionné les enregistrements.
 
-Une liste qui dépasse sa limite garde toutes ses valeurs. La fusion relève la limite de
-l'espace de travail pour cet attribut personnalisé jusqu'au nombre combiné, dans la
-limite de 20. Chaque enregistrement de ce type peut ensuite contenir autant de valeurs.
+Si une liste combinée dépasse la limite du champ, la limite monte jusqu'au nombre
+combiné. Cela vaut pour tout l'espace de travail : chaque enregistrement de ce type peut
+ensuite contenir autant de valeurs. Une fusion dont la liste dépasserait 20 valeurs est
+refusée. La boîte de dialogue vous demande de supprimer d'abord quelques valeurs.
 
 ## Anciens liens
 

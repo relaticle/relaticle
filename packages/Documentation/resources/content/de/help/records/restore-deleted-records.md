@@ -36,10 +36,11 @@ und auch der Relaticle-Support kann ihn nicht zurückholen. Im Zweifel
 - Ein zusammengeführter Eintrag liegt nicht im Papierkorb und kann nicht wiederhergestellt
   werden. Das Zusammenführen ist endgültig, siehe
   [Doppelte Einträge zusammenführen](/de/help/records/merge-duplicate-records).
-- Die Seite eines gelöschten Eintrags zeigt **Dieser Eintrag wurde gelöscht** und eine
-  Schaltfläche **Zurück**. Das Wiederherstellen beginnt deshalb im Filter für gelöschte
-  Einträge der Liste. Gelöschte Zeilen im Filter öffnen beim Klicken nichts. Markieren Sie
-  sie und nutzen Sie **Ausgewählte wiederherstellen**.
+- Bei Unternehmen, Personen und Verkaufschancen zeigt die Seite eines gelöschten Eintrags
+  **Dieser Eintrag wurde gelöscht** und eine Schaltfläche **Zurück**. Das Wiederherstellen
+  beginnt im Listenfilter **Gelöschte Einträge**. Dort öffnet eine gelöschte Zeile beim
+  Klicken nichts. Markieren Sie sie und nutzen Sie **Ausgewählte wiederherstellen**.
+  Aufgaben und Notizen verhalten sich wie bisher.
 - Gelöschte Einträge erscheinen weder in Listen, in der Suche und auf dem Board
   noch in den Antworten des KI-Assistenten.
 - Wird ein Unternehmen gelöscht, werden die daran hängenden Personen, Aufgaben

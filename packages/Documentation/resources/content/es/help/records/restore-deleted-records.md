@@ -37,10 +37,10 @@ recuperarlo. Si tiene alguna duda,
 - Un registro fusionado no está en la papelera y no se puede restaurar. La fusión es
   definitiva, consulte
   [Fusionar registros duplicados](/es/help/records/merge-duplicate-records).
-- La página de un registro eliminado muestra **Este registro se eliminó** y un botón
-  **Volver**, así que la restauración empieza en el filtro de eliminados de la lista. Las
-  filas eliminadas del filtro no abren nada al hacer clic. Márquelas y use **Restaurar
-  seleccionados**.
+- En empresas, personas y oportunidades, la página de un registro eliminado muestra **Este
+  registro se eliminó** y un botón **Volver**. La restauración empieza en el filtro
+  **Registros eliminados** de la lista. Allí, una fila eliminada no abre nada al hacer
+  clic. Márquela y use **Restaurar seleccionados**. Las tareas y las notas siguen igual.
 - Los registros eliminados no aparecen en las listas, la búsqueda, el tablero ni en
   las respuestas del asistente de IA.
 - Eliminar una empresa no elimina las personas, tareas o notas asociadas. Al
