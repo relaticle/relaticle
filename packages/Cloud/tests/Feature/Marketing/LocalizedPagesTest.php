@@ -234,7 +234,7 @@ it('leaves a link to the unprefixed-only API reference English', function (): vo
 it('groups the credits on a localized pricing page the way that language does', function (string $locale): void {
     Feature::for(null)->activate(Billing::class);
 
-    $each = Locales::within($locale, fn (): string => __(':credits credits each month', ['credits' => Number::format(Plan::Pro->credits(), locale: $locale)]));
+    $each = Locales::within($locale, fn (): string => __(':credits credits a month', ['credits' => Number::format(Plan::Pro->credits(), locale: $locale)]));
 
     $this->get("/{$locale}/pricing")->assertOk()->assertSee($each, false);
 })->with(['de', 'fr']);
@@ -248,7 +248,7 @@ it('groups the credits of the Spanish pricing page the Latin American way', func
 it('keeps English grouping on the English pricing page', function (): void {
     Feature::for(null)->activate(Billing::class);
 
-    $this->get('/pricing')->assertOk()->assertSee('2,000 credits each month', false);
+    $this->get('/pricing')->assertOk()->assertSee('2,000 credits a month', false);
 });
 
 it('words the own-your-data heading of the security page as moving away, not leaving a workspace', function (string $locale, string $heading): void {

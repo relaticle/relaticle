@@ -32,7 +32,7 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertSee('$24')
         ->assertSee('$228 billed yearly')
         ->assertSee('Save 21%')
-        ->assertSee('2,000 AI credits')
+        ->assertSee('2,000 credits a month')
         ->assertSee('Cloud Pro')
         ->assertSee('Prefer to self-host? It’s free.')
         ->assertSee('Start 14-day trial')
@@ -64,7 +64,7 @@ it('closes with a trial start and a sales contact when billing is on', function 
     $cta = $crawler->filter('#pricing-cta');
 
     expect($cta->filter('h2')->text())->toBe(__('Start with a 14-day trial'))
-        ->and($cta->filter('a[href="'.route('login').'"]')->text())->toContain(__('Start for free'))
+        ->and($cta->filter('a[href="'.route('login').'"]')->text())->toContain('Start 14-day trial')
         ->and($cta->filter('a[href="'.route('contact').'"]')->text())->toContain(__('Talk to us'))
         ->and($crawler->filter('#pricing-plans #self-hosting'))->toHaveCount(0)
         ->and($crawler->filter('#self-hosting a[href="'.route('selfHosted').'"]'))->toHaveCount(1);
@@ -230,7 +230,8 @@ it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
         ->and($card->text())->toContain('Recommended')
         ->toContain('$49')
         ->toContain('$588 billed yearly')
-        ->toContain(number_format(Plan::Scale->credits()).' AI credits a month, about 3,000 replies')
+        ->toContain(number_format(Plan::Scale->credits()).' credits a month')
+        ->toContain('About 3,000 replies')
         ->toContain('Up to '.Plan::Scale->connectedMailboxes().' connected mailboxes')
         ->and($crawler->filter('#pro-plan')->text())->not->toContain('Recommended');
 
@@ -246,7 +247,7 @@ it('prices a typical reply from the production average on each paid card', funct
 
     $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
 
-    expect($crawler->filter('#pro-plan')->text())->toContain('2,000 AI credits a month, about 1,200 replies')
+    expect($crawler->filter('#pro-plan')->text())->toContain('AI allowance 2,000 credits a month About 1,200 replies')
         ->and($crawler->filter('#pricing-faq')->text())->toContain('about 1,200 typical replies');
 });
 
@@ -283,14 +284,38 @@ it('drops the star count from the trust line when GitHub has none to report', fu
         ->not->toContain('GitHub stars');
 });
 
-it('states the Enterprise AI allowance and API throughput the plan enforces', function (): void {
+it('compares self-hosting beside the cloud plans when billing is on', function (): void {
+    withHostedBilling();
+
+    $table = (new Crawler((string) $this->get('/pricing')->assertOk()->getContent()))->filter('#compare table');
+
+    expect($table->filter('thead th')->each(fn (Crawler $cell): string => trim($cell->text())))
+        ->toBe(['What’s included', 'Self-hosted Free', 'Cloud Pro $19/mo', 'Cloud Scale $49/mo', 'Enterprise From $20K/yr'])
+        ->and($table->filter('tbody th[scope="colgroup"]')->each(fn (Crawler $cell): string => trim($cell->text())))
+        ->toContain('Workspace', 'AI', 'Integrations', 'Setup and support')
+        ->and($table->text())
+        ->toContain('Unlimited on every plan')
+        ->toContain('Not metered, with your own AI provider key')
+        ->toContain('You install it with Docker Compose')
+        ->toContain('Community on Discord')
+        ->toContain(Plan::Scale->throughputMultiplier().'x the request limit')
+        ->not->toContain('1 on every plan')
+        ->and($table->filter('td svg.lucide'))->toHaveCount(2);
+});
+
+it('leaves the Enterprise allowance and limits to the agreement', function (): void {
     withHostedBilling();
 
     $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
+    $card = $crawler->filter('#enterprise-plan')->text();
+    $enterpriseCells = $crawler->filter('#compare tbody tr')->each(fn (Crawler $row): string => $row->filter('td')->count() === 4 ? trim($row->filter('td')->last()->text()) : '');
 
-    expect($crawler->filter('#enterprise-plan')->text())
-        ->toContain(number_format(Plan::Enterprise->credits()).' AI credits a month, about 6,000 replies')
-        ->toContain(Plan::Enterprise->throughputMultiplier().'x REST API and MCP throughput');
+    expect($card)->toContain('AI allowance Custom Agreed with your team')
+        ->toContain('AI credits, mailboxes and API limits set for your team')
+        ->not->toContain(number_format(Plan::Enterprise->credits()))
+        ->not->toContain(Plan::Enterprise->throughputMultiplier().'x')
+        ->and(array_count_values($enterpriseCells)['Agreed with your team'] ?? 0)->toBe(3)
+        ->and($crawler->filter('#compare')->text())->not->toContain(number_format(Plan::Enterprise->credits()));
 });
 
 it('names the buyer each plan is for on the pricing page', function (): void {

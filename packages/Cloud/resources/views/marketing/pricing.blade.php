@@ -180,8 +180,7 @@
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 @if($billingActive)
-                    {{ __('Add teammates without the bill changing.') }}<br class="hidden sm:block"/>
-                    {{ __('Hosted by us, or self-hosted for free.') }}
+                    {{ __('Add teammates without the bill changing. Hosted by us, or self-hosted for free.') }}
                 @else
                     {{ __('Unlimited users. Unlimited records. Self-host for free, or let us run it for you.') }}
                 @endif
@@ -276,7 +275,7 @@
             : __('Unlimited users and records. Hosted by us, or on your own server.')"
     >
         <x-cloud::marketing.button :href="route('login')" data-analytics-intent="signup" data-analytics-placement="pricing">
-            {{ __('Start for free') }}
+            {{ $billingActive ? __('Start :days-day trial', ['days' => $trialDays]) : __('Start for free') }}
         </x-cloud::marketing.button>
         @if($billingActive)
             <x-cloud::marketing.button variant="secondary" :href="LocalizedUrl::route('contact')">

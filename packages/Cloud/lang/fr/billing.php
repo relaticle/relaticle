@@ -104,12 +104,19 @@ return [
     'billed_monthly' => 'Facturé mensuellement · résiliable à tout moment',
     'billed_yearly' => '$:price facturés annuellement · résiliable à tout moment',
     'per_month' => '/ mois',
+    'allowance' => [
+        'label' => 'Allocation IA',
+        'credits' => 'crédits par mois',
+        'replies' => 'Environ :replies réponses',
+        'line' => ':credits crédits d\'IA par mois, environ :replies réponses',
+        'custom' => 'Sur mesure',
+        'agreed' => 'Convenu avec votre équipe',
+    ],
     'pro_plan' => [
         'tagline' => 'Pour les équipes qui mettent l\'IA au travail',
         'pricing_tagline' => 'Pour un vendeur avec une liste ciblée',
         'features' => [
             'Utilisateurs et enregistrements illimités',
-            ':credits crédits d\'IA par mois, environ :replies réponses',
             'Modèles d\'IA premium inclus',
             'Jusqu\'à 10 boîtes mail connectées',
             'REST API et MCP server',
@@ -122,7 +129,6 @@ return [
         'badge' => 'Recommandé',
         'includes' => 'Tout ce qui est dans Cloud Pro, plus',
         'features' => [
-            ':credits crédits d\'IA par mois, environ :replies réponses',
             'Jusqu\'à 50 boîtes mail connectées',
             'Débit 3x pour la REST API et le MCP server',
             'Support prioritaire',
@@ -185,9 +191,7 @@ return [
         'billing' => 'Facturé annuellement · jamais par siège',
         'includes' => 'Tout ce qui est dans Cloud Scale, plus',
         'features' => [
-            ':credits crédits d\'IA par mois, environ :replies réponses',
-            'Boîtes mail connectées illimitées',
-            'Débit 10x pour la REST API et le MCP server',
+            'Crédits d\'IA, boîtes mail et limites d\'API adaptés à votre équipe',
             'Un projet de mise en œuvre cadré',
             'Intégrations sur mesure selon accord',
             'Accès direct à l\'équipe fondatrice',

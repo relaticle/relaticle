@@ -104,12 +104,19 @@ return [
     'billed_monthly' => 'Billed monthly · cancel anytime',
     'billed_yearly' => '$:price billed yearly · cancel anytime',
     'per_month' => '/ month',
+    'allowance' => [
+        'label' => 'AI allowance',
+        'credits' => 'credits a month',
+        'replies' => 'About :replies replies',
+        'line' => ':credits AI credits a month, about :replies replies',
+        'custom' => 'Custom',
+        'agreed' => 'Agreed with your team',
+    ],
     'pro_plan' => [
         'tagline' => 'For teams that put AI to work',
         'pricing_tagline' => 'For one seller with a named list',
         'features' => [
             'Unlimited users and records',
-            ':credits AI credits a month, about :replies replies',
             'Premium AI models included',
             'Up to 10 connected mailboxes',
             'REST API and MCP server',
@@ -122,7 +129,6 @@ return [
         'badge' => 'Recommended',
         'includes' => 'Everything in Cloud Pro, plus',
         'features' => [
-            ':credits AI credits a month, about :replies replies',
             'Up to 50 connected mailboxes',
             '3x REST API and MCP throughput',
             'Priority support',
@@ -185,9 +191,7 @@ return [
         'billing' => 'Billed yearly · never per seat',
         'includes' => 'Everything in Cloud Scale, plus',
         'features' => [
-            ':credits AI credits a month, about :replies replies',
-            'Unlimited connected mailboxes',
-            '10x REST API and MCP throughput',
+            'AI credits, mailboxes and API limits set for your team',
             'A scoped implementation project',
             'Custom integrations by agreement',
             'Direct access to the founding team',

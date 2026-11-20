@@ -104,12 +104,19 @@ return [
     'billed_monthly' => 'Facturación mensual · cancele cuando quiera',
     'billed_yearly' => '$:price facturados al año · cancele cuando quiera',
     'per_month' => '/ mes',
+    'allowance' => [
+        'label' => 'Asignación de IA',
+        'credits' => 'créditos al mes',
+        'replies' => 'Unas :replies respuestas',
+        'line' => ':credits créditos de IA al mes, unas :replies respuestas',
+        'custom' => 'A medida',
+        'agreed' => 'Acordado con su equipo',
+    ],
     'pro_plan' => [
         'tagline' => 'Para equipos que ponen la IA a trabajar',
         'pricing_tagline' => 'Para un vendedor con una lista definida',
         'features' => [
             'Usuarios y registros ilimitados',
-            ':credits créditos de IA al mes, unas :replies respuestas',
             'Modelos de IA premium incluidos',
             'Hasta 10 buzones conectados',
             'REST API y MCP server',
@@ -122,7 +129,6 @@ return [
         'badge' => 'Recomendado',
         'includes' => 'Todo lo de Cloud Pro, más',
         'features' => [
-            ':credits créditos de IA al mes, unas :replies respuestas',
             'Hasta 50 buzones conectados',
             '3x de capacidad de REST API y MCP server',
             'Soporte prioritario',
@@ -185,9 +191,7 @@ return [
         'billing' => 'Facturación anual · nunca por usuario',
         'includes' => 'Todo lo de Cloud Scale, más',
         'features' => [
-            ':credits créditos de IA al mes, unas :replies respuestas',
-            'Buzones conectados ilimitados',
-            '10x de capacidad de REST API y MCP server',
+            'Créditos de IA, buzones y límites de API a la medida de su equipo',
             'Un proyecto de implementación acotado',
             'Integraciones personalizadas por acuerdo',
             'Acceso directo al equipo fundador',

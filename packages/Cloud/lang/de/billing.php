@@ -104,12 +104,19 @@ return [
     'billed_monthly' => 'Monatlich abgerechnet · jederzeit kündbar',
     'billed_yearly' => '$:price jährlich abgerechnet · jederzeit kündbar',
     'per_month' => '/ Monat',
+    'allowance' => [
+        'label' => 'KI-Kontingent',
+        'credits' => 'Credits pro Monat',
+        'replies' => 'Etwa :replies Antworten',
+        'line' => ':credits KI-Credits pro Monat, etwa :replies Antworten',
+        'custom' => 'Individuell',
+        'agreed' => 'Mit Ihrem Team vereinbart',
+    ],
     'pro_plan' => [
         'tagline' => 'Für Teams, die KI für sich arbeiten lassen',
         'pricing_tagline' => 'Für eine Person im Vertrieb mit klarer Zielliste',
         'features' => [
             'Unbegrenzt viele Nutzer und Einträge',
-            ':credits KI-Credits pro Monat, etwa :replies Antworten',
             'Premium-KI-Modelle inklusive',
             'Bis zu 10 verbundene Postfächer',
             'REST API und MCP-Server',
@@ -122,7 +129,6 @@ return [
         'badge' => 'Empfohlen',
         'includes' => 'Alles aus Cloud Pro, plus',
         'features' => [
-            ':credits KI-Credits pro Monat, etwa :replies Antworten',
             'Bis zu 50 verbundene Postfächer',
             '3-facher Durchsatz für REST API und MCP-Server',
             'Support mit Priorität',
@@ -185,9 +191,7 @@ return [
         'billing' => 'Jährlich abgerechnet · nie pro Nutzer',
         'includes' => 'Alles aus Cloud Scale, plus',
         'features' => [
-            ':credits KI-Credits pro Monat, etwa :replies Antworten',
-            'Unbegrenzt viele verbundene Postfächer',
-            '10-facher Durchsatz für REST API und MCP-Server',
+            'KI-Credits, Postfächer und API-Limits passend zu Ihrem Team',
             'Ein klar umrissenes Implementierungsprojekt',
             'Individuelle Integrationen nach Vereinbarung',
             'Direkter Zugang zum Gründerteam',
