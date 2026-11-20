@@ -32,7 +32,7 @@
         tab: 'emails',
         switchTab() {
             this.tab = this.tab === 'emails' ? 'meetings' : 'emails'
-            this.$nextTick(() => this.$refs[this.tab].focus())
+            this.$refs[this.tab].focus()
         },
     }"
     {{ $attributes }}
