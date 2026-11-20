@@ -675,6 +675,7 @@ final class ActivityLog extends Page implements HasTable
             'restored' => 'lucide-undo-2',
             ExecuteImportJob::IMPORTED_EVENT => 'lucide-upload',
             ExecuteImportJob::FAILED_EVENT => 'lucide-triangle-exclamation-point',
+            AppEventPalette::RecordMerged->value => AppEventPalette::RecordMerged->getIcon(),
             default => 'lucide-square-pen',
         };
     }
