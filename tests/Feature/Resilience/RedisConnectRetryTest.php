@@ -11,6 +11,9 @@ function unreachableRedisConnection(): string
         ...config('database.redis.default'),
         'host' => '127.0.0.1',
         'port' => 1,
+        'max_retries' => 4,
+        'backoff_base' => 100,
+        'backoff_cap' => 1000,
     ]]);
 
     return 'unreachable';
