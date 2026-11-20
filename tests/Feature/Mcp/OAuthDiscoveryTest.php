@@ -48,6 +48,8 @@ it('registers a client that redirects to a known connector host', function (stri
     'claude' => 'https://claude.ai/api/mcp/auth_callback',
     'chatgpt' => 'https://chatgpt.com/connector_platform_oauth_redirect',
     'mistral' => 'https://console.mistral.ai/oauth/callback',
+    'perplexity' => 'https://www.perplexity.ai/rest/connections/oauth_callback',
+    'perplexity enterprise' => 'https://enterprise.perplexity.ai/rest/connections/oauth_callback',
     'localhost on any port' => 'http://localhost:33418/callback',
     'ipv4 loopback' => 'http://127.0.0.1:52100/callback',
     'cursor' => 'cursor://anysphere.cursor-mcp/oauth/callback',
@@ -64,6 +66,7 @@ it('refuses a client that redirects anywhere else', function (string $redirectUr
 })->with([
     'unknown host' => 'https://attacker.example/callback',
     'lookalike subdomain' => 'https://claude.ai.attacker.example/callback',
+    'unlisted subdomain of a known host' => 'https://labs.perplexity.ai/rest/connections/oauth_callback',
     'known host over plain http' => 'http://claude.ai/api/mcp/auth_callback',
     'loopback over https' => 'https://localhost:33418/callback',
     'unlisted custom scheme' => 'evil://callback.example/oauth',
