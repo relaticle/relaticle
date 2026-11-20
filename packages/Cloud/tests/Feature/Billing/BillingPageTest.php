@@ -1408,3 +1408,52 @@ it('titles the page in the user language', function (): void {
 
     expect(livewire(Billing::class)->instance()->getTitle())->toBe('Abrechnung');
 });
+
+function planCardCheckoutOwner(): Workspace
+{
+    config()->set('cashier.secret', 'sk_test_fake');
+    config()->set('services.stripe.prices.scale_monthly', 'price_scale_monthly_test');
+
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['plan' => Plan::Free, 'stripe_id' => 'cus_plan_card'])->save();
+
+    return $workspace;
+}
+
+it('sends the owner from a plan card straight to Stripe checkout for the chosen plan and period', function (): void {
+    withHostedBilling();
+
+    $recorder = StripeRecorder::install();
+    planCardCheckoutOwner();
+
+    livewire(Billing::class)
+        ->call('subscribe', 'scale', 'monthly')
+        ->assertRedirect('https://checkout.stripe.com/c/pay/cs_test_fake')
+        ->assertNotNotified();
+
+    expect($recorder->paramsFor('/checkout/sessions')['line_items'][0]['price'])->toBe('price_scale_monthly_test');
+});
+
+it('does not open checkout from a plan card for a member who cannot manage billing', function (): void {
+    withHostedBilling();
+
+    StripeRecorder::install();
+    $workspace = planCardCheckoutOwner();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'admin']);
+    $this->actingAs($member);
+
+    livewire(Billing::class)
+        ->call('subscribe', 'scale', 'monthly')
+        ->assertNoRedirect();
+});
+
+it('tells a trialing owner on the plan cards when the card is first charged', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'plan' => Plan::Free, 'trial_ends_at' => now()->addDays(9)])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.upgrade.trial_notice', ['date' => now()->addDays(9)->isoFormat('ll')]));
+});

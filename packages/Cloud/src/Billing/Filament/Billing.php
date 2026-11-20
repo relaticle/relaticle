@@ -33,12 +33,14 @@ use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Livewire\Concerns\StartsSubscriptionCheckout;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Throwable;
 
 final class Billing extends Page
 {
     use HasWorkspaceSettingsNavigation;
+    use StartsSubscriptionCheckout;
 
     protected static string|\BackedEnum|null $navigationIcon = 'lucide-credit-card';
 
@@ -192,14 +194,6 @@ final class Billing extends Page
             report($exception);
             $this->notifyCheckoutFailed();
         }
-    }
-
-    private function notifyCheckoutFailed(): void
-    {
-        Notification::make()
-            ->title(__('cloud::billing.errors.checkout_failed'))
-            ->danger()
-            ->send();
     }
 
     /** @return array<string, mixed> */
