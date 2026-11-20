@@ -109,7 +109,7 @@ return [
         'pricing_tagline' => 'Für eine Person im Vertrieb mit klarer Zielliste',
         'features' => [
             'Unbegrenzt viele Nutzer und Einträge',
-            '2.000 KI-Credits / Monat',
+            ':credits KI-Credits pro Monat, etwa :replies Antworten',
             'Premium-KI-Modelle inklusive',
             'Bis zu 10 verbundene Postfächer',
             'REST API und MCP-Server',
@@ -122,7 +122,7 @@ return [
         'badge' => 'Empfohlen',
         'includes' => 'Alles aus Cloud Pro, plus',
         'features' => [
-            '5.000 KI-Credits / Monat',
+            ':credits KI-Credits pro Monat, etwa :replies Antworten',
             'Bis zu 50 verbundene Postfächer',
             '3-facher Durchsatz für REST API und MCP-Server',
             'Support mit Priorität',

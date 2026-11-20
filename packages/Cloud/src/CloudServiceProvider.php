@@ -368,7 +368,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     private function registerCommunityCounts(): void
     {
-        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.community', 'cloud::marketing.press', 'cloud::marketing.self-hosted'], static function (ViewContract $view): void {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.community', 'cloud::marketing.press', 'cloud::marketing.self-hosted', 'cloud::marketing.pricing'], static function (ViewContract $view): void {
             $gitHubService = resolve(GitHubService::class);
 
             $view->with([

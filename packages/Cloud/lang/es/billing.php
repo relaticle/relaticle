@@ -109,7 +109,7 @@ return [
         'pricing_tagline' => 'Para un vendedor con una lista definida',
         'features' => [
             'Usuarios y registros ilimitados',
-            '2,000 créditos de IA / mes',
+            ':credits créditos de IA al mes, unas :replies respuestas',
             'Modelos de IA premium incluidos',
             'Hasta 10 buzones conectados',
             'REST API y MCP server',
@@ -122,7 +122,7 @@ return [
         'badge' => 'Recomendado',
         'includes' => 'Todo lo de Cloud Pro, más',
         'features' => [
-            '5,000 créditos de IA / mes',
+            ':credits créditos de IA al mes, unas :replies respuestas',
             'Hasta 50 buzones conectados',
             '3x de capacidad de REST API y MCP server',
             'Soporte prioritario',

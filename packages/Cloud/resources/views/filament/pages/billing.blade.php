@@ -261,7 +261,7 @@
                                 <p class="mt-5 text-xs font-medium text-gray-500 dark:text-gray-400">{{ __('cloud::billing.scale_plan.includes') }}</p>
                             @endif
                             <ul @class(['grid gap-2.5', 'mt-2.5' => $isScale, 'mt-5' => ! $isScale])>
-                                @foreach(__("cloud::billing.{$plan->value}_plan.features") as $feature)
+                                @foreach(__("cloud::billing.{$plan->value}_plan.features", ['credits' => Number::format($plan->credits()), 'replies' => Number::format($plan->typicalReplies())]) as $feature)
                                     <li class="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-300">
                                         <x-lucide-check class="mt-0.5 h-4 w-4 shrink-0 text-primary dark:text-primary-400" />
                                         {{ $feature }}

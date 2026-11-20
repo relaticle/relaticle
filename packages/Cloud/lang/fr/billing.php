@@ -109,7 +109,7 @@ return [
         'pricing_tagline' => 'Pour un vendeur avec une liste ciblée',
         'features' => [
             'Utilisateurs et enregistrements illimités',
-            '2 000 crédits d\'IA / mois',
+            ':credits crédits d\'IA par mois, environ :replies réponses',
             'Modèles d\'IA premium inclus',
             'Jusqu\'à 10 boîtes mail connectées',
             'REST API et MCP server',
@@ -122,7 +122,7 @@ return [
         'badge' => 'Recommandé',
         'includes' => 'Tout ce qui est dans Cloud Pro, plus',
         'features' => [
-            '5 000 crédits d\'IA / mois',
+            ':credits crédits d\'IA par mois, environ :replies réponses',
             'Jusqu\'à 50 boîtes mail connectées',
             'Débit 3x pour la REST API et le MCP server',
             'Support prioritaire',

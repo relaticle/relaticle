@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\Workspace;
+use Illuminate\Support\Facades\Cache;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Cloud\Marketing\Support\CompetitorFacts;
@@ -34,9 +35,10 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertSee('2,000 AI credits')
         ->assertSee('Cloud Pro')
         ->assertSee('Prefer to self-host? It’s free.')
-        ->assertSee('Start for free')
-        ->assertSee('14-day trial, no card.')
-        ->assertSee('Starts as a 14-day Cloud Pro trial.')
+        ->assertSee('Start 14-day trial')
+        ->assertSee('No card needed.')
+        ->assertSee('Starts on Cloud Pro. Pick Cloud Scale when you subscribe.')
+        ->assertSee('Unlimited users at this price')
         ->assertDontSee('Switch plans in Billing.')
         ->assertDontSee('One workspace price as your workspace grows')
         ->assertDontSee('300 AI credits')
@@ -228,7 +230,7 @@ it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
         ->and($card->text())->toContain('Recommended')
         ->toContain('$49')
         ->toContain('$588 billed yearly')
-        ->toContain(number_format(Plan::Scale->credits()).' AI credits / month')
+        ->toContain(number_format(Plan::Scale->credits()).' AI credits a month, about 3,000 replies')
         ->toContain('Up to '.Plan::Scale->connectedMailboxes().' connected mailboxes')
         ->and($crawler->filter('#pro-plan')->text())->not->toContain('Recommended');
 
@@ -237,6 +239,48 @@ it('sells Cloud Scale as the highlighted self-serve plan', function (): void {
 
     expect($offer['price'])->toBe('49')
         ->and($offer['description'])->toContain('$588/year');
+});
+
+it('prices a typical reply from the production average on each paid card', function (): void {
+    withHostedBilling();
+
+    $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
+
+    expect($crawler->filter('#pro-plan')->text())->toContain('2,000 AI credits a month, about 1,200 replies')
+        ->and($crawler->filter('#pricing-faq')->text())->toContain('about 1,200 typical replies');
+});
+
+it('tells buyers extra credits never expire without quoting an unconfirmed pack price', function (): void {
+    withHostedBilling();
+
+    $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
+
+    foreach (['#pro-plan', '#scale-plan'] as $card) {
+        expect($crawler->filter($card)->text())
+            ->toContain('Need more? Buy extra credits anytime. They never expire.')
+            ->not->toContain('Top up AI credits anytime.');
+    }
+});
+
+it('shows the open-source trust line beside the price control', function (): void {
+    withHostedBilling();
+    Cache::forever('github_stars_Relaticle_relaticle', 1234);
+
+    $trust = (new Crawler((string) $this->get('/pricing')->assertOk()->getContent()))->filter('#pricing-trust')->text();
+
+    expect($trust)->toContain('Open source under AGPL-3.0')
+        ->toContain('1.2K GitHub stars')
+        ->toContain('Export to CSV anytime');
+});
+
+it('drops the star count from the trust line when GitHub has none to report', function (): void {
+    withHostedBilling();
+    Cache::forever('github_stars_Relaticle_relaticle', 0);
+
+    $trust = (new Crawler((string) $this->get('/pricing')->assertOk()->getContent()))->filter('#pricing-trust')->text();
+
+    expect($trust)->toContain('Open source under AGPL-3.0')
+        ->not->toContain('GitHub stars');
 });
 
 it('states the Enterprise AI allowance and API throughput the plan enforces', function (): void {

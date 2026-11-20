@@ -36,29 +36,28 @@
                             <span x-show="yearly" class="ms-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/[0.08] dark:text-gray-200">{{ __('cloud::billing.yearly_save', ['percent' => $plan->yearlySavingPercent()]) }}</span>
                         </p>
                         <p class="mt-2 text-sm text-gray-500 dark:text-gray-400" x-text="yearly ? @js(__('cloud::billing.billed_yearly', ['price' => \Illuminate\Support\Number::format($plan->yearlyPrice())])) : @js(__('cloud::billing.billed_monthly'))">{{ __('cloud::billing.billed_yearly', ['price' => \Illuminate\Support\Number::format($plan->yearlyPrice())]) }}</p>
+                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">{{ __('Unlimited users at this price') }}</p>
                     </div>
 
                     <x-cloud::marketing.button :variant="$isScale ? 'primary' : 'secondary'" :href="route('login')" class="mt-8 w-full" data-analytics-intent="signup" data-analytics-placement="pricing">
-                        {{ __('Start for free') }}
+                        {{ __('Start :days-day trial', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}
                     </x-cloud::marketing.button>
                     <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {{ $isScale
-                            ? __('Starts as a :days-day Cloud Pro trial.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS])
-                            : __(':days-day trial, no card.', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}
+                        {{ $isScale ? __('Starts on Cloud Pro. Pick Cloud Scale when you subscribe.') : __('No card needed.') }}
                     </p>
                 </div>
 
                 <div class="border-rail flex flex-1 flex-col border-t p-6 md:px-10">
                     <p class="{{ $priceLabel }} mb-5">{{ $isScale ? __('cloud::billing.scale_plan.includes') : __('Your workspace includes') }}</p>
                     <ul class="{{ $featureList }}">
-                        @foreach(__("cloud::billing.{$plan->value}_plan.features") as $feature)
+                        @foreach(__("cloud::billing.{$plan->value}_plan.features", ['credits' => Number::format($plan->credits()), 'replies' => Number::format($plan->typicalReplies())]) as $feature)
                             <li class="flex items-start gap-3">
                                 <x-lucide-check class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
                                 {{ $feature }}
                             </li>
                         @endforeach
                     </ul>
-                    <p class="mt-auto pt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Top up AI credits anytime.') }}</p>
+                    <p class="mt-auto pt-6 text-sm text-gray-500 dark:text-gray-400">{{ __('Need more? Buy extra credits anytime. They never expire.') }}</p>
                 </div>
             </section>
         @endforeach

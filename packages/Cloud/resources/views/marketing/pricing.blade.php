@@ -88,7 +88,7 @@
             ]);
             $hostedUpdatesCell = __('Managed by Relaticle. No self-hosted maintenance required');
             $hostedPlanAnswer = __(
-                'Cloud Pro is :price and includes unlimited users and records, every offered AI model (:models), the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. Cloud Scale raises the allowance to :scaleCredits credits, lifts the mailbox cap to :scaleMailboxes, and triples REST API and MCP throughput for $:scalePrice/mo billed yearly. New workspaces start on a :days-day trial automatically, with no card required.',
+                'Cloud Pro is :price and includes unlimited users and records, every offered AI model (:models), the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers about :typicalReplies typical replies at the average cost across workspaces, up to :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. Cloud Scale raises the allowance to :scaleCredits credits, lifts the mailbox cap to :scaleMailboxes, and triples REST API and MCP throughput for $:scalePrice/mo billed yearly. New workspaces start on a :days-day trial automatically, with no card required.',
                 [
                     'price' => $hostedPriceCell,
                     'scaleCredits' => $scaleCredits,
@@ -98,6 +98,7 @@
                     'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' '.__('and').' '),
                     'cheapestModel' => $cheapestModel,
                     'dearestModel' => $dearestEntry['label'],
+                    'typicalReplies' => \Illuminate\Support\Number::format(\App\Enums\Plan::Pro->typicalReplies()),
                     'dearestReplies' => \Illuminate\Support\Number::format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
                     'days' => $trialDays,
                 ]
@@ -187,6 +188,13 @@
             </p>
             @if($billingActive)
                 <x-cloud::billing.interval-toggle class="mt-6 items-center" />
+                <p id="pricing-trust" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                    {{ __('Open source under AGPL-3.0') }}
+                    @if($githubStars > 0)
+                        <span class="mx-1.5" aria-hidden="true">·</span>{{ __(':count GitHub stars', ['count' => $formattedGithubStars]) }}
+                    @endif
+                    <span class="mx-1.5" aria-hidden="true">·</span>{{ __('Export to CSV anytime') }}
+                </p>
             @endif
         </x-slot:aside>
 
