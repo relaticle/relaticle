@@ -1378,7 +1378,7 @@
     }
 
     // Filament answers a page change by scrolling the table container into view, which never moves the rows' own
-    // scroll box. The footer sits after the last row, so without this the next page opens at its end.
+    // scroll box, and the footer that was clicked sits after the last row.
     function registerPaginationFooter() {
         window.Alpine.data('tablePaginationFooter', () => {
             const listeners = new AbortController()
