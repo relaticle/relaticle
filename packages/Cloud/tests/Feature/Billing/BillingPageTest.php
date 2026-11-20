@@ -26,8 +26,10 @@ use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
+use Relaticle\Cloud\Billing\Data\Renewal;
 use Relaticle\Cloud\Billing\Filament\Billing;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
+use Relaticle\Cloud\Billing\Livewire\CreditUsage;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Tests\Helpers\StripeRecorder;
@@ -41,7 +43,7 @@ mutates(
 );
 
 beforeEach(function (): void {
-    Queue::fake([RefreshManagedRenewal::class]);
+    Queue::fake([RefreshRenewal::class]);
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
 });
@@ -1159,7 +1161,7 @@ function managedPageWorkspace(Workspace $workspace, string $status = 'active', P
 
 function cacheManagedRenewalForPage(): void
 {
-    Cache::forever(RefreshManagedRenewal::CACHE_PREFIX.'sub_managed_page', [
+    Cache::forever(Renewal::cacheKey('sub_managed_page'), [
         'renews_at' => now()->addMonths(6)->getTimestamp(),
         'amount' => 70800,
         'currency' => 'usd',
@@ -1215,7 +1217,7 @@ it('omits the renewal line when nothing is cached and asks Stripe for it in the 
         ->assertDontSee('Renews')
         ->assertSee(__('cloud::billing.manage.button'));
 
-    Queue::assertPushed(RefreshManagedRenewal::class, fn (RefreshManagedRenewal $job): bool => $job->stripeSubscriptionId === 'sub_managed_page');
+    Queue::assertPushed(RefreshRenewal::class, fn (RefreshRenewal $job): bool => $job->stripeSubscriptionId === 'sub_managed_page');
 });
 
 it('warns the owner when the managed invoice is overdue', function (): void {
@@ -1474,6 +1476,7 @@ function graceSubscriptionOwner(): Workspace
         'quantity' => 1,
         'ends_at' => now()->addDays(12),
     ]);
+    rememberRenewal('sub_grace', ['amount' => 3190, 'renews_at' => now()->addDays(12)->getTimestamp()]);
 
     return $workspace;
 }
@@ -1489,7 +1492,7 @@ it('keeps a subscription set to cancel once the owner confirms its renewal terms
         ->assertActionVisible('keepSubscription')
         ->assertActionExists('keepSubscription', fn (Action $action): bool => $action->getModalHeading() === __('cloud::billing.keep.heading', ['plan' => Plan::Pro->marketingLabel()])
             && str_contains((string) $action->getModalDescription(), $renewal)
-            && str_contains((string) $action->getModalDescription(), '$'.Plan::Pro->monthlyPrice()))
+            && str_contains((string) $action->getModalDescription(), '$31.90'))
         ->callAction('keepSubscription')
         ->assertNotified(__('cloud::billing.keep.kept', ['plan' => Plan::Pro->marketingLabel(), 'date' => $renewal]));
 
@@ -1529,4 +1532,120 @@ it('does not offer to keep a subscription that is not set to cancel', function (
     $workspace->subscription()->update(['ends_at' => null]);
 
     livewire(Billing::class)->assertActionHidden('keepSubscription');
+});
+
+/** @param  array<string, mixed>  $overrides */
+function rememberRenewal(string $stripeId, array $overrides = []): void
+{
+    Cache::forever(Renewal::cacheKey($stripeId), array_merge([
+        'renews_at' => now()->addDays(20)->getTimestamp(),
+        'amount' => 2900,
+        'amount_due' => null,
+        'currency' => 'usd',
+        'card_brand' => 'visa',
+        'card_last4' => '4242',
+    ], $overrides));
+}
+
+function proPageSubscription(Workspace $workspace, string $status = 'active', array $attributes = []): void
+{
+    config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
+    $workspace->forceFill(['plan' => Plan::Pro, 'stripe_id' => 'cus_summary'])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_summary',
+        'stripe_status' => $status,
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        ...$attributes,
+    ]);
+}
+
+it('states the next charge and the card of an active subscription', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+    rememberRenewal('sub_summary');
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.active'))
+        ->assertSee(__('cloud::billing.summary.renews', ['date' => now()->addDays(20)->isoFormat('ll'), 'amount' => '$29']))
+        ->assertSee(__('cloud::billing.summary.card', ['brand' => 'Visa', 'last4' => '4242']));
+});
+
+it('asks Stripe for the next charge when none is remembered', function (): void {
+    withHostedBilling();
+    Queue::fake();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+
+    livewire(Billing::class)->assertSee(__('cloud::billing.manage.auto_renews'));
+
+    Queue::assertPushed(RefreshRenewal::class, fn (RefreshRenewal $job): bool => $job->stripeSubscriptionId === 'sub_summary');
+});
+
+it('states the first charge of a subscription still on its card trial', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace, 'trialing', ['trial_ends_at' => now()->addDays(6)]);
+    rememberRenewal('sub_summary', ['renews_at' => now()->addDays(6)->getTimestamp()]);
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.trialing'))
+        ->assertSee(__('cloud::billing.summary.first_charge', ['date' => now()->addDays(6)->isoFormat('ll'), 'amount' => '$29']));
+});
+
+it('says when a cancelling subscription ends and never calls it a trial', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace, attributes: ['ends_at' => now()->addDays(12)]);
+    $workspace->forceFill(['trial_ends_at' => now()->addDays(14)])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.canceling'))
+        ->assertSee(__('cloud::billing.summary.ends', ['date' => now()->addDays(12)->isoFormat('ll')]))
+        ->assertDontSee(__('cloud::billing.trial.active_title'));
+});
+
+it('states what a past-due subscription owes', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace, 'past_due');
+    rememberRenewal('sub_summary', ['amount_due' => 2900]);
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.past_due'))
+        ->assertSee(__('cloud::billing.summary.payment_failed', ['amount' => '$29']));
+});
+
+it('opens credit usage on its own tab for someone who manages billing', function (): void {
+    withHostedBilling();
+
+    billingPageOwner();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.usage_tab.tab'))
+        ->set('tab', 'usage')
+        ->assertSeeLivewire(CreditUsage::class)
+        ->assertDontSee(__('cloud::billing.usage.title'));
+});
+
+it('keeps the usage tab from a member who cannot manage billing', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'admin']);
+    $this->actingAs($member);
+
+    livewire(Billing::class)
+        ->assertDontSee(__('cloud::billing.usage_tab.tab'))
+        ->set('tab', 'usage')
+        ->assertDontSeeLivewire(CreditUsage::class)
+        ->assertSee(__('cloud::billing.usage.title'));
 });

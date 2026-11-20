@@ -52,10 +52,11 @@ use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
 use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
+use Relaticle\Cloud\Billing\Livewire\CreditUsage;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Mail\InactiveWorkspaceDeletionReminderMail;
@@ -124,6 +125,7 @@ final class CloudServiceProvider extends ServiceProvider
         $this->speakTheLanguageOfALocalizedNotFound();
 
         Livewire::component('app.billing.upgrade-modal', UpgradeModal::class);
+        Livewire::component('app.billing.credit-usage', CreditUsage::class);
         Livewire::component('App\\Filament\\Pages\\Billing', BillingPage::class);
 
         Event::listen(WebhookHandled::class, [SyncPlanOnStripeSubscriptionChange::class, 'handle']);
@@ -300,7 +302,8 @@ final class CloudServiceProvider extends ServiceProvider
             'App\Notifications\ManagedInvoiceOverdueNotification' => ManagedInvoiceOverdueNotification::class,
             'App\Mail\ProEndedMail' => ProEndedMail::class,
             'App\Mail\ProTrialEndingSoonMail' => ProTrialEndingSoonMail::class,
-            'App\Jobs\RefreshManagedRenewal' => RefreshManagedRenewal::class,
+            'App\Jobs\RefreshManagedRenewal' => RefreshRenewal::class,
+            'Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal' => RefreshRenewal::class,
             'Relaticle\SystemAdmin\Mail\ManagedPlanInvoiceMail' => ManagedPlanInvoiceMail::class,
             'App\Mail\NewContactSubmissionMail' => NewContactSubmissionMail::class,
         ];

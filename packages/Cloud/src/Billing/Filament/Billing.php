@@ -20,10 +20,6 @@ use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Number;
-use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
@@ -36,8 +32,10 @@ use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\KeepWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Data\BillingSummary;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Livewire\Concerns\StartsSubscriptionCheckout;
+use Relaticle\Cloud\Billing\Queries\BillingSummaryQuery;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Throwable;
 
@@ -58,6 +56,10 @@ final class Billing extends Page
 
     public const string KEEP_SUBSCRIPTION_ACTION = 'keepSubscription';
 
+    public const string OVERVIEW_TAB = 'overview';
+
+    public const string USAGE_TAB = 'usage';
+
     private const string CHECKOUT_SESSION_PREFIX = 'cs_';
 
     #[Url]
@@ -65,6 +67,9 @@ final class Billing extends Page
 
     #[Url]
     public ?string $credits = null;
+
+    #[Url]
+    public string $tab = self::OVERVIEW_TAB;
 
     #[Override]
     public static function shouldRegisterNavigation(): bool
@@ -264,7 +269,7 @@ final class Billing extends Page
             'subscription' => $subscription,
             'managedSubscription' => $managedSubscription,
             'managedPastDue' => $managedSubscription?->pastDue() ?? false,
-            'renewalLabel' => $this->renewalLabel($managedSubscription),
+            'summary' => $this->summary($workspace),
             'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
             'trialAvailable' => $this->trialAvailable(),
@@ -274,8 +279,23 @@ final class Billing extends Page
             'activating' => in_array($this->checkout, [self::CHECKOUT_SUCCESS, self::CHECKOUT_REOPENED], true) && ! $workspace->subscribed() && ! $workspace->plan->isManaged(),
             'creditsFulfilling' => $this->creditsFulfilling($workspace),
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
+            'showsUsage' => $this->tab === self::USAGE_TAB && $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
             ...($hasHostedAccess ? [] : $this->pausedViewData($workspace)),
         ];
+    }
+
+    private function summary(Workspace $workspace): BillingSummary
+    {
+        $summary = resolve(BillingSummaryQuery::class)->forWorkspace(
+            $workspace,
+            $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
+        );
+
+        if ($summary->refreshSubscriptionId !== null) {
+            dispatch(new RefreshRenewal($summary->refreshSubscriptionId));
+        }
+
+        return $summary;
     }
 
     private function creditsFulfilling(Workspace $workspace): bool
@@ -288,26 +308,6 @@ final class Billing extends Page
             ->where('workspace_id', $workspace->getKey())
             ->where('idempotency_key', GrantPurchasedCredits::IDEMPOTENCY_PREFIX.$this->credits)
             ->doesntExist();
-    }
-
-    private function renewalLabel(?Subscription $managedSubscription): ?string
-    {
-        if (! $managedSubscription instanceof Subscription || ! $managedSubscription->active() || $managedSubscription->pastDue() || $managedSubscription->onGracePeriod()) {
-            return null;
-        }
-
-        $renewal = Cache::get(RefreshManagedRenewal::CACHE_PREFIX.$managedSubscription->stripe_id);
-
-        if (! is_array($renewal)) {
-            dispatch(new RefreshManagedRenewal($managedSubscription->stripe_id));
-
-            return null;
-        }
-
-        return __('cloud::billing.managed.renews', [
-            'date' => Date::createFromTimestamp($renewal['renews_at'])->isoFormat('ll'),
-            'amount' => Number::currency($renewal['amount'] / 100, strtoupper($renewal['currency']), precision: $renewal['amount'] % 100 === 0 ? 0 : 2),
-        ]);
     }
 
     /** @return array{billingStatus: BillingStatus, deletesWhenInactive: bool, lapsedPlan: ?Plan, mailboxSyncPaused: bool, trialExtensionAvailable: bool, otherWorkspaces: Collection<int, Workspace>} */

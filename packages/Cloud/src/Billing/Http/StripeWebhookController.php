@@ -18,7 +18,7 @@ use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
 use Relaticle\Cloud\Billing\Actions\RestoreWorkspaceTrial;
 use Relaticle\Cloud\Billing\Actions\RevokeRefundedPackCredits;
 use Relaticle\Cloud\Billing\Actions\VoidOpenInvoices;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Stripe\Invoice;
 use Symfony\Component\HttpFoundation\Response;
@@ -110,6 +110,10 @@ final class StripeWebhookController extends CashierWebhookController
 
         $response = parent::handleCustomerSubscriptionUpdated($payload);
 
+        if (is_string($stripeId)) {
+            dispatch(new RefreshRenewal($stripeId));
+        }
+
         $this->followManagedSubscription($payload);
 
         return $response;
@@ -129,8 +133,6 @@ final class StripeWebhookController extends CashierWebhookController
         if (! $subscription instanceof Subscription) {
             return;
         }
-
-        dispatch(new RefreshManagedRenewal($subscription->stripe_id));
 
         $previousStatus = $payload['data']['previous_attributes']['status'] ?? null;
 

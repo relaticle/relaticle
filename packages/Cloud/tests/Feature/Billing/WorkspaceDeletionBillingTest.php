@@ -11,9 +11,11 @@ use App\Models\Workspace;
 use App\Notifications\WorkspaceDeletionCancelledNotification;
 use Filament\Actions\Action;
 use Filament\Notifications\Notification as Toast;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\Cloud\Billing\Actions\CancelWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\KeepWorkspaceSubscription;
+use Relaticle\Cloud\Billing\Data\Renewal;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\StripeBilling;
 use Tests\Helpers\StripeRecorder;
@@ -136,6 +138,7 @@ function graceDeletionWorkspace(): array
         'quantity' => 1,
         'ends_at' => now()->addDays(12),
     ]);
+    Cache::forever(Renewal::cacheKey('sub_undo'), ['renews_at' => now()->addDays(12)->getTimestamp(), 'amount' => 2900, 'amount_due' => null, 'currency' => 'usd', 'card_brand' => 'visa', 'card_last4' => '4242']);
 
     return [$owner, $workspace];
 }

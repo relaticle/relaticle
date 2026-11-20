@@ -38,9 +38,10 @@ use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
 use Relaticle\Cloud\Billing\Actions\RevokeRefundedPackCredits;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\Actions\SyncWorkspacePlanFromSubscription;
+use Relaticle\Cloud\Billing\Data\Renewal;
 use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\Http\StripeWebhookController;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
@@ -55,7 +56,7 @@ mutates(GrantPurchasedCredits::class);
 mutates(NotifyWorkspaceOfPaymentFailure::class);
 mutates(ActivateManagedPlan::class);
 mutates(CancelWithUnusedTimeRefund::class);
-mutates(RefreshManagedRenewal::class);
+mutates(RefreshRenewal::class);
 mutates(PaymentFailedNotification::class);
 mutates(ManagedInvoiceOverdueNotification::class);
 mutates(StripeWebhookController::class);
@@ -1651,8 +1652,8 @@ it('remembers the renewal date and amount for the billing page', function (): vo
 
     $renewsAt = stripeManagedSubscriptionBody($workspace)['items']['data'][0]['current_period_end'];
 
-    expect(Cache::get(RefreshManagedRenewal::CACHE_PREFIX.'sub_managed_1'))
-        ->toBe(['renews_at' => $renewsAt, 'amount' => 76464, 'currency' => 'usd']);
+    expect(Cache::get(Renewal::cacheKey('sub_managed_1')))
+        ->toMatchArray(['renews_at' => $renewsAt, 'amount' => 76464, 'currency' => 'usd']);
 });
 
 it('subscribes the Stripe endpoint to paid invoices', function (): void {
@@ -2013,19 +2014,19 @@ it('remembers the renewal date and the total Stripe will invoice, tax included, 
 
     sendStripeWebhook($payload, stripeAlsoAnswers: ['POST /v1/invoices/create_preview' => upcomingManagedInvoice(76464)])->assertSuccessful();
 
-    expect(Cache::get(RefreshManagedRenewal::CACHE_PREFIX.'sub_managed_1'))
-        ->toBe(['renews_at' => 1_800_000_000, 'amount' => 76464, 'currency' => 'usd']);
+    expect(Cache::get(Renewal::cacheKey('sub_managed_1')))
+        ->toMatchArray(['renews_at' => 1_800_000_000, 'amount' => 76464, 'currency' => 'usd']);
 });
 
 it('forgets the remembered renewal once Stripe no longer bills the managed subscription', function (): void {
     $workspace = stripeBillingWorkspace();
     $workspace->forceFill(['plan' => Plan::Enterprise])->save();
     managedSubscriptionOn($workspace);
-    Cache::forever(RefreshManagedRenewal::CACHE_PREFIX.'sub_managed_1', ['renews_at' => 1_800_000_000, 'amount' => 70800, 'currency' => 'usd']);
+    Cache::forever(Renewal::cacheKey('sub_managed_1'), ['renews_at' => 1_800_000_000, 'amount' => 70800, 'currency' => 'usd']);
 
     sendStripeWebhook(managedSubscriptionEvent($workspace, 'updated', overrides: ['status' => 'unpaid']))->assertSuccessful();
 
-    expect(Cache::get(RefreshManagedRenewal::CACHE_PREFIX.'sub_managed_1'))->toBeNull();
+    expect(Cache::get(Renewal::cacheKey('sub_managed_1')))->toBeNull();
 });
 
 /** @return array<string, mixed> */
@@ -2034,17 +2035,90 @@ function upcomingManagedInvoice(int $total): array
     return ['object' => 'invoice', 'total' => $total, 'currency' => 'usd'];
 }
 
-it('remembers no renewal for a Pro subscription update', function (): void {
+it('remembers the renewal when a Pro subscription updates', function (): void {
     $workspace = stripeBillingWorkspace();
     proSubscriptionOn($workspace, 'sub_test_1');
 
     $payload = stripeSubscriptionEvent($workspace, 'updated');
     $payload['data']['object']['items']['data'][0]['current_period_end'] = 1_800_000_000;
-    $payload['data']['object']['items']['data'][0]['price'] += ['unit_amount' => 1900, 'currency' => 'usd'];
 
-    sendStripeWebhook($payload)->assertSuccessful();
+    sendStripeWebhook($payload, stripeAlsoAnswers: ['POST /v1/invoices/create_preview' => upcomingManagedInvoice(2900)])->assertSuccessful();
 
-    expect(Cache::get(RefreshManagedRenewal::CACHE_PREFIX.'sub_test_1'))->toBeNull();
+    expect(Cache::get(Renewal::cacheKey('sub_test_1')))->toMatchArray(['renews_at' => 1_800_000_000, 'amount' => 2900, 'currency' => 'usd']);
+});
+
+/**
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function proSubscriptionBody(Workspace $workspace, array $overrides = []): array
+{
+    return array_merge([
+        'id' => 'sub_test_1',
+        'object' => 'subscription',
+        'customer' => ['id' => $workspace->stripe_id, 'object' => 'customer', 'invoice_settings' => ['default_payment_method' => null]],
+        'status' => 'active',
+        'cancel_at_period_end' => false,
+        'cancel_at' => null,
+        'default_payment_method' => ['id' => 'pm_sub', 'object' => 'payment_method', 'type' => 'card', 'card' => ['brand' => 'visa', 'last4' => '4242']],
+        'latest_invoice' => ['id' => 'in_latest', 'object' => 'invoice', 'status' => 'paid', 'amount_due' => 2900, 'currency' => 'usd'],
+        'items' => ['object' => 'list', 'data' => [['id' => 'si_test_1', 'object' => 'subscription_item', 'current_period_end' => 1_800_000_000]]],
+    ], $overrides);
+}
+
+/** @param  array<string, mixed>  $subscription */
+function refreshRenewalFrom(array $subscription, int $previewTotal = 2900): StripeRecorder
+{
+    $recorder = StripeRecorder::install()
+        ->respondTo('GET /v1/subscriptions/sub_test_1', $subscription)
+        ->respondTo('POST /v1/invoices/create_preview', upcomingManagedInvoice($previewTotal));
+
+    (new RefreshRenewal('sub_test_1'))->handle();
+
+    return $recorder;
+}
+
+it('remembers the next charge and the card a Pro subscription will be charged on', function (): void {
+    refreshRenewalFrom(proSubscriptionBody(stripeBillingWorkspace()));
+
+    expect(Cache::get(Renewal::cacheKey('sub_test_1')))->toBe([
+        'renews_at' => 1_800_000_000,
+        'amount' => 2900,
+        'amount_due' => null,
+        'currency' => 'usd',
+        'card_brand' => 'visa',
+        'card_last4' => '4242',
+    ]);
+});
+
+it('reads the card from the customer when the subscription names none', function (): void {
+    $workspace = stripeBillingWorkspace();
+
+    refreshRenewalFrom(proSubscriptionBody($workspace, [
+        'default_payment_method' => null,
+        'customer' => ['id' => $workspace->stripe_id, 'object' => 'customer', 'invoice_settings' => ['default_payment_method' => ['id' => 'pm_customer', 'object' => 'payment_method', 'type' => 'card', 'card' => ['brand' => 'mastercard', 'last4' => '5555']]]],
+    ]));
+
+    expect(Cache::get(Renewal::cacheKey('sub_test_1')))->toMatchArray(['card_brand' => 'mastercard', 'card_last4' => '5555']);
+});
+
+it('prices a subscription set to cancel at what it would charge if kept', function (string $field, mixed $value): void {
+    $recorder = refreshRenewalFrom(proSubscriptionBody(stripeBillingWorkspace(), [$field => $value]), previewTotal: 3190);
+
+    expect(Cache::get(Renewal::cacheKey('sub_test_1')))->toMatchArray(['amount' => 3190])
+        ->and($recorder->paramsFor('POST /v1/invoices/create_preview')['subscription_details'])->toBe(['cancel_at_period_end' => 'false']);
+})->with([
+    'cancel at period end' => ['cancel_at_period_end', true],
+    'cancel at a date' => ['cancel_at', 1_800_000_000],
+]);
+
+it('remembers what a past-due subscription owes on its open invoice', function (): void {
+    refreshRenewalFrom(proSubscriptionBody(stripeBillingWorkspace(), [
+        'status' => 'past_due',
+        'latest_invoice' => ['id' => 'in_open', 'object' => 'invoice', 'status' => 'open', 'amount_due' => 2900, 'currency' => 'usd'],
+    ]));
+
+    expect(Cache::get(Renewal::cacheKey('sub_test_1')))->toMatchArray(['amount_due' => 2900]);
 });
 
 function acquiredBillingWorkspace(Workspace $workspace): Acquisition

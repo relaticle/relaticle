@@ -10,12 +10,13 @@ use App\Enums\Plan;
 use App\Features\Billing as BillingFeature;
 use App\Models\User;
 use App\Models\Workspace;
-use Illuminate\Support\Number;
 use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Actions\CancelWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
+use Relaticle\Cloud\Billing\Data\Renewal;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 
 final readonly class StripeBilling implements Billing
@@ -79,11 +80,22 @@ final readonly class StripeBilling implements Billing
             return null;
         }
 
+        $renewal = Renewal::remembered($subscription->stripe_id)
+            ?? rescue(static function () use ($subscription): ?Renewal {
+                dispatch_sync(new RefreshRenewal($subscription->stripe_id));
+
+                return Renewal::remembered($subscription->stripe_id);
+            });
+
+        if (! $renewal instanceof Renewal) {
+            return null;
+        }
+
         $yearly = Plan::intervalFromStripePrice($subscription->stripe_price) === 'yearly';
         $replace = [
             'plan' => $plan->marketingLabel(),
             'date' => $subscription->ends_at->isoFormat('ll'),
-            'price' => '$'.Number::format((int) ($yearly ? $plan->yearlyPrice() : $plan->monthlyPrice())),
+            'price' => $renewal->amount(),
         ];
 
         return new SubscriptionEnding(
