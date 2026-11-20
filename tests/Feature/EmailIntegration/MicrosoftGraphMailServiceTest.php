@@ -417,7 +417,7 @@ it('resolves the well-known folders once per mailbox, not once per sync job', fu
     runIncrementalMailSync($account);
 
     expect($firstRun)->toBe(9)
-        ->and(count(graphFolderResolutionPaths()))->toBe(9);
+        ->and(graphFolderResolutionPaths())->toHaveCount(9);
 });
 
 it('does not ask again for a folder the mailbox does not have', function (): void {
