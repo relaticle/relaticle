@@ -312,7 +312,7 @@
                                         {{ __('cloud::billing.trial.start_button') }}
                                     </x-filament::button>
                                 @else
-                                    <x-filament::button type="button" size="lg" :color="$isScale ? 'primary' : 'gray'" class="w-full justify-center" wire:loading.attr="disabled" wire:target="subscribe" x-on:click="$wire.subscribe({{ \Illuminate\Support\Js::from($plan->value) }}, yearly ? 'yearly' : 'monthly')">
+                                    <x-filament::button type="button" size="lg" :color="$isScale ? 'primary' : 'gray'" class="w-full justify-center" wire:loading.attr="disabled" wire:target="subscribe('{{ $plan->value }}', 'yearly'), subscribe('{{ $plan->value }}', 'monthly')" x-on:click="$wire.subscribe({{ \Illuminate\Support\Js::from($plan->value) }}, yearly ? 'yearly' : 'monthly')">
                                         {{ $onTrial ? __('cloud::billing.subscribe.button') : __('cloud::billing.upgrade.button', ['plan' => $plan->marketingLabel()]) }}
                                     </x-filament::button>
                                     @if($onTrial)
