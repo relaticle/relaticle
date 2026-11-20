@@ -18,6 +18,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 use Override;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\CreatePeople;
 use Relaticle\SystemAdmin\Filament\Resources\PeopleResource\Pages\EditPeople;
@@ -131,9 +132,10 @@ final class PeopleResource extends Resource
                     ->options(CreationSource::class)
                     ->multiple(),
             ])
+            ->checkIfRecordIsSelectableUsing(fn (Model $record): bool => $record->getAttribute('merged_into_id') === null)
             ->recordActions([
                 ViewAction::make(),
-                EditAction::make()->action(null),
+                EditAction::make()->action(null)->hidden(fn (Model $record): bool => $record->getAttribute('merged_into_id') !== null),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
