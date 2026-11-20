@@ -76,6 +76,36 @@ it('adds, searches, reorders and keeps several sorts', function (): void {
         ->assertNoJavaScriptErrors();
 });
 
+it('keeps a sort moved by keyboard in place and focused when the previous sort write answers late', function (): void {
+    $page = ($this->open)();
+
+    $page->script(<<<'JS'
+        window.sortWrites = 0;
+        const fetchFromPage = window.fetch;
+        window.fetch = async (...args) => {
+            const write = String(args[1]?.body ?? '').includes('setFilterBarSorts') ? ++window.sortWrites : 0;
+            const response = await fetchFromPage(...args);
+            if (write === 2) {
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+            }
+            return response;
+        };
+    JS);
+
+    $page->click('[data-filter-sort]')
+        ->click('[data-sort-pop] [data-sort-column][data-column="name"]')
+        ->assertScript(filterBarWaitFor('window.sortWrites === 1 && ! document.querySelector(".fi-ta").hasAttribute("aria-busy")'), true)
+        ->click('[data-sort-add]')
+        ->click('[data-sort-pop] [data-sort-column][data-column="created_at"]')
+        ->assertScript(filterBarWaitFor('document.querySelector("[data-filter-sort-more]")?.textContent.trim() === "+1"'), true)
+        ->keys('[data-sort-row][data-column="created_at"] [data-sort-grip]', 'ArrowUp')
+        ->wait(1.2)
+        ->assertScript(filterBarWaitFor('window.sortWrites === 3 && ! document.querySelector(".fi-ta").hasAttribute("aria-busy")'), true)
+        ->assertScript('[...document.querySelectorAll("[data-sort-row]")].map((row) => row.dataset.column).join()', 'created_at,name')
+        ->assertScript('document.activeElement.matches(`[data-sort-row][data-column="created_at"] [data-sort-grip]`)', true)
+        ->assertNoJavaScriptErrors();
+});
+
 it('focuses the field search every time the filter picker opens', function (): void {
     $searchFocused = 'document.activeElement.matches("[data-pop][data-open=true] input[data-filter-find]")';
     $page = ($this->open)()
