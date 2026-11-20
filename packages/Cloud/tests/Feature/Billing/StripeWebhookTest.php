@@ -2475,3 +2475,56 @@ it('keeps the credits of a pack whose dispute was won', function (): void {
     expect(packBalance($workspace))->toBe($before)
         ->and($recorder->countFor('/v1/charges'))->toBe(0);
 });
+
+function lapseRenewalToPastDue(): Workspace
+{
+    test()->travelTo(new DateTimeImmutable('2026-06-01 12:00:00', new DateTimeZone('UTC')));
+
+    $workspace = stripeBillingWorkspace();
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'created'))->assertSuccessful();
+
+    test()->travelTo(new DateTimeImmutable('2026-07-01 12:30:00', new DateTimeZone('UTC')));
+    sendStripeWebhook(stripeSubscriptionEvent($workspace->refresh(), 'updated', ['status' => 'past_due']))->assertSuccessful();
+    test()->artisan('chat:reset-credits')->assertSuccessful();
+
+    return $workspace->refresh();
+}
+
+it('refills the plan allowance when a past-due renewal is paid', function (): void {
+    withHostedBilling();
+
+    $workspace = lapseRenewalToPastDue();
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('credits_remaining'))->toBe(Plan::Free->credits());
+
+    test()->travelTo(new DateTimeImmutable('2026-07-04 09:00:00', new DateTimeZone('UTC')));
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated', ['status' => 'active']))->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+    expect($balance->credits_remaining)->toBe(Plan::Pro->credits())
+        ->and($balance->credits_used)->toBe(0)
+        ->and($balance->period_ends_at->toDateTimeString())->toBe('2026-08-01 12:00:00');
+});
+
+it('refills a recovered renewal once, however often Stripe repeats the event', function (): void {
+    withHostedBilling();
+
+    $workspace = lapseRenewalToPastDue();
+    test()->travelTo(new DateTimeImmutable('2026-07-04 09:00:00', new DateTimeZone('UTC')));
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated', ['status' => 'active']))->assertSuccessful();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 1500, 'credits_used' => 500]);
+
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated', ['status' => 'active']))->assertSuccessful();
+
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+    expect([$balance->credits_remaining, $balance->credits_used])->toBe([1500, 500]);
+});
+
+it('keeps the Free refill while the renewal is still past due', function (): void {
+    withHostedBilling();
+
+    $workspace = lapseRenewalToPastDue();
+    test()->travelTo(new DateTimeImmutable('2026-07-04 09:00:00', new DateTimeZone('UTC')));
+    sendStripeWebhook(stripeSubscriptionEvent($workspace, 'updated', ['status' => 'past_due']))->assertSuccessful();
+
+    expect(AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->value('credits_remaining'))->toBe(Plan::Free->credits());
+});

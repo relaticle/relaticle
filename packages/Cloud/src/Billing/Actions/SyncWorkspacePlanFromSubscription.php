@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 
@@ -49,7 +50,7 @@ final readonly class SyncWorkspacePlanFromSubscription
         if ($workspace->plan === $target) {
             if ($this->holdsExtensionCredits($workspace)) {
                 $this->settleExtensionCredits($workspace, $subscription);
-            } elseif ($this->holdsTrialCredits($workspace, $subscription)) {
+            } elseif ($this->holdsTrialCredits($workspace, $subscription) || $this->holdsPastDueRefill($workspace, $subscription)) {
                 $this->credits->resetPeriod($workspace);
             }
 
@@ -183,6 +184,21 @@ final readonly class SyncWorkspacePlanFromSubscription
         AiCreditBalance::query()
             ->where('workspace_id', $workspace->getKey())
             ->update(['period_ends_at' => $subscription->trial_ends_at]);
+    }
+
+    // A failed renewal refills at the Free allowance; once paid, that grant falls short of the plan.
+    // Grants older than the subscription are trial credits a conversion keeps on purpose.
+    private function holdsPastDueRefill(Workspace $workspace, Subscription $subscription): bool
+    {
+        $lastGrant = AiCreditTransaction::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->where('metadata->action', 'reset_period')
+            ->where('created_at', '>=', $subscription->created_at)
+            ->latest('created_at')
+            ->first();
+
+        return $lastGrant instanceof AiCreditTransaction
+            && (int) ($lastGrant->metadata['allowance_granted'] ?? 0) < $this->credits->allowanceFor($workspace);
     }
 
     // Cashier clears the workspace trial once a subscription exists, so the balance period is what still marks it.
