@@ -75,6 +75,7 @@ use Filament\Support\Enums\Platform;
 use Filament\Support\Enums\Size;
 use Filament\Support\Enums\Width;
 use Filament\Support\Facades\FilamentTimezone;
+use Filament\Support\Facades\FilamentView;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
 use Filament\Tables\View\TablesRenderHook;
@@ -156,6 +157,7 @@ final class AppPanelProvider extends PanelProvider
         // which panel is actually serving the request before they touch the format.
         $this->configureTables();
         $this->formatDateTimesInSchemas();
+        $this->registerFavoritesSidebar();
 
         /**
          * Filament's calendar decides which cell to circle as "today" with
@@ -175,6 +177,16 @@ final class AppPanelProvider extends PanelProvider
         DateTimePicker::configureUsing(fn (DateTimePicker $picker): DateTimePicker => $this->isCurrentPanel()
             ? $picker->extraAlpineAttributes(['x-init' => $this->todayInViewerZoneExpression()], merge: true)
             : $picker);
+    }
+
+    private function registerFavoritesSidebar(): void
+    {
+        // Not a panel hook: those register per request, after ChatServiceProvider's,
+        // and hooks render in registration order. Favorites goes above Chats.
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::SIDEBAR_NAV_END,
+            fn (): View|Factory|string => $this->isCurrentPanel() ? view('filament.app.favorites-sidebar-nav-hook') : '',
+        );
     }
 
     private function configureTables(): void
