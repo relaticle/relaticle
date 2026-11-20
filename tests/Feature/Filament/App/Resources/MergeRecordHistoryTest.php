@@ -55,7 +55,8 @@ function mergeHistoryEntities(): array
 function mergeHistoryRun(string $page, Company|People $current, Company|People $picked, bool $keepPicked): Company|People
 {
     livewire($page, ['record' => $current->getKey()])
-        ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
+        ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked])
+        ->assertHasNoActionErrors();
 
     return mergedRecord();
 }
