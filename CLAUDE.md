@@ -599,9 +599,15 @@ are under about 50. Each rule below names what fails when it is broken.
 - Code reaches the network, the shell, and a wait through `Http`, `Process`, and `Sleep`. A test
   can fake each of them, and nothing can fake the raw call. `tests/Arch/ArchTest.php` fails a
   direct Guzzle client, `curl_*`, Symfony `Process` or `HttpClient`, `sleep()`, and `usleep()`.
-- Before writing a helper, look for it in PHP, then in the framework, then in a package from
-  `composer.json`, then in this codebase. Rector's Laravel sets rewrite the hand-rolled forms
-  they know, and `composer test:refactor` fails until the rewrite is taken.
+- Before writing any code, look for the native way, and use it when one exists. Look in PHP, then
+  the framework, then a package from `composer.json`, then this codebase. This holds for every helper,
+  class, config value, middleware, script and CI step. For a package, read its docs and its `vendor/`
+  source for the switch it already ships: a config key, a middleware, a contract, an `extend()` hook.
+  Write your own code only for what nothing native expresses, and name in the PR body the native option
+  it ruled out. Sentry's `tracing.views` key and its `SentryTracesSampleRate` job middleware replaced a
+  custom traces sampler this way. Rector's Laravel sets rewrite the hand-rolled forms they know, and
+  `composer test:refactor` fails until the rewrite is taken. Rector knows only some forms, so a reviewer
+  reads for the rest.
 - A model or a job states its configuration as PHP attributes: `#[Fillable]`, `#[Table]`,
   `#[Unguarded]`, `#[Tries]`, `#[Timeout]`, `#[Backoff]`, `#[UniqueFor]`. Rector rewrites the
   property form, and `composer test:refactor` fails until the rewrite is taken. Code that needs
