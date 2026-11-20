@@ -201,6 +201,7 @@ it('grants the plan allowance when a workspace subscribes during its trial', fun
 
 it('keeps the usage of a workspace that subscribed during its trial when the webhook is replayed', function (): void {
     withHostedBilling();
+    test()->freezeSecond();
 
     $workspace = stripeBillingWorkspace();
     resolve(StartProTrial::class)->execute($workspace->owner, $workspace);

@@ -187,13 +187,17 @@ final readonly class SyncWorkspacePlanFromSubscription
     }
 
     // A failed renewal refills at the Free allowance; once paid, that grant falls short of the plan.
-    // Grants older than the subscription are trial credits a conversion keeps on purpose.
+    // Trial grants share the subscription's second and tie in created_at, so only later grants count.
     private function holdsPastDueRefill(Workspace $workspace, Subscription $subscription): bool
     {
+        if ($subscription->onTrial()) {
+            return false;
+        }
+
         $lastGrant = AiCreditTransaction::query()
             ->where('workspace_id', $workspace->getKey())
             ->where('metadata->action', 'reset_period')
-            ->where('created_at', '>=', $subscription->created_at)
+            ->where('created_at', '>', $subscription->created_at)
             ->latest('created_at')
             ->first();
 
