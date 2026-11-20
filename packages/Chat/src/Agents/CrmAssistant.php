@@ -356,12 +356,10 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
         return $this->staticInstructions().$this->turnDynamicInstructions();
     }
 
-    /**
-     * Anthropic rejects a replayed signed thinking block when `system` differs from
-     * step 1. One agent serves one turn, so the first read holds for every later step.
-     */
     private function turnDynamicInstructions(): string
     {
+        // Anthropic rejects a replayed signed thinking block once `system` differs from step 1,
+        // so one turn keeps its first read even when the workspace changes mid-loop.
         return $this->turnDynamicInstructions ??= $this->dynamicInstructions();
     }
 
