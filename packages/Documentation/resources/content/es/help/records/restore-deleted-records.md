@@ -2,7 +2,7 @@
 title: Restaure un registro eliminado
 description: Eliminar es reversible. Filtre cualquier lista por registros eliminados y restáurelos. Solo la eliminación forzada es definitiva.
 order: 4
-updated: "2026-11-13"
+updated: "2026-11-20"
 related: [help/records/company-records, help/records/export-your-data]
 ---
 
@@ -34,6 +34,13 @@ recuperarlo. Si tiene alguna duda,
 
 ## Conviene saber
 
+- Un registro fusionado no está en la papelera y no se puede restaurar. La fusión es
+  definitiva, consulte
+  [Fusionar registros duplicados](/es/help/records/merge-duplicate-records).
+- La página de un registro eliminado muestra **Este registro se eliminó** y un botón
+  **Volver**, así que la restauración empieza en el filtro de eliminados de la lista. Las
+  filas eliminadas del filtro no abren nada al hacer clic. Márquelas y use **Restaurar
+  seleccionados**.
 - Los registros eliminados no aparecen en las listas, la búsqueda, el tablero ni en
   las respuestas del asistente de IA.
 - Eliminar una empresa no elimina las personas, tareas o notas asociadas. Al

@@ -3,7 +3,7 @@ title: Company records
 description: What lives on a company, from owner and domains to the auto-fetched logo and the tabs for people, tasks, and notes.
 order: 1
 updated: "2026-11-12"
-related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record]
+related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record, help/records/merge-duplicate-records]
 ---
 
 A company record gathers one company in one place: who owns the relationship,

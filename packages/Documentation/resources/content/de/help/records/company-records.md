@@ -3,7 +3,7 @@ title: Unternehmenseinträge
 description: Was zu einem Unternehmen gehört, vom Verantwortlichen und den Domains bis zum automatisch geholten Logo und den Tabs für Personen, Aufgaben und Notizen.
 order: 1
 updated: "2026-11-12"
-related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record]
+related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record, help/records/merge-duplicate-records]
 ---
 
 Ein Unternehmenseintrag bündelt ein Unternehmen an einem Ort: wer die Beziehung

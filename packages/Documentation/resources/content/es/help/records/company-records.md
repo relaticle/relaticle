@@ -3,7 +3,7 @@ title: Registros de empresa
 description: Qué contiene una empresa, desde el responsable y los dominios hasta el logotipo automático y las pestañas de personas, tareas y notas.
 order: 1
 updated: "2026-11-12"
-related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record]
+related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record, help/records/merge-duplicate-records]
 ---
 
 Un registro de empresa reúne a una empresa en un solo lugar: quién administra la

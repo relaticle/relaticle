@@ -3,7 +3,7 @@ title: Registros de personas
 description: Personas con correos electrónicos únicos, teléfono, cargo y vínculo con una empresa, creadas por separado o desde una empresa.
 order: 2
 updated: "2026-11-12"
-related: [help/records/company-records, help/getting-started/add-your-first-person]
+related: [help/records/company-records, help/getting-started/add-your-first-person, help/records/merge-duplicate-records]
 ---
 
 Una persona es alguien con quien usted trabaja: sus correos electrónicos, su

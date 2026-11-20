@@ -3,7 +3,7 @@ title: Enregistrements d'entreprises
 description: Ce que contient une entreprise, du responsable et des domaines au logo récupéré automatiquement et aux onglets personnes, tâches et notes.
 order: 1
 updated: "2026-11-12"
-related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record]
+related: [help/records/people-records, help/getting-started/create-your-first-company, help/records/see-who-changed-a-record, help/records/merge-duplicate-records]
 ---
 
 Un enregistrement d'entreprise réunit une entreprise au même endroit : qui gère

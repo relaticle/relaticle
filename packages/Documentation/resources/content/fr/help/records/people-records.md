@@ -3,7 +3,7 @@ title: Enregistrements de personnes
 description: Des personnes avec e-mails uniques, téléphone, poste et lien vers une entreprise, créées seules ou depuis une entreprise.
 order: 2
 updated: "2026-11-12"
-related: [help/records/company-records, help/getting-started/add-your-first-person]
+related: [help/records/company-records, help/getting-started/add-your-first-person, help/records/merge-duplicate-records]
 ---
 
 Une personne est quelqu'un avec qui vous travaillez : ses e-mails, son

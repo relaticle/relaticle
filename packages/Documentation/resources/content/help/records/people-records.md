@@ -3,7 +3,7 @@ title: People records
 description: People with unique emails, phone, job title, and a company link, created standalone or from a company.
 order: 2
 updated: "2026-11-12"
-related: [help/records/company-records, help/getting-started/add-your-first-person]
+related: [help/records/company-records, help/getting-started/add-your-first-person, help/records/merge-duplicate-records]
 ---
 
 A person is someone you work with: their emails, phone, role, and the company they belong

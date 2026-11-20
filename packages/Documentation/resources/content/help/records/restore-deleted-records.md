@@ -2,7 +2,7 @@
 title: Restore a deleted record
 description: Deleting is reversible. Filter any list to deleted records and restore them; only force delete is final.
 order: 4
-updated: "2026-11-13"
+updated: "2026-11-20"
 related: [help/records/company-records, help/records/export-your-data]
 ---
 
@@ -30,6 +30,11 @@ no way for Relaticle support to bring it back. If there's any doubt,
 
 ## Good to know
 
+- A merged record is not in the trash and cannot be restored. A merge is final, see
+  [merge duplicate records](/help/records/merge-duplicate-records).
+- A deleted record's page shows **This record was deleted** and a **Go back**
+  button, so restoring starts from the list's trash filter. Deleted rows in the
+  filter open nothing when clicked. Tick them and use **Restore selected**.
 - Deleted records don't appear in lists, search, the board, or the AI
   assistant's answers.
 - Deleting a company doesn't delete the people, tasks, or notes attached to
