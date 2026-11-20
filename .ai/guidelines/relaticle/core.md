@@ -171,6 +171,12 @@ are under about 50. Each rule below names what fails when it is broken.
 - Before writing a helper, look for it in PHP, then in the framework, then in a package from
   `composer.json`, then in this codebase. Rector's Laravel sets rewrite the hand-rolled forms
   they know, and `composer test:refactor` fails until the rewrite is taken.
+- Before writing a class that changes how a package behaves, read the package's docs and its `vendor/`
+  source. Look for the switch it already ships: a config key, a job middleware, a contract, an
+  `extend()` hook. Write a class only for what those cannot express, and name in the PR body the native
+  option it ruled out. Sentry's `tracing.views` key and its `SentryTracesSampleRate` job middleware
+  replaced a custom traces sampler this way. No test reads for this, so a reviewer reads for a class
+  that redoes what a package ships.
 - A model or a job states its configuration as PHP attributes: `#[Fillable]`, `#[Table]`,
   `#[Unguarded]`, `#[Tries]`, `#[Timeout]`, `#[Backoff]`, `#[UniqueFor]`. Rector rewrites the
   property form, and `composer test:refactor` fails until the rewrite is taken. Code that needs
