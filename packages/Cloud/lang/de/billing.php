@@ -101,6 +101,7 @@ return [
     'monthly' => 'Monatlich',
     'yearly' => 'Jährlich',
     'yearly_save' => ':percent% sparen',
+    'yearly_save_up_to' => 'Bis zu :percent% sparen',
     'billed_monthly' => 'Monatlich abgerechnet · jederzeit kündbar',
     'billed_yearly' => '$:price jährlich abgerechnet · jederzeit kündbar',
     'per_month' => '/ Monat',

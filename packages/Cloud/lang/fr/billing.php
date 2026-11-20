@@ -101,6 +101,7 @@ return [
     'monthly' => 'Mensuel',
     'yearly' => 'Annuel',
     'yearly_save' => 'Économisez :percent %',
+    'yearly_save_up_to' => 'Jusqu’à :percent % d’économie',
     'billed_monthly' => 'Facturé mensuellement · résiliable à tout moment',
     'billed_yearly' => '$:price facturés annuellement · résiliable à tout moment',
     'per_month' => '/ mois',

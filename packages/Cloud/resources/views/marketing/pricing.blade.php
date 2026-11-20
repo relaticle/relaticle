@@ -186,7 +186,7 @@
                 @endif
             </p>
             @if($billingActive)
-                <x-cloud::billing.interval-toggle class="mt-6 items-center" />
+                <x-cloud::billing.interval-toggle class="mt-6 items-center" :saving="__('cloud::billing.yearly_save_up_to', ['percent' => max($proPlan->yearlySavingPercent(), $scalePlan->yearlySavingPercent())])" />
                 <p id="pricing-trust" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
                     {{ __('Open source under AGPL-3.0') }}
                     @if($githubStars > 0)

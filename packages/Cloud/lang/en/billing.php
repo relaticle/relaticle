@@ -101,6 +101,7 @@ return [
     'monthly' => 'Monthly',
     'yearly' => 'Yearly',
     'yearly_save' => 'Save :percent%',
+    'yearly_save_up_to' => 'Save up to :percent%',
     'billed_monthly' => 'Billed monthly · cancel anytime',
     'billed_yearly' => '$:price billed yearly · cancel anytime',
     'per_month' => '/ month',

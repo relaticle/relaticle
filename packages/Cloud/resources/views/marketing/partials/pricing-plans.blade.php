@@ -75,7 +75,6 @@
                             <p class="mt-2 flex flex-wrap items-baseline gap-x-1.5 gap-y-2">
                                 <span class="{{ $price }}" x-text="yearly ? @js('$'.$plan->yearlyPricePerMonth()) : @js('$'.$plan->monthlyPrice())">${{ $plan->yearlyPricePerMonth() }}</span>
                                 <span class="{{ $muted }}">{{ __('cloud::billing.per_month') }}</span>
-                                <span x-show="yearly" class="ms-1 rounded-full bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-700 dark:bg-white/[0.08] dark:text-gray-200">{{ __('cloud::billing.yearly_save', ['percent' => $plan->yearlySavingPercent()]) }}</span>
                             </p>
                             <p class="{{ $muted }} mt-2" x-text="yearly ? @js(__('cloud::billing.billed_yearly', ['price' => Number::format($plan->yearlyPrice())])) : @js(__('cloud::billing.billed_monthly'))">{{ __('cloud::billing.billed_yearly', ['price' => Number::format($plan->yearlyPrice())]) }}</p>
                             <p class="{{ $muted }} mt-0.5">{{ __('Unlimited users at this price') }}</p>
