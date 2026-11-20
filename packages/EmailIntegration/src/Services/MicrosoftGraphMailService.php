@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Services;
 
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Str;
 use JsonException;
@@ -46,7 +47,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     ];
 
     /**
-     * @var array<string, EmailFolder>|null Cached parentFolderId => EmailFolder map per instance.
+     * @var array<string, EmailFolder>|null The cached ids as a parentFolderId => EmailFolder map, memoised per instance.
      */
     private ?array $folderCache = null;
 
@@ -634,20 +635,51 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         }
 
         // Graph displayName is localized (Entwürfe). Well-known path names are not.
-        $http = $this->clientFactory->make($this->account);
+        $resolved = $this->rememberFolderIds('well-known', fn (PendingRequest $http): array => $this->resolveFolderIds($http, array_keys(self::WELL_KNOWN_FOLDERS), tolerateMissing: false));
         $ids = [];
 
         foreach (self::WELL_KNOWN_FOLDERS as $wellKnownName => $folder) {
-            $id = $http->get("/me/mailFolders/{$wellKnownName}", ['$select' => 'id'])
-                ->throw()
-                ->json('id');
-
-            if (is_string($id) && $id !== '') {
-                $ids[$id] = $folder;
+            if (is_string($resolved[$wellKnownName] ?? null)) {
+                $ids[$resolved[$wellKnownName]] = $folder;
             }
         }
 
         return $this->folderCache = $ids;
+    }
+
+    /**
+     * @param  callable(PendingRequest): array<string, string|null>  $resolve
+     * @return array<string, string|null>
+     */
+    private function rememberFolderIds(string $group, callable $resolve): array
+    {
+        $key = sprintf('email-integration:graph-folders:%s:%s:%s', $this->account->getKey(), $this->account->provider_account_id, $group);
+
+        return Cache::remember($key, now()->addDay(), fn (): array => $resolve($this->clientFactory->make($this->account)));
+    }
+
+    /**
+     * @param  list<string>  $wellKnownNames
+     * @return array<string, string|null>
+     */
+    private function resolveFolderIds(PendingRequest $http, array $wellKnownNames, bool $tolerateMissing): array
+    {
+        $ids = [];
+
+        foreach ($wellKnownNames as $wellKnownName) {
+            $response = $http->get("/me/mailFolders/{$wellKnownName}", ['$select' => 'id']);
+
+            if ($tolerateMissing && $response->status() === 404) {
+                $ids[$wellKnownName] = null;
+
+                continue;
+            }
+
+            $id = $response->throw()->json('id');
+            $ids[$wellKnownName] = is_string($id) && $id !== '' ? $id : null;
+        }
+
+        return $ids;
     }
 
     /**
@@ -658,7 +690,7 @@ final class MicrosoftGraphMailService implements MailServiceInterface
         $wellKnown = $this->wellKnownFolderIds();
         $excluded = [
             ...array_keys($wellKnown, EmailFolder::Drafts, true),
-            ...$this->excludedFolderIds($http),
+            ...$this->excludedFolderIds(),
         ];
 
         $ids = $this->listFolderIds($http, '/me/mailFolders', $excluded);
@@ -674,25 +706,11 @@ final class MicrosoftGraphMailService implements MailServiceInterface
     /**
      * @return list<string>
      */
-    private function excludedFolderIds(PendingRequest $http): array
+    private function excludedFolderIds(): array
     {
-        $ids = [];
+        $resolved = $this->rememberFolderIds('excluded', fn (PendingRequest $http): array => $this->resolveFolderIds($http, self::EXCLUDED_FOLDERS, tolerateMissing: true));
 
-        foreach (self::EXCLUDED_FOLDERS as $wellKnownName) {
-            $response = $http->get("/me/mailFolders/{$wellKnownName}", ['$select' => 'id']);
-
-            if ($response->status() === 404) {
-                continue;
-            }
-
-            $id = $response->throw()->json('id');
-
-            if (is_string($id) && $id !== '') {
-                $ids[] = $id;
-            }
-        }
-
-        return $ids;
+        return array_values(array_filter($resolved, is_string(...)));
     }
 
     /**
