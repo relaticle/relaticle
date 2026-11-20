@@ -185,7 +185,7 @@ return [
         'billing' => 'Facturé annuellement · jamais par siège',
         'includes' => 'Tout ce qui est dans Cloud Scale, plus',
         'features' => [
-            '10 000 crédits d\'IA / mois',
+            ':credits crédits d\'IA par mois, environ :replies réponses',
             'Boîtes mail connectées illimitées',
             'Débit 10x pour la REST API et le MCP server',
             'Un projet de mise en œuvre cadré',

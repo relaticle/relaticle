@@ -191,9 +191,9 @@
                 <p id="pricing-trust" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
                     {{ __('Open source under AGPL-3.0') }}
                     @if($githubStars > 0)
-                        <span class="mx-1.5" aria-hidden="true">·</span>{{ __(':count GitHub stars', ['count' => $formattedGithubStars]) }}
+                        <span aria-hidden="true">·</span> {{ __(':count GitHub stars', ['count' => $formattedGithubStars]) }}
                     @endif
-                    <span class="mx-1.5" aria-hidden="true">·</span>{{ __('Export to CSV anytime') }}
+                    <span aria-hidden="true">·</span> {{ __('Export to CSV anytime') }}
                 </p>
             @endif
         </x-slot:aside>

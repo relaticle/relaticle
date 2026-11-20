@@ -37,7 +37,7 @@ it('shows the pro tier when billing is on', function (): void {
         ->assertSee('Prefer to self-host? It’s free.')
         ->assertSee('Start 14-day trial')
         ->assertSee('No card needed.')
-        ->assertSee('Starts on Cloud Pro. Pick Cloud Scale when you subscribe.')
+        ->assertSee('Trial runs on Pro. Pick Scale anytime.')
         ->assertSee('Unlimited users at this price')
         ->assertDontSee('Switch plans in Billing.')
         ->assertDontSee('One workspace price as your workspace grows')
@@ -289,7 +289,7 @@ it('states the Enterprise AI allowance and API throughput the plan enforces', fu
     $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
 
     expect($crawler->filter('#enterprise-plan')->text())
-        ->toContain(number_format(Plan::Enterprise->credits()).' AI credits / month')
+        ->toContain(number_format(Plan::Enterprise->credits()).' AI credits a month, about 6,000 replies')
         ->toContain(Plan::Enterprise->throughputMultiplier().'x REST API and MCP throughput');
 });
 

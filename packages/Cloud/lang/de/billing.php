@@ -185,7 +185,7 @@ return [
         'billing' => 'Jährlich abgerechnet · nie pro Nutzer',
         'includes' => 'Alles aus Cloud Scale, plus',
         'features' => [
-            '10.000 KI-Credits / Monat',
+            ':credits KI-Credits pro Monat, etwa :replies Antworten',
             'Unbegrenzt viele verbundene Postfächer',
             '10-facher Durchsatz für REST API und MCP-Server',
             'Ein klar umrissenes Implementierungsprojekt',

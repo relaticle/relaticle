@@ -43,7 +43,7 @@
                         {{ __('Start :days-day trial', ['days' => \App\Models\Workspace::PRO_TRIAL_DAYS]) }}
                     </x-cloud::marketing.button>
                     <p class="mt-3 text-center text-sm text-gray-500 dark:text-gray-400">
-                        {{ $isScale ? __('Starts on Cloud Pro. Pick Cloud Scale when you subscribe.') : __('No card needed.') }}
+                        {{ $isScale ? __('Trial runs on Pro. Pick Scale anytime.') : __('No card needed.') }}
                     </p>
                 </div>
 
@@ -86,7 +86,7 @@
             <div class="border-rail flex flex-1 flex-col border-t p-6 md:px-10">
                 <p class="{{ $priceLabel }} mb-5">{{ __('cloud::billing.enterprise.includes') }}</p>
                 <ul class="{{ $featureList }}">
-                    @foreach(__('cloud::billing.enterprise.features') as $feature)
+                    @foreach(__('cloud::billing.enterprise.features', ['credits' => Number::format(\App\Enums\Plan::Enterprise->credits()), 'replies' => Number::format(\App\Enums\Plan::Enterprise->typicalReplies())]) as $feature)
                         <li class="flex items-start gap-3">
                             <x-lucide-check class="mt-0.5 size-4 shrink-0 text-gray-950 dark:text-white" />
                             {{ $feature }}

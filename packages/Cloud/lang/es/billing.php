@@ -185,7 +185,7 @@ return [
         'billing' => 'Facturación anual · nunca por usuario',
         'includes' => 'Todo lo de Cloud Scale, más',
         'features' => [
-            '10,000 créditos de IA / mes',
+            ':credits créditos de IA al mes, unas :replies respuestas',
             'Buzones conectados ilimitados',
             '10x de capacidad de REST API y MCP server',
             'Un proyecto de implementación acotado',

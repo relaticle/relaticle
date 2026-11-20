@@ -185,7 +185,7 @@ return [
         'billing' => 'Billed yearly · never per seat',
         'includes' => 'Everything in Cloud Scale, plus',
         'features' => [
-            '10,000 AI credits / month',
+            ':credits AI credits a month, about :replies replies',
             'Unlimited connected mailboxes',
             '10x REST API and MCP throughput',
             'A scoped implementation project',
