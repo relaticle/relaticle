@@ -204,10 +204,20 @@
         @endif
     </x-cloud::marketing.hero>
 
+    @if($billingActive)
+        <x-cloud::marketing.frame>
+            <x-cloud::marketing.frame-header :label="__('Team cost')" :lead="__('Run the per-seat math.')">
+                {{ __('Then invite everyone.') }}
+            </x-cloud::marketing.frame-header>
+
+            @include('cloud::marketing.partials.pricing-team-cost')
+        </x-cloud::marketing.frame>
+    @endif
+
     <x-cloud::marketing.frame id="compare">
         @if($billingActive)
-            <x-cloud::marketing.frame-header :label="__('Compare plans')" :lead="__('Choose how you get started.')">
-                {{ __('Same CRM, different levels of help.') }}
+            <x-cloud::marketing.frame-header :label="__('Compare plans')" :lead="__('The same CRM on every plan.')">
+                {{ __('They differ in AI, limits and help.') }}
             </x-cloud::marketing.frame-header>
 
             @include('cloud::marketing.partials.pricing-comparison')

@@ -162,7 +162,7 @@ it('compares hosted product access with scoped Enterprise services when billing 
 
     $this->get('/pricing')
         ->assertOk()
-        ->assertSee(__('Choose how you get started'))
+        ->assertSee(__('The same CRM on every plan.'))
         ->assertSee('$19/mo per workspace ($228 billed yearly, or $24/mo billed monthly)')
         ->assertSee(__('A scoped implementation project'))
         ->assertSee(__('Agreed deployment and maintenance'))
@@ -285,23 +285,23 @@ it('drops the star count from the trust line when GitHub has none to report', fu
         ->not->toContain('GitHub stars');
 });
 
-it('compares self-hosting beside the cloud plans when billing is on', function (): void {
+it('compares the three cloud plans only where they differ when billing is on', function (): void {
     withHostedBilling();
 
-    $table = (new Crawler((string) $this->get('/pricing')->assertOk()->getContent()))->filter('#compare table');
+    $compare = (new Crawler((string) $this->get('/pricing')->assertOk()->getContent()))->filter('#compare');
+    $table = $compare->filter('table');
 
     expect($table->filter('thead th')->each(fn (Crawler $cell): string => trim($cell->text())))
-        ->toBe(['What’s included', 'Self-hosted Free', 'Cloud Pro $19/mo', 'Cloud Scale $49/mo', 'Enterprise From $20K/yr'])
-        ->and($table->filter('tbody th[scope="colgroup"]')->each(fn (Crawler $cell): string => trim($cell->text())))
-        ->toContain('Workspace', 'AI', 'Integrations', 'Setup and support')
+        ->toBe(['Where plans differ', 'Cloud Pro $19/mo', 'Cloud Scale $49/mo', 'Enterprise From $20K/yr'])
+        ->and($table->filter('tbody th[scope="row"] > span:first-child')->each(fn (Crawler $cell): string => trim($cell->text())))
+        ->toBe(['Rela, the AI assistant', 'Connected mailboxes', 'REST API and MCP throughput', 'Where it runs', 'Setup', 'Support'])
+        ->and($compare->filter('ul li')->each(fn (Crawler $item): string => trim($item->text())))
+        ->toBe(['Unlimited users and records', 'Every AI model on offer', 'REST API and MCP server', 'Export to CSV anytime'])
         ->and($table->text())
-        ->toContain('Unlimited on every plan')
-        ->toContain('Not metered, with your own AI provider key')
-        ->toContain('You install it with Docker Compose')
-        ->toContain('Community on Discord')
+        ->toContain('About 1,200 replies')
         ->toContain(Plan::Scale->throughputMultiplier().'x the request limit')
-        ->not->toContain('1 on every plan')
-        ->and($table->filter('td svg.lucide'))->toHaveCount(2);
+        ->not->toContain('Self-hosted')
+        ->not->toContain('Docker Compose');
 });
 
 it('leaves the Enterprise allowance and limits to the agreement', function (): void {
@@ -309,7 +309,7 @@ it('leaves the Enterprise allowance and limits to the agreement', function (): v
 
     $crawler = new Crawler((string) $this->get('/pricing')->assertOk()->getContent());
     $card = $crawler->filter('#enterprise-plan')->text();
-    $enterpriseCells = $crawler->filter('#compare tbody tr')->each(fn (Crawler $row): string => $row->filter('td')->count() === 4 ? trim($row->filter('td')->last()->text()) : '');
+    $enterpriseCells = $crawler->filter('#compare tbody tr')->each(fn (Crawler $row): string => $row->filter('td')->count() === 3 ? trim($row->filter('td')->last()->text()) : '');
 
     expect($card)->toContain('AI allowance Custom Agreed with your team')
         ->toContain('AI credits, mailboxes and API limits set for your team')
@@ -667,4 +667,25 @@ it('leaves the cloud metering questions off a self-hosted pricing page', functio
         ->assertDontSee(__('What counts as an AI credit?'))
         ->assertDontSee(__('Which AI models does my plan unlock?'))
         ->assertDontSee(__('Is there a message rate limit?'));
+});
+
+it('prices a team against the median per-seat crm when billing is on', function (): void {
+    withHostedBilling();
+
+    $calculator = (new Crawler((string) $this->get('/pricing')->assertOk()->getContent()))->filter('[data-team-cost]');
+
+    expect(CompetitorFacts::medianSeatPrice())->toBe(19.5)
+        ->and($calculator->filter('#team-cost-seat')->attr('value'))->toBe('19.5')
+        ->and($calculator->filter('[data-team-cost-amount]')->each(fn (Crawler $amount): string => trim($amount->text())))->toBe(['$97.50', '$19', '$49'])
+        ->and(trim($calculator->filter('[data-team-cost-verdict]')->text()))->toBe('A per-seat CRM costs $942 more a year than Cloud Pro.')
+        ->and($calculator->text())->toContain('$19.50 is the median entry price of 16 per-seat CRMs, billed yearly.');
+});
+
+it('leaves the team cost calculator out when billing is off', function (): void {
+    Feature::define(BillingFeature::class, false);
+
+    $this->get('/pricing')
+        ->assertOk()
+        ->assertDontSee('data-team-cost', false)
+        ->assertDontSee(__('Run the per-seat math.'));
 });

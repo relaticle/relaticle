@@ -218,7 +218,6 @@ return [
         'overdue_notification_action' => 'Open billing',
     ],
     'comparison' => [
-        'integrations' => 'Integrations',
         'support' => 'Support',
     ],
     'inquiry' => [

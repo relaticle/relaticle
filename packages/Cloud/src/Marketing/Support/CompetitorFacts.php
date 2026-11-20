@@ -23,6 +23,7 @@ final readonly class CompetitorFacts
      *     contributors_verified: string,
      *     pricing: string,
      *     pricing_verified: string,
+     *     seat_price: float|null,
      *     stack: string,
      *     self_host: string,
      *     ai: string,
@@ -43,6 +44,7 @@ final readonly class CompetitorFacts
          *     contributors_verified: string,
          *     pricing: string,
          *     pricing_verified: string,
+         *     seat_price: float|null,
          *     stack: string,
          *     self_host: string,
          *     ai: string,
@@ -54,5 +56,16 @@ final readonly class CompetitorFacts
         $facts = require dirname(__DIR__, 3).'/resources/data/competitor-facts.php';
 
         return $facts;
+    }
+
+    /** @return list<float> */
+    public static function seatPrices(): array
+    {
+        return array_values(array_filter(array_column(self::all(), 'seat_price'), is_float(...)));
+    }
+
+    public static function medianSeatPrice(): float
+    {
+        return (float) collect(self::seatPrices())->median();
     }
 }

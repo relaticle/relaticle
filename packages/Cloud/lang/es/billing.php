@@ -218,7 +218,6 @@ return [
         'overdue_notification_action' => 'Abrir facturación',
     ],
     'comparison' => [
-        'integrations' => 'Integraciones',
         'support' => 'Soporte',
     ],
     'inquiry' => [
