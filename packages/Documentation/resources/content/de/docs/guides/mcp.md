@@ -156,7 +156,7 @@ Fügen Sie dies Ihren VS-Code-Einstellungen hinzu (`.vscode/mcp.json`):
 
 ## Verfügbare Tools
 
-Der Server stellt 50 Tools bereit. Sie decken Kontokontext, entitätsübergreifende Suche, Analyse des Arbeitsbereichs, vollständiges CRUD für fünf CRM-Entitäten, Beziehungsverwaltung, Datei-Uploads, das Lesen synchronisierter E-Mails, die Verwaltung von E-Mail-Entwürfen sowie das Senden und Terminieren von E-Mails ab. Eine Verbindung ohne E-Mail-Zugriff sieht 39 Tools.
+Der Server stellt 52 Tools bereit. Sie decken Kontokontext, entitätsübergreifende Suche, Analyse des Arbeitsbereichs, vollständiges CRUD für fünf CRM-Entitäten, Beziehungsverwaltung, Datei-Uploads, das Lesen synchronisierter E-Mails, die Verwaltung von E-Mail-Entwürfen sowie das Senden und Terminieren von E-Mails ab. Eine Verbindung ohne E-Mail-Zugriff sieht 41 Tools.
 
 ### Entitätsübergreifende Suche
 
@@ -190,6 +190,7 @@ Der Server stellt 50 Tools bereit. Sie decken Kontokontext, entitätsübergreife
 | `create-company-tool` | Erstellt ein neues Unternehmen (erfordert `name`) |
 | `update-company-tool` | Aktualisiert ein Unternehmen per ID |
 | `delete-company-tool` | Löscht ein Unternehmen per ID mit Soft Delete |
+| `merge-companies-tool` | Führt zwei Unternehmen zu einem neuen zusammen; das primäre gewinnt, beide Originale werden gelöscht |
 
 ### Personen
 
@@ -200,6 +201,7 @@ Der Server stellt 50 Tools bereit. Sie decken Kontokontext, entitätsübergreife
 | `create-people-tool` | Erstellt eine neue Person (erfordert `name`, optional `company_id`) |
 | `update-people-tool` | Aktualisiert eine Person per ID |
 | `delete-people-tool` | Löscht eine Person per ID mit Soft Delete |
+| `merge-people-tool` | Führt zwei Personen zu einer neuen zusammen; die primäre gewinnt, beide Originale werden gelöscht |
 
 ### Verkaufschancen
 

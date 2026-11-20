@@ -156,7 +156,7 @@ Add this to your VS Code settings (`.vscode/mcp.json`):
 
 ## Available Tools
 
-The server provides 50 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, file uploads, reading synced email, managing email drafts, and sending and scheduling email. A connection without email access sees 39 tools.
+The server provides 52 tools. They cover account context, cross-entity discovery, workspace analysis, full CRUD across five CRM entities, relationship management, file uploads, reading synced email, managing email drafts, and sending and scheduling email. A connection without email access sees 41 tools.
 
 ### Cross-entity discovery
 
@@ -190,6 +190,7 @@ The server provides 50 tools. They cover account context, cross-entity discovery
 | `create-company-tool` | Create a new company (requires `name`) |
 | `update-company-tool` | Update a company by ID |
 | `delete-company-tool` | Soft-delete a company by ID |
+| `merge-companies-tool` | Merge two companies into a new one; the primary wins, both originals are deleted |
 
 ### People
 
@@ -200,6 +201,7 @@ The server provides 50 tools. They cover account context, cross-entity discovery
 | `create-people-tool` | Create a new person (requires `name`, optional `company_id`) |
 | `update-people-tool` | Update a person by ID |
 | `delete-people-tool` | Soft-delete a person by ID |
+| `merge-people-tool` | Merge two people into a new person; the primary wins, both originals are deleted |
 
 ### Opportunities
 

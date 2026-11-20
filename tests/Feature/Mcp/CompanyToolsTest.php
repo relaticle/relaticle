@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Enums\CreationSource;
+use App\Enums\WorkspaceRole;
 use App\Mcp\Servers\RelaticleServer;
 use App\Mcp\Tools\BaseCreateTool;
 use App\Mcp\Tools\BaseDeleteTool;
@@ -13,6 +14,7 @@ use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
+use App\Mcp\Tools\Company\MergeCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\Company;
@@ -21,8 +23,11 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\CurrentWorkspace;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Str;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Laravel\Sanctum\Sanctum;
+use Relaticle\CustomFields\Services\TenantContextService;
 
 mutates(
     BaseCreateTool::class,
@@ -430,4 +435,135 @@ it('cannot read a company from another workspace over the mcp route', function (
 
     expect($response->json('result.isError'))->toBeTrue()
         ->and((string) $response->getContent())->not->toContain('Other Workspace Corp');
+});
+
+describe('merge companies tool', function (): void {
+    beforeEach(function (): void {
+        TenantContextService::setTenantId($this->workspace->getKey());
+    });
+
+    afterEach(function (): void {
+        TenantContextService::setTenantId(null);
+    });
+
+    function mergeToolCompanyIds(Model $primary, Model $secondary): array
+    {
+        return ['primary_id' => $primary->getKey(), 'secondary_id' => $secondary->getKey()];
+    }
+
+    it('merges two companies into a new one and reports it', function (): void {
+        $primary = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Winner']);
+        $secondary = mergeCompanyRecord($this->workspace, $this->user, ['name' => 'Loser']);
+
+        $response = RelaticleServer::actingAs($this->user)
+            ->tool(MergeCompaniesTool::class, mergeToolCompanyIds($primary, $secondary))
+            ->assertOk();
+
+        $newId = Company::query()->where('name', 'Winner')->sole()->getKey();
+        expect($newId)->not->toBeIn([$primary->getKey(), $secondary->getKey()]);
+
+        $response->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->where('merged', true)
+            ->where('type', 'company')
+            ->where('id', $newId)
+            ->where('name', 'Winner')
+            ->etc());
+    });
+
+    it('answers not found for both originals on the get tool afterwards', function (): void {
+        $primary = mergeCompanyRecord($this->workspace, $this->user);
+        $secondary = mergeCompanyRecord($this->workspace, $this->user);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(MergeCompaniesTool::class, mergeToolCompanyIds($primary, $secondary))
+            ->assertOk();
+
+        foreach ([$primary, $secondary] as $original) {
+            RelaticleServer::actingAs($this->user)
+                ->tool(GetCompanyTool::class, ['id' => $original->getKey()])
+                ->assertHasErrors(['not found']);
+        }
+    });
+
+    it('refuses the same id twice', function (): void {
+        $record = mergeCompanyRecord($this->workspace, $this->user);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(MergeCompaniesTool::class, mergeToolCompanyIds($record, $record))
+            ->assertHasErrors(['different']);
+
+        expect($record->fresh())->not->toBeNull();
+    });
+
+    it('refuses an id that is unknown, deleted, merged or in another workspace', function (): void {
+        $primary = mergeCompanyRecord($this->workspace, $this->user);
+        $deleted = mergeCompanyRecord($this->workspace, $this->user);
+        $deleted->delete();
+        $first = mergeCompanyRecord($this->workspace, $this->user);
+        $second = mergeCompanyRecord($this->workspace, $this->user);
+        RelaticleServer::actingAs($this->user)->tool(MergeCompaniesTool::class, mergeToolCompanyIds($first, $second))->assertOk();
+        $foreign = Company::withoutEvents(fn () => Company::factory()->create(['workspace_id' => Workspace::factory()->create()->id]));
+
+        $ids = ['unknown' => (string) Str::ulid(), 'deleted' => $deleted->getKey(), 'merged' => $first->getKey(), 'other workspace' => $foreign->getKey()];
+
+        foreach ($ids as $id) {
+            RelaticleServer::actingAs($this->user)
+                ->tool(MergeCompaniesTool::class, ['primary_id' => $primary->getKey(), 'secondary_id' => $id])
+                ->assertHasErrors(["[{$id}] not found"]);
+
+            RelaticleServer::actingAs($this->user)
+                ->tool(MergeCompaniesTool::class, ['primary_id' => $id, 'secondary_id' => $primary->getKey()])
+                ->assertHasErrors(["[{$id}] not found"]);
+        }
+
+        expect($primary->fresh())->not->toBeNull();
+    });
+
+    it('refuses a token missing one of the three abilities', function (string $missing): void {
+        $primary = mergeCompanyRecord($this->workspace, $this->user);
+        $secondary = mergeCompanyRecord($this->workspace, $this->user);
+        $token = $this->user->createToken('test', array_values(array_diff(['create', 'update', 'delete'], [$missing])));
+        $this->user->withAccessToken($token->accessToken);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(MergeCompaniesTool::class, mergeToolCompanyIds($primary, $secondary))
+            ->assertHasErrors(['Invalid ability provided.']);
+
+        expect($primary->fresh())->not->toBeNull()->and($secondary->fresh())->not->toBeNull();
+    })->with(['create', 'update', 'delete']);
+
+    it('refuses a viewer', function (): void {
+        $primary = mergeCompanyRecord($this->workspace, $this->user);
+        $secondary = mergeCompanyRecord($this->workspace, $this->user);
+        $viewer = User::factory()->create();
+        $this->workspace->users()->attach($viewer, ['role' => WorkspaceRole::Viewer->value]);
+        auth()->forgetGuards();
+
+        $this->withToken($viewer->createToken('test', ['*'])->plainTextToken)
+            ->withHeader('X-Workspace-Id', $this->workspace->getKey())
+            ->postJson('/mcp', [
+                'jsonrpc' => '2.0',
+                'id' => 1,
+                'method' => 'tools/call',
+                'params' => ['name' => 'merge-companies-tool', 'arguments' => mergeToolCompanyIds($primary, $secondary)],
+            ])
+            ->assertOk()
+            ->assertJsonPath('result.isError', true)
+            ->assertJsonPath('result.content.0.text', 'Your role in this workspace does not allow this.');
+
+        expect($primary->fresh())->not->toBeNull()->and($secondary->fresh())->not->toBeNull();
+    });
+
+    it('refuses a combined count above the ceiling of 20', function (): void {
+        $suffix = '.com';
+        $values = fn (string $prefix, int $count): array => array_map(fn (int $number): string => "{$prefix}{$number}{$suffix}", range(1, $count));
+        $primary = mergeCompanyRecord($this->workspace, $this->user, [], ['domains' => $values('a', 11)]);
+        $secondary = mergeCompanyRecord($this->workspace, $this->user, [], ['domains' => $values('b', 10)]);
+
+        RelaticleServer::actingAs($this->user)
+            ->tool(MergeCompaniesTool::class, mergeToolCompanyIds($primary, $secondary))
+            ->assertHasErrors(['20']);
+
+        expect($primary->fresh())->not->toBeNull()->and($secondary->fresh())->not->toBeNull();
+    });
 });

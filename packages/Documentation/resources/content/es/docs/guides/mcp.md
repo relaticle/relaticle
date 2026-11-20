@@ -156,7 +156,7 @@ Agregue esto a la configuración de VS Code (`.vscode/mcp.json`):
 
 ## Herramientas disponibles
 
-El servidor ofrece 50 herramientas. Cubren el contexto de la cuenta, el descubrimiento entre entidades, el análisis del espacio de trabajo, CRUD completo en cinco entidades del CRM, la administración de relaciones, la subida de archivos, la lectura del correo sincronizado, la administración de borradores de correo y el envío y la programación de correo. Una conexión sin acceso al correo ve 39 herramientas.
+El servidor ofrece 52 herramientas. Cubren el contexto de la cuenta, el descubrimiento entre entidades, el análisis del espacio de trabajo, CRUD completo en cinco entidades del CRM, la administración de relaciones, la subida de archivos, la lectura del correo sincronizado, la administración de borradores de correo y el envío y la programación de correo. Una conexión sin acceso al correo ve 41 herramientas.
 
 ### Descubrimiento entre entidades
 
@@ -190,6 +190,7 @@ El servidor ofrece 50 herramientas. Cubren el contexto de la cuenta, el descubri
 | `create-company-tool` | Crea una empresa nueva (requiere `name`) |
 | `update-company-tool` | Actualiza una empresa por ID |
 | `delete-company-tool` | Elimina una empresa por ID (eliminación lógica) |
+| `merge-companies-tool` | Fusiona dos empresas en una nueva; gana la principal y se eliminan los dos originales |
 
 ### Personas
 
@@ -200,6 +201,7 @@ El servidor ofrece 50 herramientas. Cubren el contexto de la cuenta, el descubri
 | `create-people-tool` | Crea una persona nueva (requiere `name`, `company_id` opcional) |
 | `update-people-tool` | Actualiza una persona por ID |
 | `delete-people-tool` | Elimina una persona por ID (eliminación lógica) |
+| `merge-people-tool` | Fusiona dos personas en una nueva; gana la principal y se eliminan los dos originales |
 
 ### Oportunidades
 
