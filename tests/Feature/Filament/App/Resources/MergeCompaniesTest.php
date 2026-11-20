@@ -646,14 +646,15 @@ it('takes the other company\'s logo only when the current company has none', fun
         ->and($logos->where('model_id', $duplicate->getKey())->pluck('id')->all())->toBe($keptHasLogo ? [$duplicateLogo->getKey()] : []);
 })->with([true, false]);
 
-it('offers no merge and no duplicate prompt on a deleted company', function (): void {
+it('shows the deleted notice with no merge and no duplicate prompt on a deleted company', function (): void {
     $company = mergeCompanyRecord($this->workspace, $this->user, customFields: ['domains' => ['harborline.com']]);
     mergeCompanyRecord($this->workspace, $this->user, customFields: ['domains' => ['harborline.com']]);
     $company->delete();
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
-        ->assertActionHidden(mergeRecordAction())
-        ->assertSchemaComponentHidden('duplicatePrompt', 'infolist');
+        ->assertSee('This record was deleted')
+        ->assertDontSee(['Merge record', 'possible duplicate'])
+        ->assertActionDoesNotExist(mergeRecordAction());
 });
 
 it('keeps the image of the current company\'s rich-text value when it wins the field', function (): void {

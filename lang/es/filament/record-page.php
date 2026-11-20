@@ -81,6 +81,19 @@ return [
             'tasks' => '{0} Sin tareas relacionadas|{1} :count tarea|[2,*] :count tareas',
         ],
     ],
+    'unavailable' => [
+        'merged' => [
+            'heading' => 'Este registro se fusionó',
+            'body' => 'Se fusionó con otro registro y ya no existe por sí solo.',
+            'action' => 'Ir al registro',
+            'help' => 'Cómo funciona la fusión',
+        ],
+        'deleted' => [
+            'heading' => 'Este registro se eliminó',
+            'body' => 'Se eliminó y ya no existe aquí.',
+            'action' => 'Volver',
+        ],
+    ],
     'empty' => '—',
     'view_all' => 'Ver todo',
     'show_less' => 'Ver menos',

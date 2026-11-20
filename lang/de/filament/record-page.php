@@ -81,6 +81,19 @@ return [
             'tasks' => '{0} Keine verknüpften Aufgaben|{1} :count Aufgabe|[2,*] :count Aufgaben',
         ],
     ],
+    'unavailable' => [
+        'merged' => [
+            'heading' => 'Dieser Eintrag wurde zusammengeführt',
+            'body' => 'Er wurde mit einem anderen Eintrag zusammengeführt und existiert nicht mehr für sich allein.',
+            'action' => 'Zum Eintrag',
+            'help' => 'So funktioniert das Zusammenführen',
+        ],
+        'deleted' => [
+            'heading' => 'Dieser Eintrag wurde gelöscht',
+            'body' => 'Er wurde gelöscht und existiert hier nicht mehr.',
+            'action' => 'Zurück',
+        ],
+    ],
     'empty' => '—',
     'view_all' => 'Alle anzeigen',
     'show_less' => 'Weniger anzeigen',

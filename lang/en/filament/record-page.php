@@ -81,6 +81,19 @@ return [
             'tasks' => '{0} No related tasks|{1} :count task|[2,*] :count tasks',
         ],
     ],
+    'unavailable' => [
+        'merged' => [
+            'heading' => 'This record was merged',
+            'body' => 'It was merged with another record and no longer exists on its own.',
+            'action' => 'Go to record',
+            'help' => 'How merging works',
+        ],
+        'deleted' => [
+            'heading' => 'This record was deleted',
+            'body' => 'It was deleted and no longer exists here.',
+            'action' => 'Go back',
+        ],
+    ],
     'empty' => '—',
     'view_all' => 'View all',
     'show_less' => 'Show less',

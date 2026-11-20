@@ -21,6 +21,7 @@ use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -45,6 +46,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\EmailIntegration\Filament\Actions\ComposeEmailAction;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
@@ -77,8 +79,19 @@ trait HasRecordPageLayout
         }
     }
 
+    protected function fillForm(): void
+    {
+        if (! $this->isUnavailable()) {
+            parent::fillForm();
+        }
+    }
+
     public function infolist(Schema $schema): Schema
     {
+        if ($this->isUnavailable()) {
+            return $schema->components([]);
+        }
+
         if ($this->isEmbedded) {
             return $schema->components([$this->quickActions()]);
         }
@@ -107,6 +120,10 @@ trait HasRecordPageLayout
 
     public function content(Schema $schema): Schema
     {
+        if ($this->isUnavailable()) {
+            return $schema->components([$this->unavailableNotice()]);
+        }
+
         if ($this->isEmbedded) {
             return $schema->components([
                 View::make('filament.app.record-preview-title')
@@ -152,7 +169,24 @@ trait HasRecordPageLayout
 
     public function getHeading(): string|Htmlable
     {
-        return $this->isEmbedded ? '' : $this->getRecordTitle();
+        if ($this->isEmbedded) {
+            return '';
+        }
+
+        return $this->isUnavailable() ? $this->unavailableHeading() : $this->getRecordTitle();
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return $this->isUnavailable() ? $this->unavailableHeading() : parent::getTitle();
+    }
+
+    /**
+     * @return array<int, Action|ActionGroup>
+     */
+    protected function getHeaderActions(): array
+    {
+        return $this->isUnavailable() ? [] : parent::getHeaderActions();
     }
 
     public function getHeadingStart(): Htmlable
@@ -325,6 +359,46 @@ trait HasRecordPageLayout
         }
 
         return $manager::getBadge($this->crmRecord(), static::class);
+    }
+
+    private function mergedIntoId(): ?string
+    {
+        $record = $this->getRecord();
+
+        return $record instanceof Company || $record instanceof People ? $record->merged_into_id : null;
+    }
+
+    private function isUnavailable(): bool
+    {
+        return $this->mergedIntoId() !== null || $this->crmRecord()->trashed();
+    }
+
+    private function unavailableHeading(): string
+    {
+        return __('filament/record-page.unavailable.'.$this->unavailableKind().'.heading');
+    }
+
+    private function unavailableKind(): string
+    {
+        return $this->mergedIntoId() === null ? 'deleted' : 'merged';
+    }
+
+    private function unavailableNotice(): View
+    {
+        $mergedIntoId = $this->mergedIntoId();
+        $kind = $this->unavailableKind();
+
+        return View::make('filament.app.record-unavailable')->viewData([
+            'icon' => $mergedIntoId === null ? 'lucide-trash-2' : 'lucide-git-merge',
+            'heading' => $this->unavailableHeading(),
+            'body' => __("filament/record-page.unavailable.{$kind}.body"),
+            'actionLabel' => __("filament/record-page.unavailable.{$kind}.action"),
+            'actionIcon' => $mergedIntoId === null ? 'lucide-arrow-left' : 'lucide-arrow-right',
+            'actionUrl' => $mergedIntoId === null
+                ? static::getResource()::getUrl('index')
+                : static::getResource()::getUrl('view', ['record' => $mergedIntoId]),
+            'helpUrl' => $mergedIntoId === null ? null : DocUrl::helpPage('records', 'merge-duplicate-records'),
+        ]);
     }
 
     private function crmRecord(): Company|People|Opportunity

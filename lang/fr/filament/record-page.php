@@ -81,6 +81,19 @@ return [
             'tasks' => '{0} Aucune tâche liée|{1} :count tâche|[2,*] :count tâches',
         ],
     ],
+    'unavailable' => [
+        'merged' => [
+            'heading' => 'Cette fiche a été fusionnée',
+            'body' => "Elle a été fusionnée avec une autre fiche et n'existe plus séparément.",
+            'action' => 'Aller à la fiche',
+            'help' => 'Comment fonctionne la fusion',
+        ],
+        'deleted' => [
+            'heading' => 'Cette fiche a été supprimée',
+            'body' => "Elle a été supprimée et n'existe plus ici.",
+            'action' => 'Retour',
+        ],
+    ],
     'empty' => '—',
     'view_all' => 'Tout afficher',
     'show_less' => 'Afficher moins',

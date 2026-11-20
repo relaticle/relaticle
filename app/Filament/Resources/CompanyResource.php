@@ -75,9 +75,12 @@ final class CompanyResource extends Resource
             ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
+            ->recordUrl(fn (Company $record): ?string => $record->trashed() || ! self::canView($record) ? null : self::getUrl('view', ['record' => $record]))
             ->recordActions([
                 RowActions::withoutMenu([
-                    PreviewRecordAction::make()->page(ViewCompany::class),
+                    PreviewRecordAction::make()
+                        ->page(ViewCompany::class)
+                        ->hidden(fn (Company $record): bool => $record->trashed()),
                 ]),
             ])
             ->toolbarActions([
@@ -198,7 +201,9 @@ final class CompanyResource extends Resource
 
     public static function getGlobalSearchEloquentQuery(): Builder
     {
-        return parent::getGlobalSearchEloquentQuery()->with(['media', 'domainValue']);
+        $query = parent::getGlobalSearchEloquentQuery()->with(['media', 'domainValue']);
+
+        return $query->whereNull($query->qualifyColumn('deleted_at'));
     }
 
     public static function getEloquentQuery(): Builder
