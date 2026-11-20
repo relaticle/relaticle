@@ -267,9 +267,23 @@ body.reordering-column .column-resize-handle-bar::before {
     @apply sm:block sm:truncate;
 }
 
-/* Phones keep Filament's own pagination below the stacked cards. */
+/* From 640px the list pages' pagination rides in the table footer, so it follows the last row. A caption spans every
+   column without a colspan. Phones keep Filament's own bar below the stacked cards. */
+.fi-ta-main:has(.fi-ta-pagination-footer) > .fi-pagination {
+    @apply sm:hidden;
+}
+
 .fi-ta-table > tfoot:has(.fi-ta-pagination-footer) {
-    @apply hidden;
+    @apply table-caption caption-bottom bg-transparent max-sm:hidden dark:bg-transparent;
+
+    & > tr,
+    & .fi-ta-pagination-footer {
+        @apply block p-0;
+    }
+
+    & .fi-pagination {
+        @apply sticky start-0 w-(--table-visible-width) border-t-0;
+    }
 }
 
 /* The five list pages fill the screen below the topbar, so the table scrolls inside itself and its horizontal
@@ -308,25 +322,6 @@ body.reordering-column .column-resize-handle-bar::before {
 
         .fi-ta-content-ctn:not(.fi-modal *) {
             @apply min-h-0 flex-1 overscroll-contain;
-        }
-
-        /* The pagination rides in the table footer, so it follows the last row. A caption spans every column
-           without a colspan, and the bar keeps the visible width while the rows scroll sideways. */
-        .fi-ta-main:has(.fi-ta-pagination-footer) > .fi-pagination {
-            @apply hidden;
-        }
-
-        .fi-ta-table > tfoot:has(.fi-ta-pagination-footer) {
-            @apply table-caption caption-bottom bg-transparent dark:bg-transparent;
-
-            & > tr,
-            & .fi-ta-pagination-footer {
-                @apply block p-0;
-            }
-
-            & .fi-pagination {
-                @apply sticky start-0 w-(--table-visible-width) border-t-0;
-            }
         }
 
         .fi-ta-content-ctn:not(.fi-modal *) thead {
