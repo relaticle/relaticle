@@ -2,7 +2,6 @@
 @use(App\Enums\Plan)
 @use(Relaticle\Cloud\Marketing\Support\CompetitorFacts)
 @php
-    $locale = str_replace('_', '-', app()->getLocale());
     $people = 5;
     $maxPeople = 50;
     $seatPrice = CompetitorFacts::medianSeatPrice();
@@ -10,7 +9,7 @@
     $scale = Plan::Scale->yearlyPricePerMonth();
     $seatTotal = $people * $seatPrice;
     $top = max($seatTotal, $scale);
-    $money = fn (float $amount): string => Number::currency($amount, 'USD', $locale, precision: fmod($amount, 1.0) === 0.0 ? 0 : 2);
+    $money = fn (float $amount): string => Number::currency($amount, 'USD', 'en_US', precision: fmod($amount, 1.0) === 0.0 ? 0 : 2);
     $clip = fn (float $amount): string => 'clip-path: inset(0 '.round(100 - $amount / $top * 100, 2).'% 0 0 round 0.375rem)';
 
     $copy = [
@@ -42,7 +41,7 @@
         get top() { return Math.max(this.seatTotal, this.scale) },
         clip(amount) { return `inset(0 ${100 - amount / this.top * 100}% 0 0 round 0.375rem)` },
         money(amount) {
-            return new Intl.NumberFormat(@js($locale), { style: 'currency', currency: 'USD', minimumFractionDigits: amount % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(amount)
+            return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: amount % 1 === 0 ? 0 : 2, maximumFractionDigits: 2 }).format(amount)
         },
         get verdict() {
             if (this.seatTotal > this.pro) {
