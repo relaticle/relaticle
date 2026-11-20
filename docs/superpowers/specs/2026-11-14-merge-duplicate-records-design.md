@@ -1,7 +1,7 @@
 # Merge duplicate companies and people
 
 **Date:** 2026-11-14
-**Status:** Phase 1 built (PR #1193), Phase 2 built. Reworked 2026-11-17: the merge creates a new record (decision 5), built
+**Status:** Phase 1 built (PR #1193), Phase 2 built. Reworked 2026-11-17: the merge creates a new record (decision 5), built. Phase 3 planned 2026-11-20 (`docs/superpowers/plans/2026-11-20-merge-result-parity.md`): the new record continues both originals, merged records, REST
 **Issue:** #885
 
 ## Summary
@@ -29,13 +29,15 @@ emails in a merge comes straight back on the next sync.
 | 4 | Dialog | The current record fills the priority slot, the other slot starts empty with a **+** that opens a search, a ⇄ button swaps the two, and a third card previews the result |
 | 5 | Which record survives | Neither. The merge creates a new record and soft-deletes both originals (changed 2026-11-17 on the repo owner's call). The cost is accepted: every outside reference to either ID (bookmarks, API and MCP clients, Rela mentions, saved views by ID) now points at a deleted record |
 | 6 | Duplicate prompt | Phase 2, a separate PR: a record-page section listing the duplicates, each with a Merge that opens the dialog with it picked. A duplicates review page is out of scope |
-| 7 | Rela, API, MCP | Out of scope. Panel only |
+| 7 | Rela, API, MCP | All three merge (changed 2026-11-20, Phase 3): the REST API, an MCP tool per entity, and a Rela write tool per entity that proposes merges for approval. No outbound webhook |
 | 8 | Build shape | Approach A below |
-| 9 | More than 5 domains or emails | Block the merge. The dialog names the list over the limit (`getMaxValues()`, 5) so the member trims it first. Dropping extras would let mailbox sync recreate the duplicate |
+| 9 | More than the field's limit of domains or emails | The merge keeps every value and raises the field's `max_values` to the combined count in the same transaction (changed 2026-11-20). The raise applies to the workspace's field, so every record of that entity may then hold that many. It runs for any member allowed to merge, including Members who cannot manage fields, because it is the smallest change that keeps the merged record valid. Only a combined count above the settings ceiling (20) still blocks. Dropping extras would let mailbox sync recreate the duplicate |
 | 10 | Sample data | The new record takes the priority record's `creation_source`. When that is `CreationSource::SAMPLE` and the other record's is not, it takes the other record's, so `RemoveSampleData` never deletes what was merged |
-| 11 | The new record's creator and dates | `creator_id` and `creation_source` come from the same original: the priority record, or the other one in decision 10's sample case. A mailbox-synced record stays automated. `created_at` is the merge time |
-| 12 | Timelines | History stays where it happened: each original keeps its own (changed 2026-11-18). The new record has no `created` row. The new record continues the priority record: each merge adds one entry naming the other record, "<member> merged <name> into this record", and the priority record's earlier merge entries carry over. The other record's merge entries stay on it. No value changes are logged. Each original gets a `record_merged` entry naming the record it went into |
-| 13 | Old URLs of the originals | No redirect. An old URL opens the soft-deleted original, as after any delete. A `merged_into_id` pointer with a redirect on the record page was weighed and left out for now: it needs a migration |
+| 11 | The new record's creator and dates | `creator_id` and `creation_source` come from the same original: the priority record, or the other one in decision 10's sample case. A mailbox-synced record stays automated. `created_at` comes from that same original (changed 2026-11-20), so the new record keeps the priority record's creation date whether it is the older or the newer one |
+| 12 | Timelines | The new record continues both pasts (changed again 2026-11-20). Both originals' activity rows move to it, except the non-origin's `created` row, every `deleted` or `restored` row, and every earlier `record_merged` row, so the timeline shows one creation and the latest merge only. One entry records the merge: "<member> merged 2 records into this record", with both names in its properties. The originals are deleted with logging off and get no entry. The 2026-11-18 reason for keeping history on the originals was a restored original coming back without it, and decision 14 removes restoring |
+| 13 | Old URLs of the originals | A notice, no redirect (changed 2026-11-20). Each original stores `merged_into_id`, a pointer with no foreign key. Its old URL shows "This record was merged" and a **Go to record** button to the record it was merged into (one hop, so a chain is walked notice by notice), and nothing of the record itself. Takes a migration: one nullable column on `companies` and `people` |
+| 14 | Undo and restore | None (2026-11-20). A merged record never appears in a list, the trash, search or a picker, and cannot be restored, edited or deleted, from the app panel or the system admin panel. The model refuses `restoring`, the policies refuse `update`, `delete`, `restore` and `forceDelete`, and the resources' list query drops it |
+| 15 | Deleted records' pages | A deleted company, person or opportunity's URL shows a notice, "This record was deleted", with a **Go back** button and nothing of the record (2026-11-20). Restoring stays where it is today: the trash filter on a list and **Restore selected**. Global search leaves deleted records out, as the restore help page already promises. In the trash filter a deleted row carries no link and no preview, so a click never lands on the notice: tick it and use **Restore selected** |
 
 ## Phases
 
@@ -60,6 +62,93 @@ emails in a merge comes straight back on the next sync.
    so a second scan to check it would add nothing (decided in review). Both merge entry points read
    `MergeRecordAction::canMerge()`. The section has no dismiss: a dismiss kept per record hid the
    prompt on one record of a pair and not the other, which read as a bug.
+
+3. **The result continues both originals** (planned 2026-11-20, decisions 7 and 11 to 14). Measured
+   against the reference behavior a member expects from a CRM merge, walked by hand on 2026-11-20:
+   the result kept the priority record's creation date, showed both originals' history under one
+   creation, and each original's old URL showed a notice with a button to the record it went into.
+   - **Creation date.** The new record takes `created_at` from the same original as its creator: the
+     priority record, whether older or newer, or the other one in decision 10's sample case
+     (decision 11). Call that original the origin.
+   - **History.** `MoveRecordHistory` (built 2026-11-17, removed 2026-11-18, restored) moves both
+     originals' activity rows to the new record. Left behind on the originals: the non-origin's
+     `created` row, every `deleted` and `restored` row, and every earlier `record_merged` row. The
+     custom attribute values the non-origin was created with move, and read as a change at its
+     creation time, as the reference showed. So the timeline shows the origin's one creation, both
+     originals' changes, and only the latest merge after a chain. Each
+     original's `batch_uuid` is rehashed on the move so the two never fold into one entry. The
+     originals are soft-deleted with logging off. One `record_merged` entry reads "<member> merged
+     2 records into this record" and stores `merged_names` (priority first). The workspace Activity
+     page gives the event its translated "Merged" label and offers it in its event filter.
+     `LogRecordMerge` and its three entries go (decision 12).
+   - **Merged records.** `companies.merged_into_id` and `people.merged_into_id`: a nullable ULID with
+     no foreign key, so the marker survives a force delete of the record it names. The merge writes it
+     on both originals with a query update before the muted soft delete, because a soft delete saves
+     only `deleted_at` and `updated_at`. The view page of a merged record renders a notice in place of
+     the record: heading and browser title "This record was merged", no record name, field, tab,
+     relation manager or header action, a **Go to record** button to the record it was merged into,
+     and a link to the help page on merging. The button goes one hop: after a chain of merges it opens
+     the next notice, after the result is deleted it opens the deleted notice (decision 15), and
+     after the result is force-deleted it gives a 404. Its URL is built from `merged_into_id` itself,
+     so it exists without the target row. A Rela record chip naming a merged record
+     redirects a member to that notice, after the membership check (decision 13).
+   - **No restore.** The resources' list query adds `notMerged()`, so a merged record is in no list,
+     trash filter, global search or bulk action. Filament's bulk restore reads the table query, so it
+     can never reach one. The route binding query keeps merged records, so the old URL resolves. The
+     policies refuse `update`, `delete`, `restore` and `forceDelete` on one, a `restoring` listener
+     refuses it on every path through the model, and the system admin panel's edit pages, which read
+     trashed records and whose policy takes no record, refuse it on mount (decision 14).
+   - **REST.** `POST /api/v1/companies/merge` and `POST /api/v1/people/merge` take
+     `primary_record_id` and `secondary_record_id`, call `MergeRecords` with the primary as priority,
+     and return the new record's resource with 200. Token abilities `create`, `update` and `delete`.
+     The OpenAPI 403 text still names `create` alone, the same gap the upsert routes have today. 422 keyed on the field for the same id twice, or an id
+     that is unknown, deleted, merged or in another workspace, so repeating a merge gives 422. 422
+     keyed on `records` for a field whose combined count passes the ceiling of 20, or a record that
+     vanished under the lock.
+     `MergeRecords` keys its errors on `records` instead of the dialog's `picked_id` (decision 7).
+
+   - **Limits.** `CombineRecordValues` stops reporting a list over its limit. It reports the raise
+     instead: each field whose combined count passes its `max_values`, with the new count. The merge
+     writes the raised `max_values` to the workspace's field inside its transaction, through a step
+     of its own, because `UpdateCustomField` requires the fields-manage capability and Members merge
+     too. The step locks the field row, never lowers the value, and saves through the model, so the
+     per-request field cache is cleared for the next merge in the same request and the field's
+     activity records the raise. The dialog's alert becomes a notice naming the raise ("Companies can now hold 7 domains").
+     A combined count above `CustomFieldSettingsSchema`'s ceiling of 20 still blocks (decision 9).
+   - **Deleted records.** The record page of a deleted company, person or opportunity renders the
+     deleted notice in place of the record, as the merged notice does: "This record was deleted",
+     a **Go back** button, no record data. Both notices share one view, and the record preview
+     panel shows them too. A Rela chip naming a deleted company, person or opportunity opens that
+     notice, so the chat's own 410 page remains only for tasks and notes. Global search adds the
+     soft-delete constraint the list query drops for the trash filter (decision 15).
+   - **MCP.** `MergeCompaniesTool` and `MergePeopleTool` take `primary_id` and `secondary_id`, check
+     the token's `create`, `update` and `delete` abilities, call `MergeRecords`, and return the new
+     record. The MCP guide's tool reference and count follow, in every locale.
+   - **Rela.** `MergeCompaniesTool` and `MergePeopleTool` take a batch of pairs, as every write tool
+     takes a batch, and propose one `PendingAction` per call. An id may appear in one pair only, and
+     a single pair is a plain proposal, not a batch. The proposal card shows each pair as
+     "<other> into <priority>" with the priority's values winning. Approving runs `MergeRecords` per
+     pair. A merge is approved with the rest of a plan, like a delete, because it stays inside the
+     workspace. The `CrmAssistant` prompt says when to merge and that a merge cannot be undone.
+
+   Already the same, kept as is: the menu entry, the two cards with the swap control (disabled until a
+   second record is picked) and the result card, the right-hand record winning, gaps filled from the
+   other record, lists and multi-select values combined priority first, the search by name, domain or
+   email with 25 results and keyboard picking, one pair per merge, companies and people only, the new
+   record with a new ID, the landing on it, the originals gone from lists and search, and who may
+   merge: Members and Admins hold create, update and delete, Viewers hold none, which is the
+   reference's write access.
+
+   Kept on purpose, not matched:
+   - The cards count people, opportunities, notes and tasks. The reference counts lists and comments
+     too, and Relaticle has neither.
+   - The REST merge answers 422 for an unknown or merged id, not 404 (the reference's API was not
+     walked). Every unknown id in a request body already answers 422 here (`TenantFkValidator`), and
+     `tests/Feature/Documentation/OpenApiSpecTest.php` keeps 404 for paths with an `{id}`. It returns
+     the new record's resource, where the reference returns only its id.
+   - No outbound webhook. Relaticle sends none today, so a `record.merged` event has nothing to ride
+     on. An API client learns of a merge from the 422 on the old id.
+   - Merging from Rela and the MCP server goes beyond the reference, which documents neither.
 
 ## Approaches
 
@@ -116,7 +205,8 @@ Merge  [Brightline Health]                                              ✕
   records. The result card shows the combined values and counts, and updates live as the pick or the
   swap changes.
 - **Merge records** stays disabled until a second record is picked, and while a combined list is over
-  its limit. An alert names the list over the limit.
+  its limit. An alert names the list over the limit. (Phase 3: a notice names the raised limit, and
+  only a count above 20 disables the button.)
 - The result card previews the new record.
 - After the merge, the member is always redirected to the new record's page with a "Records merged"
   notification, because the page they opened it from is now a deleted record.
@@ -137,7 +227,8 @@ then `other`'s, with duplicates removed after the field's own normalization. Ord
 **Other multi-value custom attributes** (multi-select, checkbox list, tags, and any field whose
 `allow_multiple` setting is on): combined the same way, `priority`'s first. A field that holds a list
 but allows one value, such as a person's phone, follows the single-value rule. The limit is the
-field's own `max_values` (5 for domains and emails), and record-type fields have none.
+field's own `max_values` (5 for domains and emails), and record-type fields have none. (Phase 3: the
+merge raises it instead, decision 9.)
 
 **Record-type values that name an original** are rewritten to the new record. When one original
 pointed at the other, the new record points at itself. Kept on purpose: dropping the link would
@@ -162,11 +253,11 @@ All of it runs in one database transaction.
 4. Move everything listed under What moves, from `priority` first and then from `other`. The order
    decides ties: a link both originals hold keeps `priority`'s row, and `priority`'s logo moves.
    `RecordMerged` fires once per original.
-5. Soft-delete both originals through the model, so each writes its own `deleted` activity row.
+5. Soft-delete both originals through the model, so each writes its own `deleted` activity row (Phase 3: with logging off, after setting `merged_into_id`).
    Their own custom attribute values and history stay on them.
 6. Write the combined values to the new record through `UpdateCompany` or `UpdatePeople`, with
    activity logging off, so the timeline gets no `updated` or `custom_field_changes` row.
-7. `LogRecordMerge` moves the priority record's own merge entries (those with `merged_name`) to the
+7. (Phase 3 replaces this step with `MoveRecordHistory`.) `LogRecordMerge` moves the priority record's own merge entries (those with `merged_name`) to the
    new record, then writes three `record_merged` entries, each in a batch of its own. The new
    record's stores the other record's name (`merged_name`) and reads "<member> merged <name> into
    this record". Each original's stores the new name
@@ -180,7 +271,7 @@ Each step runs once per original, into the new record.
 - Note, task, email and meeting links (`noteables`, `taskables`, `emailables`, `meetingables`).
   A link the new record already holds from the first original is dropped instead of moved, because
   each table is unique on (item, type, id).
-- Activity history does not move. A moved edit would read as the new record's own ("Name: Acme →
+- Activity history does not move (Phase 3 moves it, see Phases). A moved edit would read as the new record's own ("Name: Acme →
   Acme Corp" on a record named Acme), the two pasts would interleave, and a restored original would
   come back without its history.
 - `attachments` media the combined rich-text values actually reference, so a copied value keeps its
@@ -231,18 +322,18 @@ an original into the record it already went into.
 
 ## Known effects
 
-- **Old URLs** of either original open its soft-deleted page, which no longer shows the moved links
+- **Old URLs** (Phase 3 shows a notice instead) of either original open its soft-deleted page, which no longer shows the moved links
   (decision 13). Its timeline still shows its own history and ends with "merged this record into
   <name>", so the reader can find the new record. Notification links and Rela record chips that
   name an original land there too.
-- **The REST API, the MCP server and Rela** treat both original IDs as deleted. A pending Rela
+- **The REST API, the MCP server and Rela** treat both original IDs as deleted. After Phase 3, `GET` on an old ID still answers 404, and a REST merge naming one answers 422. A pending Rela
   proposal that names an original fails at approval, as after any delete.
 - **Saved views and filters** that name an original by ID (for example "Company is any of ...")
   stop matching it. They are not rewritten. Rewriting `saved_views` and `table_preferences` JSON is
   its own change.
-- **Sort by created date.** The new record's `created_at` is the merge time, so it sorts as the
+- **Sort by created date** (Phase 3 removes this effect). The new record's `created_at` is the merge time, so it sorts as the
   newest record, and the duplicate prompt, which lists oldest first, lists it last.
-- **Restoring an original** brings back its values and history, but none of its links: they moved.
+- **Restoring an original** (Phase 3 makes this impossible, decision 14) brings back its values and history, but none of its links: they moved.
   A restored priority record also comes back without its own "merged <name> into this record"
   entries, because the new record took them over. Its emails or
   domains now belong to the new record, so restore hits the existing `RestoreConflictMessage`, which
@@ -271,7 +362,7 @@ Feature tests through the record page (Livewire `ViewCompany` and `ViewPeople`),
   `other` never overwrites a filled one, and a record-type value naming an original names the new
   record
 - every link listed above moves from both originals, and a link both originals share ends up once
-- each original keeps its own history and gets a `record_merged` entry naming the new record; the
+- (Phase 3 replaces this case) each original keeps its own history and gets a `record_merged` entry naming the new record; the
   new record's timeline names the other record, keeps the priority record's earlier merges, and
   leaves the other record's merges on it
 - no merge and no duplicate prompt on a deleted record's page
@@ -303,12 +394,28 @@ listing a third duplicate left after a merge.
 
 Three browser test files, run in Chromium and in WebKit (`--browser safari`):
 - `MergeRecordDialogTest`: the main flows. Open, search, pick, swap, merge, land on the new record,
-  the over-limit block, and the merge opened from the duplicate prompt
+  the over-limit block (Phase 3: the raise notice, and the block above 20), and the merge opened from the duplicate prompt
 - `MergeRecordDialogKeyboardTest`: Esc, arrows, Enter, focus after a pick and tabbing out of the list
 - `MergeRecordDialogLayoutTest`: the row layout on laptop and desktop, the stacked phone layout, and
   the popover's placement and height cap, including while the phone sheet is still rising
 
 The picker joins the `MenusTest` dataset, so its rows, icons and height cap follow the menu tokens.
+
+Phase 3 adds, per entity: the creation date rule; the timeline of the new record showing both
+originals' updates and one creation and one merge entry, and the originals showing none of the
+merge; `merged_into_id` on both originals, written even though the soft delete saves only its own columns, and a chained merge's notice opening the next notice;
+`MergedRecordTest` (a merged record absent from every trash filter state, global search and bulk
+restore, the model refusing to restore it, the notice for a merged record, a merged record whose result was deleted, and a merged record whose result was force-deleted, a deleted unmerged record showing
+the deleted notice); the Rela chip redirect; and `MergeRecordsApiTest` (200,
+422 for the same id, an unknown, deleted, merged or other-workspace id and a repeat, 403 per missing
+ability, 422 above the ceiling of 20, and a raised limit stored on the field). The creation date, history and pointer cases live in a new
+`MergeRecordHistoryTest`, so the two existing merge test files stay inside the class time budget.
+It also covers the limit raise (stored on the field, never lowered, a Member allowed, refused above
+20), the deleted notice on a company, person and opportunity and global search leaving deleted
+records out, the MCP tools (`CompanyToolsTest` and the people tools' file: merge, every refusal, the
+token abilities), and the Rela tools (`MergeRecordsToolTest`: the proposal, per-pair approve and
+reject, a vanished pair, setup mode), plus one eval case in `tests/Evals/Rela/WritesTest.php` and a
+walk on the production-shaped stack. One browser file, `MergedRecordNoticeTest`, in Chromium and WebKit.
 
 ## Non-goals
 
@@ -316,9 +423,9 @@ The picker joins the `MenusTest` dataset, so its rows, icons and height cap foll
 - A duplicates review page (the record-page prompt is Phase 2)
 - Merging two duplicate opportunities, tasks or notes into one. The notes, tasks and opportunities
   linked to a merged company or person do move, as listed under What moves
-- Merging from Rela, the REST API or the MCP server
-- Undoing a merge
-- Redirecting an original's old URL to the new record (decision 13)
+- Undoing a merge, or restoring a merged record (decision 14)
+- Redirecting an original's old URL automatically. Phase 3 shows a notice with a button instead (decision 13)
+- An outbound `record.merged` webhook: Relaticle sends no webhooks
 - Per-field choice of which value wins
 
 ## Left to the builder
