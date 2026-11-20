@@ -771,6 +771,7 @@ it('keeps a staff session alive through Livewire updates made inside the idle li
 });
 
 it('leaves a customer Livewire update alone after the staff idle limit', function (): void {
+    $this->freezeSecond();
     $cookies = [];
     $customer = User::factory()->withWorkspace()->create();
     isolatedAuthRequest($cookies, 'POST', 'https://app.example.test/login', [
@@ -780,7 +781,7 @@ it('leaves a customer Livewire update alone after the staff idle limit', functio
     $page = isolatedAuthRequest($cookies, 'GET', 'https://app.example.test/'.$customer->currentWorkspace->slug.'/companies')->assertOk();
     preg_match('/wire:snapshot="([^"]+)"/', $page->getContent(), $matches);
 
-    $this->travelTo(now()->addHours(2));
+    $this->travelTo(now()->addMinutes(90));
 
     isolatedAuthRequest($cookies, 'POST', 'https://app.example.test'.route('default-livewire.update', absolute: false), [
         'components' => [[
