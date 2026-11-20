@@ -230,6 +230,8 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
 
     private int $webSearches = WebAccess::MAX_SEARCHES;
 
+    private ?string $turnDynamicInstructions = null;
+
     public function withModel(?string $label, bool $chosenByAuto): self
     {
         $this->modelLabel = $label;
@@ -351,7 +353,14 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
 
     public function instructions(): string
     {
-        return $this->staticInstructions().$this->dynamicInstructions();
+        return $this->staticInstructions().$this->turnDynamicInstructions();
+    }
+
+    private function turnDynamicInstructions(): string
+    {
+        // Anthropic rejects a replayed signed thinking block once `system` differs from step 1,
+        // so one turn keeps its first read even when the workspace changes mid-loop.
+        return $this->turnDynamicInstructions ??= $this->dynamicInstructions();
     }
 
     /**
@@ -1030,7 +1039,7 @@ PROMPT;
             'cache_control' => ['type' => 'ephemeral'],
         ]];
 
-        $dynamic = $this->dynamicInstructions();
+        $dynamic = $this->turnDynamicInstructions();
 
         if ($dynamic !== '') {
             $blocks[] = [

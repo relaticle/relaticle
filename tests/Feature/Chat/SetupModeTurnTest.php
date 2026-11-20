@@ -7,13 +7,17 @@ use App\Features\SetupConversation;
 use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Laravel\Ai\Events\ToolInvoked;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Relaticle\Chat\Jobs\ProcessChatMessage;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Services\CreditService;
+use Tests\Helpers\AnthropicSse;
 
 mutates(ProcessChatMessage::class, CrmAssistant::class);
 
@@ -185,4 +189,28 @@ it('drops the turn block on the typed turn that follows the greeting', function 
 
     CrmAssistant::assertPrompted(fn ($prompt): bool => $prompt->prompt === 'Jane Doe, Acme, jane@acme.test'
         && ! str_contains($prompt->agent->dynamicInstructions(), '<turn>'));
+});
+
+it('sends the same system prompt on every step of a turn when the workspace changes between steps', function (): void {
+    $requests = [];
+    $sse = ['Content-Type' => 'text/event-stream'];
+
+    Http::fake([
+        'api.anthropic.com/*' => function ($request) use (&$requests, $sse) {
+            $requests[] = $request->data();
+
+            if (count($requests) === 1) {
+                return Http::response(AnthropicSse::toolUseStep('GetCrmSummaryTool'), 200, $sse);
+            }
+
+            return Http::response(AnthropicSse::reply('Done.', 'claude-sonnet-5'), 200, $sse);
+        },
+    ]);
+
+    Event::listen(ToolInvoked::class, fn () => $this->workspace->users()->attach(User::factory()->create(), ['role' => 'member']));
+
+    runTurn($this->user, $this->workspace, $this->workspace->setupConversation->id);
+
+    expect($requests)->toHaveCount(2)
+        ->and($requests[1]['system'])->toBe($requests[0]['system']);
 });
