@@ -37,7 +37,6 @@
     x-data="{
         sidebarOpen: false,
         searchOpen: false,
-        returnFocus: null,
         query: '',
         records: null,
         active: 0,
@@ -48,17 +47,16 @@
                 .catch(() => { this.warmPromise = null; });
         },
         openSearch() {
-            this.returnFocus = document.activeElement;
             this.searchOpen = true;
             this.query = '';
             this.active = 0;
             this.warm();
+            this.$refs.searchDialog.showModal();
             this.$nextTick(() => this.$refs.searchInput?.focus());
         },
         closeSearch() {
             this.searchOpen = false;
-            this.returnFocus?.focus?.();
-            this.returnFocus = null;
+            this.$refs.searchDialog.close();
         },
         /* Alpine leaves plain getters unmemoized and every template reference is
            its own reactive effect, so an unguarded getter re-runs the whole
@@ -83,18 +81,14 @@
         move(delta) {
             if (this.results.length === 0) return;
             this.active = (this.active + delta + this.results.length) % this.results.length;
-            this.$refs.searchResults?.children[this.active]?.scrollIntoView({ block: 'nearest' });
-        },
-        go() {
-            const result = this.results[this.active];
-            if (result) window.location.href = result.url;
+            document.getElementById('docs-search-result-' + this.active)?.scrollIntoView({ block: 'nearest' });
         },
     }"
     x-init="('requestIdleCallback' in window) ? requestIdleCallback(() => warm(), { timeout: 3000 }) : setTimeout(() => warm(), 2000)"
     x-effect="document.body.style.overflow = (sidebarOpen || searchOpen) ? 'hidden' : ''"
     x-on:keydown.cmd.k.window.prevent="openSearch()"
     x-on:keydown.ctrl.k.window.prevent="openSearch()"
-    x-on:keydown.escape.window="searchOpen ? closeSearch() : (sidebarOpen = false)"
+    x-on:keydown.escape.window="sidebarOpen = false"
 >
     <nav aria-label="{{ __('Skip links') }}">
         <a href="#docs-content"

@@ -33,6 +33,7 @@ final class GenerateSitemapCommand extends Command
     {
         $sitemap = $this->crawlMarketingSitemap();
 
+        $this->ensureUrl($sitemap, route('scribe'));
         $this->addMarketingUrls($sitemap);
         $this->addDocumentationUrls($sitemap, $docsRepository);
 
@@ -50,6 +51,7 @@ final class GenerateSitemapCommand extends Command
         // pages) -- they're excluded as a deliberate, untested guard rather
         // than covered behavior.
         $excluded = ['/login', '/register', '/forgot-password', '/dashboard', '/discord'];
+        $home = rtrim(route('home'), '/');
 
         return SitemapGenerator::create(config('app.url'))
             ->shouldCrawl(function (string $url) use ($excluded): bool {
@@ -71,6 +73,7 @@ final class GenerateSitemapCommand extends Command
 
                 return pathinfo($path, PATHINFO_EXTENSION) === '';
             })
+            ->hasCrawled(fn (Url $tag): ?Url => rtrim($tag->url, '/') === $home ? null : $tag)
             ->getSitemap();
     }
 

@@ -73,7 +73,7 @@
             </span>
         </div>
 
-        <div class="overflow-x-auto">
+        <div tabindex="0" class="overflow-x-auto focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary dark:focus-visible:outline-primary-400">
             <table class="w-full text-sm">
                 <thead>
                     <tr>

@@ -183,6 +183,7 @@ Un paramètre s'applique aux deux fournisseurs.
 |----------|---------|-------------|
 | `EMAIL_SYNC_INITIAL_DAYS` | | Limite le premier import aux N derniers jours. Laissez non défini pour importer toute la boîte mail. |
 
+{#ai-assistant}
 ### Assistant IA
 
 Rela fonctionne avec des fournisseurs cloud, un serveur auto-hébergé, ou les deux. Les modèles n'apparaissent dans le sélecteur de modèle du chat que si leur fournisseur est configuré. Sans aucun fournisseur configuré, l'assistant ne peut pas répondre.
@@ -279,6 +280,7 @@ Le panneau s'ouvre sur le tableau de bord **Instance** à `{APP_URL}/sysadmin/in
 
 ---
 
+{#reverse-proxy-and-ssl}
 ## Reverse proxy et SSL
 
 Le conteneur de l'application sert du HTTP sur le port 8080 en interne. Placez un reverse proxy devant lui pour gérer la terminaison SSL et acheminer le trafic vers le conteneur.

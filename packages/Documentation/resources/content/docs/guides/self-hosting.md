@@ -183,6 +183,7 @@ One setting applies to both providers.
 |----------|---------|-------------|
 | `EMAIL_SYNC_INITIAL_DAYS` | | Limits the first import to the last N days. Leave unset to import the whole mailbox. |
 
+{#ai-assistant}
 ### AI Assistant
 
 Rela works with cloud providers, a self-hosted server, or both. Models appear in the chat model picker only when their provider is configured. With none configured, the assistant cannot answer.
@@ -279,6 +280,7 @@ The panel opens on the **Instance** dashboard at `{APP_URL}/sysadmin/instance`, 
 
 ---
 
+{#reverse-proxy-and-ssl}
 ## Reverse Proxy and SSL
 
 The app container serves HTTP on port 8080 internally. Place a reverse proxy in front to handle SSL termination and route traffic to the container.

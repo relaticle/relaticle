@@ -11,7 +11,7 @@ use Override;
 final class GuestLayout extends Component
 {
     /**
-     * Create a new component instance.
+     * @param  array{int, int}|null  $ogImageDimensions
      */
     public function __construct(
         public ?string $title = null,
@@ -19,6 +19,7 @@ final class GuestLayout extends Component
         public ?string $ogTitle = null,
         public ?string $ogDescription = null,
         public ?string $ogImage = null,
+        public ?array $ogImageDimensions = null,
     ) {}
 
     /**

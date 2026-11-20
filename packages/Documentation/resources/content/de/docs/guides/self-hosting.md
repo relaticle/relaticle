@@ -183,6 +183,7 @@ Eine Einstellung gilt für beide Anbieter.
 |----------|---------|-------------|
 | `EMAIL_SYNC_INITIAL_DAYS` | | Begrenzt den ersten Import auf die letzten N Tage. Lassen Sie sie ungesetzt, um das gesamte Postfach zu importieren. |
 
+{#ai-assistant}
 ### KI-Assistent
 
 Rela arbeitet mit Cloud-Anbietern, einem selbst gehosteten Server oder beidem. Modelle erscheinen in der Modellauswahl des Chats nur, wenn ihr Anbieter konfiguriert ist. Ist keiner konfiguriert, kann der Assistent nicht antworten.
@@ -279,6 +280,7 @@ Das Panel öffnet sich auf dem Dashboard **Instance** unter `{APP_URL}/sysadmin/
 
 ---
 
+{#reverse-proxy-and-ssl}
 ## Reverse Proxy und SSL
 
 Der App-Container liefert HTTP intern auf Port 8080 aus. Setzen Sie einen Reverse Proxy davor, der die SSL-Terminierung übernimmt und den Verkehr an den Container leitet.

@@ -47,12 +47,13 @@
 
     @if($post->featured_image)
         <div class="bg-tint border-rail border-t p-6 md:p-10">
-            <img
-                src="{{ asset('storage/'.$post->featured_image) }}"
+            <x-cloud::blog.cover
+                :source="$post->featured_image"
+                sizes="(min-width: 72rem) calc(67rem - 2px), (min-width: 48rem) calc(100vw - 5rem - 2px), (min-width: 40rem) calc(100vw - 3rem - 2px), calc(100vw - 3rem)"
                 alt="{{ $post->title }}"
                 fetchpriority="high"
                 class="border-rail aspect-video w-full rounded-xl border object-cover"
-            >
+            />
         </div>
     @endif
 </x-cloud::marketing.hero>
@@ -63,7 +64,7 @@
              instead of painting over the table of contents. --}}
         <article class="bg-surface blog-prose min-w-0 break-words px-6 py-12 md:px-10 md:py-16 lg:col-span-8">
             <div class="prose max-w-none dark:prose-invert prose-headings:font-medium prose-headings:tracking-tight prose-headings:text-gray-950 dark:prose-headings:text-white prose-a:text-primary-700 prose-a:no-underline hover:prose-a:underline dark:prose-a:text-primary-300 prose-code:text-sm prose-img:rounded-xl">
-                {!! $post->renderedContent() !!}
+                <x-cloud::markdown-body :html="$post->renderedContent()" />
             </div>
 
             @if($post->tags->isNotEmpty())

@@ -200,3 +200,7 @@ html:has(#main-header) {
 .blog-prose h1 .heading-permalink {
     @apply hidden;
 }
+
+:is(.blog-prose, .prose-docs) pre:focus-visible {
+    @apply outline-2 -outline-offset-2 outline-primary-400;
+}

@@ -1,9 +1,11 @@
 @use(Relaticle\Cloud\Marketing\Support\BlogCategoryName)
+@use(Relaticle\Cloud\Blog\BlogCover)
 @php
     // The panel's SEO section writes title/description to the post's `seo` row and
     // wins when set. Ink's own renderer can't honour it, because getDynamicSEOData()
     // always returns the post title, which takes precedence in prepareForUsage().
     // The override has to be applied here instead.
+    $cover = $post->featured_image ? new BlogCover($post->featured_image) : null;
     $seoTitle = $post->seo->title ?: $post->title;
     $seoDescription = $post->seo->description
         ?: ($post->excerpt ?: \Illuminate\Support\Str::limit(trim(preg_replace('/\s+/', ' ', strip_tags($post->content))), 155));
@@ -14,7 +16,8 @@
     :description="$seoDescription"
     :ogTitle="$seoTitle"
     :ogDescription="$seoDescription"
-    :ogImage="$post->featured_image ? asset('storage/' . $post->featured_image) : null"
+    :ogImage="$cover?->url()"
+    :ogImageDimensions="$cover?->manifest()['dimensions'] ?? null"
     ogType="article">
     {{-- Only the tags the layout does not already emit. <x-ink::meta-tags> repeats
          the whole og/twitter/canonical set, which put two canonicals and a

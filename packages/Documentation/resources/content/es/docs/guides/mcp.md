@@ -397,6 +397,7 @@ Los nombres planos del filtro anterior ya no existen. Dentro de `filter`, claves
 
 ---
 
+{#schema-resources}
 ## Recursos de esquema
 
 El servidor expone cinco recursos de esquema que describen los campos de cada entidad, incluidos los atributos personalizados que haya configurado su espacio de trabajo, además de un recurso de resumen con los conteos de registros:

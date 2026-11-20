@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "e9a02d52ef840cdcf70b8bb15baecd16",
+    "content-hash": "a97effc93225d4f05a95a4eb49421f8e",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10729,16 +10729,16 @@
         },
         {
             "name": "relaticle/ink",
-            "version": "v2.7.1",
+            "version": "v2.7.2",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/ink.git",
-                "reference": "2ba0b37a7e7f4ec06c40e9bae54ea5db350accd8"
+                "reference": "5e3cd04d55c29b90be891c15fff3f7ac04f8d15c"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/ink/zipball/2ba0b37a7e7f4ec06c40e9bae54ea5db350accd8",
-                "reference": "2ba0b37a7e7f4ec06c40e9bae54ea5db350accd8",
+                "url": "https://api.github.com/repos/relaticle/ink/zipball/5e3cd04d55c29b90be891c15fff3f7ac04f8d15c",
+                "reference": "5e3cd04d55c29b90be891c15fff3f7ac04f8d15c",
                 "shasum": ""
             },
             "require": {
@@ -10800,8 +10800,8 @@
                 "issues": "https://github.com/relaticle/ink/issues",
                 "source": "https://github.com/relaticle/ink"
             },
-            "time": "2026-11-19T13:13:10+00:00",
-            "published-time": "2026-11-19T13:22:22+00:00"
+            "time": "2026-11-20T17:45:50+00:00",
+            "published-time": "2026-11-20T17:46:00+00:00"
         },
         {
             "name": "ryangjchandler/blade-capture-directive",

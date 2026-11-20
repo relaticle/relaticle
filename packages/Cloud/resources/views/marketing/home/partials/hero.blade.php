@@ -5,12 +5,12 @@
     <div class="border-rail relative mx-auto max-w-6xl sm:border-x">
         <div class="flex flex-col items-center px-6 pb-12 pt-10 text-center md:px-10 md:pb-12 md:pt-10">
             <a href="https://github.com/relaticle/relaticle" target="_blank" rel="noopener"
-               aria-label="{{ __('Open Source, :count+ GitHub stars', ['count' => $formattedGithubStars]) }}"
                class="group inline-flex items-center gap-2 rounded-full border border-gray-200/80 dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.04] backdrop-blur-sm px-4 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] transition-all duration-200 hover:border-gray-300 dark:hover:border-white/[0.15]">
-                <x-ri-github-fill class="h-3.5 w-3.5"/>
+                <x-ri-github-fill class="h-3.5 w-3.5" aria-hidden="true"/>
                 <span>{{ __('Open Source') }}</span>
                 <span class="w-px h-3 bg-gray-200 dark:bg-white/10"></span>
                 <span class="inline-flex items-center whitespace-nowrap text-gray-900 dark:text-white font-semibold leading-none">
+                    <span class="sr-only">{{ $formattedGithubStars }}</span>
                     <span x-ref="githubStars" class="relative inline-grid tabular-nums" aria-hidden="true">
                         <span class="invisible col-start-1 row-start-1">{{ $formattedGithubStars }}</span>
                         <span class="col-start-1 row-start-1 inline-flex justify-self-end">
@@ -30,7 +30,8 @@
                         </span>
                     </span>{{ __('+ stars') }}
                 </span>
-                <x-lucide-arrow-up-right class="h-3 w-3 text-gray-400 dark:text-gray-500"/>
+                <x-lucide-arrow-up-right class="h-3 w-3 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
+                <span class="sr-only">({{ __('GitHub') }})</span>
             </a>
 
             <h1 class="type-display mt-7 max-w-3xl md:mt-8">

@@ -25,7 +25,7 @@
                         x-on:click="client = '{{ $key }}'"
                         x-on:keydown.left.prevent="client = client === 'claude' ? 'chatgpt' : 'claude'; $nextTick(() => $refs[client].focus())"
                         x-on:keydown.right.prevent="client = client === 'claude' ? 'chatgpt' : 'claude'; $nextTick(() => $refs[client].focus())"
-                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium text-gray-500 transition hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 aria-selected:bg-white aria-selected:text-gray-900 aria-selected:shadow-sm dark:text-gray-400 dark:hover:text-white dark:aria-selected:bg-white/10 dark:aria-selected:text-white"
+                        class="inline-flex cursor-pointer items-center gap-1.5 rounded-md px-2.5 py-1 text-sm font-medium text-gray-600 transition hover:text-gray-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary-500 aria-selected:bg-white aria-selected:text-gray-900 aria-selected:shadow-sm dark:text-gray-400 dark:hover:text-white dark:aria-selected:bg-white/10 dark:aria-selected:text-white"
                     >
                         <x-dynamic-component :component="$client->icon()" class="size-4 {{ $iconColor }}"/>
                         {{ $client->label() }}
