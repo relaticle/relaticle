@@ -389,7 +389,8 @@ final class StripeWebhookController extends CashierWebhookController
         /** @var array<string, mixed> $charge */
         $charge = Cashier::stripe()->charges->retrieve($chargeId)->toArray();
 
-        $this->revokePackCreditsFor($charge, (int) ($charge['amount_refunded'] ?? 0) + (int) ($dispute['amount'] ?? 0));
+        // A lost dispute reverses the purchase. Its amount can differ from the charge's (962 of 1,000 in the sandbox).
+        $this->revokePackCreditsFor($charge, (int) ($charge['amount'] ?? 0));
 
         return $this->successMethod();
     }

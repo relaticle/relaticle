@@ -2362,7 +2362,7 @@ function packChargeRefundedEvent(Workspace $workspace, int $amountRefunded, arra
 }
 
 /** @return array<string, mixed> */
-function packDisputeClosedEvent(string $status, int $amount = 1000): array
+function packDisputeClosedEvent(string $status, int $amount = 962): array
 {
     return [
         'id' => 'evt_'.Str::ulid(),
@@ -2453,7 +2453,7 @@ it('leaves credits alone when the refunded charge belongs to another customer', 
     expect(packBalance($workspace))->toBe($before);
 });
 
-it('takes back a pack whose dispute was lost', function (): void {
+it('takes back the whole pack when its dispute is lost for a different amount', function (): void {
     $workspace = grantRefundablePack();
     $before = packBalance($workspace);
 
