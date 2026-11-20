@@ -6,6 +6,7 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
+use App\Queries\CustomFields\ActiveCustomFieldsQuery;
 use App\Queries\ViewerZone;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
@@ -141,6 +142,7 @@ abstract class BaseWriteCreateTool implements Tool
 
         $validator = resolve(CustomFieldsRequestValidator::class);
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
+        $definitions = resolve(ActiveCustomFieldsQuery::class)->get((string) $user->currentWorkspace->getKey(), $this->entityType());
 
         $actionRecords = [];
         $items = [];
@@ -166,7 +168,7 @@ abstract class BaseWriteCreateTool implements Tool
                 continue;
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false, viewerZone: ViewerZone::strict($user->effectiveTimezone()));
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false, viewerZone: ViewerZone::strict($user->effectiveTimezone()), definitions: $definitions);
 
             if ($validation->error !== null) {
                 $skipped[] = $this->skippedRecord($record, $index, $validation->error);
@@ -196,7 +198,7 @@ abstract class BaseWriteCreateTool implements Tool
             }
 
             $display = $this->buildRecordDisplay($record);
-            $customFieldRows = $formatter->format($user, $this->entityType(), $validation->cleanFields, oldModel: null);
+            $customFieldRows = $formatter->format($user, $this->entityType(), $validation->cleanFields, oldModel: null, definitions: $definitions);
             if ($customFieldRows !== []) {
                 $existingFields = $display['fields'] ?? [];
                 $display['fields'] = array_merge(is_array($existingFields) ? $existingFields : [], $customFieldRows);
