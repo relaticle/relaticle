@@ -7,6 +7,7 @@ namespace Relaticle\Chat\Tools;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Queries\ViewerZone;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -141,6 +142,7 @@ abstract class BaseWriteCreateTool implements Tool
 
         $validator = resolve(CustomFieldsRequestValidator::class);
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
+        $definitions = resolve(WorkspaceCustomFields::class)->forEntity($user->currentWorkspace, $this->entityType())->where('active', true)->keyBy('code');
 
         $actionRecords = [];
         $items = [];
@@ -166,7 +168,7 @@ abstract class BaseWriteCreateTool implements Tool
                 continue;
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false, viewerZone: ViewerZone::strict($user->effectiveTimezone()));
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, isUpdate: false, viewerZone: ViewerZone::strict($user->effectiveTimezone()), definitions: $definitions);
 
             if ($validation->error !== null) {
                 $skipped[] = $this->skippedRecord($record, $index, $validation->error);
@@ -195,15 +197,11 @@ abstract class BaseWriteCreateTool implements Tool
                 $data['custom_fields'] = $validation->cleanFields;
             }
 
-            $display = $this->buildRecordDisplay($record);
-            $customFieldRows = $formatter->format($user, $this->entityType(), $validation->cleanFields, oldModel: null);
-            if ($customFieldRows !== []) {
-                $existingFields = $display['fields'] ?? [];
-                $display['fields'] = array_merge(is_array($existingFields) ? $existingFields : [], $customFieldRows);
-            }
-
             $actionRecords[] = $data;
-            $items[] = $display;
+            $items[] = $this->withCustomFieldRows(
+                $this->buildRecordDisplay($record),
+                $formatter->format($user, $this->entityType(), $validation->cleanFields, oldModel: null, definitions: $definitions),
+            );
         }
 
         if ($actionRecords === []) {
@@ -238,5 +236,22 @@ abstract class BaseWriteCreateTool implements Tool
         $envelope = PendingActionEnvelope::for($pending, class_basename($this->actionClass()), $pending->action_data);
 
         return (string) json_encode($this->withSkippedRecords($envelope, $skipped), JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @param  array<string, mixed>  $display
+     * @param  list<array<string, mixed>>  $customFieldRows
+     * @return array<string, mixed>
+     */
+    private function withCustomFieldRows(array $display, array $customFieldRows): array
+    {
+        if ($customFieldRows === []) {
+            return $display;
+        }
+
+        $existingFields = $display['fields'] ?? [];
+        $display['fields'] = array_merge(is_array($existingFields) ? $existingFields : [], $customFieldRows);
+
+        return $display;
     }
 }

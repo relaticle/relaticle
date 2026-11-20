@@ -30,16 +30,17 @@ final readonly class CustomFieldsDisplayFormatter
      * choice fields, ISO strings for dates).
      *
      * @param  array<string, mixed>  $cleanFields
+     * @param  Collection<string, CustomField>|null  $definitions
      * @return list<array{label: string, code: string, old?: string|null, new: string|null, type: string, values?: list<string>}>
      */
-    public function format(User $user, string $entityType, array $cleanFields, ?Model $oldModel): array
+    public function format(User $user, string $entityType, array $cleanFields, ?Model $oldModel, ?Collection $definitions = null): array
     {
         if ($cleanFields === []) {
             return [];
         }
 
         $workspaceId = $user->currentWorkspace->getKey();
-        $fields = CustomField::query()
+        $fields = $definitions ?? CustomField::query()
             ->where('tenant_id', $workspaceId)
             ->where('entity_type', $entityType)
             ->active()
@@ -364,9 +365,9 @@ final readonly class CustomFieldsDisplayFormatter
             return null;
         }
 
-        $row = $model->customFieldValues()
-            ->where('custom_field_id', $field->getKey())
-            ->first();
+        $row = $model->loadMissing('customFieldValues')
+            ->getRelation('customFieldValues')
+            ->firstWhere('custom_field_id', $field->getKey());
 
         if (! $row instanceof CustomFieldValue) {
             return null;

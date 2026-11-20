@@ -10,6 +10,7 @@ use App\Queries\Operand;
 use App\Queries\ViewerZone;
 use App\Support\ChecklistHtml;
 use App\Support\Media\RichContentAttachments;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -21,15 +22,16 @@ final readonly class CustomFieldInput
 
     /**
      * @param  array<array-key, mixed>  $customFields
+     * @param  Collection<string, CustomField>|null  $definitions
      * @return array<array-key, mixed>
      */
-    public function normalize(string $workspaceId, string $entityType, array $customFields, ?ViewerZone $viewerZone = null): array
+    public function normalize(string $workspaceId, string $entityType, array $customFields, ?ViewerZone $viewerZone = null, ?Collection $definitions = null): array
     {
         if ($customFields === []) {
             return [];
         }
 
-        $fields = CustomField::query()
+        $fields = $definitions?->toBase()->only(array_keys($customFields)) ?? CustomField::query()
             ->withoutGlobalScopes()
             ->where('tenant_id', $workspaceId)
             ->where('entity_type', $entityType)

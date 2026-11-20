@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Services\Tools;
 
+use App\Models\CustomField;
 use App\Models\User;
 use App\Queries\ViewerZone;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\MessageBag;
 use Illuminate\Validation\ValidationException;
@@ -20,8 +22,9 @@ final readonly class CustomFieldsRequestValidator
 
     /**
      * @param  string|int|null  $ignoreEntityId  the record being updated, excluded from unique-value checks
+     * @param  Collection<string, CustomField>|null  $definitions
      */
-    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null, ?ViewerZone $viewerZone = null): CustomFieldsValidationResult
+    public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null, ?ViewerZone $viewerZone = null, ?Collection $definitions = null): CustomFieldsValidationResult
     {
         $rawCustomFields = is_array($rawCustomFields) ? $rawCustomFields : [];
 
@@ -34,7 +37,7 @@ final readonly class CustomFieldsRequestValidator
         $workspaceId = $user->currentWorkspace->getKey();
 
         try {
-            $clean = $this->input->normalize($workspaceId, $entityType, $rawCustomFields, $viewerZone);
+            $clean = $this->input->normalize($workspaceId, $entityType, $rawCustomFields, $viewerZone, $definitions);
         } catch (ValidationException $exception) {
             return new CustomFieldsValidationResult(
                 cleanFields: [],
@@ -42,7 +45,7 @@ final readonly class CustomFieldsRequestValidator
             );
         }
 
-        $rules = new ValidCustomFields($workspaceId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId)
+        $rules = new ValidCustomFields($workspaceId, $entityType, isUpdate: $isUpdate, ignoreEntityId: $ignoreEntityId, definitions: $definitions)
             ->toRules($clean);
 
         $validator = Validator::make(['custom_fields' => $clean], $rules);
