@@ -19,6 +19,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Laravel\Ai\Tools\Request;
@@ -80,16 +81,72 @@ it("redirects to the record's own workspace panel when the record belongs to a n
         ->and($expectedUrl)->not->toContain($currentWorkspace->slug);
 });
 
-it('shows a gone page for a soft deleted record in the user workspace', function (): void {
+function viewUrlForRedirect(string $type, Model $record, Workspace $workspace): string
+{
+    $resource = match ($type) {
+        'company' => CompanyResource::class,
+        'people' => PeopleResource::class,
+        'opportunity' => OpportunityResource::class,
+    };
+
+    return $resource::getUrl('view', ['record' => $record->getKey()], panel: 'app', tenant: $workspace);
+}
+
+it('redirects a deleted record to its view page, which shows the deleted notice', function (string $type, string $modelClass): void {
     $user = User::factory()->withPersonalWorkspace()->create();
     $workspace = $user->currentWorkspace;
-    $company = Company::factory()->for($workspace)->create();
-    $company->delete();
+    $record = $modelClass::factory()->for($workspace)->create();
+    $record->delete();
+    $url = viewUrlForRedirect($type, $record, $workspace);
+
+    $this->actingAs($user)->get("/r/{$type}/{$record->getKey()}")->assertRedirect($url);
+
+    $this->actingAs($user)->get($url)->assertOk()->assertSee(__('filament/record-page.unavailable.deleted.heading'));
+})->with([
+    'company' => ['company', Company::class],
+    'people' => ['people', People::class],
+    'opportunity' => ['opportunity', Opportunity::class],
+]);
+
+it('redirects a merged record to its view page, which shows the merged notice', function (string $type, string $modelClass): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    $target = $modelClass::factory()->for($workspace)->create();
+    $record = $modelClass::factory()->for($workspace)->create();
+    $record->delete();
+    $modelClass::withoutGlobalScopes()->withTrashed()->whereKey($record->getKey())->update(['merged_into_id' => $target->getKey()]);
+    $url = viewUrlForRedirect($type, $record, $workspace);
+
+    $this->actingAs($user)->get("/r/{$type}/{$record->getKey()}")->assertRedirect($url);
+
+    $this->actingAs($user)->get($url)->assertOk()->assertSee(__('filament/record-page.unavailable.merged.heading'));
+})->with([
+    'company' => ['company', Company::class],
+    'people' => ['people', People::class],
+]);
+
+it('shows the gone page for a deleted task or note', function (string $modelClass, string $type): void {
+    $user = User::factory()->withPersonalWorkspace()->create();
+    $record = $modelClass::factory()->for($user->currentWorkspace)->create();
+    $record->delete();
 
     $this->actingAs($user)
-        ->get("/r/company/{$company->getKey()}")
+        ->get("/r/{$type}/{$record->getKey()}")
         ->assertStatus(410)
         ->assertSee(__('This record no longer exists'));
+})->with([
+    'task' => [Task::class, 'task'],
+    'note' => [Note::class, 'note'],
+]);
+
+it('404s a non-member for a deleted or merged record instead of redirecting', function (): void {
+    $user = User::factory()->withWorkspace()->create();
+    $target = Company::factory()->create();
+    $merged = Company::factory()->create();
+    $merged->delete();
+    Company::withoutGlobalScopes()->withTrashed()->whereKey($merged->getKey())->update(['merged_into_id' => $target->getKey()]);
+
+    $this->actingAs($user)->get("/r/company/{$merged->getKey()}")->assertNotFound();
 });
 
 it('404s for a record outside every workspace the user belongs to', function (): void {

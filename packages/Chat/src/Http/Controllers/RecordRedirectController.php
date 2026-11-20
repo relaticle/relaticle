@@ -39,9 +39,10 @@ use Relaticle\Chat\Support\RecordReferenceResolver;
  * still accessible) workspace lands on that workspace's panel.
  *
  * A record can also be soft-deleted after a chat transcript cited it: the
- * lookup is `withTrashed()` and, for a workspace member, a trashed record renders
+ * lookup is `withTrashed()` and, for a workspace member, a trashed task or note renders
  * a friendly "this record no longer exists" page (410, the state it describes)
- * instead of redirecting. The
+ * instead of redirecting. A trashed company, person or opportunity, merged or deleted,
+ * redirects to its panel view page, which shows the matching notice. The
  * workspace-membership check still runs BEFORE the trashed check, so a foreign
  * caller 404s whether the record is live, trashed, or absent. Trashed state
  * is only ever revealed to someone who could already see the record.
@@ -88,7 +89,7 @@ final readonly class RecordRedirectController
 
         abort_unless($user->belongsToWorkspaceId($record->workspace_id), 404);
 
-        if ($record->trashed()) {
+        if ($record->trashed() && ! $this->panelShowsNotice($record)) {
             return response()->view('chat::record-gone', status: Response::HTTP_GONE);
         }
 
@@ -97,6 +98,11 @@ final readonly class RecordRedirectController
         abort_if($url === null, 404);
 
         return redirect($url);
+    }
+
+    private function panelShowsNotice(Company|People|Opportunity|Task|Note $record): bool
+    {
+        return $record instanceof Company || $record instanceof People || $record instanceof Opportunity;
     }
 
     /** @param  class-string<Company|People|Opportunity|Task|Note>  $modelClass */
