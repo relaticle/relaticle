@@ -226,6 +226,15 @@ final class PeopleResource extends Resource
             ->with(['company.media', 'company.domainValue', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
+            ])
+            ->scopes('notMerged');
+    }
+
+    public static function getRecordRouteBindingEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withoutGlobalScopes([
+                SoftDeletingScope::class,
             ]);
     }
 }

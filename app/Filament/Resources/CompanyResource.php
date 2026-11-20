@@ -207,6 +207,15 @@ final class CompanyResource extends Resource
             ->with(['accountOwner', 'media', 'domainValue', 'customFieldValues.customField.options'])
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
+            ])
+            ->scopes('notMerged');
+    }
+
+    public static function getRecordRouteBindingEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withoutGlobalScopes([
+                SoftDeletingScope::class,
             ]);
     }
 }

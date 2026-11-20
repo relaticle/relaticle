@@ -6,6 +6,7 @@ namespace Relaticle\SystemAdmin\Filament\Resources\CompanyResource\Pages;
 
 use Filament\Actions\DeleteAction;
 use Filament\Actions\ViewAction;
+use Illuminate\Database\Eloquent\Model;
 use Override;
 use Relaticle\SystemAdmin\Filament\Pages\EditCustomerRecord;
 use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
@@ -13,6 +14,16 @@ use Relaticle\SystemAdmin\Filament\Resources\CompanyResource;
 final class EditCompany extends EditCustomerRecord
 {
     protected static string $resource = CompanyResource::class;
+
+    #[Override]
+    protected function resolveRecord(int|string $key): Model
+    {
+        $record = parent::resolveRecord($key);
+
+        abort_if($record->getAttribute('merged_into_id') !== null, 403);
+
+        return $record;
+    }
 
     #[Override]
     protected function getHeaderActions(): array

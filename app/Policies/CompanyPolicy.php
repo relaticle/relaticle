@@ -32,12 +32,14 @@ final readonly class CompanyPolicy
 
     public function update(User $user, Company $company): bool
     {
-        return $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsUpdate);
+        return $company->merged_into_id === null
+            && $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsUpdate);
     }
 
     public function delete(User $user, Company $company): bool
     {
-        return $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsDelete);
+        return $company->merged_into_id === null
+            && $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function deleteAny(User $user): bool
@@ -47,7 +49,8 @@ final readonly class CompanyPolicy
 
     public function restore(User $user, Company $company): bool
     {
-        return $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsDelete);
+        return $company->merged_into_id === null
+            && $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function restoreAny(User $user): bool
@@ -57,7 +60,8 @@ final readonly class CompanyPolicy
 
     public function forceDelete(User $user, Company $company): bool
     {
-        return $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsForceDelete);
+        return $company->merged_into_id === null
+            && $user->hasWorkspaceCapability($company->workspace_id, WorkspaceCapability::RecordsForceDelete);
     }
 
     public function forceDeleteAny(User $user): bool

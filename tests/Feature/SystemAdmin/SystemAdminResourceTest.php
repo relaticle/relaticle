@@ -75,6 +75,20 @@ it('rejects administrator moves of customer records between workspaces', functio
     expect($record->refresh()->workspace_id)->toBe($this->workspace->getKey());
 })->with('customer record edit pages');
 
+it('refuses to open a merged company or person for editing', function (string $modelClass, string $pageClass): void {
+    $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
+    $target = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);
+    $merged = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);
+    $merged->delete();
+    $modelClass::withTrashed()->whereKey($merged->getKey())->update(['merged_into_id' => $target->getKey()]);
+
+    livewire($pageClass, ['record' => $merged->getKey()])->assertForbidden();
+    livewire($pageClass, ['record' => $target->getKey()])->assertSuccessful();
+})->with([
+    'company' => [Company::class, EditCompany::class],
+    'person' => [People::class, EditPeople::class],
+]);
+
 it('lets administrators edit ordinary customer records', function (string $modelClass, string $pageClass, string $field): void {
     $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
     $record = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);

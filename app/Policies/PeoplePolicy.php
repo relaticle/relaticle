@@ -32,12 +32,14 @@ final readonly class PeoplePolicy
 
     public function update(User $user, People $people): bool
     {
-        return $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsUpdate);
+        return $people->merged_into_id === null
+            && $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsUpdate);
     }
 
     public function delete(User $user, People $people): bool
     {
-        return $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsDelete);
+        return $people->merged_into_id === null
+            && $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function deleteAny(User $user): bool
@@ -47,7 +49,8 @@ final readonly class PeoplePolicy
 
     public function restore(User $user, People $people): bool
     {
-        return $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsDelete);
+        return $people->merged_into_id === null
+            && $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsDelete);
     }
 
     public function restoreAny(User $user): bool
@@ -57,7 +60,8 @@ final readonly class PeoplePolicy
 
     public function forceDelete(User $user, People $people): bool
     {
-        return $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsForceDelete);
+        return $people->merged_into_id === null
+            && $user->hasWorkspaceCapability($people->workspace_id, WorkspaceCapability::RecordsForceDelete);
     }
 
     public function forceDeleteAny(User $user): bool
