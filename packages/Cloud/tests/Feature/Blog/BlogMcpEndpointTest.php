@@ -188,3 +188,15 @@ it('reads one whole message from an input that arrives in fragments', function (
         ->and($responses[3]['result']['isError'])->toBeFalse()
         ->and(Storage::disk(config('ink.uploads.disk', 'public'))->allFiles())->toHaveCount(1);
 });
+
+it('stops quietly when the client disconnects before the answers are written', function (): void {
+    SystemAdministrator::factory()->create(['role' => SystemAdministratorRole::SuperAdministrator, 'email' => 'founder@relaticle.com']);
+    $input = fopen('php://memory', 'w+');
+    fwrite($input, implode("\n", array_map(json_encode(...), blogSessionStart()))."\n");
+    rewind($input);
+    [$clientEnd, $serverEnd] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+    fclose($clientEnd);
+    app()->instance(BlogMcpStreams::class, new BlogMcpStreams($input, $serverEnd));
+
+    $this->artisan('blog:mcp')->assertExitCode(0);
+});
