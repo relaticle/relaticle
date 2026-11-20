@@ -39,7 +39,6 @@ return [
                 'Relaticle\Chat\Services\MyTasksService::forUser' => 69,
                 'Relaticle\Chat\Services\TipTapDocumentParser::walkDocument' => 67,
                 'Relaticle\Chat\Tools\Activity\ListActivityTool::handle' => 74,
-                'Relaticle\Chat\Tools\BaseReadListTool::buildDisplayBlock' => 61,
                 'Relaticle\Chat\Tools\BaseReadListTool::handle' => 75,
                 'Relaticle\Chat\Tools\BaseWriteCreateTool::handle' => 129,
                 'Relaticle\Chat\Tools\BaseWriteDeleteTool::handle' => 63,

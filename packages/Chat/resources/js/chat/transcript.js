@@ -134,7 +134,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories, proposalTexts }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockSortTexts, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories, proposalTexts }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -454,6 +454,24 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     blockTitle(block) {
         return blockTitles[block?.type] ?? (block?.title || '');
+    },
+
+    // Two tables of one record type in a reply differ only in how they were read.
+    blockSortLabel(block) {
+        const sort = block?.sort;
+        if (!sort) return '';
+
+        const descending = sort.startsWith('-');
+        const field = sort.replace(/^-/, '');
+
+        if (field === 'created_at') return descending ? blockSortTexts.newest : blockSortTexts.oldest;
+        if (field === 'updated_at') return descending ? blockSortTexts.recentlyUpdated : blockSortTexts.leastRecentlyUpdated;
+        if (field === block.core) return descending ? blockSortTexts.zToA : blockSortTexts.aToZ;
+
+        const column = (block.columns || []).find((c) => c.key === field);
+        const label = column ? this.blockColumnLabel(block, column) : field.replace(/_/g, ' ');
+
+        return (descending ? blockSortTexts.descending : blockSortTexts.ascending).replace(':column', () => label);
     },
 
     // Only columns THIS build named are ours to translate, and the map is

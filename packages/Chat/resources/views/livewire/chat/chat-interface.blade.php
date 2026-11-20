@@ -77,6 +77,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ],
         ]),
         blockFooterTemplate: @js(__('Showing :showing of :total')),
+        blockSortTexts: @js([
+            'newest' => __('Newest first'),
+            'oldest' => __('Oldest first'),
+            'recentlyUpdated' => __('Recently updated first'),
+            'leastRecentlyUpdated' => __('Least recently updated first'),
+            'aToZ' => __('A to Z'),
+            'zToA' => __('Z to A'),
+            'descending' => __('By :column, descending'),
+            'ascending' => __('By :column, ascending'),
+        ]),
         {{-- Records-table collapse (D4) and the tool's own "more pages exist"
              link (D5). See blockToggleLabel/blockOpenUrlLabel in transcript.js. --}}
         blockShowAllTemplate: @js(__('Show all :count rows')),
