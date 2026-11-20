@@ -43,7 +43,7 @@ RUN --mount=type=bind,from=composer,source=/app/vendor,target=/app/vendor \
 ###########################################
 # Stage 3: Production image
 ###########################################
-FROM serversideup/php:8.5-fpm-nginx@sha256:0b3d79815a1c8f06bb923a4cfdaf515ff9b466271c41428d61f08b29e6c4ac5a AS production
+FROM serversideup/php:8.5.13-fpm-nginx@sha256:66028c9387191a54f6a4f5029dd7a77c9d3fa69346b65056b0dc4014a1b6beaa AS production
 
 LABEL org.opencontainers.image.title="Relaticle CRM"
 LABEL org.opencontainers.image.description="Modern, open-source CRM platform"

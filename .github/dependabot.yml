@@ -61,6 +61,9 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+      # serversideup rebuilds its tags in place, and no digest bump reached a PR under this cooldown.
+      exclude:
+        - "serversideup/php"
     groups:
       docker:
         applies-to: version-updates
