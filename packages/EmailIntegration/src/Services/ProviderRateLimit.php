@@ -67,7 +67,7 @@ final readonly class ProviderRateLimit
         $current = $exception;
 
         while ($current instanceof Throwable) {
-            if (self::isUnreachable($current) || self::isTokenRefreshOutage($current) || (self::httpStatus($current) ?? 0) >= 500) {
+            if (self::isUnreachable($current) || self::isTokenRefreshOutage($current) || self::isHtmlBadRequest($current) || (self::httpStatus($current) ?? 0) >= 500) {
                 return self::clamp(self::headerSeconds($current) ?? self::FALLBACK_SECONDS);
             }
 
@@ -80,6 +80,16 @@ final readonly class ProviderRateLimit
     private static function isUnreachable(Throwable $exception): bool
     {
         return $exception instanceof ConnectionException || $exception instanceof NetworkExceptionInterface;
+    }
+
+    private static function isHtmlBadRequest(Throwable $exception): bool
+    {
+        if (! $exception instanceof RequestException || $exception->response->status() !== 400) {
+            return false;
+        }
+
+        return str_contains($exception->response->header('Content-Type'), 'text/html')
+            || str_starts_with(ltrim($exception->response->body()), '<');
     }
 
     private static function isTokenRefreshOutage(Throwable $exception): bool

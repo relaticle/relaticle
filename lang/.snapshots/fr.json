@@ -1785,6 +1785,7 @@
         "filament/pages/email-accounts.sync_error.badge": "8d997bba0689113f3d1ba2fd5efdf79b7adba709fa721c2f4f868bd4ae52d98a",
         "filament/pages/email-accounts.sync_error.heading": "00e85fca8097eeccc28d5b5d7d91116fd9018efd0b2bfce95322d0ed374abe21",
         "filament/pages/email-accounts.sync_error.reasons.google_mail_disabled": "7aa97d35c7dcb7ed10fa959126d80a3f9e828dc093ee8eee92eb083362af5cd0",
+        "filament/pages/email-accounts.sync_error.reasons.microsoft_mailbox_not_enabled": "683c462c36f1da4aca1698d41c46ef6fd51e5676c90eb2e0f8102ccc83955604",
         "filament/pages/email-accounts.synced_at": "ac774fab619247e74635b42acdbc15418dcbe3250c5d81ad8dcbf24609030ed6",
         "filament/pages/email-accounts.title": "973bf1ef904518ad308253787c8d7183829d128d7e9945fd41622d2a515dd7b7",
         "filament/pages/email-inbox.account_filter.label": "7e1b0d5641f2640ce9a953ec231eea2c27a2a7633f7d3c273e5735e2b30c10b7",

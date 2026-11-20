@@ -6,6 +6,7 @@ namespace Relaticle\EmailIntegration\Jobs\Middleware;
 
 use Closure;
 use Google\Service\Exception as GoogleServiceException;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Queue\Jobs\SyncJob;
 use Relaticle\EmailIntegration\Actions\CompleteMailboxHistoryImportAction;
 use Relaticle\EmailIntegration\Actions\StopCalendarPushChannelAction;
@@ -47,7 +48,13 @@ final class HandlesProviderFailures
             }
 
             if ($disabledService === 'mail') {
-                $this->failMailDisabled($job, $exception);
+                $this->failWithReason($job, $exception, SyncErrorReason::GoogleMailDisabled);
+
+                return;
+            }
+
+            if ($this->isMicrosoftMailboxMissing($exception)) {
+                $this->failWithReason($job, $exception, SyncErrorReason::MicrosoftMailboxNotEnabled);
 
                 return;
             }
@@ -95,6 +102,13 @@ final class HandlesProviderFailures
         return null;
     }
 
+    private function isMicrosoftMailboxMissing(Throwable $exception): bool
+    {
+        return $exception instanceof RequestException
+            && $exception->response->status() === 404
+            && $exception->response->json('error.code') === 'MailboxNotEnabledForRESTAPI';
+    }
+
     private function disableCalendar(
         IncrementalEmailSyncJob|InitialEmailSyncJob|IncrementalCalendarSyncJob|InitialCalendarSyncJob|EnsureCalendarPushChannelJob $job,
     ): void {
@@ -111,15 +125,16 @@ final class HandlesProviderFailures
         $job->delete();
     }
 
-    private function failMailDisabled(
+    private function failWithReason(
         IncrementalEmailSyncJob|InitialEmailSyncJob|IncrementalCalendarSyncJob|InitialCalendarSyncJob|EnsureCalendarPushChannelJob $job,
         Throwable $exception,
+        SyncErrorReason $reason,
     ): void {
         $job->fail($exception);
 
         $job->connectedAccount->fresh()?->update([
             'status' => EmailAccountStatus::ERROR,
-            'last_error' => SyncErrorReason::GoogleMailDisabled->value,
+            'last_error' => $reason->value,
         ]);
     }
 }

@@ -105,6 +105,7 @@ return [
         'heading' => 'Certains éléments n\'ont pas pu être synchronisés',
         'reasons' => [
             'google_mail_disabled' => "Gmail n'est pas activé pour ce compte Google Workspace. Demandez à votre administrateur Google de l'activer, puis reconnectez la boîte mail.",
+            'microsoft_mailbox_not_enabled' => "Ce compte Microsoft n'a aucune boîte mail que Relaticle puisse lire. Connectez plutôt le compte qui contient votre boîte Outlook.",
         ],
     ],
     'importing' => 'Synchronisation',
