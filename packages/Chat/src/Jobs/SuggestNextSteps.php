@@ -43,6 +43,9 @@ final class SuggestNextSteps implements ShouldQueue
 
     private const int MAX_PROMPT_CHARS = 160;
 
+    // The cheapest model keeps writing these despite the prompt rule, and clicking one sends a promise the assistant cannot act on.
+    private const string STATEMENT_OPENER = "/^(i[’']ll|i will|i[’']m ready to|i am ready to|here is|here are|here[’']s)\\b/iu";
+
     /**
      * @param  list<string>  $toolNames
      */
@@ -124,7 +127,7 @@ final class SuggestNextSteps implements ShouldQueue
             $label = is_string($suggestion['label'] ?? null) ? trim($suggestion['label']) : '';
             $prompt = is_string($suggestion['prompt'] ?? null) ? trim($suggestion['prompt']) : '';
 
-            if ($label === '' || $prompt === '') {
+            if ($label === '' || $prompt === '' || preg_match(self::STATEMENT_OPENER, $prompt) === 1) {
                 continue;
             }
 
