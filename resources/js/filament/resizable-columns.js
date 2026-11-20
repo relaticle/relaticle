@@ -1377,6 +1377,33 @@
         }))
     }
 
+    // A new page starts the rows' scroll box at the top, since the footer that was clicked sits after the last row.
+    // Not Filament's scrollToTopOnPageChange: it also fires on every sort and filter, and jumps the page on phones.
+    function registerPaginationFooter() {
+        window.Alpine.data('tablePaginationFooter', () => {
+            let unwatchPage = null
+            let resizeObserver = null
+
+            return {
+                init() {
+                    const box = this.$el.closest('.fi-ta-content-ctn')
+                    if (!box) return
+
+                    unwatchPage = this.$wire.$watch('paginators', () => box.scrollTo({ top: 0 }))
+
+                    // Not a container query: containment on the box makes Floating UI flip the popovers in its cells.
+                    resizeObserver = new ResizeObserver(() => this.$el.style.setProperty('--table-visible-width', `${box.clientWidth}px`))
+                    resizeObserver.observe(box)
+                },
+
+                destroy() {
+                    unwatchPage?.()
+                    resizeObserver?.disconnect()
+                },
+            }
+        })
+    }
+
     // `morphed` fires once per component after the morph settles. `morph.updated` fires per node
     // mid-morph, and the rest of the same pass strips what it adds.
     document.addEventListener('livewire:init', () => window.Livewire.hook('morphed', rebuildResizableTablesAfterMorph))
@@ -1387,11 +1414,13 @@
         registerColumnMenu()
         registerViewSettings()
         registerAddColumn()
+        registerPaginationFooter()
     } else {
         document.addEventListener('alpine:init', registerDragAnimation)
         document.addEventListener('alpine:init', registerResizableColumn)
         document.addEventListener('alpine:init', registerColumnMenu)
         document.addEventListener('alpine:init', registerViewSettings)
         document.addEventListener('alpine:init', registerAddColumn)
+        document.addEventListener('alpine:init', registerPaginationFooter)
     }
 })()

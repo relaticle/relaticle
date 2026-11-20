@@ -8,8 +8,9 @@ use App\Models\Company;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
+use App\Providers\Filament\AppPanelProvider;
 
-mutates(HasResizableColumns::class, ResizableColumns::class);
+mutates(HasResizableColumns::class, ResizableColumns::class, AppPanelProvider::class);
 
 function headerSelector(string $column): string
 {
@@ -63,11 +64,21 @@ function dragFeedbackMidDrag(string $column): string
 function tableAreaBottomGap(): string
 {
     return <<<'JS'
+        (() => Math.abs(Math.round(document.querySelector('.fi-ta-content-ctn').getBoundingClientRect().bottom - window.innerHeight)) <= 1)();
+    JS;
+}
+
+function footerPaginationBox(): string
+{
+    return <<<'JS'
         (() => {
-            const container = document.querySelector('.fi-ta-content-ctn');
-            const pagination = document.querySelector('.fi-ta-ctn .fi-pagination');
-            const lowest = Math.max(container.getBoundingClientRect().bottom, pagination ? pagination.getBoundingClientRect().bottom : 0);
-            return Math.abs(Math.round(lowest - window.innerHeight)) <= 1;
+            const container = document.querySelector('.fi-ta-content-ctn').getBoundingClientRect();
+            const pagination = document.querySelector('.fi-ta-content-ctn tfoot .fi-pagination').getBoundingClientRect();
+            return JSON.stringify({
+                belowFold: pagination.top >= window.innerHeight,
+                atContainerBottom: Math.abs(Math.round(pagination.bottom - container.bottom)) <= 1,
+                spansContainer: Math.round(pagination.left) === Math.round(container.left) && Math.round(pagination.width) === document.querySelector('.fi-ta-content-ctn').clientWidth,
+            });
         })();
     JS;
 }
@@ -306,21 +317,75 @@ it('puts the horizontal scrollbar at the bottom of the screen with few records',
         ->assertNoJavaScriptErrors();
 });
 
-it('puts the horizontal scrollbar at the bottom of the screen with many records and scrolls the rows inside the table', function (): void {
+it('puts the pagination after the last row while the horizontal scrollbar stays at the bottom of the screen', function (): void {
     People::factory()->recycle([$this->user, $this->workspace])->count(60)->create();
 
     $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1440, 900)
         ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
 
-    $page->script('(() => { const select = document.querySelector(".fi-pagination-records-per-page-select:not(.fi-compact) select"); select.value = "50"; select.dispatchEvent(new Event("change", { bubbles: true })); })()');
-
-    $page->wait(1.5)
-        ->assertScript('document.querySelectorAll(".fi-ta-content-ctn tbody tr").length', 50)
+    $page->assertScript('document.querySelectorAll(".fi-ta-content-ctn tbody tr").length', 25)
         ->assertScript(tableAreaBottomGap(), true)
         ->assertScript(pageScrollsVertically(), false)
-        ->assertScript('(() => { const c = document.querySelector(".fi-ta-content-ctn"); return c.scrollHeight > c.clientHeight + 1; })()', true)
-        ->assertScript('document.querySelector(".fi-ta-ctn .fi-pagination") !== null', true)
-        ->assertScript('(() => { const p = document.querySelector(".fi-ta-ctn .fi-pagination").getBoundingClientRect(); return p.top >= 0 && p.bottom <= window.innerHeight + 1; })()', true)
+        ->assertScript('document.querySelector(".fi-ta-main > .fi-pagination").checkVisibility()', false)
+        ->assertScript(footerPaginationBox(), json_encode(['belowFold' => true, 'atContainerBottom' => false, 'spansContainer' => true]));
+
+    $page->script('(() => { const c = document.querySelector(".fi-ta-content-ctn"); c.scrollTo(c.scrollWidth, c.scrollHeight); })()');
+
+    $page->wait(0.3)
+        ->assertScript('document.querySelector(".fi-ta-content-ctn").scrollLeft > 0', true)
+        ->assertScript(footerPaginationBox(), json_encode(['belowFold' => false, 'atContainerBottom' => true, 'spansContainer' => true]))
+        ->assertScript(tableAreaBottomGap(), true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('opens the next page at its first row from the pagination after the last row', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(60)->create();
+
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 1440, 900)
+        ->assertVisible(headerSelector('name').' .column-resize-handle-bar');
+
+    $page->script('(() => { const c = document.querySelector(".fi-ta-content-ctn"); c.scrollTo(0, c.scrollHeight); })()');
+    $page->click('.fi-ta-content-ctn tfoot [aria-label="Go to page 2"]');
+
+    $page->wait(1.5)
+        ->assertScript('document.querySelector(".fi-ta-content-ctn tfoot .fi-pagination-overview").innerText.includes("26")', true)
+        ->assertScript('document.querySelector(".fi-ta-content-ctn").scrollTop', 0);
+
+    $page->script('(() => { const c = document.querySelector(".fi-ta-content-ctn"); c.scrollTo(c.scrollWidth, c.scrollHeight); })()');
+
+    $page->wait(0.3)
+        ->assertScript(footerPaginationBox(), json_encode(['belowFold' => false, 'atContainerBottom' => true, 'spansContainer' => true]))
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the pagination on a page past the last record', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/people?page=9", 1440, 900)
+        ->assertVisible('.fi-ta-empty-state')
+        ->assertScript('document.querySelector(".fi-ta-main > .fi-pagination").checkVisibility()', true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('leaves the page where it is when a sort changes on a phone', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
+
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/people", 390, 844)
+        ->assertScript('Math.round(window.scrollY)', 0);
+
+    $page->script('(() => { const table = document.querySelector(".fi-ta-ctn"); Livewire.all().filter((component) => component.el.contains(table)).pop().$wire.call("sortTable", "created_at"); })()');
+
+    $page->wait(1.5)
+        ->assertScript('Math.round(window.scrollY)', 0)
+        ->assertNoJavaScriptErrors();
+});
+
+it('keeps the pagination below the stacked cards on a phone', function (): void {
+    People::factory()->recycle([$this->user, $this->workspace])->count(30)->create();
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/people", 390, 844)
+        ->assertScript('document.querySelector(".fi-ta-main > .fi-pagination").checkVisibility()', true)
+        ->assertScript('document.querySelector(".fi-ta-content-ctn tfoot").checkVisibility()', false)
         ->assertNoJavaScriptErrors();
 });
 
