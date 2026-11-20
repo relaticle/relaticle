@@ -10,6 +10,7 @@ use Closure;
 use Illuminate\Contracts\Database\Query\Builder;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Illuminate\Support\Collection;
 use Illuminate\Translation\PotentiallyTranslatedString;
 use Illuminate\Validation\Rule;
 use Relaticle\CustomFields\Facades\CustomFieldsType;
@@ -22,14 +23,14 @@ final readonly class ValidCustomFields implements ValidationRule
      * @param  string|int|null  $ignoreEntityId  the record being updated, excluded from
      *                                           unique-value checks so resubmitting its own
      *                                           unchanged value never reads as a collision
-     * @param  EloquentCollection<string, CustomField>|null  $definitions  the entity's active fields by code, when the caller already loaded them
+     * @param  Collection<string, CustomField>|null  $definitions
      */
     public function __construct(
         private string $tenantId,
         private string $entityType,
         private bool $isUpdate = false,
         private string|int|null $ignoreEntityId = null,
-        private ?EloquentCollection $definitions = null,
+        private ?Collection $definitions = null,
     ) {}
 
     /**
@@ -150,7 +151,7 @@ final readonly class ValidCustomFields implements ValidationRule
      */
     private function resolveCustomFields(array $submittedCodes): EloquentCollection
     {
-        if ($this->definitions instanceof EloquentCollection) {
+        if ($this->definitions instanceof Collection) {
             return $this->loadedCustomFields($this->definitions, $submittedCodes);
         }
 
@@ -184,16 +185,17 @@ final readonly class ValidCustomFields implements ValidationRule
     }
 
     /**
-     * @param  EloquentCollection<string, CustomField>  $definitions
+     * @param  Collection<string, CustomField>  $definitions
      * @param  array<int, string>  $submittedCodes
      * @return EloquentCollection<int, CustomField>
      */
-    private function loadedCustomFields(EloquentCollection $definitions, array $submittedCodes): EloquentCollection
+    private function loadedCustomFields(Collection $definitions, array $submittedCodes): EloquentCollection
     {
         $required = fn (CustomField $field): bool => collect($field->validation_rules)->get('required') === true;
 
-        return $definitions
+        return new EloquentCollection($definitions
             ->filter(fn (CustomField $field): bool => in_array($field->code, $submittedCodes, true) || (! $this->isUpdate && $required($field)))
-            ->values();
+            ->values()
+            ->all());
     }
 }

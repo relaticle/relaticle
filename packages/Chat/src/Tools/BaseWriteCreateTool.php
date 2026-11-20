@@ -6,8 +6,8 @@ namespace Relaticle\Chat\Tools;
 
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
-use App\Queries\CustomFields\ActiveCustomFieldsQuery;
 use App\Queries\ViewerZone;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -142,7 +142,7 @@ abstract class BaseWriteCreateTool implements Tool
 
         $validator = resolve(CustomFieldsRequestValidator::class);
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
-        $definitions = resolve(ActiveCustomFieldsQuery::class)->get((string) $user->currentWorkspace->getKey(), $this->entityType());
+        $definitions = resolve(WorkspaceCustomFields::class)->forEntity($user->currentWorkspace, $this->entityType())->where('active', true)->keyBy('code');
 
         $actionRecords = [];
         $items = [];

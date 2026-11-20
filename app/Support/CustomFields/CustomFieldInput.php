@@ -10,7 +10,7 @@ use App\Queries\Operand;
 use App\Queries\ViewerZone;
 use App\Support\ChecklistHtml;
 use App\Support\Media\RichContentAttachments;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +22,7 @@ final readonly class CustomFieldInput
 
     /**
      * @param  array<array-key, mixed>  $customFields
-     * @param  Collection<string, CustomField>|null  $definitions  the entity's active fields by code, when the caller already loaded them
+     * @param  Collection<string, CustomField>|null  $definitions
      * @return array<array-key, mixed>
      */
     public function normalize(string $workspaceId, string $entityType, array $customFields, ?ViewerZone $viewerZone = null, ?Collection $definitions = null): array

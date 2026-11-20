@@ -9,7 +9,7 @@ use App\Models\User;
 use App\Queries\ViewerZone;
 use App\Rules\ValidCustomFields;
 use App\Support\CustomFields\CustomFieldInput;
-use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\MessageBag;
 use Illuminate\Validation\ValidationException;
@@ -22,7 +22,7 @@ final readonly class CustomFieldsRequestValidator
 
     /**
      * @param  string|int|null  $ignoreEntityId  the record being updated, excluded from unique-value checks
-     * @param  Collection<string, CustomField>|null  $definitions  the entity's active fields by code, loaded once per tool call
+     * @param  Collection<string, CustomField>|null  $definitions
      */
     public function validate(User $user, string $entityType, mixed $rawCustomFields, bool $isUpdate = true, string|int|null $ignoreEntityId = null, ?ViewerZone $viewerZone = null, ?Collection $definitions = null): CustomFieldsValidationResult
     {

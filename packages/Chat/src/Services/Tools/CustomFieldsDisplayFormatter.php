@@ -12,7 +12,6 @@ use App\Support\CustomFields\RecordNameResolver;
 use App\Support\PlainText;
 use Carbon\CarbonImmutable;
 use DateTimeInterface;
-use Illuminate\Database\Eloquent\Collection as EloquentCollection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Date;
@@ -31,10 +30,10 @@ final readonly class CustomFieldsDisplayFormatter
      * choice fields, ISO strings for dates).
      *
      * @param  array<string, mixed>  $cleanFields
-     * @param  EloquentCollection<string, CustomField>|null  $definitions  the entity's active fields by code, loaded once per tool call
+     * @param  Collection<string, CustomField>|null  $definitions
      * @return list<array{label: string, code: string, old?: string|null, new: string|null, type: string, values?: list<string>}>
      */
-    public function format(User $user, string $entityType, array $cleanFields, ?Model $oldModel, ?EloquentCollection $definitions = null): array
+    public function format(User $user, string $entityType, array $cleanFields, ?Model $oldModel, ?Collection $definitions = null): array
     {
         if ($cleanFields === []) {
             return [];
