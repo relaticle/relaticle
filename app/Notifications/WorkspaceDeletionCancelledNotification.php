@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Notifications;
 
+use App\Contracts\Billing;
 use App\Models\Workspace;
 use Filament\Facades\Filament;
 use Illuminate\Bus\Queueable;
@@ -37,6 +38,7 @@ final class WorkspaceDeletionCancelledNotification extends Notification implemen
             ->markdown('mail.notifications.workspace-deletion-cancelled', [
                 'workspaceName' => Str::squish($this->workspace->name),
                 'workspaceUrl' => Filament::getPanel('app')->getUrl($this->workspace),
+                'subscriptionEnding' => resolve(Billing::class)->subscriptionEnding($this->workspace),
             ]);
     }
 }

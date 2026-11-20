@@ -16,7 +16,7 @@ it('keeps each plan tagline on one line in the narrowest three-column layout', f
 
     $lines = $page->script(<<<'JS'
         ['#pro-plan', '#scale-plan', '#enterprise-plan']
-            .map((plan) => document.querySelector(`${plan} p.mt-1\\.5`))
+            .map((plan) => document.querySelector(`${plan} > div:first-child > p`))
             .map((tagline) => Math.round(tagline.getBoundingClientRect().height / parseFloat(getComputedStyle(tagline).lineHeight)))
     JS);
 

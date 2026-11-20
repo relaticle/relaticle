@@ -13,10 +13,11 @@ use Illuminate\Support\Facades\Exceptions;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Billing\Actions\CreateSubscriptionCheckout;
 use Relaticle\Cloud\Billing\Filament\Billing;
+use Relaticle\Cloud\Billing\Livewire\Concerns\StartsSubscriptionCheckout;
 use Relaticle\Cloud\Billing\Livewire\UpgradeModal;
 use Tests\Helpers\StripeRecorder;
 
-mutates(UpgradeModal::class);
+mutates(UpgradeModal::class, StartsSubscriptionCheckout::class);
 
 beforeEach(function (): void {
     config()->set('cashier.secret', 'sk_test_fake');
@@ -50,7 +51,7 @@ it('sends the owner to hosted Stripe checkout for the chosen period', function (
     $recorder = StripeRecorder::install();
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'pro', 'monthly')
+        ->call('subscribe', 'pro', 'monthly')
         ->assertRedirect('https://checkout.stripe.com/c/pay/cs_test_fake')
         ->assertNotNotified();
 
@@ -63,7 +64,7 @@ it('sends the owner to checkout for Cloud Scale when that plan is picked', funct
     $recorder = StripeRecorder::install();
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'scale', 'yearly')
+        ->call('subscribe', 'scale', 'yearly')
         ->assertRedirect('https://checkout.stripe.com/c/pay/cs_test_fake')
         ->assertNotNotified();
 
@@ -77,7 +78,7 @@ it('notifies instead of throwing when the plan is not sold through checkout', fu
     StripeRecorder::install();
 
     livewire(UpgradeModal::class)
-        ->call('checkout', $plan, 'yearly')
+        ->call('subscribe', $plan, 'yearly')
         ->assertNoRedirect()
         ->assertNotified(Notification::make()->title(__('cloud::billing.errors.checkout_failed'))->danger());
 
@@ -121,7 +122,7 @@ it('refuses a member who does not own the workspace', function (): void {
 
     livewire(UpgradeModal::class)
         ->assertDontSee(__('cloud::billing.upgrade.review.proceed'))
-        ->call('checkout', 'pro', 'yearly')
+        ->call('subscribe', 'pro', 'yearly')
         ->assertNoRedirect();
 });
 
@@ -139,7 +140,7 @@ it('refuses a workspace that already subscribes', function (): void {
     ]);
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'pro', 'yearly')
+        ->call('subscribe', 'pro', 'yearly')
         ->assertNoRedirect();
 });
 
@@ -150,7 +151,7 @@ it('refuses a workspace on a managed plan', function (Plan $plan): void {
     $this->workspace->forceFill(['plan' => $plan])->save();
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'pro', 'yearly')
+        ->call('subscribe', 'pro', 'yearly')
         ->assertNoRedirect();
 })->with([Plan::Enterprise]);
 
@@ -159,7 +160,7 @@ it('refuses when billing is switched off', function (): void {
     Feature::define(BillingFeature::class, false);
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'pro', 'yearly')
+        ->call('subscribe', 'pro', 'yearly')
         ->assertNoRedirect();
 });
 
@@ -170,7 +171,7 @@ it('notifies instead of throwing when the interval is unknown', function (): voi
     StripeRecorder::install();
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'pro', 'weekly')
+        ->call('subscribe', 'pro', 'weekly')
         ->assertNoRedirect()
         ->assertNotified(Notification::make()->title(__('cloud::billing.errors.checkout_failed'))->danger());
 
@@ -187,7 +188,7 @@ it('reports an unexpected checkout failure instead of swallowing it', function (
     });
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'pro', 'yearly')
+        ->call('subscribe', 'pro', 'yearly')
         ->assertNoRedirect()
         ->assertNotified(Notification::make()->title(__('cloud::billing.errors.checkout_failed'))->danger());
 
@@ -202,7 +203,7 @@ it('reports a missing price configuration instead of blaming the browser', funct
     config()->set('services.stripe.prices.pro_yearly', null);
 
     livewire(UpgradeModal::class)
-        ->call('checkout', 'pro', 'yearly')
+        ->call('subscribe', 'pro', 'yearly')
         ->assertNoRedirect()
         ->assertNotified(Notification::make()->title(__('cloud::billing.errors.checkout_failed'))->danger());
 

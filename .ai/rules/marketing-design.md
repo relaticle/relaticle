@@ -21,6 +21,7 @@ outside the roles.
 | `rail` | gray-200 | white 10% | `bg-rail gap-px` grids, `border-rail` frame lines |
 | `surface` | white | gray-950 | every cell |
 | `tint` | gray-50 | gray-900 | cells that hold product UI, link hover |
+| `highlight` | primary-50 at 60% on white | primary-500 at 8% on gray-950 | the recommended plan's column in a comparison table |
 
 Three treatments sit on top of the tokens. A page has at most one dark moment: the `closing-band` on
 the homepage, `/ai` and `/email-and-calendar`. `bg-hero-panel` is the
@@ -30,6 +31,9 @@ human moments (the homepage email visual), never behind body text.
 
 `bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
 sit on. It never sits behind marketing copy. On `/ai` the showcase visuals and the Control cells use it.
+
+`highlight` is mixed opaque, so a sticky table header and the cells under it carry the same colour.
+It marks one column on a page and never sits behind a whole section.
 
 Cells inside a `gap-px` grid stay opaque. A translucent fill lets the rail color show through and
 turns the cell gray in dark mode. `canvas` is taken by the Scribe theme, which is why the third
@@ -55,6 +59,7 @@ product page takes a different composition, so no two read as copies:
 | `/self-hosted` | `stack`, `start` | `corners` light on `tint` |
 | `/email-and-calendar` | `split` | `around` light on `tint` |
 | `/ai-native-crm` | `stack`, centred | `dots` on `tint` |
+| `/pricing` | `stack`, centred, the plan cards as the visual | `seam` light and `dots` on `tint` |
 | homepage story | a `frame` section | `center` light on `tint`, dots inside |
 
 The homepage hero keeps its own rounded `bg-hero-panel` outside the rails, and no other page copies
@@ -162,6 +167,17 @@ reach it. Change the header height and the token together. `html` also carries `
   (`partials/ai-native-checklist.blade.php`). Five checks, a toggle per check for the visitor's own CRM
   with a live "x of 5" readout, and Relaticle's answer beside each with a link to the page that proves
   it. `tests/Browser/Marketing/AiNativeChecklistTest.php` pins the score and the toggles.
+- The `/pricing` signature is a team cost calculator (`partials/pricing-team-cost.blade.php`) in its own
+  frame under the plan cards. A team-size slider and a per-seat price redraw three bars: a per-seat CRM,
+  Cloud Pro and Cloud Scale, each per month billed yearly, and one sentence states the yearly difference or
+  the team size where Cloud Pro becomes cheaper. The default seat price is `CompetitorFacts::medianSeatPrice()`
+  over every product with a `seat_price`, and the footnote names the count, never a product. The server
+  renders the default state, and the bars animate `clip-path` only. It renders only while billing is on.
+  `tests/Browser/Marketing/TeamCostCalculatorTest.php` pins the prices, the verdict and the break-even line.
+- The `/pricing` comparison shows only where the plans differ. What every plan includes sits on one
+  "On every plan" line above the table, the rows carry no group headings, and the recommended plan's
+  column takes `highlight` from the sticky header down. Self-hosting is not a column: it has its own row
+  under the plan cards.
 - The `/crm-for-{assistant}` hero is an ask gallery (`partials/assistant-playground.blade.php`): four
   asks as tabs, each showing the assistant's reply with the Relaticle tool it called, and for a write
   the record it produced with the assistant's actor chip. The client is fixed to the page's assistant,

@@ -52,7 +52,7 @@ use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
 use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
@@ -300,7 +300,8 @@ final class CloudServiceProvider extends ServiceProvider
             'App\Notifications\ManagedInvoiceOverdueNotification' => ManagedInvoiceOverdueNotification::class,
             'App\Mail\ProEndedMail' => ProEndedMail::class,
             'App\Mail\ProTrialEndingSoonMail' => ProTrialEndingSoonMail::class,
-            'App\Jobs\RefreshManagedRenewal' => RefreshManagedRenewal::class,
+            'App\Jobs\RefreshManagedRenewal' => RefreshRenewal::class,
+            'Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal' => RefreshRenewal::class,
             'Relaticle\SystemAdmin\Mail\ManagedPlanInvoiceMail' => ManagedPlanInvoiceMail::class,
             'App\Mail\NewContactSubmissionMail' => NewContactSubmissionMail::class,
         ];
@@ -367,7 +368,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     private function registerCommunityCounts(): void
     {
-        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.community', 'cloud::marketing.press', 'cloud::marketing.self-hosted'], static function (ViewContract $view): void {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.community', 'cloud::marketing.press', 'cloud::marketing.self-hosted', 'cloud::marketing.pricing'], static function (ViewContract $view): void {
             $gitHubService = resolve(GitHubService::class);
 
             $view->with([

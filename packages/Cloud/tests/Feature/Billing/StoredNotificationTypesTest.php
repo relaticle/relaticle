@@ -8,14 +8,14 @@ use App\Models\User;
 use App\Models\Workspace;
 use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Mail\ProEndedMail;
 use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\Cloud\CloudServiceProvider;
 
-mutates(CloudServiceProvider::class, PaymentFailedNotification::class, ManagedInvoiceOverdueNotification::class, ProEndedMail::class, ProTrialEndingSoonMail::class, RefreshManagedRenewal::class);
+mutates(CloudServiceProvider::class, PaymentFailedNotification::class, ManagedInvoiceOverdueNotification::class, ProEndedMail::class, ProTrialEndingSoonMail::class, RefreshRenewal::class);
 
 it('still shows a bell row stored under the class name it had before the move', function (Closure $notification, string $storedType, Closure $title): void {
     $owner = User::factory()->withPersonalWorkspace()->create();
@@ -47,5 +47,6 @@ it('loads a payload serialized under the class name it had before the move', fun
     'managed invoice overdue notification' => ['App\Notifications\ManagedInvoiceOverdueNotification', ManagedInvoiceOverdueNotification::class],
     'pro ended mail' => ['App\Mail\ProEndedMail', ProEndedMail::class],
     'pro trial ending soon mail' => ['App\Mail\ProTrialEndingSoonMail', ProTrialEndingSoonMail::class],
-    'managed renewal refresh job' => ['App\Jobs\RefreshManagedRenewal', RefreshManagedRenewal::class],
+    'managed renewal refresh job' => ['App\Jobs\RefreshManagedRenewal', RefreshRenewal::class],
+    'renewal refresh job before it covered every subscription' => ['Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal', RefreshRenewal::class],
 ]);

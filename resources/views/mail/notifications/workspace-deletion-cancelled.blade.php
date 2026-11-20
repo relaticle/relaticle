@@ -4,6 +4,10 @@
 
 <p>{{ __('mail.workspace_deletion_cancelled.body', ['workspace' => $workspaceName]) }}</p>
 
+@if($subscriptionEnding)
+<p>{{ $subscriptionEnding->notice }} <a href="{{ $subscriptionEnding->keepUrl }}">{{ $subscriptionEnding->keepLabel }}</a></p>
+@endif
+
 <x-mail::button :url="$workspaceUrl">
 {{ __('mail.workspace_deletion_cancelled.cta', ['workspace' => $workspaceName]) }}
 </x-mail::button>

@@ -45,7 +45,7 @@ final readonly class CreateCreditPackCheckout
         $billingUrl = Billing::getUrl(panel: 'app', tenant: $workspace);
 
         $options = [
-            'success_url' => "{$billingUrl}?credits=success",
+            'success_url' => $billingUrl.'?credits={CHECKOUT_SESSION_ID}',
             'cancel_url' => $billingUrl,
             // Stripe stores this key on its own side, and the webhook reads it
             // back off sessions created before any deploy. It cannot be renamed.

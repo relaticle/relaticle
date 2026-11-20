@@ -33,7 +33,6 @@
                     get current() { return this.plans[this.plan] },
                     get amount() { return this.yearly ? this.current.amountYearly : this.current.amountMonthly },
                 }"
-                x-on:upgrade-plan-changed.window="plan = $event.detail.plan in plans ? $event.detail.plan : plan; yearly = $event.detail.interval !== 'monthly'"
                 class="grid gap-6 md:grid-cols-2"
             >
                 <div class="space-y-6">
@@ -135,8 +134,8 @@
                     @endif
 
                     <x-filament::button size="lg" class="mt-6 w-full justify-center"
-                        wire:loading.attr="disabled" wire:target="checkout"
-                        x-on:click="$wire.checkout(plan, yearly ? 'yearly' : 'monthly')">
+                        wire:loading.attr="disabled" wire:target="subscribe"
+                        x-on:click="$wire.subscribe(plan, yearly ? 'yearly' : 'monthly')">
                         {{ __('cloud::billing.upgrade.review.proceed') }}
                     </x-filament::button>
 

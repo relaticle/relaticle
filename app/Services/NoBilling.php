@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use App\Contracts\Billing;
+use App\Data\SubscriptionEnding;
 use App\Models\User;
 use App\Models\Workspace;
 
@@ -37,5 +38,10 @@ final readonly class NoBilling implements Billing
     public function inactivityDeletionStands(Workspace $workspace): bool
     {
         return false;
+    }
+
+    public function subscriptionEnding(Workspace $workspace): ?SubscriptionEnding
+    {
+        return null;
     }
 }
