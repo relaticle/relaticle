@@ -26,6 +26,7 @@ use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Services\Contracts\CalendarServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\Factories\MicrosoftGraphClientFactory;
 use Relaticle\EmailIntegration\Support\CalendarPushWebhookUrl;
+use Sentry\Laravel\Jobs\Middleware\SentryTracesSampleRate;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -47,11 +48,11 @@ final class EnsureCalendarPushChannelJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return list<HandlesProviderFailures>
+     * @return list<SentryTracesSampleRate|HandlesProviderFailures>
      */
     public function middleware(): array
     {
-        return [new HandlesProviderFailures];
+        return [new SentryTracesSampleRate(0.1), new HandlesProviderFailures];
     }
 
     public function handle(CalendarServiceFactoryInterface $calendarFactory): void
