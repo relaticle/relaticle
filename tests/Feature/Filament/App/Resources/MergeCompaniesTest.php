@@ -18,6 +18,7 @@ use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Components\Forms\MergeRecordPicker;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ViewCompany;
+use App\Livewire\App\Records\DuplicateRecordsPrompt;
 use App\Models\ActivityLog\Activity;
 use App\Models\Company;
 use App\Models\CustomField;
@@ -653,7 +654,8 @@ it('shows the deleted notice with no merge and no duplicate prompt on a deleted 
 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->assertSee('This record was deleted')
-        ->assertDontSee(['Merge record', 'possible duplicate'])
+        ->assertDontSee('Merge record')
+        ->assertDontSeeLivewire(DuplicateRecordsPrompt::class)
         ->assertActionDoesNotExist(mergeRecordAction());
 });
 

@@ -136,6 +136,33 @@ it('places the company where the list now shows it when a stepped position has g
         ->not->toContain($newest->getKey());
 });
 
+it('steps the preview over deleted rows and counts only live ones', function (): void {
+    [$oldest, $deleted, $newest] = collect([3, 2, 1])
+        ->map(fn (int $daysAgo): Company => Company::factory()->recycle([$this->user, $this->workspace])->create(['created_at' => now()->subDays($daysAgo)]))
+        ->all();
+    $deleted->delete();
+
+    $header = previewHeader(livewire(ListCompanies::class)
+        ->filterTable('trashed', true)
+        ->mountAction(TestAction::make('preview')->table($newest))
+        ->getMountedActionModalHtml());
+
+    expect($header)
+        ->toContain(__('filament/record-page.preview.position', ['position' => 1, 'total' => 2, 'label' => 'Companies']))
+        ->toContain($oldest->getKey())
+        ->not->toContain($deleted->getKey());
+
+    $last = previewHeader(livewire(ListCompanies::class)
+        ->filterTable('trashed', true)
+        ->mountAction(TestAction::make('preview')->table($oldest))
+        ->getMountedActionModalHtml());
+
+    expect($last)
+        ->toContain(__('filament/record-page.preview.position', ['position' => 2, 'total' => 2, 'label' => 'Companies']))
+        ->toContain($newest->getKey())
+        ->not->toContain($deleted->getKey());
+});
+
 it('offers the preview in the row menu for keyboard and touch users', function (string $model, string $list): void {
     $record = $model::factory()->recycle([$this->user, $this->workspace])->create();
 

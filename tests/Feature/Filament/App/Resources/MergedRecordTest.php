@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Features\EmailIntegration;
 use App\Filament\Concerns\HasRecordPageLayout;
 use App\Filament\Resources\CompanyResource;
 use App\Filament\Resources\CompanyResource\Pages\ListCompanies;
@@ -20,6 +21,7 @@ use App\Policies\CompanyPolicy;
 use App\Policies\PeoplePolicy;
 use Filament\Facades\Filament;
 use Illuminate\Database\Eloquent\Model;
+use Laravel\Pennant\Feature;
 use Relaticle\Documentation\Support\DocUrl;
 
 mutates(CompanyResource::class, PeopleResource::class, OpportunityResource::class, HasRecordPageLayout::class, CompanyPolicy::class, PeoplePolicy::class, Company::class, People::class);
@@ -240,4 +242,42 @@ it('gives a trashed row no link and no preview and a live row both', function (s
     'company' => [Company::class, CompanyResource::class, ListCompanies::class],
     'person' => [People::class, PeopleResource::class, ListPeople::class],
     'opportunity' => [Opportunity::class, OpportunityResource::class, ListOpportunities::class],
+]);
+
+it('hands the email composer nothing from a merged or deleted person', function (string $state): void {
+    Feature::for(null)->activate(EmailIntegration::class);
+    $person = mergePersonRecord($this->workspace, $this->user, ['name' => 'Ghost Person'], ['emails' => ['ghost@example.com']]);
+    $person->delete();
+
+    if ($state === 'merged') {
+        $target = People::factory()->recycle([$this->user, $this->workspace])->create();
+        People::withTrashed()->whereKey($person->getKey())->update(['merged_into_id' => $target->getKey()]);
+    }
+
+    $this->get(PeopleResource::getUrl('view', ['record' => $person]))
+        ->assertOk()
+        ->assertDontSee('ghost@example.com');
+})->with(['deleted', 'merged']);
+
+it('hands the email composer a live person\'s address', function (): void {
+    Feature::for(null)->activate(EmailIntegration::class);
+    $person = mergePersonRecord($this->workspace, $this->user, ['name' => 'Live Person'], ['emails' => ['live@example.com']]);
+
+    $this->get(PeopleResource::getUrl('view', ['record' => $person]))->assertOk()->assertSee('live@example.com');
+});
+
+it('renders the notice in the preview of a deleted or merged record with no quick actions', function (string $model, string $page, string $state): void {
+    $record = $state === 'merged'
+        ? mergedAwayRecord($model, $this->user, 'Preview Ghost')
+        : deletedOnlyRecord($model, $this->user, 'Preview Ghost');
+
+    livewire($page, ['record' => $record->getKey(), 'isEmbedded' => true])
+        ->assertSee($state === 'merged' ? 'This record was merged' : 'This record was deleted')
+        ->assertDontSee(['Preview Ghost', 'New note', 'New task', 'Overview']);
+})->with([
+    'deleted company' => [Company::class, ViewCompany::class, 'deleted'],
+    'deleted person' => [People::class, ViewPeople::class, 'deleted'],
+    'deleted opportunity' => [Opportunity::class, ViewOpportunity::class, 'deleted'],
+    'merged company' => [Company::class, ViewCompany::class, 'merged'],
+    'merged person' => [People::class, ViewPeople::class, 'merged'],
 ]);
