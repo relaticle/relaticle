@@ -79,7 +79,6 @@ it('rolls back the new person and every moved link when the final write fails va
     $task = Task::factory()->recycle([$this->user, $this->workspace])->create();
     $duplicate->tasks()->attach($task->getKey());
     $opportunity = Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
-    activity()->performedOn($kept)->event('record_merged')->withProperties(['merged_names' => ['Dana', 'Dana W.']])->log('record_merged');
 
     Event::listen(RecordMerged::class, fn (): int => DB::table('companies')->where('id', $company->getKey())->update(['deleted_at' => now()]));
     mergePeopleWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
@@ -88,8 +87,7 @@ it('rolls back the new person and every moved link when the final write fails va
         ->and(People::withTrashed()->count())->toBe(2)
         ->and(DB::table('noteables')->where('note_id', $note->getKey())->pluck('noteable_id')->all())->toBe([$duplicate->getKey()])
         ->and(DB::table('taskables')->where('task_id', $task->getKey())->pluck('taskable_id')->all())->toBe([$duplicate->getKey()])
-        ->and($opportunity->refresh()->contact_id)->toBe($duplicate->getKey())
-        ->and(Activity::query()->where('event', 'record_merged')->pluck('subject_id')->all())->toBe([$kept->getKey()]);
+        ->and($opportunity->refresh()->contact_id)->toBe($duplicate->getKey());
 });
 
 it('creates a new person with the current person\'s emails first and without repeats', function (): void {

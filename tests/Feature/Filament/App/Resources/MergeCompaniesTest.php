@@ -406,7 +406,6 @@ it('rolls back the new company and every moved link when the final write fails v
     $duplicate->tasks()->attach($task->getKey());
     $person = People::factory()->recycle([$this->user, $this->workspace])->create(['company_id' => $duplicate->getKey()]);
     $logo = mergeMedia($duplicate, Company::LOGO_MEDIA_COLLECTION);
-    activity()->performedOn($kept)->event('record_merged')->withProperties(['merged_names' => ['Brightline', 'Brightline Health']])->log('record_merged');
 
     Event::listen(RecordMerged::class, fn (): int => $this->workspace->users()->detach($member));
     mergeWith($kept, $duplicate)->assertHasActionErrors(['picked_id']);
@@ -416,8 +415,7 @@ it('rolls back the new company and every moved link when the final write fails v
         ->and(DB::table('noteables')->where('note_id', $note->getKey())->pluck('noteable_id')->all())->toBe([$duplicate->getKey()])
         ->and(DB::table('taskables')->where('task_id', $task->getKey())->pluck('taskable_id')->all())->toBe([$duplicate->getKey()])
         ->and($person->refresh()->company_id)->toBe($duplicate->getKey())
-        ->and($logo->refresh()->model_id)->toBe($duplicate->getKey())
-        ->and(Activity::query()->where('event', 'record_merged')->pluck('subject_id')->all())->toBe([$kept->getKey()]);
+        ->and($logo->refresh()->model_id)->toBe($duplicate->getKey());
 });
 
 it('finds a company by name or by any of its domains', function (string $term, array $found): void {

@@ -232,11 +232,36 @@ it('lists the merge on the workspace activity page and filters by it', function 
     foreach (mergeHistoryEntities() as [$page, $make]) {
         $merged = mergeHistoryRun($page, $make($this->workspace, $this->user), $make($this->workspace, $this->user), false);
         $entry = Activity::query()->where('subject_id', $merged->getKey())->where('event', 'record_merged')->sole();
+        $created = Activity::query()->where('subject_id', $merged->getKey())->where('event', 'created')->sole();
 
         livewire(ActivityLog::class)
+            ->assertCanSeeTableRecords([$entry, $created])
             ->filterTable('event', 'record_merged')
             ->assertCanSeeTableRecords([$entry])
-            ->assertSee(AppEventPalette::RecordMerged->getLabel());
+            ->assertCanNotSeeTableRecords([$created])
+            ->assertTableColumnFormattedStateSet('event', AppEventPalette::RecordMerged->getLabel(), $entry);
+    }
+});
+
+it('rolls back the new record and leaves every original row where it was when the merge entry fails', function (): void {
+    foreach (mergeHistoryEntities() as [$page, $make]) {
+        $kept = $make($this->workspace, $this->user, ['name' => 'Brightline Health']);
+        $duplicate = $make($this->workspace, $this->user, ['name' => 'Brightline Health Inc.']);
+        $kept->update(['name' => 'Brightline']);
+        $duplicate->update(['name' => 'Brightline Health Inc']);
+        $rowsBefore = fn (): array => Activity::query()->whereIn('subject_id', [$kept->getKey(), $duplicate->getKey()])->orderBy('id')->get(['id', 'subject_id', 'batch_uuid', 'event'])->toArray();
+        $before = $rowsBefore();
+        Activity::created(function (Activity $activity): void {
+            throw_if($activity->event === 'record_merged' && $activity->properties->has('merged_names'), RuntimeException::class, 'logging failed');
+        });
+
+        expect(fn (): Company|People => mergeHistoryRun($page, $kept, $duplicate, false))->toThrow(RuntimeException::class, 'logging failed');
+
+        expect($rowsBefore())->toBe($before)
+            ->and($kept::withTrashed()->count())->toBe(2)
+            ->and($kept::query()->whereKey([$kept->getKey(), $duplicate->getKey()])->count())->toBe(2)
+            ->and(Activity::query()->where('event', 'record_merged')->exists())->toBeFalse();
+
     }
 });
 
