@@ -2,10 +2,25 @@
 title: API REST
 description: Connectez-vous à l'API REST de Relaticle avec un jeton d'accès personnel, des permissions, des limites de débit, des upserts et la référence des endpoints.
 order: 3
-updated: "2026-10-06"
+updated: "2026-11-20"
 ---
 
 Relaticle propose une API REST pour les entreprises, les personnes, les opportunités, les tâches, les notes et les attributs personnalisés. Utilisez-la pour synchroniser des enregistrements avec un autre système ou pour créer votre propre intégration. La [référence de l'API](/developers/api) liste chaque endpoint, chaque paramètre et chaque réponse, et la spécification OpenAPI se trouve à l'adresse [/openapi.json](/openapi.json).
+
+## Fusionner deux enregistrements
+
+`POST /v1/people/merge` et `POST /v1/companies/merge` fusionnent deux enregistrements du même type en un nouvel enregistrement. Envoyez les identifiants des deux :
+
+```json
+{
+  "primary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3a",
+  "secondary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3b"
+}
+```
+
+L'enregistrement principal l'emporte sur chaque conflit, et le secondaire complète les valeurs que le principal laisse vides. Les liens, les notes, les tâches, les e-mails et l'historique passent au nouvel enregistrement. La réponse est le nouvel enregistrement avec `200`. Ensuite, les deux anciens identifiants répondent `404` : conservez donc le nouvel identifiant.
+
+Une fusion renvoie `422` quand un identifiant manque, n'est pas valide, répète l'autre identifiant ou désigne un enregistrement qui n'existe pas, est supprimé, a déjà été fusionné ou appartient à un autre espace de travail. L'erreur porte le nom du champ qui contient le mauvais identifiant. Elle renvoie aussi `422` sur `records` quand un champ à valeurs multiples dépasserait 20 valeurs après la fusion. Un champ dont la limite est plus basse voit sa limite relevée pour accueillir les valeurs fusionnées. Une fusion exige les permissions `create`, `update` et `delete`.
 
 ## URL de base
 
