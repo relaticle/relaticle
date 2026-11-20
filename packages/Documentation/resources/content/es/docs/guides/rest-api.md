@@ -7,21 +7,6 @@ updated: "2026-11-20"
 
 Relaticle tiene una API REST para empresas, personas, oportunidades, tareas, notas y atributos personalizados. Úsela para sincronizar registros con otro sistema o para crear su propia integración. La [referencia de la API](/developers/api) enumera cada endpoint, parámetro y respuesta, y la especificación OpenAPI está en [/openapi.json](/openapi.json).
 
-## Fusionar dos registros
-
-`POST /v1/people/merge` y `POST /v1/companies/merge` fusionan dos registros del mismo tipo en un registro nuevo. Envíe los ID de ambos:
-
-```json
-{
-  "primary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3a",
-  "secondary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3b"
-}
-```
-
-El registro principal gana en cada conflicto, y el secundario rellena los valores que el principal deja vacíos. Los vínculos, las notas, las tareas, los correos y el historial pasan al registro nuevo. La respuesta es el registro nuevo con `200`. Después, los dos ID antiguos responden `404`, así que guarde el ID nuevo.
-
-Una fusión devuelve `422` cuando falta un ID, no es un ID válido, repite el otro ID o nombra un registro que no existe, está eliminado, ya se fusionó o pertenece a otro espacio de trabajo. El error se asocia al campo que contiene el ID incorrecto. También devuelve `422` en `records` cuando un campo de varios valores pasaría de 20 valores tras la fusión. Un campo con un límite menor sube su límite para alojar los valores fusionados. Una fusión necesita los permisos `create`, `update` y `delete`.
-
 ## URL base
 
 Relaticle Cloud sirve la API en:
@@ -143,6 +128,21 @@ Un teléfono necesita un código de país. Un teléfono sin él devuelve `422`.
 ```
 
 El valor coincide sin distinguir mayúsculas de minúsculas, también dentro de campos de varios valores. Un dominio coincide con o sin esquema o `www.`. La API devuelve `201` cuando crea un registro y `200` cuando lo actualiza. Cuando más de un registro tiene el valor, no escribe nada y devuelve `409` con los ID coincidentes. Un upsert necesita los permisos `create` y `update`.
+
+## Fusionar dos registros
+
+`POST /v1/people/merge` y `POST /v1/companies/merge` fusionan dos registros del mismo tipo en un registro nuevo. Envíe los ID de ambos:
+
+```json
+{
+  "primary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3a",
+  "secondary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3b"
+}
+```
+
+El registro principal gana en cada conflicto, y el secundario rellena los valores que el principal deja vacíos. Los vínculos, las notas, las tareas, los correos y el historial pasan al registro nuevo. La respuesta es el registro nuevo con `200`. Después, los dos ID antiguos responden `404`, así que guarde el ID nuevo.
+
+Una fusión devuelve `422` cuando falta un ID, no es un ID válido, repite el otro ID o nombra un registro que no existe, está eliminado, ya se fusionó o pertenece a otro espacio de trabajo. El error se asocia al campo que contiene el ID incorrecto. También devuelve `422` en `records` cuando un campo de varios valores pasaría de 20 valores tras la fusión. Un campo con un límite menor sube su límite para alojar los valores fusionados. Una fusión necesita los permisos `create`, `update` y `delete`.
 
 ## Límites de uso de la API
 

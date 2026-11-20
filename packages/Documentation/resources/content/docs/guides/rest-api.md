@@ -7,21 +7,6 @@ updated: "2026-11-20"
 
 Relaticle has a REST API for companies, people, opportunities, tasks, notes and custom attributes. Use it to sync records with another system or to build your own integration. The [API reference](/developers/api) lists every endpoint, parameter and response, and the OpenAPI spec is at [/openapi.json](/openapi.json).
 
-## Merge two records
-
-`POST /v1/people/merge` and `POST /v1/companies/merge` merge two records of the same kind into one new record. Send the IDs of both:
-
-```json
-{
-  "primary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3a",
-  "secondary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3b"
-}
-```
-
-The primary record wins every conflict, and the secondary record fills the values the primary leaves empty. Links, notes, tasks, emails and history move to the new record. The response is the new record with `200`. Both old IDs answer `404` afterwards, so store the new ID.
-
-A merge returns `422` when an ID is missing, is not a valid ID, repeats the other ID, or names a record that does not exist, is deleted, was already merged, or belongs to another workspace. The error is keyed by the field that holds the bad ID. It also returns `422` on `records` when a merged multi-value field would hold more than 20 values. A multi-value field with a lower limit has its limit raised to fit the merged values. A merge needs the `create`, `update` and `delete` permissions.
-
 ## Base URL
 
 Relaticle Cloud serves the API at:
@@ -143,6 +128,21 @@ A phone needs a country code. A phone without one returns `422`.
 ```
 
 The value matches case-insensitively, including inside multi-value fields. A domain matches with or without a scheme or `www.`. The API returns `201` when it creates a record and `200` when it updates one. When more than one record holds the value, it writes nothing and returns `409` with the matching IDs. An upsert needs both the `create` and `update` permissions.
+
+## Merge two records
+
+`POST /v1/people/merge` and `POST /v1/companies/merge` merge two records of the same kind into one new record. Send the IDs of both:
+
+```json
+{
+  "primary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3a",
+  "secondary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3b"
+}
+```
+
+The primary record wins every conflict, and the secondary record fills the values the primary leaves empty. Links, notes, tasks, emails and history move to the new record. The response is the new record with `200`. Both old IDs answer `404` afterwards, so store the new ID.
+
+A merge returns `422` when an ID is missing, is not a valid ID, repeats the other ID, or names a record that does not exist, is deleted, was already merged, or belongs to another workspace. The error is keyed by the field that holds the bad ID. It also returns `422` on `records` when a merged multi-value field would hold more than 20 values. A multi-value field with a lower limit has its limit raised to fit the merged values. A merge needs the `create`, `update` and `delete` permissions.
 
 ## API rate limits
 

@@ -142,7 +142,7 @@ Der Wert wird ohne Beachtung der Groß- und Kleinschreibung abgeglichen, auch in
 
 Der primäre Eintrag gewinnt bei jedem Konflikt, und der sekundäre Eintrag füllt die Werte, die der primäre leer lässt. Verknüpfungen, Notizen, Aufgaben, E-Mails und der Verlauf wandern zum neuen Eintrag. Die Antwort ist der neue Eintrag mit `200`. Beide alten IDs antworten danach mit `404`. Speichern Sie also die neue ID.
 
-Eine Zusammenführung liefert `422`, wenn eine ID fehlt, keine gültige ID ist, die andere ID wiederholt oder einen Eintrag benennt, der nicht existiert, gelöscht ist, bereits zusammengeführt wurde oder zu einem anderen Workspace gehört. Der Fehler trägt den Namen des Feldes mit der fehlerhaften ID. Außerdem liefert sie `422` auf `records`, wenn ein Feld mit mehreren Werten nach der Zusammenführung mehr als 20 Werte enthielte. Hat ein solches Feld ein niedrigeres Limit, wird es auf die zusammengeführten Werte angehoben. Eine Zusammenführung braucht die Berechtigungen `create`, `update` und `delete`.
+Eine Zusammenführung liefert `422`, wenn eine ID fehlt, keine gültige ID ist, die andere ID wiederholt oder einen Eintrag benennt, der nicht existiert, gelöscht ist, bereits zusammengeführt wurde oder zu einem anderen Arbeitsbereich gehört. Der Fehler trägt den Namen des Feldes mit der fehlerhaften ID. Außerdem liefert sie `422` auf `records`, wenn ein Feld mit mehreren Werten nach der Zusammenführung mehr als 20 Werte enthielte. Hat ein solches Feld ein niedrigeres Limit, wird es auf die zusammengeführten Werte angehoben. Eine Zusammenführung braucht die Berechtigungen `create`, `update` und `delete`.
 
 ## Ratenlimits der API
 
