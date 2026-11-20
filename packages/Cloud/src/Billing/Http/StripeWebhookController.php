@@ -16,6 +16,7 @@ use Relaticle\Cloud\Billing\Actions\ActivateManagedPlan;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
 use Relaticle\Cloud\Billing\Actions\RestoreWorkspaceTrial;
+use Relaticle\Cloud\Billing\Actions\RevokeRefundedPackCredits;
 use Relaticle\Cloud\Billing\Actions\VoidOpenInvoices;
 use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
@@ -41,6 +42,7 @@ final class StripeWebhookController extends CashierWebhookController
         private readonly NotifyWorkspaceOfPaymentFailure $notifyPaymentFailure,
         private readonly ActivateManagedPlan $activateManagedPlan,
         private readonly VoidOpenInvoices $voidOpenInvoices,
+        private readonly RevokeRefundedPackCredits $revokePackCredits,
     ) {
         parent::__construct();
     }
@@ -355,8 +357,54 @@ final class StripeWebhookController extends CashierWebhookController
             return $this->successMethod();
         }
 
-        $this->grantCredits->execute($workspace, $priceId, $sessionId);
+        $paymentIntent = $session['payment_intent'] ?? null;
+
+        $this->grantCredits->execute($workspace, $priceId, $sessionId, is_string($paymentIntent) ? $paymentIntent : null);
 
         return $this->successMethod();
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    protected function handleChargeRefunded(array $payload): Response
+    {
+        /** @var array<string, mixed> $charge */
+        $charge = $payload['data']['object'] ?? [];
+
+        $this->revokePackCreditsFor($charge, (int) ($charge['amount_refunded'] ?? 0));
+
+        return $this->successMethod();
+    }
+
+    /** @param  array<string, mixed>  $payload */
+    protected function handleChargeDisputeClosed(array $payload): Response
+    {
+        /** @var array<string, mixed> $dispute */
+        $dispute = $payload['data']['object'] ?? [];
+        $chargeId = $dispute['charge'] ?? null;
+
+        if (($dispute['status'] ?? null) !== 'lost' || ! is_string($chargeId)) {
+            return $this->successMethod();
+        }
+
+        /** @var array<string, mixed> $charge */
+        $charge = Cashier::stripe()->charges->retrieve($chargeId)->toArray();
+
+        $this->revokePackCreditsFor($charge, (int) ($charge['amount_refunded'] ?? 0) + (int) ($dispute['amount'] ?? 0));
+
+        return $this->successMethod();
+    }
+
+    /** @param  array<string, mixed>  $charge */
+    private function revokePackCreditsFor(array $charge, int $returned): void
+    {
+        $chargeId = $charge['id'] ?? null;
+        $paymentIntent = $charge['payment_intent'] ?? null;
+        $customer = $charge['customer'] ?? null;
+
+        if (! is_string($chargeId) || ! is_string($paymentIntent)) {
+            return;
+        }
+
+        $this->revokePackCredits->execute($chargeId, $paymentIntent, is_string($customer) ? $customer : null, (int) ($charge['amount'] ?? 0), $returned);
     }
 }

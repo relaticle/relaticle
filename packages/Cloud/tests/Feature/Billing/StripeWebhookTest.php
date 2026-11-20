@@ -35,6 +35,7 @@ use Relaticle\Cloud\Billing\Actions\CancelWithUnusedTimeRefund;
 use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
 use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\NotifyWorkspaceOfPaymentFailure;
+use Relaticle\Cloud\Billing\Actions\RevokeRefundedPackCredits;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\Actions\SyncWorkspacePlanFromSubscription;
 use Relaticle\Cloud\Billing\Filament\Billing;
@@ -58,6 +59,7 @@ mutates(RefreshManagedRenewal::class);
 mutates(PaymentFailedNotification::class);
 mutates(ManagedInvoiceOverdueNotification::class);
 mutates(StripeWebhookController::class);
+mutates(RevokeRefundedPackCredits::class);
 mutates(RecordSubscriptionOutcome::class);
 mutates(CaptureSubscriptionOutcome::class);
 
@@ -2330,4 +2332,146 @@ it('notifies an acquired workspace of failed payment without waiting for analyti
 
     expect($workspace->owner->notifications()->sole()->type)->toBe(PaymentFailedNotification::class);
     Queue::assertPushed(CallQueuedListener::class);
+});
+
+function grantRefundablePack(?string $paymentIntent = 'pi_pack_1'): Workspace
+{
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_credits_1k_test', 'credits' => 1000]);
+
+    $workspace = stripeBillingWorkspace();
+    sendStripeWebhook(checkoutSessionCompletedEvent($workspace, ['payment_intent' => $paymentIntent]))->assertOk();
+
+    return $workspace;
+}
+
+/** @return array<string, mixed> */
+function packChargeRefundedEvent(Workspace $workspace, int $amountRefunded, array $overrides = []): array
+{
+    return [
+        'id' => 'evt_'.Str::ulid(),
+        'type' => 'charge.refunded',
+        'data' => ['object' => array_merge([
+            'id' => 'ch_pack_1',
+            'object' => 'charge',
+            'amount' => 1000,
+            'amount_refunded' => $amountRefunded,
+            'customer' => $workspace->stripe_id,
+            'payment_intent' => 'pi_pack_1',
+        ], $overrides)],
+    ];
+}
+
+/** @return array<string, mixed> */
+function packDisputeClosedEvent(string $status, int $amount = 1000): array
+{
+    return [
+        'id' => 'evt_'.Str::ulid(),
+        'type' => 'charge.dispute.closed',
+        'data' => ['object' => [
+            'id' => 'dp_pack_1',
+            'object' => 'dispute',
+            'amount' => $amount,
+            'charge' => 'ch_pack_1',
+            'status' => $status,
+        ]],
+    ];
+}
+
+/** @return array{remaining: int, purchased: int} */
+function packBalance(Workspace $workspace): array
+{
+    $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->sole();
+
+    return ['remaining' => $balance->credits_remaining, 'purchased' => $balance->purchased_credits];
+}
+
+it('takes back a refunded credit pack', function (): void {
+    $workspace = grantRefundablePack();
+    $before = packBalance($workspace);
+
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 1000))->assertOk();
+
+    expect(packBalance($workspace))->toBe(['remaining' => $before['remaining'] - 1000, 'purchased' => 0]);
+});
+
+it('takes back a partly refunded pack in proportion and only once per refund', function (): void {
+    $workspace = grantRefundablePack();
+    $before = packBalance($workspace);
+
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 250))->assertOk();
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 250))->assertOk();
+
+    expect(packBalance($workspace))->toBe(['remaining' => $before['remaining'] - 250, 'purchased' => 750]);
+
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 1000))->assertOk();
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 250))->assertOk();
+
+    expect(packBalance($workspace))->toBe(['remaining' => $before['remaining'] - 1000, 'purchased' => 0]);
+});
+
+it('writes off the credits a refunded pack already spent instead of going below zero', function (): void {
+    $workspace = grantRefundablePack();
+    AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->update(['credits_remaining' => 300, 'purchased_credits' => 300]);
+
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 1000))->assertOk();
+
+    $revocation = AiCreditTransaction::query()->where('workspace_id', $workspace->getKey())->where('metadata->charge_id', 'ch_pack_1')->sole();
+
+    expect(packBalance($workspace))->toBe(['remaining' => 0, 'purchased' => 0])
+        ->and($revocation->credits_charged)->toBe(300)
+        ->and($revocation->metadata['owed'])->toBe(1000);
+});
+
+it('takes back a pack bought before grants recorded their payment', function (): void {
+    $workspace = grantRefundablePack(paymentIntent: null);
+    $before = packBalance($workspace);
+
+    StripeRecorder::install()->respondTo('GET /v1/checkout/sessions', ['object' => 'list', 'has_more' => false, 'data' => [['id' => 'cs_test_pack_1', 'object' => 'checkout.session']]]);
+
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 1000))->assertOk();
+
+    expect(packBalance($workspace))->toBe(['remaining' => $before['remaining'] - 1000, 'purchased' => 0]);
+});
+
+it('leaves credits alone when the refunded charge paid for no pack', function (): void {
+    $workspace = grantRefundablePack();
+    $before = packBalance($workspace);
+
+    StripeRecorder::install()->respondTo('GET /v1/checkout/sessions', ['object' => 'list', 'has_more' => false, 'data' => []]);
+
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 1000, ['id' => 'ch_subscription', 'payment_intent' => 'pi_subscription']))->assertOk();
+
+    expect(packBalance($workspace))->toBe($before);
+});
+
+it('leaves credits alone when the refunded charge belongs to another customer', function (): void {
+    $workspace = grantRefundablePack();
+    $before = packBalance($workspace);
+
+    sendStripeWebhook(packChargeRefundedEvent($workspace, 1000, ['customer' => 'cus_someone_else']))->assertOk();
+
+    expect(packBalance($workspace))->toBe($before);
+});
+
+it('takes back a pack whose dispute was lost', function (): void {
+    $workspace = grantRefundablePack();
+    $before = packBalance($workspace);
+
+    StripeRecorder::install()->respondTo('GET /v1/charges/ch_pack_1', packChargeRefundedEvent($workspace, 0)['data']['object']);
+
+    sendStripeWebhook(packDisputeClosedEvent('lost'))->assertOk();
+
+    expect(packBalance($workspace))->toBe(['remaining' => $before['remaining'] - 1000, 'purchased' => 0]);
+});
+
+it('keeps the credits of a pack whose dispute was won', function (): void {
+    $workspace = grantRefundablePack();
+    $before = packBalance($workspace);
+
+    $recorder = StripeRecorder::install();
+
+    sendStripeWebhook(packDisputeClosedEvent('won'))->assertOk();
+
+    expect(packBalance($workspace))->toBe($before)
+        ->and($recorder->countFor('/v1/charges'))->toBe(0);
 });

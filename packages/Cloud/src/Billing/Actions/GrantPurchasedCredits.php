@@ -19,7 +19,7 @@ final readonly class GrantPurchasedCredits
      * Fulfill a completed credit-pack checkout. Idempotent on the Stripe
      * checkout session id; unknown prices grant nothing and log.
      */
-    public function execute(Workspace $workspace, string $priceId, string $sessionId): bool
+    public function execute(Workspace $workspace, string $priceId, string $sessionId, ?string $paymentIntent = null): bool
     {
         $credits = $this->catalog->creditsForPrice($priceId);
 
@@ -36,6 +36,7 @@ final readonly class GrantPurchasedCredits
         return $this->credits->addPurchasedCredits($workspace, $credits, self::IDEMPOTENCY_PREFIX.$sessionId, [
             'price_id' => $priceId,
             'session_id' => $sessionId,
+            'payment_intent' => $paymentIntent,
         ]);
     }
 }
