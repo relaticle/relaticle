@@ -1954,6 +1954,15 @@ it('stops an assistant from holding more than ten emails at once', function (): 
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(10);
 });
 
+it('names the present moment when the ten held emails are already overdue', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    agentEmailsDueAt($this, now()->subMinutes(10));
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailTool::class, sendArguments($this->viewerAccount))
+        ->assertHasErrors([agentLimitMessage(now())]);
+});
+
 it('lets an assistant send while its earlier emails are due more than a day out', function (): void {
     agentEmailsDueAt($this, now()->addDays(5));
 
