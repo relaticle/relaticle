@@ -21559,12 +21559,12 @@
             "source": {
                 "type": "git",
                 "url": "https://github.com/ManukMinasyan/pest.git",
-                "reference": "2ba8757292d0059ff1f1746bfe2dced6849a68c3"
+                "reference": "dbe6c177684502ee2f88bc278ca522778be37a6f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/ManukMinasyan/pest/zipball/2ba8757292d0059ff1f1746bfe2dced6849a68c3",
-                "reference": "2ba8757292d0059ff1f1746bfe2dced6849a68c3",
+                "url": "https://api.github.com/repos/ManukMinasyan/pest/zipball/dbe6c177684502ee2f88bc278ca522778be37a6f",
+                "reference": "dbe6c177684502ee2f88bc278ca522778be37a6f",
                 "shasum": ""
             },
             "require": {
@@ -21730,7 +21730,7 @@
                     "url": "https://www.paypal.com/paypalme/enunomaduro"
                 }
             ],
-            "time": "2026-11-21T01:31:11+00:00"
+            "time": "2026-11-21T03:29:17+00:00"
         },
         {
             "name": "pestphp/pest-plugin",
