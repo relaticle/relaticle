@@ -5,16 +5,22 @@ declare(strict_types=1);
 use App\Features\Blog;
 use App\Features\EmailIntegration;
 use GuzzleHttp\HandlerStack;
+use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
+use Relaticle\Cloud\Marketing\Support\IndexNow;
 use Relaticle\Ink\Models\Post;
 use Spatie\Crawler\Faking\FakeHandler;
 
-mutates(GenerateSitemapCommand::class);
+mutates(GenerateSitemapCommand::class, IndexNow::class);
 
 /**
  * spatie/crawler drives its own Guzzle client, so Illuminate's Http::fake()
@@ -323,4 +329,91 @@ it('lists a translated post with its alternates and leaves out a language with n
         ->and($xml)->toContain('hreflang="en" href="'.route('blog.show', $english->slug).'"')
         ->and($xml)->toContain('<loc>'.route('blog.de.index').'</loc>')
         ->and($xml)->not->toContain('/es/blog');
+});
+
+it('submits nothing to IndexNow from a host other than relaticle.com', function (): void {
+    Http::fake();
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+    Post::factory()->published()->create();
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    Http::assertNothingSent();
+});
+
+it('serves the configured IndexNow key as plain text at the site root', function (): void {
+    config(['services.indexnow.key' => 'a1b2c3d4e5f6a7b8']);
+
+    $this->get('/a1b2c3d4e5f6a7b8.txt')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/plain; charset=UTF-8')
+        ->assertContent('a1b2c3d4e5f6a7b8');
+});
+
+it('answers not found for any other key, and for every key when none is configured', function (?string $configured): void {
+    config(['services.indexnow.key' => $configured]);
+
+    $this->get('/0f0f0f0f0f0f0f0f.txt')->assertNotFound();
+})->with(['another key' => 'a1b2c3d4e5f6a7b8', 'no key' => null]);
+
+describe('IndexNow on relaticle.com', function (): void {
+    beforeEach(function (): void {
+        config([
+            'app.url' => 'https://relaticle.com',
+            'documentation.public_url' => 'https://relaticle.com',
+            'services.indexnow.key' => 'a1b2c3d4e5f6a7b8',
+        ]);
+        URL::forceRootUrl('https://relaticle.com');
+        fakeSitemapCrawl(['https://relaticle.com' => '<html><body></body></html>']);
+    });
+
+    it('stays quiet on the first build, with no earlier sitemap to compare', function (): void {
+        Http::fake();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Http::assertNothingSent();
+    });
+
+    it('submits the urls added and removed since the last build', function (): void {
+        Http::fake(['api.indexnow.org/*' => Http::response(status: 200)]);
+        $removed = Post::factory()->published()->create();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        $removed->delete();
+        $added = Post::factory()->published()->create();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request['host'] === IndexNow::HOST
+            && $request['key'] === 'a1b2c3d4e5f6a7b8'
+            && $request['keyLocation'] === 'https://relaticle.com/a1b2c3d4e5f6a7b8.txt'
+            && in_array(route('blog.show', $added->slug), $request['urlList'], true)
+            && in_array(route('blog.show', $removed->slug), $request['urlList'], true)
+            && ! in_array(route('pricing'), $request['urlList'], true));
+    });
+
+    it('submits nothing while no key is configured', function (): void {
+        config(['services.indexnow.key' => null]);
+        Http::fake();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+        Post::factory()->published()->create();
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Http::assertNothingSent();
+    });
+
+    it('keeps the build green and reports it when IndexNow refuses the request', function (): void {
+        Exceptions::fake();
+        Http::fake(['api.indexnow.org/*' => Http::response(status: 429)]);
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+        Post::factory()->published()->create();
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Exceptions::assertReported(RequestException::class);
+    });
 });
