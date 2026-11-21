@@ -1945,16 +1945,7 @@ it('leaves no email behind when the notice cannot be stored', function (): void 
 it('stops an assistant from holding more than ten emails at once', function (): void {
     $this->travelTo(now()->startOfSecond());
 
-    foreach (range(1, 10) as $number) {
-        Email::factory()->outbound()->create([
-            'workspace_id' => $this->workspace->id,
-            'user_id' => $this->viewer->id,
-            'connected_account_id' => $this->viewerAccount->getKey(),
-            'status' => EmailStatus::QUEUED,
-            'creation_source' => EmailCreationSource::MCP,
-            'scheduled_for' => now()->addMinutes(5),
-        ]);
-    }
+    agentEmailsDueAt($this, now()->addMinutes(5));
 
     RelaticleServer::actingAs($this->viewer)
         ->tool(SendEmailTool::class, sendArguments($this->viewerAccount))
@@ -2303,16 +2294,7 @@ it('refuses to rewrite a mass send draft, which goes to each person separately',
 it('does not let a retry hold more than ten assistant emails at once', function (): void {
     $this->travelTo(now()->startOfSecond());
 
-    foreach (range(1, 10) as $number) {
-        Email::factory()->outbound()->create([
-            'workspace_id' => $this->workspace->id,
-            'user_id' => $this->viewer->id,
-            'connected_account_id' => $this->viewerAccount->getKey(),
-            'status' => EmailStatus::QUEUED,
-            'creation_source' => EmailCreationSource::MCP,
-            'scheduled_for' => now()->addMinutes(5),
-        ]);
-    }
+    agentEmailsDueAt($this, now()->addMinutes(5));
 
     $failed = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::FAILED, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'creation_source' => EmailCreationSource::MCP]);
 

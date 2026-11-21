@@ -15,7 +15,7 @@ use Relaticle\EmailIntegration\Models\Email;
 
 final readonly class ReserveAgentHold
 {
-    public const int WINDOW_HOURS = 24;
+    private const int WINDOW_HOURS = 24;
 
     public function execute(User $user, CarbonImmutable $sendsAt, ?Email $moving = null): void
     {
@@ -44,8 +44,6 @@ final readonly class ReserveAgentHold
         $earliest = $due->min('scheduled_for');
         $nextSendsAt = $earliest === null ? now() : Date::parse($earliest)->max(now());
 
-        throw $moving instanceof Email
-            ? AgentOutboxFull::forMove($limit, $nextSendsAt, $moving->scheduled_for)
-            : AgentOutboxFull::atLimit($limit, $nextSendsAt);
+        throw AgentOutboxFull::atLimit($limit, self::WINDOW_HOURS, $nextSendsAt, $moving?->scheduled_for);
     }
 }
