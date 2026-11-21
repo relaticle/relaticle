@@ -8,6 +8,7 @@ use App\Models\User;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Date;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Exceptions\AgentOutboxFull;
 use Relaticle\EmailIntegration\Models\Email;
@@ -40,8 +41,11 @@ final readonly class ReserveAgentHold
             return;
         }
 
-        $nextSendsAt = $due->min('scheduled_for');
+        $earliest = $due->min('scheduled_for');
+        $nextSendsAt = $earliest === null ? now() : Date::parse($earliest)->max(now());
 
-        throw AgentOutboxFull::atLimit($limit, $nextSendsAt === null ? now() : CarbonImmutable::parse($nextSendsAt));
+        throw $moving instanceof Email
+            ? AgentOutboxFull::forMove($limit, $nextSendsAt, $moving->scheduled_for)
+            : AgentOutboxFull::atLimit($limit, $nextSendsAt);
     }
 }

@@ -1149,9 +1149,9 @@ function agentEmailsDueAt(object $test, CarbonImmutable $sendsAt): void
     }
 }
 
-function agentLimitMessage(CarbonImmutable $nextSendsAt): string
+function agentLimitMessage(CarbonImmutable $nextSendsAt, string $opener = 'Not sent.'): string
 {
-    return "Not sent. This user already has 10 assistant emails due to go out in the next 24 hours, which is the most allowed at once. The next one leaves at {$nextSendsAt->utc()->format('H:i')} UTC ({$nextSendsAt->utc()->toIso8601ZuluString()}), and a slot opens then. Try again after that time, or ask the user to cancel a waiting email in Relaticle.";
+    return "{$opener} This user already has 10 assistant emails due to go out in the next 24 hours, which is the most allowed at once. The next one leaves at {$nextSendsAt->utc()->format('H:i')} UTC ({$nextSendsAt->utc()->toIso8601ZuluString()}), and a slot opens then. Try again after that time, or ask the user to cancel a waiting email in Relaticle.";
 }
 
 function sendArguments(ConnectedAccount $account, array $overrides = []): array
@@ -1987,9 +1987,28 @@ it('refuses to move an assistant email into a day that already holds ten', funct
 
     RelaticleServer::actingAs($this->viewer)
         ->tool(RescheduleEmailTool::class, ['id' => $later->id, 'scheduled_for' => now()->addHour()->toIso8601String()])
-        ->assertHasErrors([agentLimitMessage(now()->addMinutes(5))]);
+        ->assertHasErrors([agentLimitMessage(now()->addMinutes(5), "Not moved. It still leaves at {$later->scheduled_for->utc()->format('H:i')} UTC ({$later->scheduled_for->utc()->toIso8601ZuluString()}).")]);
 
     expect($later->fresh()->scheduled_for->equalTo(now()->addDays(3)))->toBeTrue();
+});
+
+it('lets an assistant move one of the ten emails already due within the day', function (): void {
+    agentEmailsDueAt($this, now()->addMinutes(5));
+    $due = Email::query()->where('status', EmailStatus::QUEUED)->firstOrFail();
+
+    $data = emailToolData($this->viewer, RescheduleEmailTool::class, ['id' => $due->id, 'scheduled_for' => now()->addHour()->toIso8601String()]);
+
+    expect($data['status'])->toBe('queued')
+        ->and($due->fresh()->scheduled_for->isAfter(now()->addMinutes(30)))->toBeTrue();
+});
+
+it('still caps how many assistant emails a user can queue for later', function (): void {
+    config(['email-integration.outbox.max_queued_per_user' => 10]);
+    agentEmailsDueAt($this, now()->addDays(5));
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(SendEmailTool::class, sendArguments($this->viewerAccount, ['scheduled_for' => now()->addDays(5)->toIso8601String()]))
+        ->assertHasErrors(['You have 10 emails queued. Clear the outbox before queuing more.']);
 });
 
 it('does not count the user own queued mail toward the assistant cap', function (): void {
