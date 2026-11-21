@@ -386,6 +386,14 @@ jobs:
           key: pest-timings-${{ github.run_id }}
           restore-keys: pest-timings-
 
+      - name: Probe board header drag
+        if: matrix.shard == 1
+        run: |
+          for run in $(seq 15); do
+            vendor/bin/pest tests/Browser/CRM --configuration phpunit.ci.xml --parallel --processes=3 --filter='(BoardHeaderDragTest|BoardHeaderDragProbeTest)::' > probe.txt 2>&1 || { echo "=== run $run failed"; sed -n '/FAILED/,/at tests/p' probe.txt | head -80; }
+          done
+          echo "probe loop finished"
+
       - name: Browser Tests
         run: vendor/bin/pest tests/Browser/ --configuration phpunit.ci.xml ${{ matrix.browser == 'webkit' && '--group=webkit --browser safari' || format('--shard={0}/8 --parallel --processes=3', matrix.shard) }} --log-junit junit.xml
 
