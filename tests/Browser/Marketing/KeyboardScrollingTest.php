@@ -16,18 +16,14 @@ it('lets a keyboard reader scroll the conversation and its table during the home
         ->and($page->script("document.querySelector('[data-hero-demo]').dataset.demoState"))->toBe('done');
 
     $page->page()->locator($conversation)->press('ArrowDown', ['delay' => 120]);
-    $page->wait(0.3);
-
-    expect($page->script("document.querySelector('{$conversation}').scrollTop"))->toBeGreaterThan(0);
+    $page->assertScript("document.querySelector('{$conversation}').scrollTop > 0", true);
 
     $page->keys($conversation, 'Tab');
 
     expect($page->script("document.activeElement.matches('{$table}')"))->toBeTrue();
 
     $page->page()->locator($table)->press('ArrowRight', ['delay' => 120]);
-    $page->wait(0.3);
-
-    expect($page->script("document.querySelector('{$table}').scrollLeft"))->toBeGreaterThan(0);
+    $page->assertScript("document.querySelector('{$table}').scrollLeft > 0", true);
 
     $page->keys($table, 'Tab');
 
