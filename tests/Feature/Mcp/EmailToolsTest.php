@@ -23,6 +23,7 @@ use App\Models\Notification;
 use App\Models\People;
 use App\Models\User;
 use App\Models\Workspace;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
@@ -44,6 +45,8 @@ use Relaticle\EmailIntegration\Actions\PrepareAgentDraftSend;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmail;
 use Relaticle\EmailIntegration\Actions\PrepareAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\QueueAgentEmailAction;
+use Relaticle\EmailIntegration\Actions\RescheduleAgentEmail;
+use Relaticle\EmailIntegration\Actions\ReserveAgentHold;
 use Relaticle\EmailIntegration\Actions\SaveAgentEmailDraft;
 use Relaticle\EmailIntegration\Actions\SaveMailboxSharingTier;
 use Relaticle\EmailIntegration\Actions\SendAgentEmailDraft;
@@ -77,7 +80,7 @@ use Relaticle\EmailIntegration\Support\EmailForAgent;
 use Relaticle\EmailIntegration\Support\QueuedSendNotifier;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
-mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, SendAgentEmailDraft::class, PrepareAgentDraftSend::class, HoldAgentEmail::class, PickAgentSendTime::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
+mutates(ListEmailsTool::class, GetEmailTool::class, ListEmailAccountsTool::class, CreateEmailDraftTool::class, UpdateEmailDraftTool::class, DeleteEmailDraftTool::class, SendEmailTool::class, SendEmailDraftTool::class, CancelEmailTool::class, RescheduleEmailTool::class, RetryEmailTool::class, SendAgentEmailDraft::class, PrepareAgentDraftSend::class, HoldAgentEmail::class, ReserveAgentHold::class, RescheduleAgentEmail::class, PickAgentSendTime::class, QueueAgentEmailAction::class, PrepareAgentEmail::class, PrepareAgentEmailDraft::class, SaveAgentEmailDraft::class, QueuedSendNotifier::class, EmailSendHeldNotification::class, AgentEmailBody::class, SignatureBlock::class, VisibleEmailsQuery::class, EmailForAgent::class, EmailPolicy::class);
 
 beforeEach(function (): void {
     $this->viewer = User::factory()->withWorkspace()->create();
@@ -1132,6 +1135,25 @@ it('separates table cells and line breaks in derived text', function (): void {
     expect(fetchedEmail($this->viewer, $email->id)['body_text'])->toBe("Name Amount\nAcme $40\nFirst\nSecond line");
 });
 
+function agentEmailsDueAt(object $test, CarbonImmutable $sendsAt): void
+{
+    foreach (range(1, 10) as $number) {
+        Email::factory()->outbound()->create([
+            'workspace_id' => $test->workspace->id,
+            'user_id' => $test->viewer->id,
+            'connected_account_id' => $test->viewerAccount->getKey(),
+            'status' => EmailStatus::QUEUED,
+            'creation_source' => EmailCreationSource::MCP,
+            'scheduled_for' => $sendsAt,
+        ]);
+    }
+}
+
+function agentLimitMessage(CarbonImmutable $nextSendsAt): string
+{
+    return "Not sent. This user already has 10 assistant emails due to go out in the next 24 hours, which is the most allowed at once. The next one leaves at {$nextSendsAt->utc()->format('H:i')} UTC ({$nextSendsAt->utc()->toIso8601ZuluString()}), and a slot opens then. Try again after that time, or ask the user to cancel a waiting email in Relaticle.";
+}
+
 function sendArguments(ConnectedAccount $account, array $overrides = []): array
 {
     return [
@@ -1921,6 +1943,8 @@ it('leaves no email behind when the notice cannot be stored', function (): void 
 });
 
 it('stops an assistant from holding more than ten emails at once', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
     foreach (range(1, 10) as $number) {
         Email::factory()->outbound()->create([
             'workspace_id' => $this->workspace->id,
@@ -1934,9 +1958,38 @@ it('stops an assistant from holding more than ten emails at once', function (): 
 
     RelaticleServer::actingAs($this->viewer)
         ->tool(SendEmailTool::class, sendArguments($this->viewerAccount))
-        ->assertHasErrors(['The user already has 10 assistant emails waiting to send. Wait until they send or the user cancels them.']);
+        ->assertHasErrors([agentLimitMessage(now()->addMinutes(5))]);
 
     expect(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(10);
+});
+
+it('lets an assistant send while its earlier emails are due more than a day out', function (): void {
+    agentEmailsDueAt($this, now()->addDays(5));
+
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount));
+
+    expect($data['status'])->toBe('queued')
+        ->and(Email::query()->where('status', EmailStatus::QUEUED)->count())->toBe(11);
+});
+
+it('accepts a send scheduled past the next day while ten are due within it', function (): void {
+    agentEmailsDueAt($this, now()->addMinutes(5));
+
+    $data = emailToolData($this->viewer, SendEmailTool::class, sendArguments($this->viewerAccount, ['scheduled_for' => now()->addDays(2)->toIso8601String()]));
+
+    expect($data['status'])->toBe('queued');
+});
+
+it('refuses to move an assistant email into a day that already holds ten', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    agentEmailsDueAt($this, now()->addMinutes(5));
+    $later = ($this->emailFrom)($this->viewer, ['status' => EmailStatus::QUEUED, 'direction' => EmailDirection::OUTBOUND, 'sent_at' => null, 'creation_source' => EmailCreationSource::MCP, 'scheduled_for' => now()->addDays(3)]);
+
+    RelaticleServer::actingAs($this->viewer)
+        ->tool(RescheduleEmailTool::class, ['id' => $later->id, 'scheduled_for' => now()->addHour()->toIso8601String()])
+        ->assertHasErrors([agentLimitMessage(now()->addMinutes(5))]);
+
+    expect($later->fresh()->scheduled_for->equalTo(now()->addDays(3)))->toBeTrue();
 });
 
 it('does not count the user own queued mail toward the assistant cap', function (): void {
@@ -2229,6 +2282,8 @@ it('refuses to rewrite a mass send draft, which goes to each person separately',
 });
 
 it('does not let a retry hold more than ten assistant emails at once', function (): void {
+    $this->travelTo(now()->startOfSecond());
+
     foreach (range(1, 10) as $number) {
         Email::factory()->outbound()->create([
             'workspace_id' => $this->workspace->id,
@@ -2244,7 +2299,7 @@ it('does not let a retry hold more than ten assistant emails at once', function 
 
     RelaticleServer::actingAs($this->viewer)
         ->tool(RetryEmailTool::class, ['id' => $failed->id])
-        ->assertHasErrors(['The user already has 10 assistant emails waiting to send. Wait until they send or the user cancels them.']);
+        ->assertHasErrors([agentLimitMessage(now()->addMinutes(5))]);
 
     expect($failed->fresh()->status)->toBe(EmailStatus::FAILED);
 });

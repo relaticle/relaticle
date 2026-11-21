@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace Relaticle\EmailIntegration\Actions;
 
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Config;
 use Relaticle\EmailIntegration\Enums\EmailStatus;
 use Relaticle\EmailIntegration\Exceptions\AgentOutboxFull;
@@ -12,19 +14,34 @@ use Relaticle\EmailIntegration\Models\Email;
 
 final readonly class ReserveAgentHold
 {
-    public function execute(User $user): void
+    public const int WINDOW_HOURS = 24;
+
+    public function execute(User $user, CarbonImmutable $sendsAt, ?Email $moving = null): void
     {
+        $windowEnds = now()->addHours(self::WINDOW_HOURS);
+
+        if ($sendsAt->isAfter($windowEnds)) {
+            return;
+        }
+
         // Callers queue inside the same transaction, so the lock holds until the email exists.
         User::query()->whereKey($user->getKey())->lockForUpdate()->first();
 
         $limit = Config::integer('email-integration.outbox.agent_max_held_per_user');
 
-        $held = Email::query()
+        $due = Email::query()
             ->where('user_id', $user->getKey())
             ->where('status', EmailStatus::QUEUED)
             ->createdOverMcp()
-            ->count();
+            ->where(fn (Builder $query): Builder => $query->whereNull('scheduled_for')->orWhere('scheduled_for', '<=', $windowEnds))
+            ->when($moving, fn (Builder $query, Email $email): Builder => $query->whereKeyNot($email->getKey()));
 
-        throw_if($held >= $limit, AgentOutboxFull::atLimit($limit));
+        if ($due->count() < $limit) {
+            return;
+        }
+
+        $nextSendsAt = $due->min('scheduled_for');
+
+        throw AgentOutboxFull::atLimit($limit, $nextSendsAt === null ? now() : CarbonImmutable::parse($nextSendsAt));
     }
 }

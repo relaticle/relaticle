@@ -29,7 +29,7 @@ final readonly class RequeueAgentEmail
             $isAgentEmail = $email->creation_source === EmailCreationSource::MCP;
 
             if ($isAgentEmail) {
-                $this->reserveHold->execute($user);
+                $this->reserveHold->execute($user, $scheduledFor);
             }
 
             $retried = $this->retry->execute($email);
