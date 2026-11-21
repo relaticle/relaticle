@@ -732,7 +732,7 @@ test directories; if one is ever needed, declare it in BOTH `phpunit.xml` and
   a test reads from disk, so `PestTiaRuntime::FILES_ARCH_TESTS_READ` maps those to
   `tests/Arch`. A new test that reads a file adds its path there.
 - `pestphp/pest` installs from the `ManukMinasyan/pest` fork, branch
-  `tia-warmup-worktrees-5x`: the fork's commits rebased onto upstream `5.x`. Stock Pest
+  `tia-warmup-worktrees-5x-2`: the fork's commits rebased onto upstream `5.x`. Stock Pest
   cannot fetch a baseline inside a git worktree (pestphp/pest#1914, still open) and has no
   `trustDefaultBranch()`. Return to `^5.0` when both ship.
 - A hand-picked run over more than one file goes parallel on four processes:

@@ -11,10 +11,12 @@ it('opens the visible selected result from the documentation search box', functi
     $trigger = 'button[aria-label="Search the docs"]';
     $input = '[role="combobox"]';
     $selected = '[role="option"][aria-selected="true"]';
+    $settled = '(() => { const nav = document.querySelector(\'nav[aria-label="Search the docs"]\'); return getComputedStyle(nav).opacity === "1" && nav.getAnimations({ subtree: true }).length === 0; })()';
 
     $page->click($trigger)
         ->fill($input, 'workspace')
         ->assertPresent($selected)
+        ->assertScript($settled, true)
         ->assertNoAccessibilityIssues()
         ->keys($input, 'ArrowUp');
 
