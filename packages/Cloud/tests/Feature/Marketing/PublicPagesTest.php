@@ -480,23 +480,30 @@ describe('Hero AI tab: entry phase', function () {
 });
 
 describe('Page metadata', function () {
-    it('keeps the title, description and heading of :path within search-result bounds', function (string $path, bool $expectsHeading) {
-        $html = $this->get($path)->assertOk()->getContent();
+    it('keeps the title, description and heading of :path within search-result bounds in each language', function (string $path, bool $expectsHeading, bool $translated = true) {
+        withHostedBilling();
+        config()->set('services.gmail.client_id', 'gmail-client');
+        config()->set('services.azure.client_id', 'azure-client');
 
-        preg_match('/<title>(.*?)<\/title>/s', $html, $title);
-        preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
+        foreach ($translated ? config('app.available_locales') : ['en'] as $locale) {
+            $url = rtrim(($locale === 'en' ? '' : '/'.$locale).$path, '/') ?: '/';
+            $html = $this->get($url)->assertOk()->getContent();
 
-        $titleText = html_entity_decode(trim($title[1] ?? ''));
-        $descriptionText = html_entity_decode($description[1] ?? '');
+            preg_match('/<title>(.*?)<\/title>/s', $html, $title);
+            preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
 
-        expect(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$path} title: {$titleText}")
-            ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(20, "{$path} title: {$titleText}")
-            ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$path} description: {$descriptionText}")
-            ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$path} description: {$descriptionText}")
-            ->and($titleText.$descriptionText)->not->toContain("\u{2014}");
+            $titleText = html_entity_decode(trim($title[1] ?? ''));
+            $descriptionText = html_entity_decode($description[1] ?? '');
 
-        if ($expectsHeading) {
-            expect(substr_count($html, '<h1'))->toBe(1, "{$path} must render exactly one h1");
+            expect(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$url} title: {$titleText}")
+                ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(20, "{$url} title: {$titleText}")
+                ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$url} description: {$descriptionText}")
+                ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$url} description: {$descriptionText}")
+                ->and($titleText.$descriptionText)->not->toContain("\u{2014}");
+
+            if ($expectsHeading) {
+                expect(substr_count($html, '<h1'))->toBe(1, "{$url} must render exactly one h1");
+            }
         }
     })->with([
         ['/', true],
@@ -509,7 +516,10 @@ describe('Page metadata', function () {
         ['/security', true],
         ['/press', true],
         ['/contact', true],
-        ['/developers/api', false],
+        ['/email-and-calendar', true],
+        ['/developers', false],
+        ['/help', true],
+        ['/developers/api', false, false],
         ['/blog', true],
         ['/compare/relaticle-vs-twenty', true],
         ['/compare/relaticle-vs-espocrm', true],
