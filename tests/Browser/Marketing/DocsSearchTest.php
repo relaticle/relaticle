@@ -15,6 +15,7 @@ it('opens the visible selected result from the documentation search box', functi
     $page->click($trigger)
         ->fill($input, 'workspace')
         ->assertPresent($selected)
+        ->assertScript('document.querySelector(\'nav[aria-label="Search the docs"]\').getAnimations({ subtree: true }).length', 0)
         ->assertNoAccessibilityIssues()
         ->keys($input, 'ArrowUp');
 
