@@ -39,8 +39,10 @@ it('probes the third header drag after a card was opened', function (): void {
     dragWithPointerEvents($page, boardHeaderTitle($ids[2]), boardHeaderTitle($ids[1]));
     waitForStoredStageOrder($page, $user, $entity, $second);
 
-    $page->click($card)->assertVisible('.fi-modal-window')->wait(0.5);
-    $page->script('document.querySelector(".fi-modal-window .fi-modal-close-btn")?.click()');
+    $page->click($card)
+        ->assertVisible('.fi-modal.fi-modal-open input.fi-input >> nth=0')
+        ->click('.fi-modal.fi-modal-open .fi-modal-close-btn')
+        ->assertScript('[...document.querySelectorAll(".fi-modal-window")].some((modal) => modal.checkVisibility())', false);
     $page->wait(1);
     $beforeThird = $page->script($state);
 
