@@ -625,7 +625,7 @@ it('shows the view switcher linking list and board views', function (): void {
 
 it('redirects the legacy board url to the resource board page', function (): void {
     $this->get(route('filament.app.opportunities-board.redirect', ['tenant' => $this->workspace->slug]))
-        ->assertRedirect(OpportunityResource::getUrl('board'));
+        ->assertRedirect(OpportunityResource::getUrl('board', ['tenant' => $this->workspace]));
 });
 
 it('moves a card between columns via moveCard', function (): void {
