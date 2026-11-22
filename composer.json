@@ -42,7 +42,7 @@
         "livewire/livewire": "^4.0",
         "mallardduck/blade-lucide-icons": "^2.0",
         "manukminasyan/blade-mdi": "^1.0",
-        "propaganistas/laravel-disposable-email": "^2.5",
+        "propaganistas/laravel-disposable-email": "^3.0",
         "ralphjsmit/laravel-filament-seo": "^2.2",
         "ralphjsmit/laravel-seo": "^1.8",
         "relaticle/activity-log": "^1.2",
