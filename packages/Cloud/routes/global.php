@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Docs\Http\Controllers\HelpController;
+use Relaticle\Cloud\Marketing\Support\IndexNow;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\DocPage;
 use Relaticle\Documentation\Support\DocsRepository;
@@ -23,6 +24,12 @@ Route::get('/sitemap.xml', function (): Response {
         'Cache-Control' => 'public, max-age=3600',
     ]);
 })->name('sitemap');
+
+Route::get('/{key}.txt', function (string $key): Response {
+    abort_unless($key === IndexNow::key(), Response::HTTP_NOT_FOUND);
+
+    return response($key, Response::HTTP_OK, ['Content-Type' => 'text/plain; charset=UTF-8']);
+})->where('key', '[A-Za-z0-9-]{8,128}')->name('indexnow-key');
 
 Route::get('/discord', fn (): RedirectResponse => redirect()->away(config('services.discord.invite_url')))->name('discord');
 
