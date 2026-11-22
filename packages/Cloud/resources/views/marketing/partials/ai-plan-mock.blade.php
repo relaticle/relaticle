@@ -1,21 +1,24 @@
 @php
     $icon = static fn (string $type): ?string => \Relaticle\Chat\Support\RecordChipRenderer::iconPath($type);
 
-    $steps = [
+    $steps ??= [
         ['company', 'Kovra Systems', __('Create company'), [[__('Account Owner'), 'Lena Ortiz', false]]],
         ['people', 'Sarah Chen', __('Create person'), [[__('Company'), 'Kovra Systems', true], [__('Job Title'), __('VP of Engineering'), false]]],
         ['task', __('Call Sarah Chen'), __('Create task'), [[__('Linked people'), 'Sarah Chen', true], [__('Due Date'), today()->next('Friday')->isoFormat('ll'), false]]],
     ];
+    $message ??= __('Add Kovra Systems, their VP of Engineering Sarah Chen, and a task to call her Friday.');
+    $summary ??= __('Three changes. The person links to the new company, and the task to the new person.');
+    $workspace ??= null;
 @endphp
 
 <div class="bg-dots flex h-full min-h-[inherit] items-center justify-center p-4 sm:p-8 md:p-12">
-    <x-cloud::marketing.chat-window class="w-full max-w-lg">
+    <x-cloud::marketing.chat-window class="w-full max-w-lg" :workspace="$workspace">
         <div class="space-y-3 p-4 sm:p-5">
             <p class="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">
-                {{ __('Add Kovra Systems, their VP of Engineering Sarah Chen, and a task to call her Friday.') }}
+                {{ $message }}
             </p>
 
-            <p class="px-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">{{ __('Three changes. The person links to the new company, and the task to the new person.') }}</p>
+            <p class="px-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">{{ $summary }}</p>
 
             <div class="space-y-2">
                 <div class="overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10" data-ai-plan>

@@ -38,6 +38,17 @@
         ],
     ];
 
+    $friday = today()->next('Friday')->isoFormat('ll');
+    $planSteps = [];
+
+    foreach ([['Meridian House', ':company office cleaning', 4800], ['Kestrel Fitness', ':company daily cleaning', 2900], ['Oakline Clinic', ':company clinical cleaning', 1600]] as [$company, $titleKey, $amount]) {
+        $planSteps[] = ['opportunity', __($titleKey, ['company' => $company]), __('Update opportunity'), [[__('Stage'), __('Quote'), false], [__('Amount'), \Illuminate\Support\Number::currency($amount, 'USD', precision: 0), false]]];
+    }
+
+    foreach (['Meridian House', 'Kestrel Fitness', 'Oakline Clinic'] as $company) {
+        $planSteps[] = ['task', __('Follow-up call with :company', ['company' => $company]), __('Create task'), [[__('Linked companies'), $company, false], [__('Due Date'), $friday, false]]];
+    }
+
     $linkClass = 'font-medium text-gray-950 underline decoration-gray-300 underline-offset-4 hover:decoration-gray-950 dark:text-white dark:decoration-gray-600 dark:hover:decoration-white';
 @endphp
 
@@ -53,8 +64,8 @@
         </x-slot:eyebrow>
 
         <x-slot:title>
-            {{ __('A CRM for commercial cleaning') }}
-            <span class="text-gray-500 dark:text-gray-400">{{ __('from walkthrough to signed contract.') }}</span>
+            {{ __('A cleaning CRM') }}
+            <span class="text-gray-500 dark:text-gray-400">{{ __('from walkthrough to contract.') }}</span>
         </x-slot:title>
 
         <x-slot:aside>
@@ -103,31 +114,13 @@
         </x-cloud::marketing.frame-header>
 
         <div class="bg-rail grid grid-cols-1 gap-px md:grid-cols-2">
-            <div class="bg-tint bg-dots flex items-center justify-center px-6 py-10">
-                <x-cloud::marketing.window class="w-full max-w-md">
-                    <div class="border-rail flex items-center gap-2 border-b px-4 py-2.5">
-                        <x-cloud::marketing.actor as="rela"/>
-                    </div>
-                    <div class="space-y-3 px-4 py-4">
-                        <div class="flex justify-end">
-                            <p class="max-w-[90%] rounded-2xl rounded-br-md bg-gray-100 px-3.5 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">{{ __('Walkthroughs done. Quotes went out: Meridian House $4,800 a month, Kestrel Fitness $2,900, Oakline Clinic $1,600. Move all three to Quote, set the amounts, and add a follow-up call for each on Friday.') }}</p>
-                        </div>
-                        <div class="border-rail rounded-lg border">
-                            <p class="border-rail flex items-center gap-2 border-b px-3 py-2 text-sm">
-                                <x-lucide-arrow-right class="size-3.5 shrink-0 text-gray-400" aria-hidden="true"/>
-                                <span class="text-gray-700 dark:text-gray-300">{{ __('Move three opportunities to Quote, with their amounts') }}</span>
-                            </p>
-                            <p class="border-rail flex items-center gap-2 border-b px-3 py-2 text-sm">
-                                <x-lucide-calendar class="size-3.5 shrink-0 text-gray-400" aria-hidden="true"/>
-                                <span class="text-gray-700 dark:text-gray-300">{{ __('Add a follow-up call for each on Friday') }}</span>
-                            </p>
-                            <div class="flex items-center justify-end gap-2 px-3 py-2">
-                                <span class="inline-flex h-7 items-center rounded-md px-2.5 text-xs font-medium text-gray-600 dark:text-gray-300">{{ __('Discard') }}</span>
-                                <x-cloud::marketing.rela-approve tabindex="-1" :label="__('Approve')"/>
-                            </div>
-                        </div>
-                    </div>
-                </x-cloud::marketing.window>
+            <div class="bg-tint">
+                @include('cloud::marketing.partials.ai-plan-mock', [
+                    'workspace' => 'Clearwell Cleaning',
+                    'message' => __('Walkthroughs done. Quotes went out: Meridian House $4,800 a month, Kestrel Fitness $2,900, Oakline Clinic $1,600. Move all three to Quote, set the amounts, and add a follow-up call for each on Friday.'),
+                    'summary' => __('Six changes. Three opportunities move to Quote with their amounts, and each company gets a follow-up call on Friday.'),
+                    'steps' => $planSteps,
+                ])
             </div>
 
             <div class="bg-surface flex flex-col justify-center p-6 md:p-10">

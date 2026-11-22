@@ -21,10 +21,10 @@
         <span class="text-xs text-gray-500 dark:text-gray-400">{{ __('Example workspace: Clearwell Cleaning') }}</span>
     </div>
 
-    <div class="relative overflow-hidden">
+    <div class="relative overflow-x-auto lg:overflow-visible">
         <div class="flex gap-3 p-3 md:gap-4 md:p-4" data-cleaning-board>
             @foreach($columns as $column)
-                <div class="flex w-[220px] shrink-0 flex-col rounded-2xl bg-gray-100 ring-1 ring-gray-950/5 md:w-[236px] dark:bg-white/[0.04] dark:ring-white/10">
+                <div class="flex w-[220px] shrink-0 flex-col rounded-2xl lg:w-auto lg:min-w-0 lg:flex-1 lg:shrink bg-gray-100 ring-1 ring-gray-950/5 md:w-[236px] dark:bg-white/[0.04] dark:ring-white/10">
                     <div class="flex items-center gap-2 px-4 pb-3 pt-4">
                         <span class="h-2 w-2 shrink-0 rounded-full" style="background-color: {{ $column['color'] }}" aria-hidden="true"></span>
                         <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ $column['label'] }}</p>
@@ -59,6 +59,5 @@
             @endforeach
         </div>
 
-        <div class="pointer-events-none absolute inset-y-0 right-0 hidden w-24 bg-linear-to-r from-transparent to-white md:block dark:to-gray-900" aria-hidden="true"></div>
-    </div>
+            </div>
 </x-cloud::marketing.window>
