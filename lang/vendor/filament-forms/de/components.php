@@ -16,9 +16,6 @@ return [
     'file_upload' => [
         'placeholder' => 'Keine Dateien hochgeladen',
     ],
-    'js_field' => [
-        'failed_to_load' => 'Dieses Feld konnte nicht geladen werden. Laden Sie die Seite neu und versuchen Sie es erneut.',
-    ],
     'key_value' => [
         'actions' => [
             'move_down' => [
