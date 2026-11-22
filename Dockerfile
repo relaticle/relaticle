@@ -122,4 +122,20 @@ ENV CACHE_STORE=redis
 ENV PHP_OPCACHE_ENABLE=1
 ENV SSL_MODE=off
 
+# A worker container runs its artisan command as PID 1 and no nginx, so the base image's
+# HTTP check alone would mark Horizon, the scheduler and Reverb unhealthy on hosts that cannot override it.
+COPY --chmod=755 <<'SH' /usr/local/bin/healthcheck-relaticle
+#!/bin/sh
+case "$(tr '\0' ' ' < /proc/1/cmdline)" in
+    *horizon*) exec healthcheck-horizon ;;
+    *schedule:work*) exec healthcheck-schedule ;;
+    *reverb:start*) exec healthcheck-reverb ;;
+    *queue:work*) exec healthcheck-queue ;;
+esac
+exec curl --insecure --silent --location --show-error --fail "http://localhost:${NGINX_HTTP_PORT}${HEALTHCHECK_PATH}"
+SH
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --start-interval=3s --retries=3 \
+    CMD ["healthcheck-relaticle"]
+
 EXPOSE 8080
