@@ -165,12 +165,13 @@ it('fits a pending invitation above the list and the board, in line with the too
     WorkspaceInvitation::factory()->create(['email' => $user->email]);
 
     $page = visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900);
+    $left = fn (string $selector): string => "Math.round(document.querySelector('{$selector}').getBoundingClientRect().left)";
 
     foreach (['companies', 'opportunities/board'] as $path) {
         $page->navigate("/app/{$workspace->slug}/{$path}")
             ->assertVisible('.fi-page-invitations .fi-section')
             ->assertScript('(() => { const main = document.querySelector(".fi-main"); return main.scrollHeight === main.clientHeight; })()', true)
-            ->assertScript('Math.round(document.querySelector(".fi-page-invitations .fi-section").getBoundingClientRect().left) === Math.round(document.querySelector(":is(.fi-header, .fi-board-header) .fi-btn").getBoundingClientRect().left)', true)
+            ->assertScript($left('.fi-page-invitations .fi-section').' === '.$left(':is(.fi-header, .fi-board-header) .fi-btn'), true)
             ->assertNoJavaScriptErrors();
     }
 });

@@ -344,11 +344,14 @@ it('keeps the board stage menu above the window edge', function (): void {
 });
 
 it('shows a menu action spinner while the action loads and hides it at rest', function (): void {
-    $spinner = 'document.querySelector(".fi-header .fi-dropdown-panel:not([style*=\"display: none\"]) .fi-loading-indicator")';
+    $spinner = "[...document.querySelectorAll('.fi-header .fi-dropdown-panel .fi-loading-indicator')].find((indicator) => indicator.closest('.fi-dropdown-panel').getClientRects().length > 0)";
 
-    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
         ->click('.fi-header button.fi-ac-btn-group:visible')
-        ->assertScript("getComputedStyle({$spinner}).display", 'none')
-        ->assertScript("({$spinner}.classList.add('fi-loading'), getComputedStyle({$spinner}).display !== 'none')", true)
+        ->assertScript("getComputedStyle({$spinner}).display", 'none');
+
+    $page->script("{$spinner}.classList.add('fi-loading')");
+
+    $page->assertScript("getComputedStyle({$spinner}).display !== 'none'", true)
         ->assertNoJavaScriptErrors();
 });
