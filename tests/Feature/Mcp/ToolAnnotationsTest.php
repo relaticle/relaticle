@@ -18,6 +18,7 @@ use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\MergeCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
+use App\Mcp\Tools\Concerns\MergesRecords;
 use App\Mcp\Tools\CreateUploadUrlTool;
 use App\Mcp\Tools\Email\CancelEmailTool;
 use App\Mcp\Tools\Email\CreateEmailDraftTool;
@@ -162,6 +163,7 @@ mutates(...array_merge(
         BaseRelationshipTool::class,
         BaseAttachTool::class,
         BaseDetachTool::class,
+        MergesRecords::class,
     ],
     array_keys($toolContracts),
 ));

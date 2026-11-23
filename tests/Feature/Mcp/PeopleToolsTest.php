@@ -9,6 +9,7 @@ use App\Mcp\Tools\BaseDeleteTool;
 use App\Mcp\Tools\BaseListTool;
 use App\Mcp\Tools\BaseShowTool;
 use App\Mcp\Tools\BaseUpdateTool;
+use App\Mcp\Tools\Concerns\MergesRecords;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\DeletePeopleTool;
@@ -38,6 +39,8 @@ mutates(
     DeletePeopleTool::class,
     GetPeopleTool::class,
     ListPeopleTool::class,
+    MergePeopleTool::class,
+    MergesRecords::class,
     SerializesRelatedModels::class,
     UpdatePeopleTool::class,
 );

@@ -190,7 +190,7 @@ The server provides 52 tools. They cover account context, cross-entity discovery
 | `create-company-tool` | Create a new company (requires `name`) |
 | `update-company-tool` | Update a company by ID |
 | `delete-company-tool` | Soft-delete a company by ID |
-| `merge-companies-tool` | Merge two companies into a new one; the primary wins, both originals are deleted |
+| `merge-companies-tool` | Merge two companies into a new one; the primary wins single values, lists keep both |
 
 ### People
 
@@ -201,7 +201,7 @@ The server provides 52 tools. They cover account context, cross-entity discovery
 | `create-people-tool` | Create a new person (requires `name`, optional `company_id`) |
 | `update-people-tool` | Update a person by ID |
 | `delete-people-tool` | Soft-delete a person by ID |
-| `merge-people-tool` | Merge two people into a new person; the primary wins, both originals are deleted |
+| `merge-people-tool` | Merge two people into a new person; the primary wins single values, lists keep both |
 
 ### Opportunities
 

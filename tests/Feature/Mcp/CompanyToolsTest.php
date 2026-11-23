@@ -16,6 +16,7 @@ use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
 use App\Mcp\Tools\Company\MergeCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
+use App\Mcp\Tools\Concerns\MergesRecords;
 use App\Mcp\Tools\Concerns\SerializesRelatedModels;
 use App\Models\Company;
 use App\Models\People;
@@ -39,6 +40,8 @@ mutates(
     DeleteCompanyTool::class,
     GetCompanyTool::class,
     ListCompaniesTool::class,
+    MergeCompaniesTool::class,
+    MergesRecords::class,
     SerializesRelatedModels::class,
     UpdateCompanyTool::class,
 );

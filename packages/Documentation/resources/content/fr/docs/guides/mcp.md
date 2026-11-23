@@ -190,7 +190,7 @@ Le serveur fournit 52 outils. Ils couvrent le contexte du compte, la découverte
 | `create-company-tool` | Crée une nouvelle entreprise (exige `name`) |
 | `update-company-tool` | Modifie une entreprise par ID |
 | `delete-company-tool` | Supprime une entreprise par ID (suppression logique) |
-| `merge-companies-tool` | Fusionne deux entreprises en une nouvelle; la principale l'emporte et les deux originaux sont supprimés |
+| `merge-companies-tool` | Fusionne deux entreprises en une nouvelle; la principale l'emporte sur les valeurs uniques, les listes gardent les deux |
 
 ### Personnes
 
@@ -201,7 +201,7 @@ Le serveur fournit 52 outils. Ils couvrent le contexte du compte, la découverte
 | `create-people-tool` | Crée une nouvelle personne (exige `name`, `company_id` facultatif) |
 | `update-people-tool` | Modifie une personne par ID |
 | `delete-people-tool` | Supprime une personne par ID (suppression logique) |
-| `merge-people-tool` | Fusionne deux personnes en une nouvelle; la principale l'emporte et les deux originaux sont supprimés |
+| `merge-people-tool` | Fusionne deux personnes en une nouvelle; la principale l'emporte sur les valeurs uniques, les listes gardent les deux |
 
 ### Opportunités
 

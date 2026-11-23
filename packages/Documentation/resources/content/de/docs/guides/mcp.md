@@ -190,7 +190,7 @@ Der Server stellt 52 Tools bereit. Sie decken Kontokontext, entitätsübergreife
 | `create-company-tool` | Erstellt ein neues Unternehmen (erfordert `name`) |
 | `update-company-tool` | Aktualisiert ein Unternehmen per ID |
 | `delete-company-tool` | Löscht ein Unternehmen per ID mit Soft Delete |
-| `merge-companies-tool` | Führt zwei Unternehmen zu einem neuen zusammen; das primäre gewinnt, beide Originale werden gelöscht |
+| `merge-companies-tool` | Führt zwei Unternehmen zu einem neuen zusammen; die primäre gewinnt bei Einzelwerten, Listen behalten beide |
 
 ### Personen
 
@@ -201,7 +201,7 @@ Der Server stellt 52 Tools bereit. Sie decken Kontokontext, entitätsübergreife
 | `create-people-tool` | Erstellt eine neue Person (erfordert `name`, optional `company_id`) |
 | `update-people-tool` | Aktualisiert eine Person per ID |
 | `delete-people-tool` | Löscht eine Person per ID mit Soft Delete |
-| `merge-people-tool` | Führt zwei Personen zu einer neuen zusammen; die primäre gewinnt, beide Originale werden gelöscht |
+| `merge-people-tool` | Führt zwei Personen zu einer neuen zusammen; die primäre gewinnt bei Einzelwerten, Listen behalten beide |
 
 ### Verkaufschancen
 
