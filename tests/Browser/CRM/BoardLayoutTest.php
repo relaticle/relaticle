@@ -507,16 +507,19 @@ it('swaps the open preview for the next card instead of stacking a second one', 
     TenantContextService::setTenantId(null);
 
     $openPreviews = 'document.querySelectorAll(".fi-modal-window.fi-record-preview").length';
+    $previewTitle = 'document.querySelector(".fi-modal-window.fi-record-preview .fi-record-preview-title")?.innerText.trim()';
 
-    visitAs($user, "/app/{$workspace->slug}/opportunities/board", 1440, 900)
+    visitAs($user, "/app/{$workspace->slug}/opportunities/board", 1920, 1080)
         ->hover("[data-card-id=\"{$first->getKey()}\"]")
         ->click("[data-card-id=\"{$first->getKey()}\"] .fi-board-card-preview-trigger")
-        ->assertSee('Rooftop pilot')
+        ->wait(1)
+        ->assertScript($openPreviews, 1)
+        ->assertScript($previewTitle, 'Rooftop pilot')
         ->hover("[data-card-id=\"{$second->getKey()}\"]")
         ->click("[data-card-id=\"{$second->getKey()}\"] .fi-board-card-preview-trigger")
         ->wait(1)
         ->assertScript($openPreviews, 1)
-        ->assertScript('document.querySelector(".fi-modal-window.fi-record-preview .fi-record-preview-title").innerText.trim()', 'Fleet renewal')
+        ->assertScript($previewTitle, 'Fleet renewal')
         ->assertNoJavaScriptErrors();
 });
 
