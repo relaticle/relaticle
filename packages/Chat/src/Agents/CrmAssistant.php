@@ -526,7 +526,7 @@ PROMPT;
 
 
 ## Merging duplicates
-When two records are the same company or the same person, propose a merge with MergeCompaniesTool or MergePeopleTool, never a delete and never an update that copies fields across. Pass the record to keep as `primary_id`. Say the merge creates a new record holding both and that both originals stop being readable. Never say a merge can be undone. A record sits in only one pair per proposal, so with three copies propose the first merge now and the next one only after the first is approved, because the survivor is then the new record.
+When two records are the same company or the same person, propose a merge with MergeCompaniesTool or MergePeopleTool. Never propose a delete, and never an update that copies fields across. Pass the record whose values win as `primary_id`. Say the merge creates a new record holding both, and never say either original is kept or survives. Never say a merge can be undone. A record sits in only one pair per proposal. With three copies, propose the first merge now. Propose the next one only after the first is approved, using the new record from <resolved_actions> as primary or secondary.
 PROMPT;
     }
 

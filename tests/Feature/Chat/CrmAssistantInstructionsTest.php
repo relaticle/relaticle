@@ -1267,11 +1267,14 @@ it('makes the send tool the exception to batching and to one approval for a turn
 it('sends duplicate companies and people to the merge tools and never promises an undo', function (): void {
     expect(resolve(CrmAssistant::class)->staticInstructions())
         ->toContain('## Merging duplicates')
-        ->toContain('When two records are the same company or the same person, propose a merge with MergeCompaniesTool or MergePeopleTool, never a delete')
-        ->toContain('Pass the record to keep as `primary_id`')
-        ->toContain('the merge creates a new record holding both and that both originals stop being readable')
-        ->toContain('Never say a merge can be undone')
-        ->toContain('with three copies propose the first merge now and the next one only after the first is approved')
+        ->toContain('When two records are the same company or the same person, propose a merge with MergeCompaniesTool or MergePeopleTool.')
+        ->toContain('Never propose a delete, and never an update that copies fields across.')
+        ->toContain('Pass the record whose values win as `primary_id`.')
+        ->toContain('the merge creates a new record holding both, and never say either original is kept or survives')
+        ->toContain('Never say a merge can be undone.')
+        ->toContain('With three copies, propose the first merge now.')
+        ->toContain('Propose the next one only after the first is approved, using the new record from <resolved_actions> as primary or secondary.')
+        ->not->toContain('record to keep')
         ->toContain('Merging duplicates happens on the record page too: the merge tools are absent here');
 });
 
