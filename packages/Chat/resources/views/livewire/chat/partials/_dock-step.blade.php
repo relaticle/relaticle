@@ -256,7 +256,7 @@
                         'refLinks' => $step['refLinks'],
                     ])
                 </div>
-            @elseif ($step['fields'] !== [])
+            @elseif ($writesFields && $step['fields'] !== [])
                 <div class="pb-2 pe-2 ps-[3.125rem]">
                     @foreach ($step['fields'] as $row)
                         <div data-proposal-field-row>

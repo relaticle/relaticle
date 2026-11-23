@@ -27,12 +27,14 @@ use App\Actions\Task\DeleteTask;
 use App\Actions\Task\UpdateTask;
 use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Features\SetupConversation;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -840,6 +842,34 @@ final readonly class PendingActionService
     }
 
     /**
+     * The new records an approved merge created: the originals are gone, so these are what a later turn may link.
+     *
+     * @return list<array{id: string, label: string|null, url: string}>
+     */
+    private function mergedRecords(PendingAction $action): array
+    {
+        $resultData = is_array($action->result_data) ? $action->result_data : [];
+        $resultIds = ProposalPayload::from($action)->isBatch
+            ? array_column(is_array($resultData['items'] ?? null) ? $resultData['items'] : [], 'id')
+            : [$resultData['id'] ?? null];
+        $ids = array_values(array_filter($resultIds, is_string(...)));
+        $entity = CrmEntity::from($action->entity_type->value);
+        $resolver = resolve(RecordReferenceResolver::class);
+
+        return array_values($entity->model()::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $action->workspace_id)
+            ->whereKey($ids)
+            ->get()
+            ->map(fn (Model $record): array => [
+                'id' => (string) $record->getKey(),
+                'label' => (string) $record->{$entity->titleColumn()},
+                'url' => $resolver->referenceUrl($action->entity_type->value, (string) $record->getKey()),
+            ])
+            ->all());
+    }
+
+    /**
      * Approved records with the label and citation url the read tools use, so a
      * later turn can name and link a record it created without a re-fetch.
      *
@@ -851,11 +881,15 @@ final readonly class PendingActionService
             return [];
         }
 
-        // A delete leaves no record to cite, and a merge labels its pair, not the new record. The single-record path is safe by
+        if ($action->operation === PendingActionOperation::Merge) {
+            return $this->mergedRecords($action);
+        }
+
+        // A delete leaves no record to cite. The single-record path is safe by
         // accident (executeDelete returns null, so there is no result id), but a batch
         // stores the deleted models' keys, which would hand the model /r/ links to
         // rows it just removed.
-        if (! $action->operation->writesFields()) {
+        if ($action->operation === PendingActionOperation::Delete) {
             return [];
         }
 
