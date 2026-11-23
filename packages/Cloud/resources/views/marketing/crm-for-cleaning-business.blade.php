@@ -191,7 +191,6 @@
         <div class="bg-rail grid grid-cols-1 gap-px lg:grid-cols-12">
             <div class="bg-tint lg:col-span-7">
                 <x-cloud::marketing.chat-plan
-                    workspace="Clearwell Cleaning"
                     width="max-w-xl"
                     :message="__('Walkthroughs done. Quotes went out: Meridian House $4,800 a month, Kestrel Fitness $2,900, Oakline Clinic $1,600. Move all three to Quote, set the amounts, and add a follow-up call for each on Friday.')"
                     :summary="__('Six changes. Three opportunities move to Quote with their amounts, and each company gets a follow-up call on Friday.')"

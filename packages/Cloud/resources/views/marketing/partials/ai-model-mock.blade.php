@@ -32,7 +32,7 @@
         </div>
 
         <div class="w-full rounded-2xl border border-[var(--surface-input-border)] bg-white dark:bg-gray-900">
-            <p class="px-4 pb-3 pt-3.5 text-sm text-gray-500 dark:text-gray-400">{{ __('Ask anything...') }}</p>
+            <p class="min-h-16 px-4 pb-2 pt-3 text-sm leading-6 text-gray-400 dark:text-gray-500">{{ __('Ask anything...') }}</p>
             <div class="flex items-center gap-2 px-3 pb-2">
                 <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400" aria-hidden="true">
                     <x-lucide-paperclip class="h-4 w-4"/>
@@ -42,8 +42,8 @@
                         {{ __('Auto') }}
                         <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true"/>
                     </span>
-                    <span class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500" aria-hidden="true">
-                        <x-lucide-arrow-up class="h-4 w-4"/>
+                    <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-600 text-white" aria-hidden="true">
+                        <x-lucide-mic class="h-4 w-4"/>
                     </span>
                 </div>
             </div>

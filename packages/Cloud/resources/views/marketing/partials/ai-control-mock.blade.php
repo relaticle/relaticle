@@ -5,31 +5,23 @@
 @endphp
 
 @if($mock === 'approval')
-    <div class="w-full max-w-xs space-y-0.5">
-        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 1 change · just now') }}</p>
-        <div class="flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-            <x-lucide-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
-            <span class="shrink-0">{{ __('Created') }}</span>
-            {!! $chip('people', 'Sarah Chen') !!}
-        </div>
-        <div class="flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400">
-            <x-lucide-ban class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-            <span class="min-w-0 truncate line-through decoration-gray-300 dark:decoration-gray-600">{{ __('Call Sarah Chen') }}</span>
-            <span class="shrink-0">&middot; {{ __('left out') }}</span>
+    <div class="w-full max-w-xs">
+        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied :count change · :when', ['count' => 1, 'when' => __('just now')]) }}</p>
+        <div class="mt-1 space-y-0.5">
+            <x-cloud::marketing.rela-receipt-line :verb="\Relaticle\Chat\Enums\ProposalEntity::People->receiptVerb(\Relaticle\Chat\Enums\PendingActionOperation::Create)" type="people" name="Sarah Chen"/>
+            <x-cloud::marketing.rela-receipt-line outcome="left_out" :name="__('Call Sarah Chen')"/>
         </div>
         <x-cloud::marketing.rela-settled class="mt-4 py-1.5" outcome="expired" :summary="$expiredSummary"/>
     </div>
 @elseif($mock === 'batch')
-    <div class="w-full max-w-xs space-y-0.5">
-        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 2 changes · just now') }}</p>
-        <div class="flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-            <x-lucide-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
-            <span class="min-w-0 truncate">{{ __('Moved :count opportunities to :stage', ['count' => 2, 'stage' => __('Negotiation/Review')]) }}</span>
-        </div>
-        <div class="flex min-w-0 items-center gap-1.5 px-2 py-1.5 text-sm text-gray-500 dark:text-gray-400">
-            <x-lucide-ban class="size-4 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-            <span class="min-w-0 truncate line-through decoration-gray-300 dark:decoration-gray-600">{{ __('Kovra add-on seats') }}</span>
-            <span class="shrink-0">&middot; {{ __('left out') }}</span>
+    <div class="w-full max-w-xs">
+        <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied :count changes · :when', ['count' => 2, 'when' => __('just now')]) }}</p>
+        <div class="mt-1 space-y-0.5">
+            <x-cloud::marketing.rela-receipt-line
+                :label="__('Moved :count :entities to :value', ['count' => 2, 'entities' => \Relaticle\Chat\Enums\ProposalEntity::Opportunity->plural(2), 'value' => __('enums/custom-fields.opportunity.stage.options.negotiation_review')])"
+                :meta="\Illuminate\Support\Number::currency(86000, 'USD', app()->getLocale())"
+            />
+            <x-cloud::marketing.rela-receipt-line outcome="left_out" :name="__('Kovra add-on seats')"/>
         </div>
     </div>
 @else

@@ -6,6 +6,7 @@
     'view',
     'layout' => 'list',
     'newLabel',
+    'framed' => true,
     /** @var list<array{field: string, icon: string, condition: string, value: string}> */
     'filters' => [],
 ])
@@ -16,7 +17,7 @@
     $tile = $layout === 'board' ? ['bg-orange-500', 'lucide-square-kanban'] : ['bg-green-500', 'lucide-table-2'];
 @endphp
 
-<x-cloud::marketing.window :attributes="$attributes">
+<x-dynamic-component :component="$framed ? 'cloud::marketing.window' : 'cloud::marketing.bare'" :attributes="$attributes">
     <div class="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2 dark:border-white/[0.06]">
         <span class="flex shrink-0 items-center gap-2 text-sm font-semibold text-gray-950 dark:text-white">
             <x-dynamic-component :component="$icon" class="h-4 w-4 shrink-0 text-gray-400" aria-hidden="true"/>
@@ -80,4 +81,4 @@
     </div>
 
     {{ $slot }}
-</x-cloud::marketing.window>
+</x-dynamic-component>

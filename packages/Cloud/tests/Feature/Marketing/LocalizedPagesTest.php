@@ -130,6 +130,8 @@ it('emits hreflang for all four languages plus x-default and a self canonical', 
 });
 
 it('formats the home page mock dates and amounts in the page language', function (): void {
+    $this->travelTo('2026-08-25 10:00:00');
+
     $this->get('/')->assertOk()->assertSee('Aug 24, 2026')->assertSee('$18,000.00')->assertSee('$48,000');
 
     $this->get('/de')->assertOk()

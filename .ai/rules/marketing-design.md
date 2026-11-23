@@ -95,12 +95,19 @@ app does not have, and its hand-written Spanish chip read "en los próximos" whe
 
 A mock of an app screen is built from the shared components in `components/marketing`, never from
 page markup: `app-screen` (the title, view and filter rows), `app-board` (the opportunities board),
-`app-list` (a record list), `app-plan` (the plan card, single and batch steps) and `chat-plan` (a
-message with its plan under it). A page passes its sample data and nothing else, so a fix to a
-component reaches every page that shows that screen. `/crm-for-cleaning-business` uses all five and
-`/ai` uses `chat-plan`. The homepage board (`home/partials/board-mock`) predates them and still
-carries its own markup. No test reads a mock against the app, so a reviewer opens both and compares
-them.
+`app-list` (a record list, with select badges and linked records), `app-plan` (the plan card, single
+and batch steps) and `chat-plan` (a message with its plan under it). Rela's side panel has its own:
+`rela-panel` and `rela-panel-header` (the panel and its header row), `rela-composer` (the empty message
+box), `rela-dock-field` (a field row on a single-record card), `rela-receipt-line` and `rela-settled`
+(the lines a decision leaves) and `rela-records` (the table a read renders). A page passes its sample
+data and nothing else, so a fix to a component reaches every page that shows that screen. The homepage
+board (`home/partials/board-mock`) predates them and still carries its own markup. No test reads a mock
+against the app, so a reviewer opens both and compares them.
+
+Words and options come from the class that owns them in the app: `ProposalEntity` for card titles,
+verbs and receipt verbs, `OpportunityField` and `TaskField` for attribute names and option colors.
+A proposal docks where the message box was, and the box stays hidden until the visitor decides. After
+the decision the app resumes the turn, so Rela's next reply follows the receipt.
 
 ## Type roles
 
@@ -187,8 +194,8 @@ reach it. Change the header height and the token together. `html` also carries `
 - `window`: the frame around a product fragment.
 - `app-screen`, `app-board`, `app-list`, `app-plan`, `chat-plan`: the app's own screens, rebuilt from the live
   markup. The Product mocks section says how to build and check them.
-- `chat-window`: a `window` with the Rela chip and the sample workspace name in its header. Every chat
-  fragment in the `/ai` showcases sits in one, so they read as the same product.
+- `chat-window`: a `window` under `rela-panel-header`. Every chat fragment in the `/ai` showcases sits
+  in one, so they read as the same product.
 - The `/self-hosted` hero is that page's signature: an install configurator
   (`partials/self-hosted-install.blade.php`). A light terminal `window` holds the guide's quick start
   with an `APP_KEY` and `DB_PASSWORD` the browser generates through `crypto.getRandomValues`, and an
@@ -221,10 +228,12 @@ reach it. Change the header height and the token together. `html` also carries `
   and the ChatGPT page prefixes every ask with `@Relaticle`. It carries no copy button, because the
   ChatGPT page must render no clipboard call. `tests/Browser/Marketing/AssistantPlaygroundTest.php`
   pins the tabs and the prefix.
-- The `/ai` hero is that page's signature: a list page with Rela's side panel docked beside it, as the
-  app renders it. An approved proposal changes the row in the list, because `ListOpportunities`,
-  `ListPeople` and `ManageTasks` re-render on `ai-write-completed`. A record page does not re-render, so
-  the hero never shows one changing live. `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows.
+- The `/ai` hero is that page's signature: a table view with Rela's side panel docked beside it, as the
+  app renders it at 420px in a 640px frame, with the example asks as tabs above the window. An approved proposal changes
+  the row in the list, because `ListOpportunities`, `ListPeople` and `ManageTasks` re-render on
+  `ai-write-completed`. The Pipeline board and a record page do not re-render, so the hero never shows
+  either changing live. Below `lg` only the panel shows, as the app covers the page on a phone.
+  `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows, the receipt and the hidden message box.
 - The 404 page stays plain: "Error 404" alone in a thin row above a rail, then the headline with generous
   space around it, one sentence (the suggestion when `MarketingNavigation::closestTo()` finds one) and at
   most two buttons, then the popular pages as linked cells. It carries no illustration; a drawn mark

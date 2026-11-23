@@ -12,11 +12,11 @@
 <div class="bg-dots flex h-full min-h-[inherit] items-center justify-center p-4 sm:p-8 md:p-12">
     <x-cloud::marketing.chat-window class="w-full max-w-lg">
         <div class="space-y-3 p-4 sm:p-5">
-            <p class="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">
+            <p class="ml-auto w-fit max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100">
                 {{ __('Email Sarah the renewal next steps and ask her to confirm seats by Friday.') }}
             </p>
 
-            <p class="px-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100">{{ __('Here is the email. It goes out only when you press Send.') }}</p>
+            <p class="px-1 text-sm leading-6 text-gray-900 dark:text-gray-100">{{ __('Here is the email. It goes out only when you press Send.') }}</p>
 
             <div class="overflow-hidden rounded-xl border border-primary-200 bg-[var(--surface-block-bg)] ring-[3px] ring-primary-100 dark:border-primary-400/30 dark:ring-primary-400/10" data-ai-email>
                 <div class="flex items-start gap-2.5 px-4 pb-2.5 pt-3">
