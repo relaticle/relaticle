@@ -11,7 +11,6 @@ use App\Models\Company;
 use App\Models\User;
 use Illuminate\Container\Attributes\CurrentUser;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
 use Knuckles\Scribe\Attributes\BodyParam;
 use Knuckles\Scribe\Attributes\Response;
 use Knuckles\Scribe\Attributes\ResponseFromApiResource;
@@ -34,12 +33,7 @@ final readonly class CompaniesMergeController
     #[BodyParam('secondary_record_id', 'string', 'The company merged into it. Must differ from the primary.', required: true, example: '01jz8x0m6v1b4n7q2r5t8w9y3b')]
     public function __invoke(MergeRecordsRequest $request, MergeRecords $mergeRecords, #[CurrentUser] User $user): JsonResponse
     {
-        $primary = Company::query()->find($request->string('primary_record_id')->toString());
-        $secondary = Company::query()->find($request->string('secondary_record_id')->toString());
-
-        if (! $primary instanceof Company || ! $secondary instanceof Company) {
-            throw ValidationException::withMessages(['records' => __('filament/record-page.merge.unavailable')]);
-        }
+        [$primary, $secondary] = $request->records();
 
         $merged = $mergeRecords->execute($user, $primary, $secondary);
         $merged->loadMissing('customFieldValues.customField.options');
