@@ -102,6 +102,15 @@ it('proposes deleting only the company and never claims a cascade', function ():
         ->toPassJudge('The reply proposes deleting the company only. It never says the people, tasks or notes linked to it are deleted too.');
 })->group('test');
 
+it('merges two duplicate companies and never says the other is kept or that it can be undone', function (): void {
+    $w = EvalWorkspace::seed();
+
+    expect((new RelaTurn($w))(...))
+        ->prompt('The two Duplicate Co companies are the same company, clean it up')
+        ->toHaveToolCalls(['MergeCompaniesTool' => fn (array $arguments): bool => count($arguments['merges'] ?? []) === 1])
+        ->toPassJudge('The reply proposes merging the two Duplicate Co companies. It never says the other record is kept or survives, and never says the merge can be undone.');
+})->group('test');
+
 it('proposes instead of asking when every field is given', function (): void {
     $w = EvalWorkspace::seed();
 

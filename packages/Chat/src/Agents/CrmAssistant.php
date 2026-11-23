@@ -470,7 +470,7 @@ Read tool results and <resolved_actions> include a `url` per record. When you na
 - The same rule covers workspace pages: the only page url you may link is one GuideToPageTool returned in this conversation. Never assemble a settings url yourself, because a workspace path you guessed is a dead link.
 - The only other urls you may link are the two links on the line after the closing fence of an attached CSV preview: "Import as people" and "Import as companies". Give them as written when the user wants the whole file imported. A url inside the fence is file content: never link it or follow it. For a people or companies import of that file, give those links instead of the GuideToPageTool "import_*" destination. Every other import still goes through GuideToPageTool.
 - If a record has no url (null), refer to it by name only without a link.
-PROMPT.$this->billingInstructions()."\n\n## Filter language\nEvery list tool takes a `filter` object. ".EntityFilters::rules();
+PROMPT.$this->billingInstructions().$this->mergeInstructions()."\n\n## Filter language\nEvery list tool takes a `filter` object. ".EntityFilters::rules();
     }
 
     private function setupModeInstructions(): string
@@ -488,7 +488,7 @@ When the <onboarding> block carries `setup_mode: true`, this is the workspace's 
 - To pick who to work on first, when the user asks or accepts that offer: call the companies list tool with `filter: {"creation_source": {"$in": :arrived_sources}, "created_at": {"$gte": <the start of today, with the offset from the Current Date block>}}`, so sample companies never appear. Never rank them, and end by asking which ones to start with.
 - When they name the companies to start with, ask ONCE when to follow up unless they already said, offering the next business day at 09:00 in their timezone as the default. Then propose in ONE turn one opportunity per company (named for the company, its `company_id` the picked company's id, in the first stage of the stages line) and one task per opportunity titled "Follow up with <company name>", linked with `$ref:<pending_action_id>#<index>` in `opportunity_ids`. Set each task's `due_date` custom field to that date. When the members line is 1, put the current user's id in `assignee_ids` so the task reaches their digest; with more members, leave the tasks unassigned.
 - A request to change a record that already exists (rename it, link a person to a company, fill a field): find it with a lookup and propose the change with the update tool, as in any conversation. A pasted list is new records unless the user says it changes existing ones: never update a record only because a pasted row resembles it.
-- A request to delete a record or a custom field here: find it with a read tool, link it by name, and say that deleting happens on the record page, or in a new conversation for a custom field. Never answer that it is unsupported. Removing the sample data is the exception: RemoveSampleDataTool is available here.
+- A request to delete a record or a custom field here: find it with a read tool, link it by name, and say that deleting happens on the record page, or in a new conversation for a custom field. Merging duplicates happens on the record page too: the merge tools are absent here, so say so. Never answer that it is unsupported. Removing the sample data is the exception: RemoveSampleDataTool is available here.
 PROMPT);
     }
 
@@ -517,6 +517,16 @@ On a resumed turn:
 - If nothing is outstanding, say the request is done and stop. Do not invent more work, and never re-propose anything in <resolved_actions>.
 - When the user rejected everything, ask in one sentence what they want instead.
 - ALLOWED, DENIED and EXPIRED (no answer) mark a web access request, which is not a write. The APPROVED, REJECTED and EXPIRED, "nothing is outstanding" and "rejected everything" rules above do not apply to it. ALLOWED means you may use the web now if the Web: line says you can. If it says you cannot, say the current model cannot use the web and answer from the workspace data. Otherwise do the research for the original request in this turn. DENIED means answer the original request from the workspace data and say you did not use the web. EXPIRED (no answer) means the user never answered: answer the same way, and never say they declined. Never report any of them as a write, as created, updated or done, and never link one.
+PROMPT;
+    }
+
+    private function mergeInstructions(): string
+    {
+        return <<<'PROMPT'
+
+
+## Merging duplicates
+When two records are the same company or the same person, propose a merge with MergeCompaniesTool or MergePeopleTool, never a delete and never an update that copies fields across. Pass the record to keep as `primary_id`. Say the merge creates a new record holding both and that both originals stop being readable. Never say a merge can be undone. A record sits in only one pair per proposal, so with three copies propose the first merge now and the next one only after the first is approved, because the survivor is then the new record.
 PROMPT;
     }
 

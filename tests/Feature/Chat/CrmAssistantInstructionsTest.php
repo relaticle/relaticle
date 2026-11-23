@@ -1264,6 +1264,17 @@ it('makes the send tool the exception to batching and to one approval for a turn
         ->toContain('approves once, except that each email to send and each invitation proposal is approved on its own');
 });
 
+it('sends duplicate companies and people to the merge tools and never promises an undo', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('## Merging duplicates')
+        ->toContain('When two records are the same company or the same person, propose a merge with MergeCompaniesTool or MergePeopleTool, never a delete')
+        ->toContain('Pass the record to keep as `primary_id`')
+        ->toContain('the merge creates a new record holding both and that both originals stop being readable')
+        ->toContain('Never say a merge can be undone')
+        ->toContain('with three copies propose the first merge now and the next one only after the first is approved')
+        ->toContain('Merging duplicates happens on the record page too: the merge tools are absent here');
+});
+
 it('limits the citations exception to the two import links after the fence of an attached csv preview', function (): void {
     $instructions = resolve(CrmAssistant::class)->staticInstructions();
     $citations = substr($instructions, (int) strpos($instructions, '## Citations'));
