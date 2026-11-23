@@ -10,29 +10,17 @@
 
         <div class="flex flex-1 items-center justify-center p-4 sm:p-6">
             <div class="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900">
-                <div class="flex flex-col items-center gap-4 px-6 pt-8 pb-6 text-center">
-                    {{ $icon }}
+                <x-workspaces.invitation-panel>
+                    <x-slot:icon>{{ $icon }}</x-slot:icon>
+                    <x-slot:heading>{{ $heading }}</x-slot:heading>
+                    <x-slot:description>{{ $description }}</x-slot:description>
 
-                    <div class="space-y-1.5">
-                        <h1 class="text-xl font-semibold tracking-tight text-gray-900 dark:text-white">
-                            {{ $heading }}
-                        </h1>
+                    @isset($details)
+                        <x-slot:details>{{ $details }}</x-slot:details>
+                    @endisset
 
-                        <p class="text-sm text-gray-500 dark:text-gray-400">
-                            {{ $description }}
-                        </p>
-                    </div>
-                </div>
-
-                @isset($details)
-                    <div class="space-y-5 border-t border-gray-200 px-6 py-6 dark:border-gray-800">
-                        {{ $details }}
-                    </div>
-                @endisset
-
-                <div class="border-t border-gray-200 px-6 py-6 dark:border-gray-800">
-                    {{ $actions }}
-                </div>
+                    <x-slot:actions>{{ $actions }}</x-slot:actions>
+                </x-workspaces.invitation-panel>
             </div>
         </div>
     </div>

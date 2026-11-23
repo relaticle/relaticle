@@ -3,10 +3,12 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\CreateWorkspace;
+use App\Livewire\App\Workspaces\PendingInvitationsForUser;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Models\WorkspaceInvitation;
 
-mutates(CreateWorkspace::class);
+mutates(CreateWorkspace::class, PendingInvitationsForUser::class);
 
 it('can create a new workspace through the browser', function (): void {
     $user = User::factory()->withWorkspace()->create();
@@ -48,3 +50,30 @@ it('fits every role column of the compare roles table on a phone', function (int
         ->assertScript("(() => { const scroller = document.querySelector('[data-role-matrix]').parentElement; return scroller.scrollWidth <= scroller.clientWidth; })()", true)
         ->assertNoJavaScriptErrors();
 })->with([390, 320]);
+
+it('asks a pending invitee to join or decline in a modal only those two buttons close', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    WorkspaceInvitation::factory()->create(['email' => $user->email, 'created_at' => now()->subMinute()]);
+    $second = WorkspaceInvitation::factory()->create(['email' => $user->email]);
+
+    $modal = '[data-fi-modal-id="'.PendingInvitationsForUser::MODAL_ID.'"]';
+    $isOpen = "document.querySelector('{$modal}').classList.contains('fi-modal-open')";
+
+    $page = visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900)
+        ->assertScript($isOpen, true)
+        ->assertMissing("{$modal} .fi-modal-close-btn");
+
+    $page->keys("{$modal} .fi-modal-window", ['Escape']);
+    $page->script("document.querySelector('{$modal} .fi-modal-window-ctn').click()");
+
+    $page->assertScript($isOpen, true)
+        ->press(__('workspaces.pending_for_user.decline'))
+        ->waitForText(__('workspaces.accept.ready.heading', ['workspace' => $second->workspace->name]))
+        ->assertScript($isOpen, true)
+        ->click("{$modal} button.fi-btn")
+        ->assertPathBeginsWith("/app/{$second->workspace->slug}")
+        ->assertNoJavaScriptErrors();
+});

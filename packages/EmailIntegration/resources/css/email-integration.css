@@ -131,11 +131,15 @@
 .email-composer-body {
     @apply flex h-full flex-col;
 
-    /* The unclassed div is the editor's own Alpine root. Without it in the
-       chain the height stops one level above the ProseMirror surface. */
+    /* Filament wraps the editor's Alpine root in a one-cell loading grid. Both
+       join the chain, or the height stops above the ProseMirror surface. */
     & .fi-input-wrp-content-ctn,
-    & .fi-input-wrp-content-ctn > div:not([class]) {
+    & .fi-async-component-content {
         @apply flex min-h-0 flex-1 flex-col;
+    }
+
+    & .fi-async-component {
+        @apply min-h-0 flex-1;
     }
 
     /* Filament's merge-tags panel sits on the right from `@2xl` (42rem) on the

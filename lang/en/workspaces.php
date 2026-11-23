@@ -341,10 +341,6 @@ return [
     ],
 
     'pending_for_user' => [
-        'heading' => 'You have been invited to join :workspace',
-        'detail_with_inviter' => ':inviter invited you with :role access.',
-        'detail' => 'You will join with :role access.',
-        'accept' => 'Join workspace',
         'decline' => 'Decline',
         'declined' => 'Invitation declined.',
     ],

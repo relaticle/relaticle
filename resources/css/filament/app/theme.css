@@ -1286,6 +1286,11 @@ a.fi-linked-records-chip {
     @apply rounded-xl;
 }
 
+/* The invitation panel draws its own padding and dividers, as on the join page it shares. */
+.fi-invitation-modal .fi-modal-content {
+    @apply gap-y-0 p-0;
+}
+
 /* Record pages split from xl, and only while the main area fits the rail's minimum
    beside the pane's; the record layout sets html.fi-record-stacked when it does not. */
 @custom-variant record-split {
@@ -2125,12 +2130,6 @@ html.fi-record-stacked .fi-record-layout {
 
 .fi-dropdown-list-item-label {
     @apply min-w-0 flex-1 text-start;
-}
-
-/* Livewire shows this on click. Idle, it must not occupy layout or it reads
-   as a grip on Detach. */
-.fi-dropdown-panel .fi-loading-indicator {
-    display: none;
 }
 
 /* Panels */
@@ -2988,5 +2987,9 @@ html.fi-record-stacked .fi-record-layout {
 
     .fi-onboarding-link {
         @apply inline-flex min-h-11 items-center;
+    }
+
+    .fi-invitation-actions .fi-link {
+        @apply mt-1! flex min-h-11 items-center justify-center;
     }
 }

@@ -341,10 +341,6 @@ return [
     ],
 
     'pending_for_user' => [
-        'heading' => 'Sie wurden eingeladen, :workspace beizutreten',
-        'detail_with_inviter' => ':inviter hat Sie mit :role-Zugriff eingeladen.',
-        'detail' => 'Sie treten mit :role-Zugriff bei.',
-        'accept' => 'Arbeitsbereich beitreten',
         'decline' => 'Ablehnen',
         'declined' => 'Einladung abgelehnt.',
     ],
