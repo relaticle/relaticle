@@ -200,6 +200,28 @@ test('declining revokes the invitation without joining', function (): void {
         ->and($invitee->fresh()->belongsToWorkspace($workspace))->toBeFalse();
 });
 
+test('declining shows the next invitation and closes the modal after the last', function (): void {
+    $first = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $second = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $invitations = collect([$first, $second])->map(fn (Workspace $workspace): WorkspaceInvitation => $workspace->workspaceInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'member',
+        'expires_at' => now()->addDays(5),
+    ]));
+
+    $this->actingAs(User::factory()->create(['email' => 'later@example.test']));
+
+    $modal = livewire(PendingInvitationsForUser::class)
+        ->assertSee($first->name)
+        ->assertDontSee($second->name)
+        ->call('decline', $invitations->first()->id)
+        ->assertSee($second->name)
+        ->assertNotDispatched('close-modal');
+
+    $modal->call('decline', $invitations->last()->id)
+        ->assertDispatched('close-modal', id: PendingInvitationsForUser::MODAL_ID);
+});
+
 test('a card whose invitation was revoked meanwhile says so on either button', function (string $button): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
@@ -216,6 +238,7 @@ test('a card whose invitation was revoked meanwhile says so on either button', f
 
     $card->call($button, $invitation->id)
         ->assertNotified(__('workspaces.accept.no_longer_valid'))
+        ->assertDispatched('close-modal', id: PendingInvitationsForUser::MODAL_ID)
         ->assertDontSee($workspace->name);
 
     expect($invitee->fresh()->belongsToWorkspace($workspace))->toBeFalse();

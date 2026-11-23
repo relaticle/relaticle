@@ -21,6 +21,8 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
  */
 final class PendingInvitationsForUser extends BaseLivewireComponent
 {
+    public const string MODAL_ID = 'pending-workspace-invitation';
+
     /**
      * @return Collection<int, WorkspaceInvitation>
      */
@@ -45,6 +47,7 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
 
         if (! $invitation instanceof WorkspaceInvitation) {
             $this->sendNotification(__('workspaces.accept.no_longer_valid'), type: 'danger');
+            $this->closeWhenNoneLeft();
 
             return;
         }
@@ -78,15 +81,24 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
 
         if (! $invitation instanceof WorkspaceInvitation) {
             $this->sendNotification(__('workspaces.accept.no_longer_valid'), type: 'danger');
+            $this->closeWhenNoneLeft();
 
             return;
         }
 
         resolve(DeclineWorkspaceInvitation::class)->decline($this->authUser(), $invitation);
 
+        $this->sendNotification(__('workspaces.pending_for_user.declined'));
+        $this->closeWhenNoneLeft();
+    }
+
+    private function closeWhenNoneLeft(): void
+    {
         unset($this->invitations);
 
-        $this->sendNotification(__('workspaces.pending_for_user.declined'));
+        if ($this->invitations->isEmpty()) {
+            $this->dispatch('close-modal', id: self::MODAL_ID);
+        }
     }
 
     // Resolved only against the collection already scoped to the user's email.

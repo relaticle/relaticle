@@ -1,21 +1,28 @@
 <div>
-    @foreach($this->invitations as $invitation)
-        @php($roleName = \App\Enums\WorkspaceRole::labelFor($invitation->role))
+    <x-filament::modal
+        :id="\App\Livewire\App\Workspaces\PendingInvitationsForUser::MODAL_ID"
+        icon="lucide-mail-open"
+        width="md"
+        :close-button="false"
+        :close-by-escaping="false"
+        :close-by-clicking-away="false"
+    >
+        @if ($invitation = $this->invitations->first())
+            @php($roleName = \App\Enums\WorkspaceRole::labelFor($invitation->role))
 
-        <x-filament::section class="mb-6">
             <x-slot name="heading">
                 {{ __('workspaces.pending_for_user.heading', ['workspace' => $invitation->workspace->name]) }}
             </x-slot>
 
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                @if($invitation->inviter)
+            <x-slot name="description">
+                @if ($invitation->inviter)
                     {{ __('workspaces.pending_for_user.detail_with_inviter', ['inviter' => $invitation->inviter->name, 'role' => $roleName]) }}
                 @else
                     {{ __('workspaces.pending_for_user.detail', ['role' => $roleName]) }}
                 @endif
-            </p>
+            </x-slot>
 
-            <div class="mt-4 flex gap-3">
+            <x-slot name="footerActions">
                 <x-filament::button wire:click="accept('{{ $invitation->id }}')">
                     {{ __('workspaces.pending_for_user.accept') }}
                 </x-filament::button>
@@ -23,7 +30,12 @@
                 <x-filament::button color="gray" wire:click="decline('{{ $invitation->id }}')">
                     {{ __('workspaces.pending_for_user.decline') }}
                 </x-filament::button>
-            </div>
-        </x-filament::section>
-    @endforeach
+            </x-slot>
+
+            <div
+                wire:key="pending-invitation-{{ $invitation->id }}"
+                x-init="$nextTick(() => $dispatch('open-modal', { id: @js(\App\Livewire\App\Workspaces\PendingInvitationsForUser::MODAL_ID) }))"
+            ></div>
+        @endif
+    </x-filament::modal>
 </div>

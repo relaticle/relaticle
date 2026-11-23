@@ -12,7 +12,6 @@ use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
 use App\Models\User;
-use App\Models\WorkspaceInvitation;
 use App\Providers\Filament\AppPanelProvider;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Relaticle\ImportWizard\Enums\ImportStatus;
@@ -154,44 +153,6 @@ it('keeps the list table header row on desktop', function (): void {
         ->assertVisible('.fi-ta-header-cell.fi-ta-header-cell-title')
         ->assertScript(CELL_LABELS_SHOWN, false)
         ->assertNoJavaScriptErrors();
-});
-
-it('fits a pending invitation above the list and the board, in line with the toolbar', function (): void {
-    $this->withVite();
-
-    $user = User::factory()->withWorkspace()->create();
-    $workspace = $user->ownedWorkspaces()->first();
-    seedListRows($user);
-    WorkspaceInvitation::factory()->create(['email' => $user->email]);
-
-    $page = visitAs($user, "/app/{$workspace->slug}/companies", 1440, 900);
-    $left = fn (string $selector): string => "Math.round(document.querySelector('{$selector}').getBoundingClientRect().left)";
-
-    foreach (['companies', 'opportunities/board'] as $path) {
-        $page->navigate("/app/{$workspace->slug}/{$path}")
-            ->assertVisible('.fi-page-invitations .fi-section')
-            ->assertScript('(() => { const main = document.querySelector(".fi-main"); return main.scrollHeight === main.clientHeight; })()', true)
-            ->assertScript($left('.fi-page-invitations .fi-section').' === '.$left(':is(.fi-header, .fi-board-header) .fi-btn'), true)
-            ->assertNoJavaScriptErrors();
-    }
-});
-
-it('keeps a pending invitation off the sidebar and the top bar on a record page and Home', function (): void {
-    $this->withVite();
-
-    $user = User::factory()->withWorkspace()->create();
-    $workspace = $user->ownedWorkspaces()->first();
-    $company = Company::factory()->recycle([$user, $workspace])->create();
-    WorkspaceInvitation::factory()->create(['email' => $user->email]);
-
-    $inset = '(() => { const card = document.querySelector(".fi-page-invitations .fi-section").getBoundingClientRect(); const main = document.querySelector(".fi-main").getBoundingClientRect(); const topbar = document.querySelector(".fi-topbar").getBoundingClientRect(); return [Math.round(card.left - main.left), Math.round(card.top - topbar.bottom)]; })()';
-
-    $page = visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}", 1440, 900);
-    expect($page->script($inset))->toBe([24, 12]);
-
-    $page->navigate("/app/{$workspace->slug}");
-    expect($page->script($inset))->toBe([32, 24]);
-    $page->assertNoJavaScriptErrors();
 });
 
 it('keeps a linked company chip inside its cell link', function (): void {
