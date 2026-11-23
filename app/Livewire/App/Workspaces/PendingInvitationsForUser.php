@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Locked;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 /**
@@ -22,6 +23,14 @@ use Symfony\Component\HttpKernel\Exception\HttpException;
 final class PendingInvitationsForUser extends BaseLivewireComponent
 {
     public const string MODAL_ID = 'pending-workspace-invitation';
+
+    #[Locked]
+    public bool $asksOnThisPage = false;
+
+    public function mount(): void
+    {
+        $this->asksOnThisPage = $this->invitations->isNotEmpty();
+    }
 
     /**
      * @return Collection<int, WorkspaceInvitation>

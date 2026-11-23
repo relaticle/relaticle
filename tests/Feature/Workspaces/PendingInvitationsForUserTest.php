@@ -374,12 +374,13 @@ test('an invitation to a workspace scheduled for deletion is neither listed nor 
     expect(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeTrue();
 });
 
-test('a user with no pending invitations sees an empty card', function (): void {
+test('a user with no pending invitations gets no modal on the page', function (): void {
     $user = User::factory()->withWorkspace()->create();
     $this->actingAs($user);
 
     livewire(PendingInvitationsForUser::class)
         ->assertOk()
+        ->assertDontSeeHtml(PendingInvitationsForUser::MODAL_ID)
         ->assertDontSee(__('workspaces.pending_for_user.accept'))
         ->assertDontSee(__('workspaces.pending_for_user.decline'));
 });
