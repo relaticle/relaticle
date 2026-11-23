@@ -16,7 +16,7 @@ final readonly class PageSections
             fn (array $heading): bool => $heading['level'] <= self::MAX_SECTION_LEVEL,
         ));
 
-        $chunks = preg_split('/^(#{2,3})[ \t]+(.+)$/m', $body, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$body];
+        $chunks = preg_split('/^(?:\{#[\w-]+\}\R)?(#{2,3})[ \t]+(.+)$/m', $body, -1, PREG_SPLIT_DELIM_CAPTURE) ?: [$body];
 
         $sections = [['section' => '', 'anchor' => '', 'markdown' => $chunks[0]]];
         $parent = '';

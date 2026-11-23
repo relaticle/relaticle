@@ -523,3 +523,43 @@ it('anchors a turn this tab did not send on its own reply', function (): void {
     expect($resumed['anchorKey'])->toBe($resumedReplyKey)
         ->and($resumed['top'])->toBe(128);
 });
+
+it('holds a resumed reply at its top while it streams past the viewport', function (): void {
+    $page = transcriptAnchorOpenTwentyMessageConversation('resumed long reply');
+
+    transcriptAnchorRun($page, <<<'JS'
+        data.messages.push(data.ensureClientKey({ role: 'assistant', content: 'Review the proposal below.', rendered: true, prerendered: false, pending_actions: [], display_blocks: [] }));
+        data.scrollToBottom(true);
+
+        return true;
+    JS);
+
+    transcriptAnchorPosition($page);
+
+    $paragraphs = <<<'JS'
+        const paragraphs = (from, to) => Array.from({ length: to - from + 1 }, (_, i) =>
+            'Paragraph ' + (from + i) + ' of the resumed reply, long enough to wrap across the transcript column.' + String.fromCharCode(10, 10)).join('');
+    JS;
+
+    transcriptAnchorRun($page, $paragraphs.<<<'JS'
+        data.handleStreamStart({ invocation_id: 'inv-resume-long' });
+        data.handleTextDelta({ invocation_id: 'inv-resume-long', delta: paragraphs(1, 4) });
+
+        return true;
+    JS);
+
+    $duringScroll = transcriptAnchorPosition($page);
+
+    transcriptAnchorRun($page, $paragraphs.<<<'JS'
+        data.handleTextDelta({ invocation_id: 'inv-resume-long', delta: paragraphs(5, 30) });
+
+        return true;
+    JS);
+
+    $atRest = transcriptAnchorPosition($page);
+
+    expect($duringScroll['top'])->toBe(128)
+        ->and([$atRest['top'], $atRest['scrollTop']])->toBe([$duringScroll['top'], $duringScroll['scrollTop']])
+        ->and($atRest['replyHeight'])->toBeGreaterThan(800)
+        ->and($atRest['jumpVisible'])->toBeTrue();
+});

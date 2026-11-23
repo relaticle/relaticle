@@ -25,7 +25,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-dark.png" />
-    <img src="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-light.png" alt="A chat with Rela, the built-in AI assistant: one request becomes three proposed changes (an opportunity moved to Financing, a task and a note) waiting for approval" />
+    <img src="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-light.png" alt="The opportunities pipeline with Rela, the built-in AI assistant, open beside it: one request becomes three proposed changes (the Linear Seat Expansion opportunity moved from Qualification to Needs Analysis, a task and a note) waiting for approval" />
   </picture>
   <br>
   <sub>One request to Rela, the built-in AI assistant: three changes, applied after you approve them.</sub>

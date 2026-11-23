@@ -19,6 +19,9 @@ DEPLOYED_COMMIT_FILE="storage/framework/deployed-commit"
 LOCK_FILE="storage/framework/deploy.lock"
 DEPLOY_WINDOW_FILE="storage/framework/deploy.window"
 DEPLOY_WINDOWS_LOG="storage/framework/deploy.windows"
+VENDOR_BUILD_DIR="storage/framework/deploy-build"
+SCHEDULE_PAUSED_FILE="storage/framework/deploy.schedule-paused"
+COMPILED_VIEWS_ROOT="storage/framework/views"
 LOCK_WAIT_SECONDS=900
 
 # The audit scan ignores secret reads inside a window. It reads the finished ones from the log, because it runs every 5 minutes.
@@ -41,6 +44,8 @@ close_deploy_window() {
     fi
 
     rm -f "$DEPLOY_WINDOW_FILE"
+
+    resume_schedule
 }
 
 fetch() {
@@ -69,11 +74,48 @@ fetch() {
 
     echo "→ Deploying ${target:0:9}"
 
+    build_vendor "$target"
+    pause_schedule
+
     # scribe:generate rewrites a tracked view on every deploy, which a pull refuses to overwrite.
     git reset --quiet --hard "$target"
+    swap_vendor
 
     # Re-executed so the release phase comes from the commit being deployed.
-    exec bash bin/deploy.sh release
+    VENDOR_PREPARED=1 exec bash bin/deploy.sh release
+}
+
+# Requests and scheduled commands load vendor while composer rewrites it in place, so the next one is built beside it.
+build_vendor() {
+    rm -rf "$VENDOR_BUILD_DIR"
+    mkdir -p "$VENDOR_BUILD_DIR"
+    git archive "$1" | tar -x -C "$VENDOR_BUILD_DIR"
+    cp -a vendor "$VENDOR_BUILD_DIR/vendor"
+
+    $COMPOSER_BIN install --working-dir="$VENDOR_BUILD_DIR" --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+}
+
+swap_vendor() {
+    rm -rf vendor-previous
+    mv vendor vendor-previous
+    mv "$VENDOR_BUILD_DIR/vendor" vendor
+}
+
+pause_schedule() {
+    touch "$SCHEDULE_PAUSED_FILE"
+    $PHP artisan schedule:pause
+}
+
+resume_schedule() {
+    if [[ ! -f "$SCHEDULE_PAUSED_FILE" ]]; then
+        return
+    fi
+
+    if $PHP artisan schedule:resume; then
+        rm -f "$SCHEDULE_PAUSED_FILE"
+    else
+        echo "✗ the scheduler is still paused: run php artisan schedule:resume" >&2
+    fi
 }
 
 release() {
@@ -83,18 +125,29 @@ release() {
     open_deploy_window
     commit="$(git rev-parse HEAD)"
 
-    $COMPOSER_BIN install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+    # A deploy started by a script from before the vendor build has no prepared vendor.
+    if [[ "${VENDOR_PREPARED:-}" == "1" ]]; then
+        $COMPOSER_BIN run-script post-autoload-dump --no-interaction
+    else
+        $COMPOSER_BIN install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+    fi
 
     $PHP artisan migrate --force
 
-    # config:cache stores the release, so web requests and queue workers report under this commit.
-    # Its view:cache also clears compiled views: Laravel reuses a stale plain-text mail copy after a template change (laravel/framework#62153).
-    ( umask 077; SENTRY_RELEASE="$commit" $PHP artisan optimize )
+    # Each release compiles into its own folder: view:cache empties the folder it compiles into, and the
+    # running workers still render from the previous one. A fresh folder also avoids laravel/framework#62153.
+    local compiled_views="$PWD/$COMPILED_VIEWS_ROOT/release-${commit:0:12}"
+    mkdir -p "$compiled_views"
+
+    # config:cache stores the release and the views folder. Until PHP-FPM reloads, it keeps the old classes in
+    # opcache, so it must keep the old compiled views too instead of recompiling templates the checkout changed.
+    ( umask 077; SENTRY_RELEASE="$commit" VIEW_COMPILED_PATH="$compiled_views" VIEW_CHECK_CACHE_TIMESTAMPS=false $PHP artisan optimize )
     chmod 600 bootstrap/cache/config.php
 
     # PHP-FPM serves the previous code from opcache until this reload. Nothing slow may run
     # between the checkout and here, because until then old classes meet new views.
     reload_fpm
+    resume_schedule
 
     $PHP artisan horizon:terminate
     $PHP artisan reverb:restart
@@ -103,9 +156,17 @@ release() {
     build_assets
     $PHP artisan app:generate-sitemap
 
+    prune_previous_release
+
     deployed_state "$commit" > "$DEPLOYED_COMMIT_FILE"
 
     echo "✓ Deployed ${commit:0:9}"
+}
+
+# Keeps the previous release's compiled views for workers still finishing a job under the old config.
+prune_previous_release() {
+    rm -rf vendor-previous "$VENDOR_BUILD_DIR"
+    ls -1dt "$COMPILED_VIEWS_ROOT"/release-* 2> /dev/null | tail -n +3 | while read -r folder; do rm -rf "$folder"; done || true
 }
 
 deployed_state() {
@@ -129,17 +190,25 @@ generate_api_docs() {
 }
 
 build_assets() {
+    local staged=storage/framework/cache/vite-next published=storage/framework/cache/vite-published
+    local prune=false
+
     $PNPM install --frozen-lockfile
+    $PNPM exec vite build --outDir "$staged" --emptyOutDir
+    test -s "$staged/manifest.json"
 
-    rm -rf public/build-next public/build-previous
-    $PNPM exec vite build --outDir public/build-next --emptyOutDir
-
-    if [[ -d public/build ]]; then
-        mv public/build public/build-previous
+    # Keep the last build's chunks for open tabs. Retry an identical build without aging them out.
+    if cmp -s "$published/manifest.json" public/build/manifest.json && ! cmp -s "$staged/manifest.json" public/build/manifest.json; then
+        prune=true
     fi
 
-    mv public/build-next public/build
-    rm -rf public/build-previous
+    rsync -a --exclude=/manifest.json "$staged/" public/build/
+    rsync -a --checksum "$staged/manifest.json" public/build/
+    if "$prune"; then
+        rsync -a --delete-after "$staged/assets/" "$published/assets/" public/build/assets/
+    fi
+    rm -rf "$published"
+    mv "$staged" "$published"
 }
 
 if [[ ! -f artisan ]]; then

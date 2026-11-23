@@ -68,7 +68,7 @@ enum Plan: string implements HasColor, HasLabel
      * The billing interval a Stripe price id sells the plan at (`monthly`,
      * `yearly`), read from the same map. Null when the id is not in it.
      */
-    private static function intervalFromStripePrice(?string $priceId): ?string
+    public static function intervalFromStripePrice(?string $priceId): ?string
     {
         $key = self::stripePriceKey($priceId);
 
@@ -139,6 +139,14 @@ enum Plan: string implements HasColor, HasLabel
             self::Scale => 5_000,
             self::Enterprise => 10_000,
         };
+    }
+
+    public function typicalReplies(): int
+    {
+        // Production average of 2,050 chat charges across 498 workspaces, 2026-09-21 to 2026-11-20.
+        $creditsPerTypicalReply = 1.66;
+
+        return intdiv((int) floor($this->credits() / $creditsPerTypicalReply), 100) * 100;
     }
 
     public static function trialCredits(): int

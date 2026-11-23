@@ -87,7 +87,6 @@
 
                     this.fields = state.fields
                     this.units = state.periodUnits
-                    this.sorts = state.sorts
                     this.sortable = state.sortable
                     this.grouping = state.grouping
                     this.groups = state.groups
@@ -96,6 +95,11 @@
                     this.view = state.view
                     this.viewerId = state.viewerId
                     this.server = state.rules
+
+                    // A response to an earlier write carries an older sort order, and moving the rows drops the focus.
+                    if (this.inflight === 0) {
+                        this.sorts = state.sorts
+                    }
                 },
 
                 serialize(rules) {
@@ -267,6 +271,10 @@
                     } finally {
                         this.inflight--
                         this.markBusy()
+
+                        if (this.inflight === 0) {
+                            this.sorts = JSON.parse(root.dataset.state).sorts
+                        }
                     }
                 },
 

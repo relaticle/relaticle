@@ -5,14 +5,22 @@ declare(strict_types=1);
 use App\Actions\Jetstream\DeleteWorkspace;
 use App\Actions\Jetstream\ScheduleWorkspaceDeletion;
 use App\Enums\Plan;
+use App\Livewire\App\Workspaces\WorkspaceDeletionBanner;
 use App\Models\User;
 use App\Models\Workspace;
+use App\Notifications\WorkspaceDeletionCancelledNotification;
+use Filament\Actions\Action;
+use Filament\Notifications\Notification as Toast;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Notification;
 use Relaticle\Cloud\Billing\Actions\CancelWorkspaceSubscription;
+use Relaticle\Cloud\Billing\Actions\KeepWorkspaceSubscription;
+use Relaticle\Cloud\Billing\Data\Renewal;
+use Relaticle\Cloud\Billing\Filament\Billing;
 use Relaticle\Cloud\Billing\StripeBilling;
 use Tests\Helpers\StripeRecorder;
 
-mutates(CancelWorkspaceSubscription::class, StripeBilling::class);
+mutates(CancelWorkspaceSubscription::class, StripeBilling::class, KeepWorkspaceSubscription::class);
 
 it('does nothing when the workspace has no subscription', function (): void {
     /** @var Workspace $workspace */
@@ -112,4 +120,73 @@ it('cancels the subscription at period end when workspace deletion is scheduled'
         ->and($stripe->lastParamsFor('POST /v1/subscriptions/sub_scheduled'))->toHaveKey('cancel_at_period_end', true)
         ->and($stripe->countFor('DELETE /v1/subscriptions'))->toBe(0)
         ->and($workspace->refresh()->scheduled_deletion_at)->not->toBeNull();
+});
+
+/** @return array{0: User, 1: Workspace} */
+function graceDeletionWorkspace(): array
+{
+    config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
+
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $workspace->forceFill(['plan' => Plan::Pro, 'stripe_id' => 'cus_undo', 'scheduled_deletion_at' => now()->addDays(30)])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_undo',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => now()->addDays(12),
+    ]);
+    Cache::forever(Renewal::cacheKey('sub_undo'), ['renews_at' => now()->addDays(12)->getTimestamp(), 'amount' => 2900, 'amount_due' => null, 'currency' => 'usd', 'card_brand' => 'visa', 'card_last4' => '4242']);
+
+    return [$owner, $workspace];
+}
+
+function subscriptionEndingNotice(): string
+{
+    return __('cloud::billing.keep.ending_notice', ['plan' => Plan::Pro->marketingLabel(), 'date' => now()->addDays(12)->isoFormat('ll')]);
+}
+
+it('offers the owner to keep the subscription right after undoing a scheduled deletion', function (): void {
+    withHostedBilling();
+    Notification::fake();
+
+    [$owner, $workspace] = graceDeletionWorkspace();
+    $this->actingAs($owner);
+
+    $keepLabel = __('cloud::billing.keep.button', ['plan' => Plan::Pro->marketingLabel()]);
+
+    livewire(WorkspaceDeletionBanner::class, ['workspace' => $workspace])
+        ->mountAction('cancelDeletion')
+        ->callMountedAction()
+        ->assertRedirect()
+        ->assertNotified(Toast::make()
+            ->title(__('workspaces.notifications.workspace_deletion_cancelled.success'))
+            ->success()
+            ->body(subscriptionEndingNotice())
+            ->persistent()
+            ->actions([Action::make('keepSubscription')->label($keepLabel)->url(Billing::getUrl(['action' => 'keepSubscription'], panel: 'app', tenant: $workspace))->button()]));
+});
+
+it('tells the owner in the deletion-cancelled email when the subscription ends and links to keep it', function (): void {
+    withHostedBilling();
+
+    [$owner, $workspace] = graceDeletionWorkspace();
+
+    $html = (string) (new WorkspaceDeletionCancelledNotification($workspace))->toMail($owner)->render();
+
+    expect($html)->toContain(e(subscriptionEndingNotice()))
+        ->and($html)->toContain('action=keepSubscription');
+});
+
+it('says nothing about a subscription in the deletion-cancelled email when none is set to cancel', function (): void {
+    withHostedBilling();
+
+    [$owner, $workspace] = graceDeletionWorkspace();
+    $workspace->subscription()->update(['ends_at' => null]);
+
+    $html = (string) (new WorkspaceDeletionCancelledNotification($workspace))->toMail($owner)->render();
+
+    expect($html)->not->toContain('action=keepSubscription');
 });

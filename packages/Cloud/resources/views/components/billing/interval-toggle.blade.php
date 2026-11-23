@@ -1,5 +1,7 @@
+@props(['saving' => null])
+
 @php
-    $name = 'billing-interval-'.\Illuminate\Support\Str::random(6);
+    $name ='billing-interval-'.\Illuminate\Support\Str::random(6);
     $segment = 'inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full px-4 text-sm font-medium text-gray-600 transition-colors duration-200 hover:text-gray-950 has-checked:bg-white has-checked:text-gray-950 has-checked:shadow-[0_1px_2px_rgba(0,0,0,0.06)] has-checked:ring-1 has-checked:ring-gray-200/80 has-focus-visible:outline-2 has-focus-visible:outline-offset-2 has-focus-visible:outline-primary dark:text-gray-400 dark:hover:text-white dark:has-checked:bg-gray-800 dark:has-checked:text-white dark:has-checked:ring-white/[0.08]';
 @endphp
 
@@ -8,6 +10,9 @@
         <label class="{{ $segment }}">
             <input type="radio" name="{{ $name }}" value="yearly" class="sr-only" checked x-on:change="yearly = true" x-bind:checked="yearly">
             {{ __('cloud::billing.yearly') }}
+            @if($saving)
+                <span class="rounded-full bg-primary-50 px-1.5 py-0.5 text-xs font-medium text-primary-700 dark:bg-primary-500/15 dark:text-primary-300">{{ $saving }}</span>
+            @endif
         </label>
         <label class="{{ $segment }}">
             <input type="radio" name="{{ $name }}" value="monthly" class="sr-only" x-on:change="yearly = false" x-bind:checked="! yearly">

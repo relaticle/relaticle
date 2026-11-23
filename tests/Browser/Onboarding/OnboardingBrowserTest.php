@@ -22,6 +22,8 @@ const FOCUSED_HEADING = 'new Promise(resolve => { const end = Date.now() + 3000;
 
 const ACTION_MODALS_READY = 'new Promise(resolve => { const ready = () => document.querySelector(\'[x-data^="filamentActionModals"]\')?._x_dataStack !== undefined; const poll = () => ready() ? resolve(true) : setTimeout(poll, 25); poll(); })';
 
+const CREATE_WORKSPACE_SUBMIT = 'button[type="submit"]:visible:has-text("Continue")';
+
 function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWebpage
 {
     return loginViaBrowser($user)
@@ -31,7 +33,7 @@ function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWeb
         ->type('[id="form.slug"]', $slug)
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertPathIs("/app/{$slug}/setup");
 }
@@ -106,7 +108,7 @@ it('walks a new owner through every setup screen to the setup conversation', fun
         ->type('[id="form.slug"]', 'my-first-workspace')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertPathIs('/app/my-first-workspace/setup')
         ->assertNoJavaScriptErrors()
@@ -236,7 +238,7 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->type('[id="form.name"]', 'Hiring Desk')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
@@ -278,7 +280,7 @@ it('moves focus to the heading of each new wizard and setup step', function (): 
         ->assertScript(FOCUSED_HEADING, 'Create your workspace')
         ->press('button:visible:has-text("Continue")')
         ->assertScript(FOCUSED_HEADING, 'How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertScript(FOCUSED_HEADING, 'Start with the people you already email')
         ->assertScript(ACTION_MODALS_READY, true)
@@ -333,7 +335,7 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[id$="onboarding_referral_detail-claude"]')
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")

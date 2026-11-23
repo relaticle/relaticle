@@ -28,6 +28,7 @@ use Relaticle\EmailIntegration\Models\EmailRead;
 use Relaticle\EmailIntegration\Services\Contracts\MailServiceFactoryInterface;
 use Relaticle\EmailIntegration\Services\MailboxSyncTracker;
 use Relaticle\EmailIntegration\Services\SyncItemFailures;
+use Sentry\Laravel\Jobs\Middleware\SentryTracesSampleRate;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -49,11 +50,11 @@ final class IncrementalEmailSyncJob implements ShouldBeUnique, ShouldQueue
     }
 
     /**
-     * @return list<Skip|HandlesProviderFailures>
+     * @return list<SentryTracesSampleRate|Skip|HandlesProviderFailures>
      */
     public function middleware(): array
     {
-        return [Skip::when($this->connectedAccount->trashed()), new HandlesProviderFailures];
+        return [new SentryTracesSampleRate(0.1), Skip::when($this->connectedAccount->trashed()), new HandlesProviderFailures];
     }
 
     public function handle(MailServiceFactoryInterface $mailFactory): void

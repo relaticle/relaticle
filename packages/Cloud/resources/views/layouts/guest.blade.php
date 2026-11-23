@@ -4,6 +4,7 @@
     'ogTitle' => null,
     'ogDescription' => null,
     'ogImage' => null,
+    'ogImageDimensions' => null,
     'ogType' => 'website',
     'canonical' => null,
     'robots' => null,
@@ -18,6 +19,7 @@
         :og-title="$ogTitle"
         :og-description="$ogDescription"
         :og-image="$ogImage"
+        :og-image-dimensions="$ogImageDimensions"
         :og-type="$ogType"
         :canonical="$canonical"
         :robots="$robots" />

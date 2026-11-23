@@ -1159,6 +1159,7 @@ it('keeps runtime file access off local-only disks and paths', function (): void
         'app/Providers/AppServiceProvider.php',
         'app/Support/Media/RichContentAttachments.php',
         'packages/Chat/src/Actions/StoreChatAttachment.php',
+        'packages/Cloud/src/Marketing/Console/Commands/GenerateSitemapCommand.php',
         'packages/Documentation/src/Http/Controllers/OpenApiSpecController.php',
     ];
     $offenders = [];

@@ -53,6 +53,10 @@ return [
         'site_id' => env('FATHOM_ANALYTICS_SITE_ID'),
     ],
 
+    'indexnow' => [
+        'key' => env('INDEXNOW_KEY'),
+    ],
+
     'turnstile' => [
         'key' => env('TURNSTILE_SITE_KEY'),
         'secret' => env('TURNSTILE_SECRET_KEY'),

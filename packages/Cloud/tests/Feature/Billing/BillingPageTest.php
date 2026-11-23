@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Support\Locales;
 use Carbon\CarbonImmutable;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Illuminate\Http\UploadedFile;
@@ -22,10 +23,12 @@ use Relaticle\Chat\Enums\AiCreditType;
 use Relaticle\Chat\Models\AiCreditBalance;
 use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
+use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
+use Relaticle\Cloud\Billing\Data\Renewal;
 use Relaticle\Cloud\Billing\Filament\Billing;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Tests\Helpers\StripeRecorder;
@@ -39,7 +42,7 @@ mutates(
 );
 
 beforeEach(function (): void {
-    Queue::fake([RefreshManagedRenewal::class]);
+    Queue::fake([RefreshRenewal::class]);
     config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
     config()->set('services.stripe.prices.pro_yearly', 'price_pro_yearly_test');
 });
@@ -161,7 +164,7 @@ it('replaces the app shell with a standalone paused screen when the trial ends',
         ->assertSee(__('cloud::billing.paused.sign_out'))
         ->assertDontSee('Delete workspace')
         ->assertDontSee('fi-sidebar', false)
-        ->assertDontSee(__('cloud::billing.usage.title'));
+        ->assertDontSee(__('cloud::billing.usage.available_label'));
 });
 
 it('opens the upgrade modal from the paused screen instead of a review page', function (): void {
@@ -423,8 +426,8 @@ it('meters an extended trial against the Free allowance', function (): void {
     expect($workspace->refresh()->onExtendedTrial())->toBeTrue();
 
     livewire(Billing::class)
-        ->assertSeeHtml('/ '.number_format(Plan::Free->credits()))
-        ->assertDontSeeHtml('/ '.number_format(Plan::Pro->credits()));
+        ->assertSee(' of '.number_format(Plan::Free->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used');
 });
 
 it('hides the extension once it was used', function (): void {
@@ -647,8 +650,8 @@ it('meters a running trial against the trial allowance', function (): void {
     resolve(StartProTrial::class)->execute($user, $workspace);
 
     livewire(Billing::class)
-        ->assertSeeHtml('/ '.number_format(Plan::trialCredits()))
-        ->assertDontSeeHtml('/ '.number_format(Plan::Pro->credits()));
+        ->assertSee(' of '.number_format(Plan::trialCredits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used');
 });
 
 it('shows manage state for an active subscription', function (): void {
@@ -744,8 +747,8 @@ it('meters a past-due workspace against the allowance it will be refilled with',
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format(Plan::Free->credits()))
-        ->assertDontSee('/ '.number_format(Plan::Pro->credits()))
+        ->assertSee(' of '.number_format(Plan::Free->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used')
         ->assertSee('100%');
 });
 
@@ -780,7 +783,7 @@ it('shows Enterprise as a managed plan with its allowance and no upgrade actions
     livewire(Billing::class)
         ->assertSee(__('billing.plans.enterprise'))
         ->assertSee(__('cloud::billing.enterprise.title'))
-        ->assertSee('/ '.number_format(Plan::Enterprise->credits()))
+        ->assertSee(' of '.number_format(Plan::Enterprise->credits()).' monthly credits used')
         ->assertDontSee(__('billing.plans.cloud_pro'))
         ->assertDontSee(__('billing.plans.cloud_scale'))
         ->assertDontSee(__('cloud::billing.upgrade.button', ['plan' => 'Cloud Pro']));
@@ -881,14 +884,65 @@ it('shows the purchased portion of the balance', function (): void {
     livewire(Billing::class)->assertSee(__('cloud::billing.packs.balance_split', ['purchased' => number_format(200)]));
 });
 
-it('shows a fulfilment-pending notice after a credit pack checkout', function (): void {
+function grantCreditPackSession(Workspace $workspace, string $sessionId): void
+{
+    AiCreditTransaction::factory()->create([
+        'workspace_id' => $workspace->getKey(),
+        'type' => AiCreditType::Purchase,
+        'idempotency_key' => GrantPurchasedCredits::IDEMPOTENCY_PREFIX.$sessionId,
+    ]);
+}
+
+it('shows a fulfilment-pending notice while the returned checkout session is not granted yet', function (): void {
     withHostedBilling();
 
     billingPageOwner();
 
-    livewire(Billing::class)
-        ->set('credits', 'success')
+    livewire(Billing::class, ['credits' => 'cs_test_pending'])
         ->assertSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('hides the fulfilment-pending notice once the checkout session was granted', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    grantCreditPackSession($workspace, 'cs_test_paid');
+
+    livewire(Billing::class, ['credits' => 'cs_test_paid'])
+        ->assertDontSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('clears the fulfilment-pending notice on the next poll after the grant lands', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+
+    $page = livewire(Billing::class, ['credits' => 'cs_test_arriving'])
+        ->assertSee(__('cloud::billing.packs.fulfilling_title'));
+
+    grantCreditPackSession($workspace, 'cs_test_arriving');
+
+    $page->call('$refresh')
+        ->assertDontSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('keeps the notice when only another workspace was granted that session', function (): void {
+    withHostedBilling();
+
+    billingPageOwner();
+    grantCreditPackSession(Workspace::factory()->create(), 'cs_test_elsewhere');
+
+    livewire(Billing::class, ['credits' => 'cs_test_elsewhere'])
+        ->assertSee(__('cloud::billing.packs.fulfilling_title'));
+});
+
+it('shows no fulfilment-pending notice on a return url that carries no checkout session', function (): void {
+    withHostedBilling();
+
+    billingPageOwner();
+
+    livewire(Billing::class, ['credits' => 'success'])
+        ->assertDontSee(__('cloud::billing.packs.fulfilling_title'));
 });
 
 it('does not show the fulfilment-pending notice without the credits query param', function (): void {
@@ -915,9 +969,9 @@ it('uses the plan allowance as the meter denominator, not remaining plus used', 
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format(Plan::Pro->credits()))
-        ->assertDontSee('/ '.number_format(575))
-        ->assertDontSee('/ '.number_format(375));
+        ->assertSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(575).' monthly credits used')
+        ->assertDontSee(' of '.number_format(375).' monthly credits used');
 });
 
 it('keeps the plan allowance as the denominator once the monthly allowance is exhausted and purchased credits are being spent', function (): void {
@@ -937,8 +991,8 @@ it('keeps the plan allowance as the denominator once the monthly allowance is ex
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format(Plan::Pro->credits()))
-        ->assertDontSee('/ '.number_format(2050));
+        ->assertSee(' of '.number_format(Plan::Pro->credits()).' monthly credits used')
+        ->assertDontSee(' of '.number_format(2050).' monthly credits used');
 });
 
 it('offers owners an Enterprise conversation without changing their plan', function (): void {
@@ -1044,7 +1098,7 @@ it('keeps the managed allowance when an older Pro subscription is past due', fun
     ]);
 
     livewire(Billing::class)
-        ->assertSee('/ '.number_format($plan->credits()))
+        ->assertSee(' of '.number_format($plan->credits()).' monthly credits used')
         ->assertSee('Your previous subscription has a payment issue.')
         ->assertDontSee(__('cloud::billing.manage.past_due_body'));
 })->with([Plan::Enterprise]);
@@ -1072,7 +1126,7 @@ it('shows spendable credits separately after the monthly allowance is exhausted'
     ]);
 
     livewire(Billing::class)
-        ->assertSee('150 credits available')
+        ->assertSeeInOrder(['150', __('cloud::billing.usage.available_label')])
         ->assertSee('2,050 credits used this period')
         ->assertSee('100%');
 });
@@ -1106,7 +1160,7 @@ function managedPageWorkspace(Workspace $workspace, string $status = 'active', P
 
 function cacheManagedRenewalForPage(): void
 {
-    Cache::forever(RefreshManagedRenewal::CACHE_PREFIX.'sub_managed_page', [
+    Cache::forever(Renewal::cacheKey('sub_managed_page'), [
         'renews_at' => now()->addMonths(6)->getTimestamp(),
         'amount' => 70800,
         'currency' => 'usd',
@@ -1162,7 +1216,7 @@ it('omits the renewal line when nothing is cached and asks Stripe for it in the 
         ->assertDontSee('Renews')
         ->assertSee(__('cloud::billing.manage.button'));
 
-    Queue::assertPushed(RefreshManagedRenewal::class, fn (RefreshManagedRenewal $job): bool => $job->stripeSubscriptionId === 'sub_managed_page');
+    Queue::assertPushed(RefreshRenewal::class, fn (RefreshRenewal $job): bool => $job->stripeSubscriptionId === 'sub_managed_page');
 });
 
 it('warns the owner when the managed invoice is overdue', function (): void {
@@ -1355,4 +1409,265 @@ it('titles the page in the user language', function (): void {
     Locales::apply('de');
 
     expect(livewire(Billing::class)->instance()->getTitle())->toBe('Abrechnung');
+});
+
+function planCardCheckoutOwner(): Workspace
+{
+    config()->set('cashier.secret', 'sk_test_fake');
+    config()->set('services.stripe.prices.scale_monthly', 'price_scale_monthly_test');
+
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['plan' => Plan::Free, 'stripe_id' => 'cus_plan_card'])->save();
+
+    return $workspace;
+}
+
+it('sends the owner from a plan card straight to Stripe checkout for the chosen plan and period', function (): void {
+    withHostedBilling();
+
+    $recorder = StripeRecorder::install();
+    planCardCheckoutOwner();
+
+    livewire(Billing::class)
+        ->call('subscribe', 'scale', 'monthly')
+        ->assertRedirect('https://checkout.stripe.com/c/pay/cs_test_fake')
+        ->assertNotNotified();
+
+    expect($recorder->paramsFor('/checkout/sessions')['line_items'][0]['price'])->toBe('price_scale_monthly_test');
+});
+
+it('does not open checkout from a plan card for a member who cannot manage billing', function (): void {
+    withHostedBilling();
+
+    StripeRecorder::install();
+    $workspace = planCardCheckoutOwner();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'admin']);
+    $this->actingAs($member);
+
+    livewire(Billing::class)
+        ->call('subscribe', 'scale', 'monthly')
+        ->assertNoRedirect();
+});
+
+it('tells a trialing owner on the plan cards when the card is first charged', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['hosted_free_grandfathered_at' => null, 'plan' => Plan::Free, 'trial_ends_at' => now()->addDays(9)])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.upgrade.trial_notice', ['date' => now()->addDays(9)->isoFormat('ll')]));
+});
+
+function graceSubscriptionOwner(): Workspace
+{
+    config()->set('cashier.secret', 'sk_test_fake');
+    config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
+
+    [, $workspace] = billingPageOwner();
+    $workspace->forceFill(['plan' => Plan::Pro, 'stripe_id' => 'cus_grace'])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_grace',
+        'stripe_status' => 'active',
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        'ends_at' => now()->addDays(12),
+    ]);
+    rememberRenewal('sub_grace', ['amount' => 3190, 'renews_at' => now()->addDays(12)->getTimestamp()]);
+
+    return $workspace;
+}
+
+it('keeps a subscription set to cancel once the owner confirms its renewal terms', function (): void {
+    withHostedBilling();
+
+    $workspace = graceSubscriptionOwner();
+    $recorder = StripeRecorder::install()->respondTo('/v1/subscriptions/sub_grace', ['id' => 'sub_grace', 'object' => 'subscription', 'status' => 'active', 'cancel_at_period_end' => false]);
+    $renewal = now()->addDays(12)->isoFormat('ll');
+
+    livewire(Billing::class)
+        ->assertActionVisible('keepSubscription')
+        ->assertActionExists('keepSubscription', fn (Action $action): bool => $action->getModalHeading() === __('cloud::billing.keep.heading', ['plan' => Plan::Pro->marketingLabel()])
+            && str_contains((string) $action->getModalDescription(), $renewal)
+            && str_contains((string) $action->getModalDescription(), '$31.90'))
+        ->callAction('keepSubscription')
+        ->assertNotified(__('cloud::billing.keep.kept', ['plan' => Plan::Pro->marketingLabel(), 'date' => $renewal]));
+
+    $updates = $recorder->allParamsFor('POST /v1/subscriptions/sub_grace');
+
+    expect($workspace->subscription()->refresh()->ends_at)->toBeNull()
+        ->and($updates[0]['cancel_at_period_end'])->toBe('false')
+        ->and(collect($updates)->pluck('metadata.kept_by_user_id')->filter()->first())->toBe((string) auth()->id());
+});
+
+it('opens the keep confirmation from the link in the deletion email', function (): void {
+    withHostedBilling();
+
+    graceSubscriptionOwner();
+
+    livewire(Billing::class, ['defaultAction' => 'keepSubscription'])
+        ->call('mountDefaultActions')
+        ->assertMountedActionModalSee(__('cloud::billing.keep.heading', ['plan' => Plan::Pro->marketingLabel()]))
+        ->assertMountedActionModalSee(__('cloud::billing.keep.dismiss'));
+});
+
+it('does not offer to keep a subscription to a member who cannot manage billing', function (): void {
+    withHostedBilling();
+
+    $workspace = graceSubscriptionOwner();
+    $member = User::factory()->create();
+    $workspace->users()->attach($member, ['role' => 'admin']);
+    $this->actingAs($member);
+
+    livewire(Billing::class)->assertActionHidden('keepSubscription');
+});
+
+it('does not offer to keep a subscription that is not set to cancel', function (): void {
+    withHostedBilling();
+
+    $workspace = graceSubscriptionOwner();
+    $workspace->subscription()->update(['ends_at' => null]);
+
+    livewire(Billing::class)->assertActionHidden('keepSubscription');
+});
+
+/** @param  array<string, mixed>  $overrides */
+function rememberRenewal(string $stripeId, array $overrides = []): void
+{
+    Cache::forever(Renewal::cacheKey($stripeId), array_merge([
+        'renews_at' => now()->addDays(20)->getTimestamp(),
+        'amount' => 2900,
+        'amount_due' => null,
+        'currency' => 'usd',
+        'card_brand' => 'visa',
+        'card_last4' => '4242',
+    ], $overrides));
+}
+
+function proPageSubscription(Workspace $workspace, string $status = 'active', array $attributes = []): void
+{
+    config()->set('services.stripe.prices.pro_monthly', 'price_pro_monthly_test');
+    $workspace->forceFill(['plan' => Plan::Pro, 'stripe_id' => 'cus_summary'])->save();
+    $workspace->subscriptions()->create([
+        'type' => 'default',
+        'stripe_id' => 'sub_summary',
+        'stripe_status' => $status,
+        'stripe_price' => 'price_pro_monthly_test',
+        'quantity' => 1,
+        ...$attributes,
+    ]);
+}
+
+it('states the next charge and the card of an active subscription', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+    rememberRenewal('sub_summary');
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.active'))
+        ->assertSee(__('cloud::billing.summary.renews', ['date' => now()->addDays(20)->isoFormat('ll'), 'amount' => '$29']))
+        ->assertSee(__('cloud::billing.summary.card', ['brand' => 'Visa', 'last4' => '4242']));
+});
+
+it('asks Stripe for the next charge when none is remembered', function (): void {
+    withHostedBilling();
+    Queue::fake();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+
+    livewire(Billing::class)->assertSee(__('cloud::billing.manage.auto_renews'));
+
+    Queue::assertPushed(RefreshRenewal::class, fn (RefreshRenewal $job): bool => $job->stripeSubscriptionId === 'sub_summary');
+});
+
+it('states the first charge of a subscription still on its card trial', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace, 'trialing', ['trial_ends_at' => now()->addDays(6)]);
+    rememberRenewal('sub_summary', ['renews_at' => now()->addDays(6)->getTimestamp()]);
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.trialing'))
+        ->assertSee(__('cloud::billing.summary.first_charge', ['date' => now()->addDays(6)->isoFormat('ll'), 'amount' => '$29']));
+});
+
+it('says when a cancelling subscription ends and never calls it a trial', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace, attributes: ['ends_at' => now()->addDays(12)]);
+    $workspace->forceFill(['trial_ends_at' => now()->addDays(14)])->save();
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.canceling'))
+        ->assertSee(__('cloud::billing.summary.ends', ['date' => now()->addDays(12)->isoFormat('ll')]))
+        ->assertDontSee(__('cloud::billing.trial.active_title'));
+});
+
+it('states what a past-due subscription owes', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace, 'past_due');
+    rememberRenewal('sub_summary', ['amount_due' => 2900]);
+
+    livewire(Billing::class)
+        ->assertSee(__('cloud::billing.status.past_due'))
+        ->assertSee(__('cloud::billing.summary.payment_failed', ['amount' => '$29']));
+});
+
+it('names a subscriber\'s plan once, with its one manage action beside it', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+    rememberRenewal('sub_summary');
+
+    $html = livewire(Billing::class)
+        ->assertDontSee(__('cloud::billing.manage.title', ['plan' => Plan::Pro->marketingLabel()]))
+        ->assertSee(__('cloud::billing.manage.button'))
+        ->html();
+
+    expect(substr_count($html, 'wire:click="managePortal"'))->toBe(1);
+});
+
+it('leads the credits with what is available and states the monthly allowance in one line', function (): void {
+    withHostedBilling();
+
+    [, $workspace] = billingPageOwner();
+    proPageSubscription($workspace);
+    rememberRenewal('sub_summary');
+    AiCreditBalance::query()->updateOrCreate(['workspace_id' => $workspace->getKey()], [
+        'credits_remaining' => 2360,
+        'credits_used' => 640,
+        'purchased_credits' => 1000,
+        'period_starts_at' => now()->subDays(10),
+        'period_ends_at' => now()->addDays(20),
+    ]);
+
+    livewire(Billing::class)
+        ->assertSeeInOrder(['2,360', __('cloud::billing.usage.available_label'), __('cloud::billing.usage.monthly_used', ['used' => '640', 'allowance' => '2,000'])])
+        ->assertDontSeeHtml('>32%<');
+});
+
+it('offers every credit pack from one buy menu', function (): void {
+    withHostedBilling();
+    config()->set('services.stripe.credit_packs.small', ['price' => 'price_small_test', 'credits' => 1000]);
+    config()->set('services.stripe.credit_packs.large', ['price' => 'price_large_test', 'credits' => 5000]);
+
+    billingPageOwner();
+
+    $html = livewire(Billing::class)
+        ->assertSeeInOrder([__('cloud::billing.packs.buy_more'), __('cloud::billing.packs.buy', ['credits' => '1,000']), __('cloud::billing.packs.buy', ['credits' => '5,000'])])
+        ->html();
+
+    expect(substr_count($html, 'fi-dropdown-trigger'))->toBeGreaterThanOrEqual(1)
+        ->and($html)->toContain("buyCredits('small')")
+        ->and($html)->toContain("buyCredits('large')");
 });

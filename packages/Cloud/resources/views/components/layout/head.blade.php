@@ -4,6 +4,7 @@
     'ogTitle' => null,
     'ogDescription' => null,
     'ogImage' => null,
+    'ogImageDimensions' => null,
     'ogType' => 'website',
     'canonical' => null,
     'robots' => null,
@@ -15,6 +16,7 @@
     // here instead of emitting an empty description.
     $description ??= __('Relaticle - The open-source AI CRM for selling without a sales team, with a built-in AI assistant and custom attributes.');
     $ogType ??= 'website';
+    $canonical ??= url()->current();
 @endphp
 
 <meta charset="utf-8">
@@ -24,7 +26,7 @@
 <meta name="description" content="{{ $description }}">
 {{-- Defaults to the query-stripped URL, which is what consolidates the marketing
      pages. Pages that genuinely paginate pass their own page-aware canonical. --}}
-<link rel="canonical" href="{{ $canonical ?? url()->current() }}" />
+<link rel="canonical" href="{{ $canonical }}" />
 <x-cloud::layout.alternate-links />
 @if($robots)
     <meta name="robots" content="{{ $robots }}">
@@ -34,17 +36,23 @@
     // Bump the version whenever public/images/open-graph.jpg is regenerated
     // so social caches re-scrape it.
     $defaultOgImage = url('/images/open-graph.jpg').'?v=5';
-    [$ogImageWidth, $ogImageHeight] = $ogImage === null ? [2400, 1260] : [1200, 630];
+    $ogImageDimensions ??= match ($ogImage === null ? null : Str::before($ogImage, '?')) {
+        null => [2400, 1260],
+        url('/images/open-graph-ai.jpg'), url('/images/open-graph-self-hosted.jpg') => [1200, 630],
+        default => null,
+    };
 @endphp
 
 <!-- Open Graph Meta Tags -->
 <meta property="og:title" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
 <meta property="og:description" content="{{ $ogDescription ?? $description }}"/>
 <meta property="og:image" content="{{ $ogImage ?? $defaultOgImage }}"/>
-<meta property="og:image:width" content="{{ $ogImageWidth }}"/>
-<meta property="og:image:height" content="{{ $ogImageHeight }}"/>
+@if($ogImageDimensions)
+    <meta property="og:image:width" content="{{ $ogImageDimensions[0] }}"/>
+    <meta property="og:image:height" content="{{ $ogImageDimensions[1] }}"/>
+@endif
 <meta property="og:image:alt" content="{{ $ogTitle ?? $title ?? config('app.name', 'Relaticle') }}"/>
-<meta property="og:url" content="{{ request()->getUri() }}"/>
+<meta property="og:url" content="{{ $canonical }}"/>
 <meta property="og:type" content="{{ $ogType }}" />
 <meta property="og:site_name" content="{{ config('app.name', 'Relaticle') }}" />
 <meta property="og:locale" content="{{ \Relaticle\Cloud\Marketing\Support\LocalizedUrl::openGraphLocale(app()->getLocale()) }}" />

@@ -37,6 +37,21 @@ trait ReleasesOnProviderRateLimit
         return true;
     }
 
+    protected function releaseIfProviderUnavailable(string $accountId, Throwable $exception): bool
+    {
+        $seconds = ProviderRateLimit::outageSeconds($exception);
+
+        if ($seconds === null) {
+            return false;
+        }
+
+        ProviderRateLimit::trip($accountId, $seconds);
+
+        $this->release($seconds + $this->providerRateLimitJitter($seconds));
+
+        return true;
+    }
+
     /**
      * A mailbox's parked jobs wake spread over a window, not all at once when
      * the cooldown ends.

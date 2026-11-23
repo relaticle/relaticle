@@ -188,6 +188,45 @@ final readonly class CreditService
         });
     }
 
+    /** @param  array<string, mixed>  $metadata */
+    public function revokePurchasedCredits(Workspace $workspace, int $credits, string $idempotencyKey, array $metadata = []): int
+    {
+        return DB::transaction(function () use ($workspace, $credits, $idempotencyKey, $metadata): int {
+            $balance = AiCreditBalance::query()
+                ->where('workspace_id', $workspace->getKey())
+                ->lockForUpdate()
+                ->first();
+
+            if (! $balance instanceof AiCreditBalance || $this->isRecorded($workspace, $idempotencyKey)) {
+                return 0;
+            }
+
+            // Spending drains the allowance first, so prepaid credits already spent are gone and stay written off.
+            $removed = min($credits, $balance->purchased_credits);
+
+            $balance->update([
+                'credits_remaining' => $balance->credits_remaining - $removed,
+                'purchased_credits' => $balance->purchased_credits - $removed,
+            ]);
+
+            AiCreditTransaction::query()->create([
+                'workspace_id' => $workspace->getKey(),
+                'user_id' => null,
+                'conversation_id' => null,
+                'idempotency_key' => $idempotencyKey,
+                'type' => AiCreditType::Adjustment,
+                'model' => 'stripe',
+                'input_tokens' => 0,
+                'output_tokens' => 0,
+                'credits_charged' => $removed,
+                'metadata' => [...$metadata, 'action' => 'revoke_purchased', 'requested' => $credits, 'removed' => $removed],
+                'created_at' => now(),
+            ]);
+
+            return $removed;
+        });
+    }
+
     /**
      * The prepaid portion of a balance once `credits_remaining` moves to
      * $newRemaining, keeping the `purchased_credits <= credits_remaining`

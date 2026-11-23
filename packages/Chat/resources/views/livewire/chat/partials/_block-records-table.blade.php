@@ -48,6 +48,9 @@
             </template>
 
             <span class="truncate text-sm font-semibold text-gray-900 dark:text-white" x-text="blockTitle(block)"></span>
+            <template x-if="blockSortLabel(block)">
+                <span class="truncate text-sm text-gray-500 dark:text-gray-400" data-block-sort x-text="'· ' + blockSortLabel(block)"></span>
+            </template>
         </span>
         <template x-if="blockHasMore(msg, block)">
             <span class="shrink-0 text-[length:var(--text-micro)] text-gray-400 dark:text-gray-500" x-text="blockFooter(msg, block)"></span>

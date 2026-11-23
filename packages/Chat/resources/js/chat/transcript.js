@@ -134,7 +134,7 @@ function snapshotMessages(messages) {
     }
 }
 
-export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories, proposalTexts }) => ({
+export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messageSearchUnreachableText, messageSearchStalledText, todayLabel, yesterdayLabel, feedbackDeleteConfirmText, blockTitles, blockColumnLabels, blockFooterTemplate, blockSortTexts, blockShowAllTemplate, blockShowFewerText, blockOpenUrlTemplate, attachmentRowText, attachmentRowsTemplate, feedbackCategories, proposalTexts }) => ({
     messageSearchUrlTemplate,
     messageSearchUnreachableText,
     messageSearchStalledText,
@@ -217,6 +217,8 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     // it. Layout changes above the anchor move both, until the reader scrolls away.
     _anchorScrollTarget: null,
     _anchorRestTop: null,
+    // Whether the anchor rests on a tall sent row's tail, decided when the row first lands.
+    _anchorOnTail: null,
     _anchorObserver: null,
 
     // Stable identity for the x-for key: server id when persisted, otherwise a
@@ -452,6 +454,24 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
     blockTitle(block) {
         return blockTitles[block?.type] ?? (block?.title || '');
+    },
+
+    // Two tables of one record type in a reply differ only in how they were read.
+    blockSortLabel(block) {
+        const sort = block?.sort;
+        if (!sort) return '';
+
+        const descending = sort.startsWith('-');
+        const field = sort.replace(/^-/, '');
+
+        if (field === 'created_at') return descending ? blockSortTexts.newest : blockSortTexts.oldest;
+        if (field === 'updated_at') return descending ? blockSortTexts.recentlyUpdated : blockSortTexts.leastRecentlyUpdated;
+        if (field === block.core) return descending ? blockSortTexts.zToA : blockSortTexts.aToZ;
+
+        const column = (block.columns || []).find((c) => c.key === field);
+        const label = column ? this.blockColumnLabel(block, column) : field.replace(/_/g, ' ');
+
+        return (descending ? blockSortTexts.descending : blockSortTexts.ascending).replace(':column', () => label);
     },
 
     // Only columns THIS build named are ours to translate, and the map is
@@ -1835,6 +1855,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
 
         this.anchorKey = msg.clientKey;
         this._anchorScrollPending = true;
+        this._anchorOnTail = null;
 
         // Edit, regenerate and next-step sends render the row a tick later, so the
         // first sync that finds it scrolls: this frame's, or the observer's.
@@ -1848,6 +1869,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
         this._anchorScrollPending = false;
         this._anchorScrollTarget = null;
         this._anchorRestTop = null;
+        this._anchorOnTail = null;
         this.setAnchorReserve(0);
     },
 
@@ -1860,7 +1882,11 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
     anchorScrollTop(el) {
         const scroller = this.$refs.messages;
         const rect = el.getBoundingClientRect();
-        const edge = rect.height > ANCHOR_TALL_ROW_PX ? rect.bottom - ANCHOR_TALL_ROW_TAIL_PX : rect.top;
+        // A reply is read from its start. Deciding from a growing reply's live height
+        // would scroll after its tail on every delta.
+        this._anchorOnTail ??= rect.height > ANCHOR_TALL_ROW_PX
+            && this.messages.find((m) => m.clientKey === this.anchorKey)?.role === 'user';
+        const edge = this._anchorOnTail ? rect.bottom - ANCHOR_TALL_ROW_TAIL_PX : rect.top;
 
         const offset = edge - scroller.getBoundingClientRect().top + scroller.scrollTop;
 

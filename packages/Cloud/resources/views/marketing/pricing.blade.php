@@ -88,7 +88,7 @@
             ]);
             $hostedUpdatesCell = __('Managed by Relaticle. No self-hosted maintenance required');
             $hostedPlanAnswer = __(
-                'Cloud Pro is :price and includes unlimited users and records, every offered AI model (:models), the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers roughly :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. Cloud Scale raises the allowance to :scaleCredits credits, lifts the mailbox cap to :scaleMailboxes, and triples REST API and MCP throughput for $:scalePrice/mo billed yearly. New workspaces start on a :days-day trial automatically, with no card required.',
+                'Cloud Pro is :price and includes unlimited users and records, every offered AI model (:models), the REST API, the MCP server, and email support. Each workspace gets a :credits-credit monthly AI allowance; how far it goes depends on the model and how many tool calls each reply makes (see "What counts as an AI credit?" below). As a reference point, :credits credits covers about :typicalReplies typical replies at the average cost across workspaces, up to :credits simple :cheapestModel replies, or around :dearestReplies :dearestModel replies before tool calls. Cloud Scale raises the allowance to :scaleCredits credits, lifts the mailbox cap to :scaleMailboxes, and triples REST API and MCP throughput for $:scalePrice/mo billed yearly. New workspaces start on a :days-day trial automatically, with no card required.',
                 [
                     'price' => $hostedPriceCell,
                     'scaleCredits' => $scaleCredits,
@@ -98,6 +98,7 @@
                     'models' => $toolCapableCloudModels->pluck('label')->join(', ', ' '.__('and').' '),
                     'cheapestModel' => $cheapestModel,
                     'dearestModel' => $dearestEntry['label'],
+                    'typicalReplies' => \Illuminate\Support\Number::format(\App\Enums\Plan::Pro->typicalReplies()),
                     'dearestReplies' => \Illuminate\Support\Number::format(intdiv((int) \App\Enums\Plan::Pro->credits(), max(1, (int) ceil($dearestEntry['credit_multiplier'])))),
                     'days' => $trialDays,
                 ]
@@ -179,14 +180,20 @@
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
                 @if($billingActive)
-                    {{ __('Add teammates without the bill changing.') }}<br class="hidden sm:block"/>
-                    {{ __('Hosted by us, or self-hosted for free.') }}
+                    {{ __('Add teammates without the bill changing. Hosted by us, or self-hosted for free.') }}
                 @else
                     {{ __('Unlimited users. Unlimited records. Self-host for free, or let us run it for you.') }}
                 @endif
             </p>
             @if($billingActive)
-                <x-cloud::billing.interval-toggle class="mt-6 items-center" />
+                <x-cloud::billing.interval-toggle class="mt-6 items-center" :saving="__('cloud::billing.yearly_save_up_to', ['percent' => max($proPlan->yearlySavingPercent(), $scalePlan->yearlySavingPercent())])" />
+                <p id="pricing-trust" class="mt-4 text-sm text-gray-500 dark:text-gray-400">
+                    {{ __('Open source under AGPL-3.0') }}
+                    @if($githubStars > 0)
+                        <span aria-hidden="true">·</span> {{ __(':count GitHub stars', ['count' => $formattedGithubStars]) }}
+                    @endif
+                    <span aria-hidden="true">·</span> {{ __('Export to CSV anytime') }}
+                </p>
             @endif
         </x-slot:aside>
 
@@ -197,10 +204,20 @@
         @endif
     </x-cloud::marketing.hero>
 
+    @if($billingActive)
+        <x-cloud::marketing.frame>
+            <x-cloud::marketing.frame-header :label="__('Team cost')" :lead="__('Run the per-seat math.')">
+                {{ __('Then invite everyone.') }}
+            </x-cloud::marketing.frame-header>
+
+            @include('cloud::marketing.partials.pricing-team-cost')
+        </x-cloud::marketing.frame>
+    @endif
+
     <x-cloud::marketing.frame id="compare">
         @if($billingActive)
-            <x-cloud::marketing.frame-header :label="__('Compare plans')" :lead="__('Choose how you get started.')">
-                {{ __('Same CRM, different levels of help.') }}
+            <x-cloud::marketing.frame-header :label="__('Compare plans')" :lead="__('The same CRM on every plan.')">
+                {{ __('They differ in AI, limits and help.') }}
             </x-cloud::marketing.frame-header>
 
             @include('cloud::marketing.partials.pricing-comparison')
@@ -268,7 +285,7 @@
             : __('Unlimited users and records. Hosted by us, or on your own server.')"
     >
         <x-cloud::marketing.button :href="route('login')" data-analytics-intent="signup" data-analytics-placement="pricing">
-            {{ __('Start for free') }}
+            {{ $billingActive ? __('Start :days-day trial', ['days' => $trialDays]) : __('Start for free') }}
         </x-cloud::marketing.button>
         @if($billingActive)
             <x-cloud::marketing.button variant="secondary" :href="LocalizedUrl::route('contact')">

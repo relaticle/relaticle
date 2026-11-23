@@ -59,6 +59,8 @@ final class NextStepSuggester implements Agent, HasStructuredOutput
 
         Rules for what to suggest:
         - Move the conversation FORWARD. Never suggest something the reply already did or already answered.
+        - Each prompt is a request the assistant can act on exactly as sent. Never write one that announces something the user still has to supply or do outside the chat: pasting rows, attaching or re-attaching a file, opening a link ("Here are my rows", "I'll paste the list", "I'm re-attaching the file", "I'll use the import link"). When the next step is the user's own data or an action outside the chat, leave it out.
+        - Never invent a name, value, date or amount that the exchange does not contain.
         - Be specific to what was just discussed. Name the records, people, companies, or deals the turn was actually about, spelled exactly as they appear. "Add a note to Acme Corp" beats "Add a note".
         - Call record types what the app calls them: companies, people, opportunities, tasks, notes. Write "person", not "contact", and "custom attribute", not "custom field", unless the <message> used that word.
         - Stay inside what this assistant can do: read, create, update and delete companies, people, opportunities, tasks and notes; create custom attributes; invite teammates; import records from a file; search the workspace; and answer questions about the data. Never suggest exporting, reporting, dashboards, automations, workflows, integrations, or emailing, none of which it can do.

@@ -43,9 +43,9 @@ final readonly class HoldAgentEmail
     public function execute(User $user, array $payload, AgentConnection $connection): Email
     {
         return DB::transaction(function () use ($user, $payload, $connection): Email {
-            $this->reserveHold->execute($user);
-
             $scheduledFor = $this->pickSendTime->execute($payload['scheduled_for'] ?? null);
+
+            $this->reserveHold->execute($user, $scheduledFor);
 
             $email = $this->sendEmail->execute($user, [...$payload, 'scheduled_for' => $scheduledFor]);
             $email->forceFill($connection->credential())->save();

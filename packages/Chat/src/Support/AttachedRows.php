@@ -106,11 +106,46 @@ final readonly class AttachedRows
      */
     private static function rows(ChatAttachment $attachment): array
     {
+        return self::lines($attachment, 0, self::INLINE_ROW_LIMIT);
+    }
+
+    // Offsets count the non-blank rows a preview shows, so offset 25 continues where "the first 25 shown" stopped.
+    /** @return array{header: string, rows: list<string>, next_offset: ?int} */
+    public static function page(ChatAttachment $attachment, int $offset): array
+    {
+        $header = self::csvLine($attachment->header());
+        $lines = self::lines($attachment, $offset, self::INLINE_ROW_LIMIT + 1);
+        $bytes = strlen($header);
+        $rows = [];
+
+        foreach (array_slice($lines, 0, self::INLINE_ROW_LIMIT) as $line) {
+            $bytes += strlen($line) + 1;
+
+            if ($bytes > self::INLINE_BYTE_LIMIT) {
+                break;
+            }
+
+            $rows[] = $line;
+        }
+
+        return [
+            'header' => $header,
+            'rows' => $rows,
+            'next_offset' => count($lines) > count($rows) ? $offset + count($rows) : null,
+        ];
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function lines(ChatAttachment $attachment, int $offset, int $limit): array
+    {
         return $attachment->withLocalFile(fn (string $path): array => array_values(SimpleExcelReader::create($path, 'csv')
             ->trimHeaderRow()
             ->getRows()
             ->reject(fn (array $row): bool => array_all($row, blank(...)))
-            ->take(self::INLINE_ROW_LIMIT)
+            ->skip($offset)
+            ->take($limit)
             ->map(fn (array $row): string => self::csvLine(array_values($row)))
             ->all()));
     }

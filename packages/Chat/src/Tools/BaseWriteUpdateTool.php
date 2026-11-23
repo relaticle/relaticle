@@ -7,7 +7,9 @@ namespace Relaticle\Chat\Tools;
 use App\Enums\WorkspaceCapability;
 use App\Models\User;
 use App\Queries\ViewerZone;
+use App\Support\CustomFields\WorkspaceCustomFields;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Laravel\Ai\Contracts\Tool;
 use Laravel\Ai\Tools\Request;
@@ -136,7 +138,8 @@ abstract class BaseWriteUpdateTool implements Tool
 
         $validator = resolve(CustomFieldsRequestValidator::class);
         $formatter = resolve(CustomFieldsDisplayFormatter::class);
-        $modelClass = $this->modelClass();
+        $definitions = resolve(WorkspaceCustomFields::class)->forEntity($user->currentWorkspace, $this->entityType())->where('active', true)->keyBy('code');
+        $models = $this->targetRecords($user, $records);
         $label = $this->entityLabel();
 
         $actionRecords = [];
@@ -151,12 +154,9 @@ abstract class BaseWriteUpdateTool implements Tool
             }
 
             $recordRequest = new Request($record);
-            $id = $recordRequest->string('id');
+            $id = (string) $recordRequest->string('id');
 
-            $model = $modelClass::query()
-                ->whereBelongsTo($user->currentWorkspace)
-                ->whereKey($id)
-                ->first();
+            $model = $models->get($id);
 
             if (! $model instanceof Model) {
                 return (string) json_encode(['error' => "records[{$index}]: {$label} with ID [{$id}] not found."], JSON_UNESCAPED_SLASHES);
@@ -172,7 +172,7 @@ abstract class BaseWriteUpdateTool implements Tool
                 return (string) json_encode(['error' => "records[{$index}]: {$nameError}"], JSON_UNESCAPED_SLASHES);
             }
 
-            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, ignoreEntityId: $model->getKey(), viewerZone: ViewerZone::strict($user->effectiveTimezone()));
+            $validation = $validator->validate($user, $this->entityType(), $record['custom_fields'] ?? null, ignoreEntityId: $model->getKey(), viewerZone: ViewerZone::strict($user->effectiveTimezone()), definitions: $definitions);
 
             if ($validation->error !== null) {
                 return (string) json_encode(['error' => "records[{$index}]: {$validation->error}"], JSON_UNESCAPED_SLASHES);
@@ -200,7 +200,7 @@ abstract class BaseWriteUpdateTool implements Tool
 
             $displayData = $this->buildDisplayData($recordRequest, $model);
             $displayData['name'] = (string) $model->getAttribute($this->proposalEntity()->titleKey());
-            $customFieldRows = $formatter->format($user, $this->entityType(), $validation->cleanFields, oldModel: $model);
+            $customFieldRows = $formatter->format($user, $this->entityType(), $validation->cleanFields, oldModel: $model, definitions: $definitions);
 
             if ($customFieldRows !== []) {
                 $existingFields = $displayData['fields'] ?? [];
@@ -263,6 +263,25 @@ abstract class BaseWriteUpdateTool implements Tool
             $isBatch ? ['_batch' => true, 'records' => $publicRecords] : $publicRecords[0],
             afterMeta: $skipped === [] ? [] : ['skipped' => $skipped],
         ), JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $records
+     * @return Collection<string, Model>
+     */
+    private function targetRecords(User $user, array $records): Collection
+    {
+        $ids = collect($records)
+            ->filter(fn (mixed $record): bool => is_array($record))
+            ->map(fn (array $record): string => (string) new Request($record)->string('id'))
+            ->all();
+
+        return $this->modelClass()::query()
+            ->whereBelongsTo($user->currentWorkspace)
+            ->whereKey($ids)
+            ->with('customFieldValues')
+            ->get()
+            ->keyBy(fn (Model $model): string => (string) $model->getKey());
     }
 
     /**

@@ -13,7 +13,7 @@ use Relaticle\CustomFields\Facades\CustomFieldsType;
 final readonly class CustomFieldOptionMap
 {
     /**
-     * @param  Collection<int, CustomField>  $fields
+     * @param  Collection<array-key, CustomField>  $fields
      * @return array<string, array{ids: array<string, list<string>>, labels: list<string>}>
      */
     public function fromFields(Collection $fields): array

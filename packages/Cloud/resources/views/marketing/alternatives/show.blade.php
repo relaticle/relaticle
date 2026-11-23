@@ -246,7 +246,7 @@
             <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 <span>{{ __('Primary sources:') }}</span>
                 @foreach ($primarySources as $source)
-                    <a href="{{ $source['url'] }}" rel="nofollow noopener" target="_blank" class="{{ $linkClass }}">{{ $source['label'] }}</a>
+                    <a href="{{ $source['url'] }}" rel="noopener" target="_blank" class="{{ $linkClass }}">{{ $source['label'] }}</a>
                 @endforeach
             </p>
             <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">

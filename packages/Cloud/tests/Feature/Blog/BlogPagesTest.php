@@ -4,14 +4,17 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Relaticle\Cloud\Blog\Jobs\GenerateBlogCover;
 use Relaticle\Cloud\CloudServiceProvider;
 use Relaticle\Cloud\Marketing\Support\BlogCategoryName;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\Ink\Models\Tag;
+use Symfony\Component\DomCrawler\Crawler;
 
 mutates(CloudServiceProvider::class, BlogCategoryName::class);
 
@@ -37,6 +40,7 @@ describe('Blog pages', function () {
     });
 
     it('renders the post cover uncropped on the index', function () {
+        Queue::fake([GenerateBlogCover::class]);
         Post::factory()->published()->create(['featured_image' => 'ink/cover.png']);
 
         $this->get('/blog')
@@ -59,7 +63,8 @@ describe('Blog pages', function () {
 
         $this->get('/blog?page=2')
             ->assertStatus(200)
-            ->assertSee('<link rel="canonical" href="'.url('/blog').'?page=2" />', false);
+            ->assertSee('<link rel="canonical" href="'.url('/blog').'?page=2" />', false)
+            ->assertSee('<meta property="og:url" content="'.url('/blog').'?page=2"/>', false);
     });
 
     it('drops junk and non-page query params from the canonical', function () {
@@ -174,6 +179,22 @@ describe('Blog pages', function () {
             ->assertSee($taggedPost->title)
             ->assertSee('#'.$tag->name)
             ->assertDontSee($otherPost->title);
+    });
+
+    it('names the selected archive in its heading on each page', function () {
+        config(['ink.per_page' => 1]);
+        $category = Category::factory()->create();
+        $tag = Tag::factory()->create();
+        $posts = Post::factory()->published()->count(2)->create(['category_id' => $category->id]);
+        $tag->posts()->attach($posts);
+
+        foreach ([1, 2] as $page) {
+            $categoryPage = $this->get("/blog/category/{$category->slug}?page={$page}")->assertOk();
+            $tagPage = $this->get("/blog/tag/{$tag->slug}?page={$page}")->assertOk();
+
+            expect((new Crawler($categoryPage->getContent()))->filter('h1')->text())->toBe('Posts in '.$category->name)
+                ->and((new Crawler($tagPage->getContent()))->filter('h1')->text())->toBe('Posts tagged #'.$tag->name);
+        }
     });
 
     it('returns 404 for non-existent tag', function () {
@@ -313,10 +334,23 @@ describe('Blog pages', function () {
         Post::factory()->published()->count(3)->create();
 
         $this->get('/blog?page=99')
-            ->assertStatus(200)
+            ->assertNotFound()
             ->assertDontSee('No posts yet')
             ->assertSee('archive only goes up to page 1', escape: false)
-            ->assertSee(route('blog.index'));
+            ->assertSee('href="'.url('/blog').'?page=1"', false);
+    });
+
+    it('links empty German archives back to their own first page', function () {
+        $category = Category::factory()->create();
+        $tag = Tag::factory()->create();
+
+        foreach (['/de/blog', "/de/blog/category/{$category->slug}", "/de/blog/tag/{$tag->slug}"] as $path) {
+            $this->get($path)->assertOk();
+            $this->get($path.'?page=2')->assertNotFound()
+                ->assertSee('Das Archiv reicht nur bis Seite 1.')
+                ->assertSee('Zurück zur ersten Seite')
+                ->assertSee('href="'.url($path).'?page=1"', false);
+        }
     });
 });
 

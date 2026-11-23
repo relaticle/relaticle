@@ -192,6 +192,13 @@ it('tells the suggester to call record types what the app calls them', function 
         ->toContain('Write "person", not "contact", and "custom attribute", not "custom field", unless the <message> used that word');
 });
 
+it('tells the suggester to send only prompts the assistant can act on and to invent nothing', function (): void {
+    expect(resolve(NextStepSuggester::class)->instructions())
+        ->toContain('Each prompt is a request the assistant can act on exactly as sent')
+        ->toContain('When the next step is the user\'s own data or an action outside the chat, leave it out')
+        ->toContain('Never invent a name, value, date or amount that the exchange does not contain');
+});
+
 it('caps the strip at three steps and drops blank or duplicate ones', function (): void {
     NextStepSuggester::fake([['suggestions' => [
         ['label' => 'First', 'prompt' => 'Do the first thing'],
@@ -215,6 +222,28 @@ it('caps the strip at three steps and drops blank or duplicate ones', function (
 
     expect(array_column(persistedNextSteps($messageId), 'label'))
         ->toBe(['First', 'Third', 'Fourth']);
+});
+
+it('drops a step that states what the user will hand over instead of asking for something', function (): void {
+    NextStepSuggester::fake([['suggestions' => [
+        ['label' => 'Use the import link', 'prompt' => "I'll use the import link to upload all 62 companies at once."],
+        ['label' => 'Paste the rows', 'prompt' => 'Here are the first 25 rows from the CSV as plain text for me to create.'],
+        ['label' => 'Paste them now', 'prompt' => 'I’m ready to paste the first 25 rows as plain text.'],
+        ['label' => 'Show my companies', 'prompt' => 'Show me the companies in my workspace.'],
+    ]]]);
+
+    $messageId = seedSuggestibleMessage('assistant', 'Here you go.');
+
+    (new SuggestNextSteps(
+        conversationId: $this->conversationId,
+        messageId: $messageId,
+        message: 'anything',
+        reply: 'Here you go.',
+        provider: 'anthropic',
+    ))->handle();
+
+    expect(array_column(persistedNextSteps($messageId), 'label'))
+        ->toBe(['Show my companies']);
 });
 
 it('truncates a label or prompt the model wrote too long for the strip', function (): void {

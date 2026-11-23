@@ -121,7 +121,7 @@ return [
         'sql_origin_threshold_ms' => env('SENTRY_TRACE_SQL_ORIGIN_THRESHOLD_MS', 100),
 
         // Capture views rendered as spans
-        'views' => env('SENTRY_TRACE_VIEWS_ENABLED', true),
+        'views' => env('SENTRY_TRACE_VIEWS_ENABLED', false),
 
         // Capture Livewire components as spans
         'livewire' => env('SENTRY_TRACE_LIVEWIRE_ENABLED', true),

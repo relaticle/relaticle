@@ -117,7 +117,7 @@ final class StoreEmailJob implements ShouldBeUnique, ShouldQueue
         try {
             $fetched = $mailFactory->make($this->connectedAccount)->fetchMessage($this->messageId);
         } catch (Throwable $exception) {
-            if ($this->releaseIfProviderRateLimited($accountId, $exception)) {
+            if ($this->releaseIfProviderRateLimited($accountId, $exception) || $this->releaseIfProviderUnavailable($accountId, $exception)) {
                 return;
             }
 

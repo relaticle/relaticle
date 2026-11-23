@@ -13,7 +13,7 @@ $root = dirname(__DIR__);
 
 match ($argv[1] ?? null) {
     'config' => writeShardConfig($root, (int) ($argv[2] ?? 0), (int) ($argv[3] ?? 0)),
-    'merge' => mergeGraphs($argv[2] ?? '', $argv[3] ?? ''),
+    'merge' => mergeGraphs($root, $argv[2] ?? '', $argv[3] ?? ''),
     default => fail("usage: php bin/tia-baseline.php config <shard> <total>\n       php bin/tia-baseline.php merge <parts directory> <output directory>"),
 };
 
@@ -120,9 +120,10 @@ function testClass(string $file): string
     return ucfirst(str_replace('/', '\\', substr($file, 0, -strlen('.php'))));
 }
 
-function mergeGraphs(string $partsDirectory, string $outputDirectory): void
+function mergeGraphs(string $root, string $partsDirectory, string $outputDirectory): void
 {
     $parts = glob(rtrim($partsDirectory, '/').'/*/'.GRAPH_FILE) ?: [];
+    $configuration = 'phpunit.xml:'.hash_file('xxh128', $root.'/phpunit.xml');
 
     if ($parts === [] || $outputDirectory === '') {
         fail("no {$partsDirectory}/*/".GRAPH_FILE.' to merge');
@@ -138,6 +139,7 @@ function mergeGraphs(string $partsDirectory, string $outputDirectory): void
             fail("{$part} has an unknown graph schema; update bin/tia-baseline.php for this Pest version");
         }
 
+        $graph['fingerprint']['structural']['phpunit_configuration'] = forPhpunitXml($part, $graph['fingerprint'], $configuration);
         $merged ??= [...$graph, 'files' => [], 'edges' => [], 'baselines' => [], 'test_tables' => []];
 
         if ($graph['fingerprint'] !== $merged['fingerprint']) {
@@ -179,6 +181,20 @@ function mergeGraphs(string $partsDirectory, string $outputDirectory): void
     file_put_contents($outputDirectory.'/'.GRAPH_FILE, json_encode($merged, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR));
 
     echo sprintf("Merged %d parts: %d test files, %d results\n", count($parts), count($merged['edges']), array_sum(array_map(fn (array $baseline): int => count($baseline['results']), $merged['baselines'])));
+}
+
+/**
+ * @param  array{structural: array<string, mixed>}  $fingerprint
+ */
+function forPhpunitXml(string $part, array $fingerprint, string $configuration): string
+{
+    // Pest fingerprints the configuration a run uses. Each part runs its own CONFIG_FILE,
+    // and the runs that read the baseline use phpunit.xml, which every part is cut from.
+    if (! str_starts_with((string) ($fingerprint['structural']['phpunit_configuration'] ?? ''), CONFIG_FILE.':')) {
+        fail("{$part} was not recorded with ".CONFIG_FILE);
+    }
+
+    return $configuration;
 }
 
 function fail(string $message): never

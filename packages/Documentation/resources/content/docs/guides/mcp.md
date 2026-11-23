@@ -241,7 +241,7 @@ The server provides 52 tools. They cover account context, cross-entity discovery
 
 These tools appear only for a connection that was given email access. The reading tools show the synced email its user may see, at the sharing level the mailbox owner chose, plus the user's own drafts and outbox. The mailbox, draft, send and outbox tools work on the user's own mailboxes and emails.
 
-The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
+The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails due to go out in the next 24 hours. Emails scheduled later don't count toward that limit.
 
 A queued email stays tied to the connection that queued it. It is not sent if that connection is revoked, deleted or expired by its send time. The same happens if its user's role no longer allows sending through an assistant. It then waits in the outbox under **Failed** with the reason.
 
@@ -399,6 +399,7 @@ The flat names of the earlier filter no longer exist. Inside `filter`, keys such
 
 ---
 
+{#schema-resources}
 ## Schema Resources
 
 The server exposes five schema resources that describe each entity's fields, including any custom attributes your workspace has configured, plus a summary resource with record counts:
