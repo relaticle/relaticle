@@ -1,7 +1,20 @@
 @php
-    $assistantName = (string) config('chat.assistant_name');
+    use App\Enums\CustomFields\OpportunityField;
+    use Relaticle\Chat\Enums\PendingActionOperation;
+    use Relaticle\Chat\Enums\ProposalEntity;
+
     $opportunityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('opportunity');
-    $closeDate = today();
+    $companyIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath('company');
+    $name = __('Northwind platform expansion');
+    $amount = 48000;
+    $closeDate = today()->addMonthNoOverflow()->endOfMonth();
+    $stage = __('enums/custom-fields.opportunity.stage.options.qualification');
+    $locale = str_replace('_', '-', app()->getLocale());
+    $labels = [
+        'stage' => OpportunityField::STAGE->getDisplayName(),
+        'amount' => OpportunityField::AMOUNT->getDisplayName(),
+        'close' => OpportunityField::CLOSE_DATE->getDisplayName(),
+    ];
 @endphp
 
 <div
@@ -11,75 +24,63 @@
     x-data="{
         decision: 'pending',
         stageIncluded: true,
+        amountIncluded: true,
         closeIncluded: true,
         editing: false,
-        closeDate: @js($closeDate->toDateString()),
-        draftDate: @js($closeDate->toDateString()),
+        amount: {{ $amount }},
+        draftAmount: {{ $amount }},
         reset() {
             this.decision = 'pending'
             this.stageIncluded = true
+            this.amountIncluded = true
             this.closeIncluded = true
             this.editing = false
-            this.closeDate = @js($closeDate->toDateString());
-            this.draftDate = this.closeDate
+            this.amount = {{ $amount }}
+            this.draftAmount = this.amount
         },
-        formatted(date) {
-            return new Date(`${date}T00:00:00`).toLocaleDateString(@js(str_replace('_', '-', app()->getLocale())), { month: 'short', day: 'numeric', year: 'numeric' })
+        money(value) {
+            return new Intl.NumberFormat(@js($locale), { style: 'currency', currency: 'USD' }).format(value)
         },
-        saveDate() {
-            if (this.draftDate) {
-                this.closeDate = this.draftDate
+        saveAmount() {
+            if (Number(this.draftAmount) > 0) {
+                this.amount = Number(this.draftAmount)
             }
 
             this.editing = false
         },
-        get receiptMeta() {
-            const stage = @js(__('Stage'));
-            const close = @js(__('Close date'));
-            const written = [this.stageIncluded ? stage : null, this.closeIncluded ? close : null].filter(Boolean)
-            const left = [this.stageIncluded ? null : stage, this.closeIncluded ? null : close].filter(Boolean)
+        get leftOut() {
+            const left = [this.stageIncluded ? null : @js($labels['stage']), this.amountIncluded ? null : @js($labels['amount']), this.closeIncluded ? null : @js($labels['close'])].filter(Boolean)
 
-            return '· ' + written.join(', ') + (left.length ? ' ' + @js(__('(:fields left out)')).replace(':fields', left.join(', ')) : '')
+            return left.length ? @js(__('(:fields left out)')).replace(':fields', left.join(', ')) : ''
         },
         get reply() {
             if (this.decision === 'discarded') {
-                return @js(__('Okay, I left Northwind renewal as it was.'));
+                return @js(__('Okay, I did not add :name.', ['name' => $name]))
             }
 
-            const date = this.formatted(this.closeDate)
-
-            if (this.stageIncluded && this.closeIncluded) {
-                return @js(__('Done. Northwind renewal is Closed Won, closing :date.')).replace(':date', date)
-            }
-
-            return this.stageIncluded
-                ? @js(__('Done. Northwind renewal is Closed Won. The close date stays as it was.'))
-                : @js(__('Done. Northwind renewal now closes :date. The stage stays Negotiation/Review.')).replace(':date', date)
+            return this.amountIncluded
+                ? @js(__('Done. :name is in your pipeline at :amount.', ['name' => $name])).replace(':amount', this.money(this.amount))
+                : @js(__('Done. :name is in your pipeline with no amount yet.', ['name' => $name]))
         },
     }"
     x-bind:data-decision="decision"
     x-on:demo-reset="reset()"
 >
     <div class="flex justify-end" data-approval-ask>
-        <p class="max-w-[85%] rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm leading-relaxed text-gray-900 dark:bg-white/10 dark:text-gray-100">
-            {{ __('Mark') }}
-            <span class="chat-chip" data-record-type="opportunity">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
-                </svg>
-                <span class="chat-chip-label">{{ __('Northwind renewal') }}</span>
-            </span>
-            {{ __('as won and close it today') }}
+        <p class="max-w-[85%] break-words rounded-2xl rounded-br-md bg-gray-100 px-4 py-2.5 text-sm text-gray-900 dark:bg-white/10 dark:text-gray-100">
+            {!! __('Add a platform expansion for :company at $48,000, closing at the end of next month', [
+                'company' => '<span class="chat-chip" data-record-type="company"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="'.$companyIcon.'"/></svg><span class="chat-chip-label">Northwind</span></span>',
+            ]) !!}
         </p>
     </div>
 
-    <div class="grid px-1 text-sm leading-relaxed">
-        <p class="invisible col-start-1 row-start-1 flex items-center gap-2 text-xs text-gray-600 dark:text-gray-300" data-approval-tool aria-hidden="true">
+    <div class="grid px-1 text-sm leading-6">
+        <p class="invisible col-start-1 row-start-1 flex items-center gap-2 py-2 text-gray-600 dark:text-gray-300" data-approval-tool aria-hidden="true">
             <span class="size-1.5 rounded-full bg-gray-400 dark:bg-gray-500"></span>
-            {{ __('Looking up Northwind renewal…') }}
+            {{ __('Drafting an opportunity…') }}
         </p>
         <p class="col-start-1 row-start-1 text-gray-900 dark:text-gray-100" data-approval-reply>
-            {{ __('I\'ll mark Northwind renewal as Closed Won and set its close date to today.') }}
+            {{ __('I will add :name at $48,000, closing :date.', ['name' => $name, 'date' => $closeDate->isoFormat('ll')]) }}
         </p>
     </div>
 
@@ -93,112 +94,68 @@
                         </svg>
                     </span>
                     <p class="min-w-0 truncate text-sm leading-6">
-                        <span class="text-gray-500 dark:text-gray-400">{{ __('Update') }}</span>
-                        <span class="font-semibold text-gray-900 dark:text-white">{{ __('Northwind renewal') }}</span>
+                        <span class="text-gray-500 dark:text-gray-400">{{ ProposalEntity::Opportunity->createLabel() }}</span>
+                        <span class="font-semibold text-gray-900 dark:text-white">{{ $name }}</span>
                     </p>
                 </div>
 
-                <div class="space-y-1 pb-2.5 pe-3 ps-[3.125rem]">
-                    @foreach([
-                        ['stageIncluded', __('Stage'), __('Negotiation/Review'), null],
-                        ['closeIncluded', __('Close date'), __('Not set'), $closeDate],
-                    ] as [$included, $field, $before, $date])
-                        <div class="group/field flex items-start gap-3 text-sm" data-approval-field="{{ $included }}">
-                            <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400" x-bind:class="{ 'line-through opacity-60': ! {{ $included }} }">{{ $field }}</span>
+                <div class="pb-2 pe-2 ps-[3.125rem]">
+                    <x-cloud::marketing.rela-dock-field :label="__('Name')" :value="$name" editable/>
+                    <x-cloud::marketing.rela-dock-field :label="__('filament/resources/opportunity.fields.company_id.label')" value="Northwind"/>
+                    <x-cloud::marketing.rela-dock-field :label="$labels['stage']" :value="$stage" badge editable toggle="stageIncluded" data-approval-field="stageIncluded"/>
 
-                            @if($date)
-                                <div class="min-w-0 flex-1 py-1" x-show="editing" style="display: none">
-                                    <input
-                                        type="date"
-                                        x-model="draftDate"
-                                        x-ref="dateInput"
-                                        aria-label="{{ __('Close date') }}"
-                                        class="block w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/20 dark:border-white/15 dark:bg-white/5 dark:text-white dark:[color-scheme:dark]"
-                                    >
-                                    <div class="mt-2 flex items-center gap-2">
-                                        <button type="button" x-on:click="saveDate()" class="inline-flex h-7 cursor-pointer items-center rounded-md bg-primary-600 px-2.5 text-xs font-medium text-white shadow-sm hover:bg-primary-500">{{ __('Save') }}</button>
-                                        <button type="button" x-on:click="editing = false; draftDate = closeDate" class="inline-flex h-7 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium text-gray-700 ring-1 ring-gray-200 hover:bg-gray-50 dark:text-gray-200 dark:ring-white/10 dark:hover:bg-white/5">{{ __('Cancel') }}</button>
-                                    </div>
-                                </div>
-                            @endif
-
-                            <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5 leading-8" @if($date) x-show="! editing" @endif x-bind:class="{ 'line-through opacity-60': ! {{ $included }} }">
-                                @if($date)
-                                    <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ $before }}</span>
-                                    <x-lucide-arrow-right class="size-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-                                    <span class="text-gray-900 dark:text-white" x-text="formatted(closeDate)" data-approval-close-date>{{ $date->isoFormat('ll') }}</span>
-                                    <button
-                                        type="button"
-                                        x-show="decision === 'pending'"
-                                        x-on:click="editing = true; draftDate = closeDate; $nextTick(() => $refs.dateInput.focus())"
-                                        aria-label="{{ __('Edit :field', ['field' => $field]) }}"
-                                        class="inline-flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded-md text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 sm:opacity-0 sm:group-hover/field:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-300"
-                                    >
-                                        <x-lucide-square-pen class="h-3.5 w-3.5" aria-hidden="true"/>
-                                    </button>
-                                @else
-                                    <span class="flex basis-full flex-col py-1.5 leading-5">
-                                        <span class="text-xs text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ $before }}</span>
-                                        <span class="text-gray-900 dark:text-white">{{ __('Closed Won') }}</span>
-                                    </span>
-                                @endif
-                            </span>
-
-                            <button
-                                type="button"
-                                x-bind:disabled="decision !== 'pending'"
-                                x-on:click="{{ $included }} = ! {{ $included }}"
-                                x-bind:aria-label="{{ $included }} ? @js(__('Leave out :field', ['field' => $field])) : @js(__('Keep :field', ['field' => $field]))"
-                                aria-label="{{ __('Leave out :field', ['field' => $field]) }}"
-                                class="inline-flex min-h-8 min-w-8 shrink-0 cursor-pointer items-center justify-center rounded-md transition focus-visible:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
-                                x-bind:class="{{ $included }} ? 'text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:opacity-0 sm:group-hover/field:opacity-100 dark:hover:bg-white/10 dark:hover:text-gray-200' : 'px-1.5 text-xs font-medium text-primary-600 hover:underline dark:text-primary-400'"
-                            >
-                                <x-lucide-x class="h-3.5 w-3.5" x-show="{{ $included }}" aria-hidden="true"/>
-                                <span x-show="! {{ $included }}" style="display: none">{{ __('Keep') }}</span>
-                            </button>
+                    <div class="group/field flex items-start gap-3" x-show="editing" style="display: none" data-approval-field="amountIncluded">
+                        <span class="w-24 shrink-0 truncate py-1.5 text-xs leading-5 text-gray-500 sm:w-32 dark:text-gray-400">{{ $labels['amount'] }}</span>
+                        <div class="w-full min-w-0">
+                            <label class="flex overflow-hidden rounded-lg bg-white shadow-sm ring-1 ring-gray-950/10 focus-within:ring-2 focus-within:ring-primary-600 dark:bg-white/5 dark:ring-white/20">
+                                <span class="flex items-center border-e border-gray-200 px-3 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">$</span>
+                                <span class="sr-only">{{ $labels['amount'] }}</span>
+                                <input type="number" inputmode="decimal" step="0.01" x-model="draftAmount" x-ref="amountInput" class="block w-full border-0 bg-transparent px-3 py-1.5 text-sm text-gray-950 focus:outline-none focus:ring-0 dark:text-white">
+                            </label>
+                            <div class="mt-2 flex items-center gap-2">
+                                <button type="button" x-on:click="saveAmount()" class="inline-flex h-7 cursor-pointer items-center rounded-lg bg-primary-600 px-2.5 text-xs font-semibold text-white shadow-sm hover:bg-primary-500">{{ __('Save') }}</button>
+                                <button type="button" x-on:click="editing = false; draftAmount = amount" class="inline-flex h-7 cursor-pointer items-center rounded-lg bg-white px-2.5 text-xs font-semibold text-gray-950 shadow-sm ring-1 ring-gray-950/10 hover:bg-gray-50 dark:bg-white/5 dark:text-white dark:ring-white/20 dark:hover:bg-white/10">{{ __('Cancel') }}</button>
+                            </div>
                         </div>
-                    @endforeach
+                    </div>
+                    <x-cloud::marketing.rela-dock-field
+                        x-show="! editing"
+                        :label="$labels['amount']"
+                        editable="editing = true; draftAmount = amount; $nextTick(() => $refs.amountInput.focus())"
+                        toggle="amountIncluded"
+                    ><span x-text="money(amount)" data-approval-amount>{{ \Illuminate\Support\Number::currency($amount, 'USD', app()->getLocale()) }}</span></x-cloud::marketing.rela-dock-field>
+
+                    <x-cloud::marketing.rela-dock-field :label="$labels['close']" :value="$closeDate->isoFormat('ll')" editable toggle="closeIncluded" data-approval-field="closeIncluded"/>
                 </div>
 
-                <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5" data-approval-pending>
-                    <button type="button" x-on:click="decision = 'discarded'; editing = false" class="inline-flex h-7 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white">{{ __('Discard') }}</button>
+                <div class="flex items-center justify-end gap-2 border-t border-gray-100 px-4 py-2 dark:border-white/5" x-bind:class="{ 'opacity-50 pointer-events-none': editing }" data-approval-pending>
+                    <button type="button" x-on:click="decision = 'discarded'; editing = false" class="inline-flex h-7 cursor-pointer items-center rounded-md px-2.5 text-xs font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-white/10 dark:hover:text-white">{{ ProposalEntity::Opportunity->declineLabel() }}</button>
                     <x-cloud::marketing.rela-approve
-                        :label="__('Approve')"
+                        :label="ProposalEntity::Opportunity->confirmLabel(PendingActionOperation::Create)"
                         x-on:click="decision = 'approved'; editing = false"
-                        x-bind:disabled="! stageIncluded && ! closeIncluded"
                         data-approval-button
                     />
                 </div>
             </x-cloud::marketing.window>
         </div>
 
-        <div class="col-start-1 row-start-1 self-start space-y-3">
-        <div class="grid">
-        <div class="invisible col-start-1 row-start-1" x-bind:class="{ 'invisible': decision !== 'approved' }" data-approval-done>
-            <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied 1 change · just now') }}</p>
-            <div class="mt-1 flex min-w-0 items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm text-gray-700 dark:text-gray-300">
-                <x-lucide-check class="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true"/>
-                <span class="shrink-0 whitespace-nowrap">{{ __('Updated') }}</span>
-                <span class="chat-chip min-w-0" data-record-type="opportunity">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" class="h-3 w-3" aria-hidden="true">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $opportunityIcon }}"/>
-                    </svg>
-                    <span class="chat-chip-label">{{ __('Northwind renewal') }}</span>
-                </span>
-                <span class="min-w-0 truncate text-gray-500 dark:text-gray-400" x-text="receiptMeta"></span>
-            </div>
-        </div>
+        <div class="col-start-1 row-start-1 self-start space-y-5 pt-10">
+            <div class="grid">
+                <div class="invisible col-start-1 row-start-1" x-bind:class="{ 'invisible': decision !== 'approved' }" data-approval-done>
+                    <p class="px-2 text-xs text-gray-500 dark:text-gray-400">{{ __('Applied :count change · :when', ['count' => 1, 'when' => __('just now')]) }}</p>
+                    <x-cloud::marketing.rela-receipt-line class="mt-1" :verb="ProposalEntity::Opportunity->receiptVerb(PendingActionOperation::Create)" type="opportunity" :name="$name">
+                        <x-slot:meta x-show="leftOut !== ''" x-text="leftOut"></x-slot:meta>
+                    </x-cloud::marketing.rela-receipt-line>
+                </div>
 
-        <x-cloud::marketing.rela-settled
-            class="invisible col-start-1 row-start-1 py-1.5"
-            x-bind:class="{ 'invisible': decision !== 'discarded' }"
-            :summary="__('Update Northwind renewal')"
-            data-approval-discarded
-        />
-        </div>
-        <p class="invisible px-1 text-sm leading-relaxed text-gray-900 dark:text-gray-100" x-bind:class="{ 'invisible': decision === 'pending' }" x-text="reply" aria-live="polite" data-approval-followup></p>
+                <x-cloud::marketing.rela-settled
+                    class="invisible col-start-1 row-start-1 py-1.5"
+                    x-bind:class="{ 'invisible': decision !== 'discarded' }"
+                    :summary="ProposalEntity::Opportunity->createSummary($name)"
+                    data-approval-discarded
+                />
+            </div>
+            <p class="invisible px-1 text-sm leading-6 text-gray-900 dark:text-gray-100" x-bind:class="{ 'invisible': decision === 'pending' }" x-text="reply" aria-live="polite" data-approval-followup></p>
         </div>
     </div>
-
-
 </div>

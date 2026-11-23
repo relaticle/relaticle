@@ -107,7 +107,8 @@ against the app, so a reviewer opens both and compares them.
 Words and options come from the class that owns them in the app: `ProposalEntity` for card titles,
 verbs and receipt verbs, `OpportunityField` and `TaskField` for attribute names and option colors.
 A proposal docks where the message box was, and the box stays hidden until the visitor decides. After
-the decision the app resumes the turn, so Rela's next reply follows the receipt.
+the decision the app resumes the turn, so Rela's next reply follows the receipt. Only a create card offers
+the edit pencil (`ProposalCard::editableCodesOf()`), so a mock that demos fixing a field shows a create.
 
 ## Type roles
 
