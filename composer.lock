@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "447c6aecdd4b638685d152bc1ffbc387",
+    "content-hash": "98b16870f03b662be6ed81cbaa2c8282",
     "packages": [
         {
             "name": "andreiio/blade-remix-icon",
@@ -10729,16 +10729,16 @@
         },
         {
             "name": "relaticle/ink",
-            "version": "v2.7.2",
+            "version": "v2.7.3",
             "source": {
                 "type": "git",
                 "url": "https://github.com/relaticle/ink.git",
-                "reference": "5e3cd04d55c29b90be891c15fff3f7ac04f8d15c"
+                "reference": "b2bf79cbaff8b0f20449838dbb527007e8ee712f"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/relaticle/ink/zipball/5e3cd04d55c29b90be891c15fff3f7ac04f8d15c",
-                "reference": "5e3cd04d55c29b90be891c15fff3f7ac04f8d15c",
+                "url": "https://api.github.com/repos/relaticle/ink/zipball/b2bf79cbaff8b0f20449838dbb527007e8ee712f",
+                "reference": "b2bf79cbaff8b0f20449838dbb527007e8ee712f",
                 "shasum": ""
             },
             "require": {
@@ -10751,7 +10751,7 @@
                 "spatie/laravel-markdown": "^2.8",
                 "spatie/laravel-package-tools": "^1.93",
                 "spatie/laravel-sitemap": "^8.2",
-                "spatie/laravel-sluggable": "^4.0"
+                "spatie/laravel-sluggable": "^4.0 || ^5.0 || ^6.0"
             },
             "require-dev": {
                 "laravel/mcp": "^0.9",
@@ -10800,8 +10800,8 @@
                 "issues": "https://github.com/relaticle/ink/issues",
                 "source": "https://github.com/relaticle/ink"
             },
-            "time": "2026-11-20T17:45:50+00:00",
-            "published-time": "2026-11-20T17:46:00+00:00"
+            "time": "2026-11-23T00:50:53+00:00",
+            "published-time": "2026-11-23T00:51:12+00:00"
         },
         {
             "name": "ryangjchandler/blade-capture-directive",
@@ -13226,28 +13226,28 @@
         },
         {
             "name": "spatie/laravel-sluggable",
-            "version": "4.0.6",
+            "version": "6.0.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/spatie/laravel-sluggable.git",
-                "reference": "8bdb6cc508459b22328f2743fda18883957da0a1"
+                "reference": "d0137c02bb85477d04ddd5da49f34c4d71087ff9"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/spatie/laravel-sluggable/zipball/8bdb6cc508459b22328f2743fda18883957da0a1",
-                "reference": "8bdb6cc508459b22328f2743fda18883957da0a1",
+                "url": "https://api.github.com/repos/spatie/laravel-sluggable/zipball/d0137c02bb85477d04ddd5da49f34c4d71087ff9",
+                "reference": "d0137c02bb85477d04ddd5da49f34c4d71087ff9",
                 "shasum": ""
             },
             "require": {
-                "illuminate/database": "^12.0|^13.0",
-                "illuminate/support": "^12.0|^13.0",
-                "php": "^8.3"
+                "illuminate/database": "^13.0",
+                "illuminate/support": "^13.0",
+                "php": "^8.4"
             },
             "require-dev": {
                 "larastan/larastan": "^3.0",
                 "laravel/pint": "^1.24",
-                "orchestra/testbench": "^10.0|^11.0",
-                "pestphp/pest": "^4.0",
+                "orchestra/testbench": "^11.0",
+                "pestphp/pest": "^5.0",
                 "spatie/laravel-translatable": "^6.0"
             },
             "type": "library",
@@ -13292,7 +13292,7 @@
             ],
             "support": {
                 "issues": "https://github.com/spatie/laravel-sluggable/issues",
-                "source": "https://github.com/spatie/laravel-sluggable/tree/4.0.6"
+                "source": "https://github.com/spatie/laravel-sluggable/tree/6.0.0"
             },
             "funding": [
                 {
@@ -13300,8 +13300,8 @@
                     "type": "github"
                 }
             ],
-            "time": "2026-10-27T14:24:52+00:00",
-            "published-time": "2026-10-27T14:26:29+00:00"
+            "time": "2026-11-13T13:00:30+00:00",
+            "published-time": "2026-11-13T13:01:27+00:00"
         },
         {
             "name": "spatie/mailcoach-mailer",
