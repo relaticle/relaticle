@@ -44,6 +44,8 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
         $invitation = $this->ownedInvitation($invitationId);
 
         if (! $invitation instanceof WorkspaceInvitation) {
+            $this->sendNotification(__('workspaces.accept.no_longer_valid'), type: 'danger');
+
             return;
         }
 
@@ -75,6 +77,8 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
         $invitation = $this->ownedInvitation($invitationId);
 
         if (! $invitation instanceof WorkspaceInvitation) {
+            $this->sendNotification(__('workspaces.accept.no_longer_valid'), type: 'danger');
+
             return;
         }
 

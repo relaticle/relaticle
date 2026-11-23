@@ -200,6 +200,27 @@ test('declining revokes the invitation without joining', function (): void {
         ->and($invitee->fresh()->belongsToWorkspace($workspace))->toBeFalse();
 });
 
+test('a card whose invitation was revoked meanwhile says so on either button', function (string $button): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $invitation = $workspace->workspaceInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'member',
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    $card = livewire(PendingInvitationsForUser::class)->assertSee($workspace->name);
+    $invitation->delete();
+
+    $card->call($button, $invitation->id)
+        ->assertNotified(__('workspaces.accept.no_longer_valid'))
+        ->assertDontSee($workspace->name);
+
+    expect($invitee->fresh()->belongsToWorkspace($workspace))->toBeFalse();
+})->with(['accept', 'decline']);
+
 test('another users invitation is invisible and cannot be accepted', function (): void {
     $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
     $invitation = $workspace->workspaceInvitations()->create([
