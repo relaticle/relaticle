@@ -294,10 +294,10 @@ body.reordering-column .column-resize-handle-bar::before {
     }
 
     .fi-page:has(> .fi-ta-fill-screen) {
-        @apply h-full;
+        @apply flex h-full flex-col;
 
         .fi-page-header-main-ctn {
-            @apply h-full gap-y-0 py-0;
+            @apply min-h-0 flex-1 gap-y-0 py-0;
         }
 
         .fi-page-main {

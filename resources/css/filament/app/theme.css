@@ -1917,16 +1917,32 @@ html.fi-record-stacked .fi-record-layout {
     }
 }
 
+/* A pending invitation renders above the page's own padding, so it takes that padding as its top margin. */
+.fi-page-invitations .fi-section {
+    @apply mt-6 mb-0;
+}
+
+/* Edge-to-edge pages have no padding, so the invitation takes their toolbar's inset. */
+:is(.fi-resource-list-records-page:not(.fi-page-has-sub-navigation), .fi-edge-to-edge-page, .fi-page:has(.fi-board-header))
+    > .fi-page-invitations
+    .fi-section {
+    @apply mx-4 mt-3 lg:mx-6;
+}
+
+.fi-record-page > .fi-page-invitations .fi-section {
+    @apply record-split:mx-6 record-split:mt-3;
+}
+
 /* Boards: a toolbar row like the lists, then the columns fill what is left of the viewport. */
 .fi-app-layout .fi-main:has(.fi-board-header) {
     @apply h-full;
 }
 
 .fi-page:has(.fi-board-header) {
-    @apply h-full;
+    @apply flex h-full flex-col;
 
     .fi-page-header-main-ctn {
-        @apply h-full gap-y-0 py-0;
+        @apply min-h-0 flex-1 gap-y-0 py-0;
     }
 
     .fi-board-header {
