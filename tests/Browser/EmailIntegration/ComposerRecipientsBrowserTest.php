@@ -379,3 +379,17 @@ it('keeps the recipient suggestions under the field while a forwarded email scro
         ->assertScript($suggestionsUnderField, 6)
         ->assertNoJavaScriptErrors();
 });
+
+it('lets the writing area fill the composer window so a click anywhere below the text starts typing', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->currentWorkspace;
+    connectSendingMailbox($user);
+
+    visitAs($user, "/app/{$workspace->slug}/email", 1440, 900)
+        ->click(__('filament/concerns/email-compose.actions.compose.label'))
+        ->waitForText(__('filament/emails/composer.title'))
+        ->assertScript('(() => { const body = document.querySelector(".email-composer-body").getBoundingClientRect(); const editor = document.querySelector(".email-composer-body .ProseMirror").getBoundingClientRect(); return body.bottom - editor.bottom < 24; })()', true)
+        ->assertNoJavaScriptErrors();
+});
