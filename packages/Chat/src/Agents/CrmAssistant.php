@@ -48,6 +48,7 @@ use Relaticle\Chat\Tools\Company\CreateCompanyTool as ChatCreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool as ChatDeleteCompanyTool;
 use Relaticle\Chat\Tools\Company\GetCompanyTool as ChatGetCompanyTool;
 use Relaticle\Chat\Tools\Company\ListCompaniesTool as ChatListCompaniesTool;
+use Relaticle\Chat\Tools\Company\MergeCompaniesTool as ChatMergeCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool as ChatUpdateCompanyTool;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
@@ -83,6 +84,7 @@ use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\People\DeletePersonTool;
 use Relaticle\Chat\Tools\People\GetPersonTool;
 use Relaticle\Chat\Tools\People\ListPeopleTool as ChatListPeopleTool;
+use Relaticle\Chat\Tools\People\MergePeopleTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\SearchCrmTool;
 use Relaticle\Chat\Tools\SearchDocsTool;
@@ -119,6 +121,8 @@ final class CrmAssistant implements Agent, Conversational, HasProviderOptions, H
         ChatDeleteTaskTool::class,
         ChatDeleteNoteTool::class,
         DeleteCustomFieldTool::class,
+        ChatMergeCompaniesTool::class,
+        MergePeopleTool::class,
     ];
 
     /**
@@ -1096,24 +1100,7 @@ PROMPT;
             AggregateCrmTool::class,
             ...$this->emailToolClasses(),
 
-            // Write tools
-            ChatCreateCompanyTool::class,
-            ChatUpdateCompanyTool::class,
-            ChatDeleteCompanyTool::class,
-            CreatePersonTool::class,
-            UpdatePersonTool::class,
-            DeletePersonTool::class,
-            ChatCreateOpportunityTool::class,
-            ChatUpdateOpportunityTool::class,
-            ChatDeleteOpportunityTool::class,
-            ChatCreateTaskTool::class,
-            ChatUpdateTaskTool::class,
-            ChatDeleteTaskTool::class,
-            ChatCreateNoteTool::class,
-            ChatUpdateNoteTool::class,
-            ChatDeleteNoteTool::class,
-            InviteWorkspaceMemberTool::class,
-            RemoveSampleDataTool::class,
+            ...$this->writeToolClasses(),
 
             // Schema management tools (admin-only, proposal-gated)
             CreateCustomFieldTool::class,
@@ -1130,6 +1117,34 @@ PROMPT;
             $classes,
             fn (string $class): bool => ! in_array($class, self::SETUP_MODE_EXCLUDED_TOOLS, true),
         ));
+    }
+
+    /**
+     * @return list<class-string<Tool>>
+     */
+    private function writeToolClasses(): array
+    {
+        return [
+            ChatCreateCompanyTool::class,
+            ChatUpdateCompanyTool::class,
+            ChatDeleteCompanyTool::class,
+            ChatMergeCompaniesTool::class,
+            CreatePersonTool::class,
+            UpdatePersonTool::class,
+            DeletePersonTool::class,
+            MergePeopleTool::class,
+            ChatCreateOpportunityTool::class,
+            ChatUpdateOpportunityTool::class,
+            ChatDeleteOpportunityTool::class,
+            ChatCreateTaskTool::class,
+            ChatUpdateTaskTool::class,
+            ChatDeleteTaskTool::class,
+            ChatCreateNoteTool::class,
+            ChatUpdateNoteTool::class,
+            ChatDeleteNoteTool::class,
+            InviteWorkspaceMemberTool::class,
+            RemoveSampleDataTool::class,
+        ];
     }
 
     /**

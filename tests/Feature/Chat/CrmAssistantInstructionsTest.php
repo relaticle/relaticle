@@ -31,6 +31,7 @@ use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Tools\BaseReadListTool;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool;
+use Relaticle\Chat\Tools\Company\MergeCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
@@ -44,6 +45,7 @@ use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\People\DeletePersonTool;
 use Relaticle\Chat\Tools\People\ListPeopleTool;
+use Relaticle\Chat\Tools\People\MergePeopleTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\SearchDocsTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
@@ -1041,7 +1043,7 @@ it('leaves the chatgpt plugin line out when the install has no plugin', function
         ->not->toContain('chatgpt_plugin:');
 });
 
-it('drops only the delete tools in setup mode and keeps updates and field definitions', function (): void {
+it('drops only the delete and merge tools in setup mode and keeps updates and field definitions', function (): void {
     $names = fn (CrmAssistant $agent): array => array_map(fn (object $tool): string => $tool::class, $agent->tools());
 
     $normal = $names(resolve(CrmAssistant::class));
@@ -1054,6 +1056,8 @@ it('drops only the delete tools in setup mode and keeps updates and field defini
         ->not->toContain(DeleteTaskTool::class)
         ->not->toContain(DeleteNoteTool::class)
         ->not->toContain(DeleteCustomFieldTool::class)
+        ->not->toContain(MergeCompaniesTool::class)
+        ->not->toContain(MergePeopleTool::class)
         ->toContain(UpdatePersonTool::class)
         ->toContain(UpdateCompanyTool::class)
         ->toContain(UpdateOpportunityTool::class)
@@ -1068,7 +1072,7 @@ it('drops only the delete tools in setup mode and keeps updates and field defini
         ->toContain(GuideToPageTool::class)
         ->toContain(SearchDocsTool::class)
         ->toContain(ListPeopleTool::class)
-        ->and($setup)->toHaveCount(count($normal) - 6);
+        ->and($setup)->toHaveCount(count($normal) - 8);
 });
 
 it('carries the setup mode instructions in the cached static block', function (): void {

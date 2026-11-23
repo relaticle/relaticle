@@ -124,6 +124,10 @@ return [
             'task' => 'Delete :count Task|Delete :count Tasks',
             'note' => 'Delete :count Note|Delete :count Notes',
         ],
+        'merge' => [
+            'company' => 'Merge :count Pair of Companies|Merge :count Pairs of Companies',
+            'people' => 'Merge :count Pair of People|Merge :count Pairs of People',
+        ],
     ],
     'batch_summary' => [
         'create' => [
@@ -149,6 +153,10 @@ return [
             'task' => 'Delete :count task|Delete :count tasks',
             'note' => 'Delete :count note|Delete :count notes',
         ],
+        'merge' => [
+            'company' => 'Merge :count pair of companies|Merge :count pairs of companies',
+            'people' => 'Merge :count pair of people|Merge :count pairs of people',
+        ],
     ],
     'delete_title' => [
         'company' => 'Delete Company',
@@ -164,6 +172,15 @@ return [
         'task' => 'Delete Task ":name"',
         'note' => 'Delete Note ":name"',
     ],
+    'merge_title' => [
+        'company' => 'Merge Companies',
+        'people' => 'Merge People',
+    ],
+    'merge_summary' => [
+        'company' => 'Merge Company ":pair"',
+        'people' => 'Merge Person ":pair"',
+    ],
+    'merge_pair' => ':secondary into :primary',
     'receipt_batch' => [
         'create' => [
             'company' => 'Created :count company|Created :count companies',
@@ -189,6 +206,10 @@ return [
             'task' => 'Deleted :count task|Deleted :count tasks',
             'note' => 'Deleted :count note|Deleted :count notes',
             'custom_field' => 'Deleted :count custom attribute|Deleted :count custom attributes',
+        ],
+        'merge' => [
+            'company' => 'Merged :count pair of companies|Merged :count pairs of companies',
+            'people' => 'Merged :count pair of people|Merged :count pairs of people',
         ],
     ],
 ];

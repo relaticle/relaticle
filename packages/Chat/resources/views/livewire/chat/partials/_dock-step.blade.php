@@ -7,10 +7,11 @@
 @php
     $stepId = $step['id'];
     $entityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath($step['entity_type']);
-    $isDelete = $step['operation'] === 'delete';
+    $writesFields = \Relaticle\Chat\Enums\PendingActionOperation::from($step['operation'])->writesFields();
     $verb = match ($step['operation']) {
         'update' => __('Update'),
         'delete' => __('Delete'),
+        'merge' => __('Merge'),
         default => $step['createLabel'],
     };
     $lineName = $step['isBatch'] || $step['recordLabel'] === '' ? $step['summary'] : $step['recordLabel'];
@@ -227,7 +228,7 @@
                                 @include('chat::livewire.chat.partials._dock-overwrite-notice', ['notice' => $step['repeatNotices'][$rowIndex]['text'], 'noticeUrl' => $step['repeatNotices'][$rowIndex]['url'], 'noticeKind' => 'repeat', 'class' => 'my-1'])
                             @endif
 
-                            @if (! $rowOut && ! $isDelete)
+                            @if (! $rowOut && $writesFields)
                                 @include('chat::livewire.chat.partials._dock-line-values', [
                                     'fields' => $rowFields,
                                     'stepId' => $stepId,
@@ -245,7 +246,7 @@
             @elseif ($isPlan)
                 <div class="pb-2.5 pe-3 ps-[3.125rem]">
                     @include('chat::livewire.chat.partials._dock-line-values', [
-                        'fields' => $isDelete ? [] : $step['fields'],
+                        'fields' => $writesFields ? $step['fields'] : [],
                         'stepId' => $stepId,
                         'titleKey' => $step['titleKey'],
                         'titleLabels' => $step['titleLabels'],

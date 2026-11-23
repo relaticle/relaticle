@@ -10,7 +10,7 @@
      ProposalEntity::receipts(), so this template never branches on an outcome. --}}
 @php
     $leftOutLabel = \Relaticle\Chat\Enums\ProposalOutcome::LeftOut->label();
-    $summaryExpression = "action.display?.summary ?? ((".\Illuminate\Support\Js::from(['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete')]).")[action.operation] ?? action.operation)";
+    $summaryExpression = "action.display?.summary ?? ((".\Illuminate\Support\Js::from(['create' => __('Create'), 'update' => __('Update'), 'delete' => __('Delete'), 'merge' => __('Merge')]).")[action.operation] ?? action.operation)";
 @endphp
 {{-- COMPACT progress view while the batch is still docked. Gated on there being
      partial progress to show: a pending step nobody has touched has no items and

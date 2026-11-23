@@ -124,6 +124,10 @@ return [
             'task' => ':count Aufgabe löschen|:count Aufgaben löschen',
             'note' => ':count Notiz löschen|:count Notizen löschen',
         ],
+        'merge' => [
+            'company' => ':count Firmenpaar zusammenführen|:count Firmenpaare zusammenführen',
+            'people' => ':count Personenpaar zusammenführen|:count Personenpaare zusammenführen',
+        ],
     ],
     'batch_summary' => [
         'create' => [
@@ -149,6 +153,10 @@ return [
             'task' => ':count Aufgabe löschen|:count Aufgaben löschen',
             'note' => ':count Notiz löschen|:count Notizen löschen',
         ],
+        'merge' => [
+            'company' => ':count Firmenpaar zusammenführen|:count Firmenpaare zusammenführen',
+            'people' => ':count Personenpaar zusammenführen|:count Personenpaare zusammenführen',
+        ],
     ],
     'delete_title' => [
         'company' => 'Unternehmen löschen',
@@ -164,6 +172,15 @@ return [
         'task' => 'Aufgabe „:name“ löschen',
         'note' => 'Notiz „:name“ löschen',
     ],
+    'merge_title' => [
+        'company' => 'Firmen zusammenführen',
+        'people' => 'Personen zusammenführen',
+    ],
+    'merge_summary' => [
+        'company' => 'Firma „:pair“ zusammenführen',
+        'people' => 'Person „:pair“ zusammenführen',
+    ],
+    'merge_pair' => ':secondary in :primary',
     'receipt_batch' => [
         'create' => [
             'company' => ':count Unternehmen erstellt|:count Unternehmen erstellt',
@@ -189,6 +206,10 @@ return [
             'task' => ':count Aufgabe gelöscht|:count Aufgaben gelöscht',
             'note' => ':count Notiz gelöscht|:count Notizen gelöscht',
             'custom_field' => ':count benutzerdefiniertes Attribut gelöscht|:count benutzerdefinierte Attribute gelöscht',
+        ],
+        'merge' => [
+            'company' => ':count Firmenpaar zusammengeführt|:count Firmenpaare zusammengeführt',
+            'people' => ':count Personenpaar zusammengeführt|:count Personenpaare zusammengeführt',
         ],
     ],
 ];

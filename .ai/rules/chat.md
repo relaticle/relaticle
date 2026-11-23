@@ -38,7 +38,9 @@ as it looked when only step one had streamed in.
 ## ProposalPayload is the only decoder for `pending_actions.action_data`
 That column is a four-arm union of marker keys: a single create is the record itself,
 a single update adds `_record_id`/`_model_class`, a single delete is `_record_ids`, and
-any multi-record proposal is `_batch` + `records`. Read it through
+any multi-record proposal is `_batch` + `records`. A merge pair adds `_merge_with` (the
+secondary) to `_record_id` (the primary) and `_model_class`, alone or as a batch item, and
+`ProposalPayload::mergeWithOf()` reads it. Read it through
 `Support\ProposalPayload` (and `ProposalProgress` for `result_data.items`), never
 re-derive `($data['_batch'] ?? false) === true` inline. Fifteen inline copies used to
 disagree: the dock counted a malformed batch as one record while approval threw.

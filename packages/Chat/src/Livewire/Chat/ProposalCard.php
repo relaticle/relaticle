@@ -833,7 +833,7 @@ final class ProposalCard extends BaseLivewireComponent
     /**
      * Field codes the user may uncheck: coded rows minus the entity's title key
      * (a create without it fails validation), and for an update only the rows
-     * that actually change something. A delete writes no fields at all, and a
+     * that actually change something. A delete or a merge writes no fields at all, and a
      * batch leaves out whole rows instead.
      *
      * @return list<string>
@@ -844,7 +844,7 @@ final class ProposalCard extends BaseLivewireComponent
             return [];
         }
 
-        if ($pendingAction->operation === PendingActionOperation::Delete || $pendingAction->entity_type->isIndivisible() || ProposalPayload::from($pendingAction)->isBatch) {
+        if (! $pendingAction->operation->writesFields() || $pendingAction->entity_type->isIndivisible() || ProposalPayload::from($pendingAction)->isBatch) {
             return [];
         }
 
