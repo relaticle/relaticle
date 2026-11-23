@@ -100,8 +100,7 @@ and batch steps) and `chat-plan` (a message with its plan under it). Rela's side
 `rela-panel` and `rela-panel-header` (the panel and its header row), `rela-composer` (the empty message
 box), `rela-dock-field` (a field row on a single-record card), `rela-receipt-line` and `rela-settled`
 (the lines a decision leaves) and `rela-records` (the table a read renders). A page passes its sample
-data and nothing else, so a fix to a component reaches every page that shows that screen. The homepage
-board (`home/partials/board-mock`) predates them and still carries its own markup. No test reads a mock
+data and nothing else, so a fix to a component reaches every page that shows that screen. No test reads a mock
 against the app, so a reviewer opens both and compares them.
 
 Words and options come from the class that owns them in the app: `ProposalEntity` for card titles,
@@ -190,8 +189,9 @@ reach it. Change the header height and the token together. `html` also carries `
   to three short lines, rendered as hairline rows under the lead; each names something the help docs
   describe. A prop is never named `loop`: Blade's own `$loop` overwrites it after the
   facts `@foreach`.
-- `board-mock`: the opportunities board built from the live board's markup, with a card that
-  `motion.js` drags to the next stage. The hero tab and the press page keep the screenshot.
+- `board-mock`: `app-board` with sample data, with a card that `motion.js` drags to the next stage. `app-board`
+  carries the hooks the drag needs: a column's `count` before and after, a card's `attributes` and a column's drop
+  `slot`. The hero tab and the press page keep the screenshot.
 - `window`: the frame around a product fragment.
 - `app-screen`, `app-board`, `app-list`, `app-plan`, `chat-plan`: the app's own screens, rebuilt from the live
   markup. The Product mocks section says how to build and check them.
