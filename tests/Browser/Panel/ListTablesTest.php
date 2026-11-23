@@ -176,6 +176,24 @@ it('fits a pending invitation above the list and the board, in line with the too
     }
 });
 
+it('keeps a pending invitation off the sidebar and the top bar on a record page and Home', function (): void {
+    $this->withVite();
+
+    $user = User::factory()->withWorkspace()->create();
+    $workspace = $user->ownedWorkspaces()->first();
+    $company = Company::factory()->recycle([$user, $workspace])->create();
+    WorkspaceInvitation::factory()->create(['email' => $user->email]);
+
+    $inset = '(() => { const card = document.querySelector(".fi-page-invitations .fi-section").getBoundingClientRect(); const main = document.querySelector(".fi-main").getBoundingClientRect(); const topbar = document.querySelector(".fi-topbar").getBoundingClientRect(); return [Math.round(card.left - main.left), Math.round(card.top - topbar.bottom)]; })()';
+
+    $page = visitAs($user, "/app/{$workspace->slug}/companies/{$company->getKey()}", 1440, 900);
+    expect($page->script($inset))->toBe([24, 12]);
+
+    $page->navigate("/app/{$workspace->slug}");
+    expect($page->script($inset))->toBe([32, 24]);
+    $page->assertNoJavaScriptErrors();
+});
+
 it('keeps a linked company chip inside its cell link', function (): void {
     $this->withVite();
 
