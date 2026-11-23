@@ -676,6 +676,12 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             ->as('membership');
     }
 
+    public function memberCount(): int
+    {
+        // The owner holds no membership row.
+        return Membership::query()->whereBelongsTo($this)->count() + 1;
+    }
+
     /** @return Collection<int, User> */
     public function allUsers(): Collection
     {

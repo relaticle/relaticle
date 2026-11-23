@@ -50,8 +50,9 @@ test('the card names who invited them and what access they get', function (): vo
     $this->actingAs($invitee);
 
     livewire(PendingInvitationsForUser::class)
-        ->assertSee(__('workspaces.pending_for_user.detail_with_inviter', [
+        ->assertSee(__('workspaces.accept.ready.body_with_inviter', [
             'inviter' => 'Dana Okafor',
+            'workspace' => $workspace->name,
             'role' => Jetstream::findRole('viewer')?->name,
         ]));
 });
@@ -70,7 +71,8 @@ test('the card still renders when the inviter account is gone', function (): voi
     $this->actingAs($invitee);
 
     livewire(PendingInvitationsForUser::class)
-        ->assertSee(__('workspaces.pending_for_user.detail', [
+        ->assertSee(__('workspaces.accept.ready.body', [
+            'workspace' => $workspace->name,
             'role' => Jetstream::findRole('member')?->name,
         ]));
 });
@@ -89,7 +91,7 @@ test('a workspaceless invitee sees the card on the tenant-registration page', fu
     $response = $this->get(route('filament.app.tenant.registration'))->assertOk();
     $response->assertSee($workspace->name);
 
-    expect(substr_count($response->getContent(), __('workspaces.pending_for_user.accept')))->toBe(1);
+    expect(substr_count($response->getContent(), 'data-fi-modal-id="'.PendingInvitationsForUser::MODAL_ID.'"'))->toBe(1);
 });
 
 test('the card still renders exactly once on an ordinary panel page', function (): void {
@@ -106,7 +108,31 @@ test('the card still renders exactly once on an ordinary panel page', function (
 
     $html = $this->get(Dashboard::getUrl(['tenant' => $invitee->currentWorkspace]))->assertOk()->getContent();
 
-    expect(substr_count($html, __('workspaces.pending_for_user.accept')))->toBe(1);
+    expect(substr_count($html, 'data-fi-modal-id="'.PendingInvitationsForUser::MODAL_ID.'"'))->toBe(1);
+});
+
+test('a panel page names an inviter from another workspace and counts its members', function (): void {
+    $inviter = User::factory()->withWorkspace()->create(['name' => 'Dana Okafor']);
+    $workspace = $inviter->currentWorkspace;
+    $workspace->users()->attach(User::factory()->create(), ['role' => 'member']);
+    $workspace->workspaceInvitations()->create([
+        'email' => 'later@example.test',
+        'role' => 'member',
+        'inviter_id' => $inviter->id,
+        'expires_at' => now()->addDays(5),
+    ]);
+
+    $invitee = User::factory()->withWorkspace()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    $this->get(Dashboard::getUrl(['tenant' => $invitee->currentWorkspace]))
+        ->assertOk()
+        ->assertSee(__('workspaces.accept.ready.body_with_inviter', [
+            'inviter' => 'Dana Okafor',
+            'workspace' => $workspace->name,
+            'role' => Jetstream::findRole('member')?->name,
+        ]))
+        ->assertSee(trans_choice('workspaces.invitation.members', 2, ['count' => 2]));
 });
 
 test('accepting from the card joins the workspace', function (): void {
@@ -203,10 +229,9 @@ test('declining revokes the invitation without joining', function (): void {
 test('declining shows the next invitation and closes the modal after the last', function (): void {
     $first = User::factory()->withWorkspace()->create()->currentWorkspace;
     $second = User::factory()->withWorkspace()->create()->currentWorkspace;
-    $invitations = collect([$first, $second])->map(fn (Workspace $workspace): WorkspaceInvitation => $workspace->workspaceInvitations()->create([
+    $invitations = collect([$first, $second])->map(fn (Workspace $workspace, int $index): WorkspaceInvitation => WorkspaceInvitation::factory()->for($workspace)->create([
         'email' => 'later@example.test',
-        'role' => 'member',
-        'expires_at' => now()->addDays(5),
+        'created_at' => now()->subMinutes(2 - $index),
     ]));
 
     $this->actingAs(User::factory()->create(['email' => 'later@example.test']));
@@ -381,7 +406,7 @@ test('a user with no pending invitations gets no modal on the page', function ()
     livewire(PendingInvitationsForUser::class)
         ->assertOk()
         ->assertDontSeeHtml(PendingInvitationsForUser::MODAL_ID)
-        ->assertDontSee(__('workspaces.pending_for_user.accept'))
+        ->assertDontSee(__('workspaces.invitation.joining_as'))
         ->assertDontSee(__('workspaces.pending_for_user.decline'));
 });
 

@@ -11,6 +11,7 @@ use App\Models\WorkspaceInvitation;
 use Filament\Facades\Filament;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Livewire\Attributes\Computed;
@@ -43,10 +44,11 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
         }
 
         return WorkspaceInvitation::query()
-            ->with(['workspace', 'inviter'])
+            ->with(['workspace', 'inviter' => fn (BelongsTo $inviter): BelongsTo => $inviter->withoutGlobalScope(Filament::getTenancyScopeName())])
             ->whereRaw('lower(email) = ?', [Str::lower($this->authUser()->email)])
             ->unexpired()
             ->whereDoesntHave('workspace', fn (Builder $workspace): Builder => $workspace->scheduledForDeletion())
+            ->oldest()
             ->get();
     }
 
@@ -118,6 +120,11 @@ final class PendingInvitationsForUser extends BaseLivewireComponent
 
     public function render(): View
     {
-        return view('livewire.app.workspaces.pending-invitations-for-user');
+        $invitation = $this->invitations->first();
+
+        return view('livewire.app.workspaces.pending-invitations-for-user', [
+            'invitation' => $invitation,
+            'memberCount' => $invitation?->workspace->memberCount(),
+        ]);
     }
 }

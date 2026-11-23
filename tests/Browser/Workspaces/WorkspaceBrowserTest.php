@@ -56,7 +56,7 @@ it('asks a pending invitee to join or decline in a modal only those two buttons 
 
     $user = User::factory()->withWorkspace()->create();
     $workspace = $user->ownedWorkspaces()->first();
-    WorkspaceInvitation::factory()->create(['email' => $user->email]);
+    WorkspaceInvitation::factory()->create(['email' => $user->email, 'created_at' => now()->subMinute()]);
     $second = WorkspaceInvitation::factory()->create(['email' => $user->email]);
 
     $modal = '[data-fi-modal-id="'.PendingInvitationsForUser::MODAL_ID.'"]';
@@ -71,9 +71,9 @@ it('asks a pending invitee to join or decline in a modal only those two buttons 
 
     $page->assertScript($isOpen, true)
         ->press(__('workspaces.pending_for_user.decline'))
-        ->waitForText(__('workspaces.pending_for_user.heading', ['workspace' => $second->workspace->name]))
+        ->waitForText(__('workspaces.accept.ready.heading', ['workspace' => $second->workspace->name]))
         ->assertScript($isOpen, true)
-        ->press(__('workspaces.pending_for_user.accept'))
+        ->click("{$modal} button.fi-btn")
         ->assertPathBeginsWith("/app/{$second->workspace->slug}")
         ->assertNoJavaScriptErrors();
 });
