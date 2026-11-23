@@ -342,3 +342,13 @@ it('keeps the board stage menu above the window edge', function (): void {
     ]);
     $page->assertNoJavaScriptErrors();
 });
+
+it('shows a menu action spinner while the action loads and hides it at rest', function (): void {
+    $spinner = 'document.querySelector(".fi-header .fi-dropdown-panel:not([style*=\"display: none\"]) .fi-loading-indicator")';
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
+        ->click('.fi-header button.fi-ac-btn-group:visible')
+        ->assertScript("getComputedStyle({$spinner}).display", 'none')
+        ->assertScript("({$spinner}.classList.add('fi-loading'), getComputedStyle({$spinner}).display !== 'none')", true)
+        ->assertNoJavaScriptErrors();
+});

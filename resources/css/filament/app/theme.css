@@ -2143,12 +2143,6 @@ html.fi-record-stacked .fi-record-layout {
     @apply min-w-0 flex-1 text-start;
 }
 
-/* Livewire shows this on click. Idle, it must not occupy layout or it reads
-   as a grip on Detach. */
-.fi-dropdown-panel .fi-loading-indicator {
-    display: none;
-}
-
 /* Panels */
 .fi-panel {
     @apply rounded-xl;
