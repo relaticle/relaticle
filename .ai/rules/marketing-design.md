@@ -67,6 +67,41 @@ it. 19 product pages measured on 2026-11-08 (Linear, Stripe, Raycast, Resend, At
 put the product in the first screen on a frame or soft light; that is the bar. No test reads this,
 so a reviewer reads for a product page that repeats another's composition or a visual with no stage.
 
+## Product mocks
+
+A mock is the app's own screen, cropped. Build it from the running app, never from another mock or
+from memory. On 2026-11-23 a company list drawn from the `/ai` list mock reached review with bars the
+app does not have, and its hand-written Spanish chip read "en los próximos" where the app says
+"en menos de".
+
+- Open the real screen in the local app with seeded data and screenshot it before writing markup.
+  Review the mock beside that screenshot.
+- Keep the screen's rows in the app's order: the title row with Ask Rela, the view row, the Sort and
+  Filter row, then the content.
+- Measure each part in the browser (height, radius, font size, gap) and match it. The board is 300px
+  columns 12px apart, 48px when collapsed, with 276px cards and 20px badges
+  (`--_column-width` and `--_collapsed-width` in Flowforge's `flowforge-modern.css`). A list row is
+  41px, a toolbar button 32px, a filter chip 28px.
+- A mock crops and never rescales. It may drop the sidebar, rows and toolbar buttons. When the
+  columns do not fit at 300px, collapse the empty ones as the app does, or let the board scroll.
+- Every label the app renders comes from the app's own language key, so the German, Spanish and
+  French pages read as the app does: `filament/panel.tables.filters.*`,
+  `filament/panel.tables.views.*`, `filament/resources/{company,opportunity}.*`,
+  `flowforge::flowforge.add_card`, and `formats.iso.date_without_year` for a card date. Only sample
+  data lives in `packages/Cloud/lang`: record names, stage names, attribute names.
+- Icons come from their owner: `CustomFieldType::icon()` for an attribute column, `lucide-table-2`
+  and `lucide-square-kanban` for the list and board view tiles.
+- Dates are computed from today, so a mock never goes stale.
+
+A mock of an app screen is built from the shared components in `components/marketing`, never from
+page markup: `app-screen` (the title, view and filter rows), `app-board` (the opportunities board),
+`app-list` (a record list), `app-plan` (the plan card, single and batch steps) and `chat-plan` (a
+message with its plan under it). A page passes its sample data and nothing else, so a fix to a
+component reaches every page that shows that screen. `/crm-for-cleaning-business` uses all five and
+`/ai` uses `chat-plan`. The homepage board (`home/partials/board-mock`) predates them and still
+carries its own markup. No test reads a mock against the app, so a reviewer opens both and compares
+them.
+
 ## Type roles
 
 | Role | Utility | Where |
@@ -150,6 +185,8 @@ reach it. Change the header height and the token together. `html` also carries `
 - `board-mock`: the opportunities board built from the live board's markup, with a card that
   `motion.js` drags to the next stage. The hero tab and the press page keep the screenshot.
 - `window`: the frame around a product fragment.
+- `app-screen`, `app-board`, `app-list`, `app-plan`, `chat-plan`: the app's own screens, rebuilt from the live
+  markup. The Product mocks section says how to build and check them.
 - `chat-window`: a `window` with the Rela chip and the sample workspace name in its header. Every chat
   fragment in the `/ai` showcases sits in one, so they read as the same product.
 - The `/self-hosted` hero is that page's signature: an install configurator

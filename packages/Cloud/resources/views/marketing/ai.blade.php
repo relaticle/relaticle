@@ -195,7 +195,15 @@
                 {{ __('Linked in order and approved once.') }}
 
                 <x-slot:visual>
-                    @include('cloud::marketing.partials.ai-plan-mock')
+                    <x-cloud::marketing.chat-plan
+                        :message="__('Add Kovra Systems, their VP of Engineering Sarah Chen, and a task to call her Friday.')"
+                        :summary="__('Three changes. The person links to the new company, and the task to the new person.')"
+                        :steps="[
+                            ['entity' => 'company', 'verb' => \Relaticle\Chat\Enums\ProposalEntity::Company->createLabel(), 'name' => 'Kovra Systems', 'fields' => [[__('Account Owner'), 'Lena Ortiz']]],
+                            ['entity' => 'people', 'verb' => \Relaticle\Chat\Enums\ProposalEntity::People->createLabel(), 'name' => 'Sarah Chen', 'fields' => [[__('Company'), 'Kovra Systems', 'new'], [__('Job Title'), __('VP of Engineering')]]],
+                            ['entity' => 'task', 'verb' => \Relaticle\Chat\Enums\ProposalEntity::Task->createLabel(), 'name' => __('Call Sarah Chen'), 'fields' => [[__('Linked people'), 'Sarah Chen', 'new'], [__('Due Date'), today()->next('Friday')->isoFormat('ll')]]],
+                        ]"
+                    />
                 </x-slot:visual>
             </x-cloud::marketing.showcase>
 
