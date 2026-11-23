@@ -453,7 +453,9 @@ final class AppPanelProvider extends PanelProvider
             )
             ->renderHook(
                 PanelsRenderHook::PAGE_START,
-                fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
+                // Filament 5.12 gives this child a key, and a keyed child beside the page header makes every
+                // Livewire update replace the header, closing its open menus. The wrapper keeps them apart.
+                fn (): string => Blade::render('<div>@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)</div>'),
             )
             ->renderHook(
                 // CreateWorkspace renders a custom view that PAGE_START never fires on.
