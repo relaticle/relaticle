@@ -35,6 +35,7 @@ Route::middleware([ProvideMarkdownResponse::class, AddVaryAcceptHeader::class])-
     }
 
     Route::get('/security', fn (): View => view('cloud::marketing.security'))->name('security');
+    Route::get('/crm-for-cleaning-business', fn (): View => view('cloud::marketing.crm-for-cleaning-business'))->name('crmForCleaningBusiness');
 
     Route::get('/email-and-calendar', function (): View {
         abort_unless(Feature::active(EmailIntegration::class), 404);

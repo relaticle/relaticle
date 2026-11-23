@@ -110,6 +110,7 @@ it('adds developer guide urls with lastmod from front matter', function (): void
 
     expect($xml)->toContain('<loc>'.route('documentation.index').'</loc>')
         ->and($xml)->toContain('<loc>'.route('aiNativeCrm').'</loc>')
+        ->and($xml)->toContain('<loc>'.route('crmForCleaningBusiness').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.claude').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.chatgpt').'</loc>')
         ->and($xml)->toContain('<loc>'.route('security').'</loc>')

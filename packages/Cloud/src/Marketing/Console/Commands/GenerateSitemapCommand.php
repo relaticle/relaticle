@@ -113,7 +113,7 @@ final class GenerateSitemapCommand extends Command
 
     private function addMarketingUrls(Sitemap $sitemap): void
     {
-        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
+        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'crmForCleaningBusiness', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
 
         foreach (ConnectableAssistant::cases() as $assistant) {
             $names[] = $assistant->routeName();

@@ -34,6 +34,7 @@ dataset('public paths', [
     '/press',
     '/ai',
     '/ai-native-crm',
+    '/crm-for-cleaning-business',
     '/self-hosted',
     '/crm-for-claude',
     '/crm-for-chatgpt',
@@ -79,6 +80,7 @@ it('keeps every English URL unchanged', function (): void {
         'press' => '/press',
         'ai' => '/ai',
         'aiNativeCrm' => '/ai-native-crm',
+        'crmForCleaningBusiness' => '/crm-for-cleaning-business',
         'selfHosted' => '/self-hosted',
         'security' => '/security',
         'emailAndCalendar' => '/email-and-calendar',
@@ -128,6 +130,8 @@ it('emits hreflang for all four languages plus x-default and a self canonical', 
 });
 
 it('formats the home page mock dates and amounts in the page language', function (): void {
+    $this->travelTo('2026-08-25 10:00:00');
+
     $this->get('/')->assertOk()->assertSee('Aug 24, 2026')->assertSee('$18,000.00')->assertSee('$48,000');
 
     $this->get('/de')->assertOk()
@@ -194,7 +198,7 @@ function unlocalizedHrefsOn(string $html, string $locale): array
 
 it('keeps every link on every localized public page German', function (): void {
     $paths = [
-        '/', '/pricing', '/press', '/ai', '/ai-native-crm', '/self-hosted', '/crm-for-claude', '/crm-for-chatgpt', '/security',
+        '/', '/pricing', '/press', '/ai', '/ai-native-crm', '/crm-for-cleaning-business', '/self-hosted', '/crm-for-claude', '/crm-for-chatgpt', '/security',
         '/email-and-calendar', '/contact', '/privacy-policy', '/terms-of-service', '/help', '/help/getting-started',
         '/help/getting-started/create-your-first-company', '/developers', '/developers/mcp',
         ...array_map(fn (string $slug): string => "/compare/relaticle-vs-{$slug}", config('comparisons.compare')),
@@ -449,7 +453,7 @@ it('renders the language switcher as an accessible disclosure', function (): voi
 });
 
 dataset('marketing paths', [
-    '/', '/pricing', '/press', '/ai', '/ai-native-crm', '/self-hosted', '/crm-for-claude', '/crm-for-chatgpt', '/security',
+    '/', '/pricing', '/press', '/ai', '/ai-native-crm', '/crm-for-cleaning-business', '/self-hosted', '/crm-for-claude', '/crm-for-chatgpt', '/security',
     '/email-and-calendar', '/contact', '/compare/relaticle-vs-twenty', '/compare/relaticle-vs-espocrm',
     '/alternatives/attio', '/alternatives/hubspot',
 ]);

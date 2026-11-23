@@ -7,6 +7,8 @@ use App\Features\Documentation;
 use App\Features\EmailIntegration;
 use Laravel\Pennant\Feature;
 use Relaticle\Chat\Agents\CrmAssistant;
+use Relaticle\Chat\Enums\PendingActionOperation;
+use Relaticle\Chat\Enums\ProposalEntity;
 use Relaticle\Cloud\CloudServiceProvider;
 use Symfony\Component\DomCrawler\Crawler;
 
@@ -97,7 +99,7 @@ it('renders the ask playground at the #demo anchor the hero points to', function
         ->and($html)->toContain(__('Add a person'))
         ->and($html)->toContain(__('Find overdue tasks'));
 
-    expect($html)->toContain('>'.__('Move').'</span>')
+    expect($html)->toContain(ProposalEntity::Opportunity->batchSummary(PendingActionOperation::Update, 3))
         ->and($html)->toContain(__('Create person'))
         ->and($html)->toContain(__('Approve :count changes', ['count' => 3]))
         ->and($html)->not->toContain('Approve or discard the proposal to keep chatting')

@@ -35,10 +35,10 @@
                             <span>{{ __('Auto') }}</span>
                             <x-lucide-chevrons-up-down class="h-3 w-3" aria-hidden="true"/>
                         </span>
-                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400">
+                        <span id="hero-entry-mic" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-600 text-white">
                             <x-lucide-mic class="h-4 w-4" aria-hidden="true"/>
                         </span>
-                        <button id="hero-entry-send" type="button" tabindex="-1" aria-hidden="true" class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500">
+                        <button id="hero-entry-send" type="button" tabindex="-1" aria-hidden="true" class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-white" style="display: none">
                             <x-lucide-arrow-up class="h-4 w-4"/>
                         </button>
                     </div>
@@ -65,9 +65,9 @@
 
             <ul class="divide-y divide-[var(--surface-block-border)] overflow-hidden rounded-xl border border-[var(--surface-block-border)] bg-[var(--surface-block-bg)]">
                 @foreach ([
-                    ['title' => __('Call Sarah Chen'), 'due' => \Illuminate\Support\Facades\Date::parse('2026-08-24')->isoFormat('ll'), 'overdue' => true],
-                    ['title' => __('Send proposal to Trellis Labs'), 'due' => \Illuminate\Support\Facades\Date::parse('2026-08-23')->isoFormat('ll'), 'overdue' => true],
-                    ['title' => __('Renewal prep for :person', ['person' => 'Daniel Okafor']), 'due' => \Illuminate\Support\Facades\Date::parse('2026-09-02')->isoFormat('ll'), 'overdue' => false],
+                    ['title' => __('Call Sarah Chen'), 'due' => now()->subDay()->isoFormat('ll'), 'overdue' => true],
+                    ['title' => __('Send proposal to Trellis Labs'), 'due' => now()->subDays(2)->isoFormat('ll'), 'overdue' => true],
+                    ['title' => __('Renewal prep for :person', ['person' => 'Daniel Okafor']), 'due' => now()->addDays(8)->isoFormat('ll'), 'overdue' => false],
                 ] as $heroTask)
                     <li class="flex items-center gap-3 pl-4">
                         {{-- 1px ring, matching the real checkbox: a 2px border
