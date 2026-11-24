@@ -341,9 +341,11 @@
                         \Spatie\SchemaOrg\Schema::offer()
                             ->name(__('Enterprise'))
                             ->priceSpecification(\Spatie\SchemaOrg\Schema::unitPriceSpecification()
+                                ->price(config('relaticle.enterprise.starting_price_yearly'))
                                 ->minPrice(config('relaticle.enterprise.starting_price_yearly'))
                                 ->priceCurrency('USD')
                                 ->unitText('year'))
+                            ->availability(\Spatie\SchemaOrg\ItemAvailability::InStock)
                             ->url(LocalizedUrl::route('contact', ['plan' => 'enterprise']))
                             ->description(__('cloud::billing.enterprise.faq_body', ['price' => $enterprisePrice])),
                     ]
