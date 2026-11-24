@@ -6,13 +6,14 @@ use Relaticle\Documentation\Support\DocUrl;
 
 mutates(DocUrl::class);
 
-/** @return array{title: string, description: string} */
+/** @return array{lang: string, title: string, description: string} */
 function headOf(string $html): array
 {
+    preg_match('/<html lang="([^"]*)">/', $html, $lang);
     preg_match('/<title>(.*?)<\/title>/s', $html, $title);
     preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
 
-    return ['title' => trim($title[1] ?? ''), 'description' => $description[1] ?? ''];
+    return ['lang' => $lang[1] ?? '', 'title' => trim($title[1] ?? ''), 'description' => $description[1] ?? ''];
 }
 
 it('would regenerate the api reference with the head it serves today', function (): void {
@@ -24,6 +25,13 @@ it('would regenerate the api reference with the head it serves today', function 
     ])->render();
 
     expect(headOf($regenerated))->toBe(headOf($served));
+});
+
+it('declares the api reference as english and its own canonical page', function (): void {
+    $html = $this->get('/developers/api')->assertOk()->getContent();
+
+    expect(headOf($html)['lang'])->toBe('en')
+        ->and($html)->toContain('<link rel="canonical" href="'.route('scribe').'"/>');
 });
 
 it('links the docs and help center from the api reference through the documentation public url', function (): void {
