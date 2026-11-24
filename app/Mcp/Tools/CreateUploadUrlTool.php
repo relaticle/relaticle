@@ -24,7 +24,7 @@ use Laravel\Mcp\Server\Tool;
 
 #[Name('create-upload-url')]
 #[Title('Create Upload URL')]
-#[Description('Get a short-lived signed URL to PUT a file body to (max 10 MB, pdf/doc/docx/xlsx/pptx/jpg/jpeg/png/gif/webp). Then call upload-file with the returned upload_id to finish. Use upload-file directly with source_url or base64 when you can.')]
+#[Description('Get a short-lived signed URL to PUT a file body to (max 10 MB, pdf/doc/docx/xlsx/pptx/jpg/jpeg/png/gif/webp). Then call upload-file with the returned upload_id to finish. Use upload-file directly with base64 when you can.')]
 final class CreateUploadUrlTool extends Tool
 {
     use ChecksTokenAbility;
