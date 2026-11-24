@@ -202,8 +202,10 @@ it('keeps the Enterprise starting price consistent with its annual structured of
     $offer = collect($product['offers'])->firstWhere('name', 'Enterprise');
 
     expect($offer)->not->toBeNull()
+        ->and($offer['priceSpecification']['price'])->toBe(25_000)
         ->and($offer['priceSpecification']['minPrice'])->toBe(25_000)
         ->and($offer['priceSpecification']['unitText'])->toBe('year')
+        ->and($offer['availability'])->toBe('https://schema.org/InStock')
         ->and($offer['url'])->toBe(route('contact', ['plan' => 'enterprise']));
 });
 
