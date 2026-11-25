@@ -22,6 +22,10 @@ final readonly class MoveFavorite
         $after = $this->sibling($user, $after, $favorite, $parentId);
         $before = $this->sibling($user, $before, $favorite, $parentId);
 
+        if ($after instanceof Favorite && $before instanceof Favorite && DecimalPosition::greaterThan($after->position, $before->position)) {
+            $before = null;
+        }
+
         if (! $after instanceof Favorite && ! $before instanceof Favorite) {
             if ($favorite->parent_id !== $parentId) {
                 $favorite->update(['parent_id' => $parentId, 'position' => Favorite::nextPosition($user, $workspaceId, $parentId)]);

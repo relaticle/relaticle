@@ -76,6 +76,16 @@ it('drops a neighbour from another list and places the favorite at the end', fun
     expect(favoriteOrder($this->user, $this->workspace))->toBe([$folder->getKey(), $b->getKey(), $a->getKey()]);
 });
 
+it('places a favorite after its first neighbour when another tab reordered the two', function (): void {
+    [$a, $b, $moved] = [movedFavorite(1), movedFavorite(2), movedFavorite(3)];
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->call('move', $moved->getKey(), null, $b->getKey(), $a->getKey())
+        ->assertDispatched('refresh-sidebar');
+
+    expect(favoriteOrder($this->user, $this->workspace))->toBe([$a->getKey(), $b->getKey(), $moved->getKey()]);
+});
+
 it('rebalances the list when two neighbours leave no room between them', function (): void {
     [$a, $b] = [movedFavorite(1), movedFavorite(2)];
     $b->update(['position' => '1.00005']);
