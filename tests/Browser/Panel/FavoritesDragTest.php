@@ -6,6 +6,8 @@ use App\Models\Company;
 use App\Models\Favorite;
 use App\Models\User;
 
+pest()->group('webkit');
+
 it('drags a favorite into a folder and back out without opening the record', function (): void {
     $this->withVite();
 
