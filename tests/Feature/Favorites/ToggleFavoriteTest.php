@@ -15,6 +15,7 @@ use App\Models\Favorite;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\User;
+use App\Models\Workspace;
 use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\DB;
@@ -32,9 +33,9 @@ beforeEach(function (): void {
 });
 
 dataset('favoritable pages', [
-    'company' => [ViewCompany::class, fn (User $user, $workspace): Company => Company::factory()->recycle([$user, $workspace])->create()],
-    'person' => [ViewPeople::class, fn (User $user, $workspace): People => People::factory()->recycle([$user, $workspace])->create()],
-    'opportunity' => [ViewOpportunity::class, fn (User $user, $workspace): Opportunity => Opportunity::factory()->recycle([$user, $workspace])->create()],
+    'company' => [ViewCompany::class, fn (User $user, Workspace $workspace): Company => Company::factory()->recycle([$user, $workspace])->create()],
+    'person' => [ViewPeople::class, fn (User $user, Workspace $workspace): People => People::factory()->recycle([$user, $workspace])->create()],
+    'opportunity' => [ViewOpportunity::class, fn (User $user, Workspace $workspace): Opportunity => Opportunity::factory()->recycle([$user, $workspace])->create()],
 ]);
 
 it('stars a :dataset from its record page', function (string $page, Closure $make): void {
