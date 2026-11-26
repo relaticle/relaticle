@@ -73,9 +73,7 @@ trait MergesRecords
         } catch (ValidationException $exception) {
             return Response::error((string) collect($exception->errors())->flatten()->first());
         } catch (HttpException $exception) {
-            if ($exception->getStatusCode() !== 403) {
-                throw $exception;
-            }
+            throw_if($exception->getStatusCode() !== 403, $exception);
 
             return Response::error('You do not have permission to merge these records.');
         }
