@@ -47,12 +47,14 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
 ### Folders
 
 - The group header carries a `lucide-folder-plus` button. It opens a modal in the center of the page
-  that asks for a name. Saving creates an empty folder.
+  that asks for a name. **Create** saves an empty folder. **Create & create another** saves it and keeps
+  the modal open, emptied. The sidebar refreshes once the modal closes, because a refresh re-mounts it.
 - A member drags a favorite into a folder, out of it, or into another folder. Dragging also reorders
   favorites and folders, and the order is kept.
 - While dragging, a dashed line in the primary color marks where the row will land.
 - A folder's menu has **Rename**, which opens the same modal, and **Delete folder**.
 - Folders are one level deep. Deleting a folder moves its favorites to the end of the top level.
+- A member has at most 50 folders per workspace (`Favorite::MAX_FOLDERS`). The 51st shows an error under the name.
 - An open empty folder shows "No items", and a favorite dropped on it moves into the folder.
 
 ### Layout
@@ -69,6 +71,8 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
   **Not built yet:** nothing in the merge touches favorites.
 - A member who loses access to a record no longer sees its favorite. `FavoritesQuery` asks the record's `view` policy.
 - A record deleted for good takes its favorites with it, through the `ForgetsFavorites` observer concern.
+  The demo reset, which force-deletes through the query builder, clears the workspace's favorites itself.
+- A member removed from a workspace loses their favorites and folders there, in `RemoveWorkspaceMember`.
 
 ## How it is built
 
