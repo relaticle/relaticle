@@ -138,7 +138,7 @@ it('shows the view switcher linking list and board views', function (): void {
 
 it('redirects the legacy board url to the resource board page', function (): void {
     $this->get(route('filament.app.tasks-board.redirect', ['tenant' => $this->workspace->slug]))
-        ->assertRedirect(TaskResource::getUrl('board'));
+        ->assertRedirect(TaskResource::getUrl('board', ['tenant' => $this->workspace]));
 });
 
 it('renders the board and the list heading when the status field has no options', function (): void {

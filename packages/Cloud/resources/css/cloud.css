@@ -204,3 +204,9 @@ html:has(#main-header) {
 :is(.blog-prose, .prose-docs) pre:focus-visible {
     @apply outline-2 -outline-offset-2 outline-primary-400;
 }
+
+@media (scripting: none) {
+    .faq-item [x-cloak] {
+        display: block !important;
+    }
+}

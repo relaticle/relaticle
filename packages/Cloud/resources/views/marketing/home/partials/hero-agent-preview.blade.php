@@ -408,11 +408,11 @@
             },
 
             setSendActive(composer, active) {
-                const button = this.find(`#hero-${composer}-send`);
+                const mic = this.find(`#hero-${composer}-mic`);
 
-                button.classList.toggle('bg-primary-600', active);
-                button.classList.toggle('text-white', active);
-                ['bg-gray-200', 'text-gray-400', 'dark:bg-gray-700', 'dark:text-gray-500'].forEach((token) => button.classList.toggle(token, !active));
+                this.find(`#hero-${composer}-send`).style.display = active ? '' : 'none';
+                ['bg-primary-600', 'text-white'].forEach((token) => mic.classList.toggle(token, !active));
+                ['text-gray-500', 'dark:text-gray-400'].forEach((token) => mic.classList.toggle(token, active));
             },
 
             clearComposer(composer) {

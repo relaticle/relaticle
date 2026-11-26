@@ -101,7 +101,7 @@ final readonly class AcceptWorkspaceInvitationController
             'inviterName' => $invitation->inviter?->name,
             'roleName' => WorkspaceRole::labelFor($invitation->role),
             'roleDescription' => WorkspaceRole::tryFrom($invitation->role)?->description(),
-            'memberCount' => $invitation->workspace->users()->count() + 1,
+            'memberCount' => $invitation->workspace->memberCount(),
             'joinUrl' => route('workspace-invitations.token.join', ['token' => $request->route('token')]),
         ]);
     }

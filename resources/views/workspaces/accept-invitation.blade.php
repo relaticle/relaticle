@@ -17,22 +17,11 @@
         </x-slot:description>
 
         <x-slot:details>
-            <x-workspaces.invitation-identity
-                :label="__('workspaces.invitation.joining_as')"
-                :value="$accountEmail"
+            <x-workspaces.invitation-details
+                :account-email="$accountEmail"
+                :member-count="$memberCount"
+                :role-description="$roleDescription"
             />
-
-            <ul class="space-y-3">
-                <x-workspaces.invitation-fact icon="lucide-users">
-                    {{ trans_choice('workspaces.invitation.members', $memberCount, ['count' => $memberCount]) }}
-                </x-workspaces.invitation-fact>
-
-                @if($roleDescription)
-                    <x-workspaces.invitation-fact icon="lucide-shield-check">
-                        {{ $roleDescription }}
-                    </x-workspaces.invitation-fact>
-                @endif
-            </ul>
         </x-slot:details>
 
         <x-slot:actions>

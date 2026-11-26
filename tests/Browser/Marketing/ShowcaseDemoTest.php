@@ -110,7 +110,7 @@ it('saves the change when the visitor approves it and Rela confirms', function (
     $page->click('[data-approval-button]');
 
     expect(approvalOutcome($page))->toBe(['decision' => 'approved', 'pending' => 'hidden', 'done' => 'visible', 'discarded' => 'hidden', 'followup' => 'visible'])
-        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toStartWith('Done. Northwind renewal is Closed Won, closing');
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Done. Northwind platform expansion is in your pipeline at $48,000.00.');
 
     $page->assertNoJavaScriptErrors();
 });
@@ -122,23 +122,24 @@ it('writes nothing when the visitor discards the proposal', function (): void {
     $page->click('[data-approval-pending] button:first-child');
 
     expect(approvalOutcome($page))->toBe(['decision' => 'discarded', 'pending' => 'hidden', 'done' => 'hidden', 'discarded' => 'visible', 'followup' => 'visible'])
-        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Okay, I left Northwind renewal as it was.');
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Okay, I did not add Northwind platform expansion.');
 
     $page->assertNoJavaScriptErrors();
 });
 
-it('saves an edited close date and leaves a field out', function (): void {
+it('saves an edited amount and leaves a field out', function (): void {
     $page = $this->visit('/');
 
     scrollShowcaseIntoView($page, '[data-approval]');
-    $page->click('[aria-label="Edit Close date"]');
-    $page->fill('[data-approval] input[type="date"]', '2026-11-20');
-    $page->click('[data-approval-field="closeIncluded"] button:text-is("Save")');
+    $page->click('[aria-label="Edit Amount"]');
+    $page->fill('[data-approval] input[type="number"]', '52000');
+    $page->click('[data-approval-field="amountIncluded"] button:text-is("Save")');
     $page->click('[aria-label="Leave out Stage"]');
     $page->click('[data-approval-button]');
 
-    expect($page->script("document.querySelector('[data-approval-close-date]').textContent"))->toBe('Nov 20, 2026')
-        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Done. Northwind renewal now closes Nov 20, 2026. The stage stays Negotiation/Review.');
+    expect($page->script("document.querySelector('[data-approval-amount]').textContent"))->toBe('$52,000.00')
+        ->and($page->script("document.querySelector('[data-approval-done] [data-mock-receipt-line]').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Created Northwind platform expansion · (Stage left out)')
+        ->and($page->script("document.querySelector('[data-approval-followup]').textContent"))->toBe('Done. Northwind platform expansion is in your pipeline at $52,000.00.');
 
     $page->assertNoJavaScriptErrors();
 });

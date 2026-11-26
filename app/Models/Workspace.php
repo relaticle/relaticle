@@ -33,7 +33,6 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -53,7 +52,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Onboard\Concerns\GetsOnboarded;
 use Spatie\Onboard\Concerns\Onboardable;
-use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\HasSlugWithUlids;
 use Spatie\Sluggable\SlugOptions;
 
 /**
@@ -116,8 +115,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     /** @use HasFactory<WorkspaceFactory> */
     use HasFactory;
 
-    use HasSlug;
-    use HasUlids;
+    use HasSlugWithUlids;
     use InteractsWithMedia;
 
     public const string LOGO_MEDIA_COLLECTION = MediaCollection::Logo->value;
@@ -174,7 +172,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
         'careers', 'jobs', 'partners', 'affiliate', 'store', 'marketplace',
         'press', 'compare', 'alternatives', 'ai', 'ai-native-crm', 'self-hosted',
-        'crm-for-claude', 'crm-for-chatgpt', 'email-and-calendar',
+        'crm-for-claude', 'crm-for-chatgpt', 'crm-for-cleaning-business', 'email-and-calendar',
 
         // Communication
         'mail', 'email', 'contact', 'feedback', 'abuse', 'report',
@@ -676,6 +674,12 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             ->withPivot('role')
             ->withTimestamps()
             ->as('membership');
+    }
+
+    public function memberCount(): int
+    {
+        // The owner holds no membership row.
+        return Membership::query()->whereBelongsTo($this)->count() + 1;
     }
 
     /** @return Collection<int, User> */

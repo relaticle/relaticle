@@ -110,6 +110,7 @@ it('adds developer guide urls with lastmod from front matter', function (): void
 
     expect($xml)->toContain('<loc>'.route('documentation.index').'</loc>')
         ->and($xml)->toContain('<loc>'.route('aiNativeCrm').'</loc>')
+        ->and($xml)->toContain('<loc>'.route('crmForCleaningBusiness').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.claude').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.chatgpt').'</loc>')
         ->and($xml)->toContain('<loc>'.route('security').'</loc>')
@@ -277,17 +278,17 @@ it('keeps the blog entry of a post the crawl also found', function (): void {
         ->and($xml)->toMatch('#<loc>'.preg_quote($url, '#').'</loc>(?:(?!</url>).)*?<priority>0.7#s');
 });
 
-it('includes the standalone api reference once regardless of crawl discovery', function (bool $linked): void {
+it('leaves the client-rendered api reference out even when a crawled page links to it', function (): void {
     $reference = route('scribe');
     fakeSitemapCrawl([
-        config('app.url') => $linked ? '<a href="'.$reference.'">API</a>' : '<p>Home</p>',
+        config('app.url') => '<a href="'.$reference.'">API</a>',
         $reference => '<p>API</p>',
     ]);
 
     $this->artisan('app:generate-sitemap')->assertSuccessful();
 
-    expect(substr_count(Storage::disk('public')->get('sitemap.xml'), '<loc>'.$reference.'</loc>'))->toBe(1);
-})->with([true, false]);
+    expect(Storage::disk('public')->get('sitemap.xml'))->not->toContain('<loc>'.$reference.'</loc>');
+});
 
 it('discovers links from the homepage and publishes one root with language alternates', function (): void {
     $root = rtrim(route('home'), '/');

@@ -3,9 +3,6 @@
 declare(strict_types=1);
 
 return [
-    'js_component' => [
-        'failed_to_load' => 'Ce composant n\'a pas pu être chargé. Rechargez la page et réessayez.',
-    ],
     'callout' => [
         'statuses' => [
             'danger' => 'Erreur :',

@@ -452,15 +452,10 @@ final class AppPanelProvider extends PanelProvider
                 $this->inviteMembersModal(...),
             )
             ->renderHook(
-                PanelsRenderHook::PAGE_START,
-                fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
-            )
-            ->renderHook(
-                // CreateWorkspace renders a custom view that PAGE_START never fires on.
-                // Scoping to it keeps this off the guest pages sharing that layout.
-                PanelsRenderHook::SIMPLE_LAYOUT_START,
-                fn (): string => Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)'),
-                scopes: CreateWorkspace::class,
+                PanelsRenderHook::BODY_END,
+                fn (): string => $this->signedInUser() instanceof User
+                    ? Blade::render('@livewire(\App\Livewire\App\Workspaces\PendingInvitationsForUser::class)')
+                    : '',
             );
     }
 

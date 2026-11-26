@@ -36,7 +36,6 @@ final class GenerateSitemapCommand extends Command
         $previous = Storage::disk('public')->get('sitemap.xml');
         $sitemap = $this->crawlMarketingSitemap();
 
-        $this->ensureUrl($sitemap, route('scribe'));
         $this->addMarketingUrls($sitemap);
         $this->addDocumentationUrls($sitemap, $docsRepository);
 
@@ -85,6 +84,9 @@ final class GenerateSitemapCommand extends Command
         // pages) -- they're excluded as a deliberate, untested guard rather
         // than covered behavior.
         $excluded = ['/login', '/register', '/forgot-password', '/dashboard', '/discord'];
+
+        // The API reference renders client-side, so Google crawls it and declines to index it.
+        $excluded[] = parse_url(route('scribe'), PHP_URL_PATH);
         $home = rtrim(route('home'), '/');
 
         return SitemapGenerator::create(config('app.url'))
@@ -113,7 +115,7 @@ final class GenerateSitemapCommand extends Command
 
     private function addMarketingUrls(Sitemap $sitemap): void
     {
-        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
+        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'crmForCleaningBusiness', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
 
         foreach (ConnectableAssistant::cases() as $assistant) {
             $names[] = $assistant->routeName();

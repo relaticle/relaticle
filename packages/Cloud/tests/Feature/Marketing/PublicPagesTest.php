@@ -219,7 +219,7 @@ describe('Feature counts', function () {
 
         expect($text)->not->toMatch('/\d+[ -](?:first-party )?(?:MCP )?tools?\b/i')
             ->not->toMatch('/\d+ (?:custom )?field types\b/i');
-    })->with(['/', '/pricing', '/press', '/ai-native-crm', '/crm-for-claude', '/crm-for-chatgpt', '/alternatives/hubspot', '/compare/relaticle-vs-espocrm']);
+    })->with(['/', '/pricing', '/press', '/ai-native-crm', '/crm-for-cleaning-business', '/crm-for-claude', '/crm-for-chatgpt', '/alternatives/hubspot', '/compare/relaticle-vs-espocrm']);
 });
 
 describe('Community redirects', function () {
@@ -510,6 +510,7 @@ describe('Page metadata', function () {
         ['/pricing', true],
         ['/ai', true],
         ['/ai-native-crm', true],
+        ['/crm-for-cleaning-business', true],
         ['/crm-for-claude', true],
         ['/crm-for-chatgpt', true],
         ['/self-hosted', true],
@@ -554,6 +555,7 @@ describe('Page metadata', function () {
         '/pricing',
         '/ai',
         '/ai-native-crm',
+        '/crm-for-cleaning-business',
         '/crm-for-claude',
         '/crm-for-chatgpt',
         '/self-hosted',

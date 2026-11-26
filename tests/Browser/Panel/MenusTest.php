@@ -350,3 +350,16 @@ it('keeps the board stage menu above the window edge', function (): void {
     ]);
     $page->assertNoJavaScriptErrors();
 });
+
+it('shows a menu action spinner while the action loads and hides it at rest', function (): void {
+    $spinner = "[...document.querySelectorAll('.fi-header .fi-dropdown-panel .fi-loading-indicator')].find((indicator) => indicator.closest('.fi-dropdown-panel').getClientRects().length > 0)";
+
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies", 1440, 900)
+        ->click('.fi-header button.fi-ac-btn-group:visible')
+        ->assertScript("getComputedStyle({$spinner}).display", 'none');
+
+    $page->script("{$spinner}.classList.add('fi-loading')");
+
+    $page->assertScript("getComputedStyle({$spinner}).display !== 'none'", true)
+        ->assertNoJavaScriptErrors();
+});
