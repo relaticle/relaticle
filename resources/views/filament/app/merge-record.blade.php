@@ -18,6 +18,20 @@
         }
     "
 >
+    {{-- Filament bakes the submit's disabled state into x-bind:aria-disabled, which Alpine never re-reads after a morph. --}}
+    <span
+        hidden
+        wire:key="merge-submit-{{ $isBlocked() ? 'blocked' : 'ready' }}"
+        x-init="$nextTick(() => {
+            const submit = $el.closest('.fi-modal-window')?.querySelector('button[type=submit]')
+
+            if (submit) {
+                Alpine.destroyTree(submit)
+                Alpine.initTree(submit)
+            }
+        })"
+    ></span>
+
     <p role="note" class="flex items-start gap-2 rounded-lg bg-gray-50 px-3 py-2.5 text-sm text-gray-600 dark:bg-white/5 dark:text-gray-300">
         <x-filament::icon icon="lucide-info" class="mt-0.5 size-4 shrink-0 text-gray-400 dark:text-gray-500" />
         {{ __('filament/record-page.merge.notice') }}
