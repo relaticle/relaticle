@@ -108,6 +108,17 @@ it('refuses renaming or deleting another member\'s folder', function (): void {
     expect($folder->refresh()->name)->toBe('Theirs');
 });
 
+it('refuses a folder in a workspace the member does not belong to', function (): void {
+    $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    Filament::setTenant($otherWorkspace);
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->callAction('createFolder', data: ['name' => 'Theirs'])
+        ->assertForbidden();
+
+    expect(Favorite::query()->withoutGlobalScopes()->folders()->exists())->toBeFalse();
+});
+
 it('stores every kind of favorite the database shape allows', function (): void {
     foreach (FavoriteKind::cases() as $kind) {
         $favorite = match ($kind) {
