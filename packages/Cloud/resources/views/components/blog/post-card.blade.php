@@ -1,3 +1,4 @@
+@use(Relaticle\Cloud\Marketing\Support\BlogCategoryName)
 @props([
     'post',
     'heading' => 'h2',
@@ -12,7 +13,7 @@
                 </time>
             @endif
             @if($post->category)
-                <span class="type-label text-primary-700 dark:text-primary-300">{{ $post->category->name }}</span>
+                <span class="type-label text-primary-700 dark:text-primary-300">{{ BlogCategoryName::of($post->category) }}</span>
             @endif
         </div>
 
@@ -27,15 +28,14 @@
         </div>
 
         @if($post->featured_image)
-            {{-- Covers are 1200x630; aspect-video keeps them uncropped enough that
-                 the title baked into the image survives (a square chops 48% off). --}}
             <div class="md:col-span-3">
-                <img
-                    src="{{ asset('storage/'.$post->featured_image) }}"
+                <x-cloud::blog.cover
+                    :source="$post->featured_image"
+                    sizes="(min-width: 72rem) calc(15.25rem - 0.5px), (min-width: 48rem) calc(25vw - 2.75rem - 0.5px), (min-width: 40rem) 16rem, calc(100vw - 3rem)"
                     alt=""
                     loading="lazy"
                     class="border-rail aspect-video w-full rounded-lg border object-cover sm:w-64 md:w-full"
-                >
+                />
             </div>
         @endif
     </a>

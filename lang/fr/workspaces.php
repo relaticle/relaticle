@@ -39,7 +39,7 @@ return [
         ],
         'update_workspace_logo' => [
             'title' => 'Logo de l\'espace de travail',
-            'description' => 'Votre logo apparaît dans le sélecteur d\'espace de travail, sur les invitations et sur la page d\'adhésion.',
+            'description' => 'Votre logo apparaît dans le sélecteur d\'espace de travail, sur les invitations et sur la page d\'invitation.',
         ],
         'assistant' => [
             'description' => 'Choisissez ce que :assistant, l\'assistant IA intégré, peut faire pour les membres de cet espace de travail.',
@@ -49,7 +49,7 @@ return [
         ],
         'add_workspace_member' => [
             'title' => 'Inviter des membres',
-            'description' => 'Envoyez une invitation par e-mail, ou partagez un lien qui permet de rejoindre l\'espace de travail soi-même.',
+            'description' => 'Invitez des membres par e-mail. Chaque personne invitée reçoit sa propre invitation.',
         ],
         'workspace_members' => [
             'title' => 'Membres',
@@ -67,12 +67,7 @@ return [
         'save' => 'Enregistrer',
         'invite_people' => 'Inviter des membres de l\'espace de travail',
         'send_invitations' => 'Envoyer les invitations',
-        'invite_link' => 'Lien d\'invitation',
         'close' => 'Fermer',
-        'copy_invite_link' => 'Copier le lien',
-        'rotate_invite_link' => 'Générer un nouveau lien',
-        'disable_invite_link' => 'Désactiver le lien',
-        'enable_invite_link' => 'Activer le lien',
         'update_workspace_role' => 'Changer le rôle',
         'compare_roles' => 'Comparer les rôles',
         'compare_roles_help_link' => 'Lire le détail complet',
@@ -113,18 +108,6 @@ return [
         'role_updated' => [
             'success' => 'Rôle mis à jour.',
         ],
-        'invite_link_role_updated' => [
-            'success' => 'Toute personne qui rejoint avec ce lien a désormais le rôle :role.',
-        ],
-        'invite_link_rotated' => [
-            'success' => 'Un nouveau lien d\'invitation a été généré. Le lien précédent ne fonctionne plus.',
-        ],
-        'invite_link_disabled' => [
-            'success' => 'Le lien de l\'espace de travail est désactivé. Invitez plutôt par e-mail.',
-        ],
-        'invite_link_enabled' => [
-            'success' => 'Le lien de l\'espace de travail est activé. Toute personne qui l\'ouvre peut rejoindre.',
-        ],
         'resend_throttled' => 'Veuillez patienter :seconds secondes avant de renvoyer.',
         'some_invites_failed' => [
             'title' => 'Certaines invitations n\'ont pas pu être envoyées',
@@ -143,7 +126,6 @@ return [
         'email_already_invited' => 'Cette personne a déjà été invitée dans l\'espace de travail.',
         'email_already_member' => 'Cette personne appartient déjà à l\'espace de travail.',
         'only_owner_promotes_admins' => 'Seul le propriétaire de l\'espace de travail peut accorder le rôle administrateur.',
-        'invite_link_role_cannot_be_admin' => 'Le lien de l\'espace de travail ne peut pas accorder le rôle administrateur. Invitez plutôt les administrateurs par e-mail.',
         'no_valid_emails' => 'Saisissez au moins une adresse e-mail.',
         'too_many_invites' => 'Vous pouvez inviter jusqu\'à :max membres à la fois.',
         'managed_plan_before_deleting' => 'Cet espace de travail est sur une offre facturée par Relaticle. Contactez-nous pour mettre fin à l\'offre avant de supprimer l\'espace de travail.',
@@ -165,14 +147,6 @@ return [
         ],
         'delete_workspace' => [
             'notice' => 'La suppression de l\'espace de travail sera programmée. Vous aurez 30 jours pour l\'annuler avant que toutes les données soient supprimées définitivement.',
-        ],
-        'rotate_invite_link' => [
-            'heading' => 'Générer un nouveau lien d\'invitation ?',
-            'notice' => 'Le lien actuel cesse de fonctionner immédiatement. Toute personne qui le détient encore, dans un chat ou un e-mail, ne pourra pas rejoindre.',
-        ],
-        'disable_invite_link' => [
-            'heading' => 'Désactiver le lien de l\'espace de travail ?',
-            'notice' => 'Personne ne peut rejoindre avec le lien actuel une fois désactivé. Le réactiver émet un lien différent, l\'ancien reste donc inutilisable.',
         ],
         'cancel_deletion' => [
             'heading' => 'Annuler la suppression de l\'espace de travail ?',
@@ -358,37 +332,8 @@ return [
     ],
 
     'invitation' => [
+        'joining_as' => 'Vous rejoignez en tant que',
         'members' => '{1} 1 membre est déjà dans cet espace de travail|[2,*] :count membres sont déjà dans cet espace de travail',
-    ],
-
-    'invite_link' => [
-        'heading' => 'Lien d\'invitation',
-        'description' => 'Partagez un seul lien au lieu de saisir des adresses. Toute personne qui l\'ouvre rejoint cet espace de travail.',
-        'url' => 'Lien de l\'espace de travail',
-        'copied' => 'Lien copié.',
-        'expires_in' => 'Cesse de fonctionner dans :time. Générer un nouveau lien remet le compteur à zéro.',
-        'default_role' => 'Les membres rejoignent en tant que',
-        'default_role_helper' => 'Enregistré dès que vous le choisissez. Les administrateurs sont invités par e-mail.',
-        'lapsed' => [
-            'title' => 'Ce lien a expiré il y a :time',
-            'notice' => 'Personne ne peut rejoindre avec lui. Générez un nouveau lien pour continuer à inviter des membres.',
-        ],
-        'disabled' => [
-            'title' => 'Le lien de l\'espace de travail est désactivé',
-            'notice' => 'Les invitations par e-mail sont le seul accès. Activer le lien en émet un nouveau.',
-        ],
-        'join' => [
-            'heading' => 'Rejoindre :workspace',
-            'body' => 'Vous rejoindrez avec l\'accès :role.',
-            'joining_as' => 'Vous rejoignez en tant que',
-            'action' => 'Rejoindre l\'espace de travail',
-            'decline' => 'Pas maintenant',
-        ],
-        'expired' => [
-            'heading' => 'Ce lien d\'invitation ne fonctionne plus',
-            'body' => 'Il a expiré, a été désactivé ou a été remplacé par un nouveau. Demandez au propriétaire de l\'espace de travail de partager le lien actuel.',
-            'action' => 'Aller à mon espace de travail',
-        ],
     ],
 
     'deletion_banner' => [
@@ -396,10 +341,6 @@ return [
     ],
 
     'pending_for_user' => [
-        'heading' => 'Vous avez été invité à rejoindre :workspace',
-        'detail_with_inviter' => ':inviter vous a invité avec l\'accès :role.',
-        'detail' => 'Vous rejoindrez avec l\'accès :role.',
-        'accept' => 'Rejoindre l\'espace de travail',
         'decline' => 'Refuser',
         'declined' => 'Invitation refusée.',
     ],

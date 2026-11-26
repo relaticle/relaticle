@@ -243,6 +243,81 @@ it('fails the mailbox with a plain reason when the workspace has switched the ma
     'initial email' => [fn (ConnectedAccount $account): InitialEmailSyncJob => new InitialEmailSyncJob($account)],
 ]);
 
+function graphMailboxNotEnabled(): RequestException
+{
+    return new RequestException(new Response(new PsrResponse(
+        404,
+        ['Content-Type' => 'application/json'],
+        '{"error":{"code":"MailboxNotEnabledForRESTAPI","message":"The mailbox is either inactive, soft-deleted, or is hosted on-premise."}}',
+    )));
+}
+
+function graphHtmlBadRequest(): RequestException
+{
+    return new RequestException(new Response(new PsrResponse(
+        400,
+        ['Content-Type' => 'text/html'],
+        '<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01//EN"><HTML><HEAD><TITLE>Bad Request</TITLE></HEAD><BODY><h2>Bad Request</h2></BODY></HTML>',
+    )));
+}
+
+it('fails the mailbox with a plain reason when the Microsoft account has no Exchange Online mailbox', function (Closure $job): void {
+    $account = mailboxWithCursors();
+    providerThrows(graphMailboxNotEnabled());
+
+    workMailboxJob($job($account));
+
+    Exceptions::assertNothingReported();
+
+    expect(DB::table('jobs')->count())->toBe(0)
+        ->and(DB::table('failed_jobs')->count())->toBe(1)
+        ->and($account->fresh()?->status)->toBe(EmailAccountStatus::ERROR)
+        ->and($account->fresh()?->last_error)->toBe(SyncErrorReason::MicrosoftMailboxNotEnabled->value)
+        ->and($account->fresh()?->syncErrorReason())->toBe('This Microsoft account has no mailbox Relaticle can read. Connect the account that holds your Outlook mailbox instead.');
+})->with([
+    'incremental email' => [fn (ConnectedAccount $account): IncrementalEmailSyncJob => new IncrementalEmailSyncJob($account)],
+    'initial email' => [fn (ConnectedAccount $account): InitialEmailSyncJob => new InitialEmailSyncJob($account)],
+    'incremental calendar' => [fn (ConnectedAccount $account): IncrementalCalendarSyncJob => new IncrementalCalendarSyncJob($account)],
+    'initial calendar' => [fn (ConnectedAccount $account): InitialCalendarSyncJob => new InitialCalendarSyncJob($account)],
+]);
+
+it('keeps reporting a Graph 404 that is not a missing mailbox', function (): void {
+    $account = mailboxWithCursors();
+    providerThrows(new RequestException(new Response(new PsrResponse(404, [], '{"error":{"code":"ErrorItemNotFound","message":"gone"}}'))));
+
+    workMailboxJob(new IncrementalEmailSyncJob($account));
+
+    Exceptions::assertReported(RequestException::class);
+
+    expect($account->fresh()?->last_error)->not->toBe(SyncErrorReason::MicrosoftMailboxNotEnabled->value);
+});
+
+it('parks the job when Graph answers 400 with an HTML error page', function (Closure $job): void {
+    config()->set('app.url', 'https://app.relaticle.com');
+    $account = mailboxWithCursors();
+    providerThrows(graphHtmlBadRequest());
+
+    workMailboxJob($job($account));
+
+    expect($account->fresh()?->status)->toBe(EmailAccountStatus::ACTIVE)
+        ->and(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeGreaterThan(0)
+        ->and(DB::table('jobs')->count())->toBe(1)
+        ->and(DB::table('failed_jobs')->count())->toBe(0);
+
+    Exceptions::assertNothingReported();
+})->with('provider-calling jobs');
+
+it('keeps reporting a Graph 400 that carries a JSON error body', function (): void {
+    $account = mailboxWithCursors();
+    providerThrows(new RequestException(new Response(new PsrResponse(400, ['Content-Type' => 'application/json'], '{"error":{"code":"BadRequest","message":"Invalid filter clause"}}'))));
+
+    workMailboxJob(new IncrementalCalendarSyncJob($account));
+
+    Exceptions::assertReported(RequestException::class);
+
+    expect(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeNull();
+});
+
 it('turns calendar sync off and keeps the mailbox active when the user has no Google Calendar', function (Closure $job): void {
     config()->set('app.url', 'https://app.relaticle.com');
     $account = mailboxWithCursors();

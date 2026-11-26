@@ -18,6 +18,19 @@ beforeEach(function (): void {
     $this->user = User::factory()->withWorkspace()->create();
     $this->actingAs($this->user);
     Filament::setTenant($this->user->currentWorkspace);
+    config()->set('services.logo_finder.url', 'https://logos.example.test');
+    config()->set('services.logo_finder.key', 'worker-secret');
+});
+
+test('observer dispatches no favicon job when no logo finder is configured', function (): void {
+    Bus::fake([FetchFaviconForCompany::class]);
+    config()->set('services.logo_finder.url', null);
+
+    Company::factory()->for($this->user->currentWorkspace)->create([
+        'custom_fields' => [CompanyField::DOMAINS->value => ['example.com']],
+    ]);
+
+    Bus::assertNotDispatched(FetchFaviconForCompany::class);
 });
 
 test('observer dispatches favicon job when company has domain and no existing logo', function (): void {
@@ -108,4 +121,26 @@ test('observer does not dispatch favicon job when the stored logo matches the do
     $company->update(['name' => 'Renamed']);
 
     Bus::assertNotDispatched(FetchFaviconForCompany::class);
+});
+
+test('observer handles saving several companies loaded together', function (): void {
+    Bus::fake([FetchFaviconForCompany::class]);
+
+    $domainsField = CustomField::query()
+        ->where('code', CompanyField::DOMAINS->value)
+        ->forEntity(Company::class)
+        ->firstOrFail();
+
+    Company::factory()->count(2)->for($this->user->currentWorkspace)->create()
+        ->each(fn (Company $company): CustomFieldValue => CustomFieldValue::forceCreate([
+            'tenant_id' => $this->user->currentWorkspace->getKey(),
+            'entity_type' => 'company',
+            'entity_id' => $company->getKey(),
+            'custom_field_id' => $domainsField->getKey(),
+            'json_value' => ["{$company->getKey()}.example.com"],
+        ]));
+
+    Company::query()->whereKey(Company::query()->pluck('id'))->get()->each->touch();
+
+    Bus::assertDispatchedTimes(FetchFaviconForCompany::class, 2);
 });

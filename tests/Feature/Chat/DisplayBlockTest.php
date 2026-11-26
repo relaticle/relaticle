@@ -277,6 +277,16 @@ it('returns a records_table block with reference urls and formatted cells', func
         ->and($block['rows'][0]['cells']['segment'])->toBe('Enterprise');
 });
 
+it('carries the sort the table was read with, and none when the call named none', function (): void {
+    Company::factory()->count(2)->for($this->user->currentWorkspace)->create();
+
+    $sorted = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request(['sort' => '-created_at'])));
+    $unsorted = displayBlockOf(app(ListCompaniesTool::class)->handle(new Request([])));
+
+    expect($sorted['sort'])->toBe('-created_at')
+        ->and($unsorted['sort'])->toBeNull();
+});
+
 it('keeps the model-facing rows under data alongside the block', function (): void {
     $user = $this->user;
 

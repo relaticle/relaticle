@@ -5,16 +5,22 @@ declare(strict_types=1);
 use App\Features\Blog;
 use App\Features\EmailIntegration;
 use GuzzleHttp\HandlerStack;
+use Illuminate\Http\Client\Request;
+use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Config;
+use Illuminate\Support\Facades\Exceptions;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
+use Relaticle\Cloud\Marketing\Support\IndexNow;
 use Relaticle\Ink\Models\Post;
 use Spatie\Crawler\Faking\FakeHandler;
 
-mutates(GenerateSitemapCommand::class);
+mutates(GenerateSitemapCommand::class, IndexNow::class);
 
 /**
  * spatie/crawler drives its own Guzzle client, so Illuminate's Http::fake()
@@ -104,6 +110,7 @@ it('adds developer guide urls with lastmod from front matter', function (): void
 
     expect($xml)->toContain('<loc>'.route('documentation.index').'</loc>')
         ->and($xml)->toContain('<loc>'.route('aiNativeCrm').'</loc>')
+        ->and($xml)->toContain('<loc>'.route('crmForCleaningBusiness').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.claude').'</loc>')
         ->and($xml)->toContain('<loc>'.route('assistants.chatgpt').'</loc>')
         ->and($xml)->toContain('<loc>'.route('security').'</loc>')
@@ -198,7 +205,7 @@ it('excludes auth and utility redirect urls from the sitemap', function (): void
 
     $xml = Storage::disk('public')->get('sitemap.xml');
 
-    expect($xml)->toContain('<loc>'.url('/').'/</loc>')
+    expect($xml)->toContain('<loc>'.route('home').'</loc>')
         ->and($xml)->not->toContain('<loc>'.url('/login').'</loc>')
         ->and($xml)->not->toContain('<loc>'.url('/register').'</loc>')
         ->and($xml)->not->toContain('<loc>'.url('/discord').'</loc>');
@@ -271,15 +278,43 @@ it('keeps the blog entry of a post the crawl also found', function (): void {
         ->and($xml)->toMatch('#<loc>'.preg_quote($url, '#').'</loc>(?:(?!</url>).)*?<priority>0.7#s');
 });
 
-it('keeps the api reference in the crawl', function (): void {
+it('leaves the client-rendered api reference out even when a crawled page links to it', function (): void {
+    $reference = route('scribe');
     fakeSitemapCrawl([
-        config('app.url') => '<html><body><a href="'.url('/developers/api').'">API</a></body></html>',
-        url('/developers/api') => '<html><body></body></html>',
+        config('app.url') => '<a href="'.$reference.'">API</a>',
+        $reference => '<p>API</p>',
     ]);
 
     $this->artisan('app:generate-sitemap')->assertSuccessful();
 
-    expect(Storage::disk('public')->get('sitemap.xml'))->toContain('<loc>'.url('/developers/api').'</loc>');
+    expect(Storage::disk('public')->get('sitemap.xml'))->not->toContain('<loc>'.$reference.'</loc>');
+});
+
+it('discovers links from the homepage and publishes one root with language alternates', function (): void {
+    $root = rtrim(route('home'), '/');
+    $child = url('/only-linked-from-home');
+
+    fakeSitemapCrawl([
+        config('app.url') => '<a href="'.$child.'">Child</a>',
+        $child => '<p>Child</p>',
+    ]);
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    $xml = simplexml_load_string(Storage::disk('public')->get('sitemap.xml'));
+    $xml->registerXPathNamespace('s', 'http://www.sitemaps.org/schemas/sitemap/0.9');
+    $homes = $xml->xpath('//s:url[s:loc="'.$root.'" or s:loc="'.$root.'/"]');
+    expect($homes)->toHaveCount(1)
+        ->and($xml->xpath('//s:url[s:loc="'.$child.'"]'))->toHaveCount(1);
+
+    $alternates = [];
+    foreach ($homes[0]->children('http://www.w3.org/1999/xhtml')->link as $alternate) {
+        $alternates[(string) $alternate->attributes()['hreflang']] = (string) $alternate->attributes()['href'];
+    }
+    foreach (config('app.available_locales') as $locale) {
+        expect($alternates[$locale])->toBe(route($locale === 'en' ? 'home' : $locale.'.home'));
+    }
+    expect($alternates['x-default'])->toBe(route('home'));
 });
 
 it('lists a translated post with its alternates and leaves out a language with no post', function (): void {
@@ -295,4 +330,91 @@ it('lists a translated post with its alternates and leaves out a language with n
         ->and($xml)->toContain('hreflang="en" href="'.route('blog.show', $english->slug).'"')
         ->and($xml)->toContain('<loc>'.route('blog.de.index').'</loc>')
         ->and($xml)->not->toContain('/es/blog');
+});
+
+it('submits nothing to IndexNow from a host other than relaticle.com', function (): void {
+    Http::fake();
+
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+    Post::factory()->published()->create();
+    $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+    Http::assertNothingSent();
+});
+
+it('serves the configured IndexNow key as plain text at the site root', function (): void {
+    config(['services.indexnow.key' => 'a1b2c3d4e5f6a7b8']);
+
+    $this->get('/a1b2c3d4e5f6a7b8.txt')
+        ->assertOk()
+        ->assertHeader('Content-Type', 'text/plain; charset=UTF-8')
+        ->assertContent('a1b2c3d4e5f6a7b8');
+});
+
+it('answers not found for any other key, and for every key when none is configured', function (?string $configured): void {
+    config(['services.indexnow.key' => $configured]);
+
+    $this->get('/0f0f0f0f0f0f0f0f.txt')->assertNotFound();
+})->with(['another key' => 'a1b2c3d4e5f6a7b8', 'no key' => null]);
+
+describe('IndexNow on relaticle.com', function (): void {
+    beforeEach(function (): void {
+        config([
+            'app.url' => 'https://relaticle.com',
+            'documentation.public_url' => 'https://relaticle.com',
+            'services.indexnow.key' => 'a1b2c3d4e5f6a7b8',
+        ]);
+        URL::forceRootUrl('https://relaticle.com');
+        fakeSitemapCrawl(['https://relaticle.com' => '<html><body></body></html>']);
+    });
+
+    it('stays quiet on the first build, with no earlier sitemap to compare', function (): void {
+        Http::fake();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Http::assertNothingSent();
+    });
+
+    it('submits the urls added and removed since the last build', function (): void {
+        Http::fake(['api.indexnow.org/*' => Http::response(status: 200)]);
+        $removed = Post::factory()->published()->create();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        $removed->delete();
+        $added = Post::factory()->published()->create();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn (Request $request): bool => $request['host'] === IndexNow::HOST
+            && $request['key'] === 'a1b2c3d4e5f6a7b8'
+            && $request['keyLocation'] === 'https://relaticle.com/a1b2c3d4e5f6a7b8.txt'
+            && in_array(route('blog.show', $added->slug), $request['urlList'], true)
+            && in_array(route('blog.show', $removed->slug), $request['urlList'], true)
+            && ! in_array(route('pricing'), $request['urlList'], true));
+    });
+
+    it('submits nothing while no key is configured', function (): void {
+        config(['services.indexnow.key' => null]);
+        Http::fake();
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+        Post::factory()->published()->create();
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Http::assertNothingSent();
+    });
+
+    it('keeps the build green and reports it when IndexNow refuses the request', function (): void {
+        Exceptions::fake();
+        Http::fake(['api.indexnow.org/*' => Http::response(status: 429)]);
+
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+        Post::factory()->published()->create();
+        $this->artisan('app:generate-sitemap')->assertSuccessful();
+
+        Exceptions::assertReported(RequestException::class);
+    });
 });

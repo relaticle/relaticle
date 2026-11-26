@@ -239,7 +239,7 @@ Le serveur fournit 50 outils. Ils couvrent le contexte du compte, la découverte
 
 Ces outils n'apparaissent que pour une connexion à laquelle l'accès à l'e-mail a été accordé. Les outils de lecture montrent les e-mails synchronisés que leur utilisateur peut voir, au niveau de partage choisi par le propriétaire de la boîte mail, ainsi que ses propres brouillons et sa boîte d'envoi. Les outils de boîte mail, de brouillon, d'envoi et de boîte d'envoi travaillent sur les boîtes mail et les e-mails de l'utilisateur lui-même.
 
-Les deux outils de lecture exigent l'accès en lecture. L'outil de boîte mail apparaît pour une connexion autorisée à rédiger des brouillons ou à envoyer, et les trois outils de brouillon pour une connexion autorisée à rédiger des brouillons. Les outils d'envoi, d'annulation, de reprogrammation et de nouvel essai exigent l'autorisation d'envoi et un rôle autorisé à envoyer via un assistant. Un envoi programmé ne part jamais avant le délai de retenue. Un e-mail part vers 20 destinataires au plus au total, tous champs À, Cc et Cci confondus. Un utilisateur peut avoir jusqu'à 10 e-mails d'assistant en attente à la fois.
+Les deux outils de lecture exigent l'accès en lecture. L'outil de boîte mail apparaît pour une connexion autorisée à rédiger des brouillons ou à envoyer, et les trois outils de brouillon pour une connexion autorisée à rédiger des brouillons. Les outils d'envoi, d'annulation, de reprogrammation et de nouvel essai exigent l'autorisation d'envoi et un rôle autorisé à envoyer via un assistant. Un envoi programmé ne part jamais avant le délai de retenue. Un e-mail part vers 20 destinataires au plus au total, tous champs À, Cc et Cci confondus. Un utilisateur peut avoir jusqu'à 10 e-mails d'assistant prévus dans les prochaines 24 heures. Les e-mails programmés plus tard ne comptent pas dans cette limite.
 
 Un e-mail en file d'attente reste lié à la connexion qui l'y a mis. Il n'est pas envoyé si cette connexion est révoquée, supprimée ou expirée à l'heure de son envoi. Il en va de même si le rôle de son utilisateur n'autorise plus l'envoi via un assistant. Il attend alors dans la boîte d'envoi sous **Échoués** avec la raison.
 
@@ -261,7 +261,7 @@ Un e-mail en file d'attente reste lié à la connexion qui l'y a mis. Il n'est p
 
 | Outil | Description |
 |------|-------------|
-| `upload-file` | Stocke un fichier dans l'espace de travail à partir d'une URL https publique, d'un corps en base64 avec `filename`, ou d'un `upload_id`. Renvoie `suggested_markdown` pour intégrer le fichier dans un champ d'éditeur enrichi comme le corps d'une note, ainsi que `file_id` pour le fichier stocké. Types autorisés : pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, jusqu'à 10 Mo. 60 appels par heure et par espace de travail. |
+| `upload-file` | Stocke un fichier dans l'espace de travail à partir d'un corps en base64 avec `filename`, ou d'un `upload_id`. Renvoie `suggested_markdown` pour intégrer le fichier dans un champ d'éditeur enrichi comme le corps d'une note, ainsi que `file_id` pour le fichier stocké. Types autorisés : pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, jusqu'à 10 Mo. 60 appels par heure et par espace de travail. |
 | `create-upload-url` | Obtient une URL signée valable cinq minutes vers laquelle faire un `PUT` du corps d'un fichier, puis transmettez l'`upload_id` renvoyé à `upload-file` dans l'heure. Un corps non stocké à ce moment-là est supprimé. 60 appels par heure et par espace de travail. |
 
 Les téléversements restent en attente pendant 24 heures. Le fichier est réclamé dès qu'un enregistrement dont le corps d'éditeur enrichi l'intègre est sauvegardé. Les fichiers non réclamés sont purgés.
@@ -397,6 +397,7 @@ Les noms à plat de l'ancien filtre n'existent plus. Dans `filter`, des clés co
 
 ---
 
+{#schema-resources}
 ## Ressources de schéma
 
 Le serveur expose cinq ressources de schéma qui décrivent les champs de chaque entité, y compris les attributs personnalisés configurés dans votre espace de travail, ainsi qu'une ressource de synthèse avec le nombre d'enregistrements :

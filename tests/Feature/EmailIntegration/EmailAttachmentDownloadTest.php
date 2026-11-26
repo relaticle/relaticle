@@ -201,6 +201,26 @@ it('serves inline image attachments for email body cid references', function ():
     expect($response->content())->toBe('png-bytes');
 });
 
+it('serves inline images with no-store', function (): void {
+    Storage::fake(EmailAttachment::DISK);
+    Storage::disk(EmailAttachment::DISK)->put('attachments/logo.png', 'png-bytes');
+
+    $attachment = makeAttachmentForUser($this->user, $this->workspace, $this->account, attachmentOverrides: [
+        'provider_attachment_id' => null,
+        'storage_path' => 'attachments/logo.png',
+        'filename' => 'logo.png',
+        'mime_type' => 'image/png',
+        'is_inline' => true,
+        'content_id' => 'logo@example.test',
+    ]);
+
+    $cacheControl = (string) $this->get(route('email-attachments.inline', ['attachment' => $attachment->id]))
+        ->assertOk()
+        ->headers->get('Cache-Control');
+
+    expect($cacheControl)->toContain('no-store')->toContain('private');
+});
+
 it('serves declared raster aliases inline under their canonical type', function (string $declared, string $served): void {
     Storage::fake(EmailAttachment::DISK);
     Storage::disk(EmailAttachment::DISK)->put('attachments/pic.bin', 'image-bytes');

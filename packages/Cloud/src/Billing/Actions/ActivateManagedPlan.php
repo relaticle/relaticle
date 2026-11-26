@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
 use Laravel\Cashier\Cashier;
 use Laravel\Cashier\Subscription;
 use Relaticle\Chat\Services\CreditService;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Stripe\Subscription as StripeSubscription;
 use UnexpectedValueException;
 
@@ -94,7 +94,7 @@ final readonly class ActivateManagedPlan
 
         $this->cancelReplaced($workspace, $stripeSubscription->id, $invoiceId);
 
-        dispatch(new RefreshManagedRenewal($stripeSubscription->id));
+        dispatch(new RefreshRenewal($stripeSubscription->id));
     }
 
     private function cancelReplaced(Workspace $workspace, string $activatedId, string $invoiceId): void

@@ -196,3 +196,18 @@ test('login page without an invitation leaves the email blank', function (): voi
         ->assertSuccessful()
         ->assertFormSet(['email' => null]);
 });
+
+test('an invitation to a workspace scheduled for deletion shows no workspace banner on login', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $workspace->forceFill(['scheduled_deletion_at' => now()->addDays(30)])->save();
+
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'guest@example.test', 'role' => 'member']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    session(['url.intended' => route('workspace-invitations.token.accept', ['token' => $raw])]);
+
+    $this->get(Filament::getLoginUrl())
+        ->assertOk()
+        ->assertDontSee("You've been invited to join", false);
+});

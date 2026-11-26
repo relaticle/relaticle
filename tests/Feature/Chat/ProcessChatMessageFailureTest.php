@@ -49,6 +49,7 @@ use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Models\PendingAction;
 use Relaticle\Chat\Queries\ConversationMessagesQuery;
 use Relaticle\Chat\Services\CreditService;
+use Relaticle\Chat\Services\ModelRegistry;
 use Relaticle\Chat\Services\PendingActionService;
 use Relaticle\Chat\Support\StoredSteps;
 use Relaticle\Chat\Support\TurnPresence;
@@ -57,6 +58,7 @@ use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
 use Tests\Helpers\AnthropicSse;
+use Tests\Helpers\ChatCatalog;
 
 mutates(ProcessChatMessage::class, CreditService::class, SelfHostedEntitlements::class, PlanEntitlements::class);
 
@@ -670,6 +672,8 @@ it('offers Retry on Auto when the provider rejects an explicit pick mid-stream',
 
 it('offers no Retry on Auto when Auto has no other model to answer with', function (): void {
     withHostedBilling();
+    config()->set('chat.models', [ChatCatalog::entry()]);
+    app()->forgetInstance(ModelRegistry::class);
 
     Event::fake([ChatStreamFailed::class]);
 

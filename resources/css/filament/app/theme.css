@@ -1172,6 +1172,22 @@ a.fi-linked-records-chip {
 /* The head cells already rule off an empty table. */
 .fi-ta-ctn .fi-ta-empty-state {
     @apply border-t-0;
+
+    & .fi-ta-empty-state-icon-bg {
+        @apply mb-4 flex size-10 items-center justify-center bg-white p-0 shadow-xs ring-1 ring-gray-950/10 dark:bg-white/5 dark:ring-white/10;
+
+        & :is(.fi-icon, .fi-loading-indicator) {
+            @apply size-5 text-primary-600 dark:text-primary-400;
+        }
+    }
+
+    & .fi-ta-empty-state-description {
+        @apply max-w-xs text-balance;
+    }
+
+    & .fi-ta-actions {
+        @apply mt-5;
+    }
 }
 
 /* Table header actions */
@@ -1281,6 +1297,11 @@ a.fi-linked-records-chip {
 
 .fi-modal-content {
     @apply rounded-xl;
+}
+
+/* The invitation panel draws its own padding and dividers, as on the join page it shares. */
+.fi-invitation-modal .fi-modal-content {
+    @apply gap-y-0 p-0;
 }
 
 /* Record pages split from xl, and only while the main area fits the rail's minimum
@@ -2127,12 +2148,6 @@ html.fi-record-stacked .fi-record-layout {
 
 .fi-dropdown-list-item-label {
     @apply min-w-0 flex-1 text-start;
-}
-
-/* Livewire shows this on click. Idle, it must not occupy layout or it reads
-   as a grip on Detach. */
-.fi-dropdown-panel .fi-loading-indicator {
-    display: none;
 }
 
 /* Panels */
@@ -2990,5 +3005,9 @@ html.fi-record-stacked .fi-record-layout {
 
     .fi-onboarding-link {
         @apply inline-flex min-h-11 items-center;
+    }
+
+    .fi-invitation-actions .fi-link {
+        @apply mt-1! flex min-h-11 items-center justify-center;
     }
 }

@@ -74,8 +74,10 @@ it('keeps header dragging alive after a card moved and after a card was opened',
     waitForStoredStageOrder($page, $user, $entity, $second);
     expect(storedStageOrder($user, $entity))->toBe($second);
 
-    $page->click($card)->assertVisible('.fi-modal-window')->wait(0.5);
-    $page->script('document.querySelector(".fi-modal-window .fi-modal-close-btn")?.click()');
+    $page->click($card)
+        ->assertVisible('.fi-modal.fi-modal-open input.fi-input >> nth=0')
+        ->click('.fi-modal.fi-modal-open .fi-modal-close-btn')
+        ->assertScript('[...document.querySelectorAll(".fi-modal-window")].some((modal) => modal.checkVisibility())', false);
     $page->wait(1);
 
     dragWithPointerEvents($page, boardHeaderTitle($ids[0]), boardHeaderTitle($ids[2]));

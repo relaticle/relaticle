@@ -15,6 +15,7 @@
     --color-rail: var(--color-gray-200);
     --color-surface: var(--color-white);
     --color-tint: var(--color-gray-50);
+    --color-highlight: color-mix(in oklab, var(--color-primary-50) 60%, var(--color-white));
     --header-height: 4rem;
 }
 
@@ -35,6 +36,7 @@ html:has(#main-header) {
     --color-rail: rgb(255 255 255 / 0.1);
     --color-surface: var(--color-gray-950);
     --color-tint: var(--color-gray-900);
+    --color-highlight: color-mix(in oklab, var(--color-primary-500) 8%, var(--color-gray-950));
 }
 
 @utility bg-hero-panel {
@@ -197,4 +199,14 @@ html:has(#main-header) {
 
 .blog-prose h1 .heading-permalink {
     @apply hidden;
+}
+
+:is(.blog-prose, .prose-docs) pre:focus-visible {
+    @apply outline-2 -outline-offset-2 outline-primary-400;
+}
+
+@media (scripting: none) {
+    .faq-item [x-cloak] {
+        display: block !important;
+    }
 }

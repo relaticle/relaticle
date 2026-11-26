@@ -183,6 +183,7 @@ Un ajuste se aplica a ambos proveedores.
 |----------|---------|-------------|
 | `EMAIL_SYNC_INITIAL_DAYS` | | Limita la primera importación a los últimos N días. Déjela sin definir para importar todo el buzón. |
 
+{#ai-assistant}
 ### Asistente de IA
 
 Rela funciona con proveedores en la nube, con un servidor autoalojado o con ambos. Los modelos aparecen en el selector de modelos del chat solo cuando su proveedor está configurado. Si no hay ninguno configurado, el asistente no puede responder.
@@ -279,6 +280,7 @@ El panel se abre en el tablero **Instance** en `{APP_URL}/sysadmin/instance`, y 
 
 ---
 
+{#reverse-proxy-and-ssl}
 ## Proxy inverso y SSL
 
 El contenedor de la aplicación sirve HTTP internamente en el puerto 8080. Coloque un proxy inverso delante para encargarse de la terminación SSL y enrutar el tráfico al contenedor.

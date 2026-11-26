@@ -21,6 +21,7 @@ return [
         'tags' => true,
         'media_library' => false,
         'mcp' => false,
+        'url_uploads' => false,
     ],
 
     /*
@@ -30,30 +31,14 @@ return [
     'middleware' => ['web', ProvideMarkdownResponse::class, RequireBlogFrontEnd::class],
 
     /*
-     * ink's Mcp::web() route already carries ReorderJsonAccept and
-     * AddWwwAuthenticateHeader. auth:sanctum-sysadmin authenticates the caller
-     * against the dedicated guard scoped to system_administrators
-     * (config/auth.php) -- the app's own /mcp and /api/v1/* routes use the
-     * default 'sanctum' guard, scoped to users only, so a blog token and an
-     * app token are never accepted on each other's endpoints. throttle:mcp
-     * (defined in AppServiceProvider::configureRateLimiting(), shared with the
-     * app's own /mcp endpoint) bounds request volume once a caller has a token.
-     *
-     * WARNING: never add 'web' to this route's middleware. Sanctum's
-     * Guard::__invoke() checks the 'web' session guard before it ever consults
-     * the bearer token / configured provider, so a caller with an unrelated
-     * logged-in web session would silently authenticate as that session user
-     * instead of the sanctum-sysadmin token holder.
+     * The guard ink resolves an MCP caller from. The host that serves the blog MCP
+     * server sets it, and nothing serves it over HTTP.
      */
     'mcp' => [
-        'path' => '/mcp/blog',
-        'guard' => 'sanctum-sysadmin',
-        'middleware' => ['auth:sanctum-sysadmin', 'throttle:mcp'],
+        'guard' => 'sysadmin',
     ],
 
     'feed' => [
-        'title' => 'Relaticle Engineering Blog',
-        'description' => 'Deep dives into building an open-source CRM for AI agents.',
         'author_email' => 'hello@relaticle.com',
     ],
 

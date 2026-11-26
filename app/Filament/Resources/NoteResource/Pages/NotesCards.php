@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Filament\Resources\NoteResource\Pages;
 
 use App\Enums\CreatedPeriod;
+use App\Enums\CrmEntity;
 use App\Filament\Components\Tables\EmptyListDescription;
 use App\Filament\Components\Tables\NoteCardColumn;
 use App\Filament\Concerns\HasNoteHeaderActions;
@@ -33,6 +34,7 @@ final class NotesCards extends ManageRecords
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query->with(['opportunities', 'creator']))
+            ->emptyStateIcon(CrmEntity::Note->icon())
             ->emptyStateDescription(EmptyListDescription::unlessFiltered(__('filament/resources/note.empty_state.description')))
             ->columns([
                 Stack::make([

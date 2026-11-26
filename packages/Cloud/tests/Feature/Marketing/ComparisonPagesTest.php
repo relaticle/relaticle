@@ -20,6 +20,9 @@ it('renders each declared comparison page with a facts table and dates', functio
     ['/alternatives/hubspot', 'HubSpot'],
     ['/alternatives/salesforce', 'Salesforce'],
     ['/alternatives/pipedrive', 'Pipedrive'],
+    ['/alternatives/zoho', 'Zoho CRM'],
+    ['/alternatives/dynamics', 'Dynamics 365 Sales'],
+    ['/alternatives/odoo', 'Odoo'],
 ]);
 
 it('404s for undeclared competitors', function (): void {
@@ -49,6 +52,17 @@ it('renders question-shaped headings and primary source links on comparison page
         ->and($html)->toContain('https://github.com/twentyhq/twenty');
 });
 
+it('keeps editorial pricing citations followable in each language', function (string $path): void {
+    foreach (config('app.available_locales') as $locale) {
+        $prefix = $locale === 'en' ? '' : '/'.$locale;
+        $html = $this->get($prefix.$path)->assertOk()->getContent();
+        $link = (new Crawler($html))->filter('a[href="https://relaticle.com/pricing"][target="_blank"]');
+
+        expect($link->count())->toBe(1)
+            ->and($link->attr('rel'))->toBe('noopener');
+    }
+})->with(['/compare/relaticle-vs-twenty', '/alternatives/hubspot']);
+
 it('marks comparison pages with dateModified and about entities in the JSON-LD graph', function (): void {
     $html = $this->get('/compare/relaticle-vs-espocrm')->assertOk()->getContent();
 
@@ -72,6 +86,9 @@ it('gives each page a search title that leads with open source and stays under 6
     ['/alternatives/hubspot', 'Open Source HubSpot Alternative, Self-Hosted | Relaticle'],
     ['/alternatives/salesforce', 'Open Source Salesforce Alternative, Self-Hosted | Relaticle'],
     ['/alternatives/pipedrive', 'Open Source Pipedrive Alternative, Self-Hosted | Relaticle'],
+    ['/alternatives/zoho', 'Open Source Zoho CRM Alternative, Self-Hosted | Relaticle'],
+    ['/alternatives/dynamics', 'Open Source Microsoft Dynamics 365 Alternative | Relaticle'],
+    ['/alternatives/odoo', 'Open Source Odoo Alternative | Relaticle'],
 ]);
 
 it('keeps the on-page heading short and distinct from the longer search title', function (string $url, string $heading): void {
@@ -102,6 +119,9 @@ it('keeps competitor prices out of meta descriptions so the facts file stays the
     '/alternatives/hubspot',
     '/alternatives/salesforce',
     '/alternatives/pipedrive',
+    '/alternatives/zoho',
+    '/alternatives/dynamics',
+    '/alternatives/odoo',
 ]);
 
 it('does not lowercase the leading acronym of an extensibility fact in alternatives prose', function (): void {

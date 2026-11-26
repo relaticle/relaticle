@@ -77,6 +77,16 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             ],
         ]),
         blockFooterTemplate: @js(__('Showing :showing of :total')),
+        blockSortTexts: @js([
+            'newest' => __('Newest first'),
+            'oldest' => __('Oldest first'),
+            'recentlyUpdated' => __('Recently updated first'),
+            'leastRecentlyUpdated' => __('Least recently updated first'),
+            'aToZ' => __('A to Z'),
+            'zToA' => __('Z to A'),
+            'descending' => __('By :column, descending'),
+            'ascending' => __('By :column, ascending'),
+        ]),
         {{-- Records-table collapse (D4) and the tool's own "more pages exist"
              link (D5). See blockToggleLabel/blockOpenUrlLabel in transcript.js. --}}
         blockShowAllTemplate: @js(__('Show all :count rows')),
@@ -156,6 +166,7 @@ Alpine.data('chatInterface', (initialConversationId, sendUrl, initialMessage, in
             'list_custom_fields' => __('Reading custom attributes…'),
             'search_docs' => __('Searching the documentation…'),
             'guide_to_page' => __('Finding the right page…'),
+            'read_attachment_rows' => __('Reading the attached file…'),
             'get_credit_balance' => __('Checking your AI credits…'),
             'request_web_access' => __('Asking to search the web…'),
             'web_search' => __('Searching the web…'),

@@ -14,7 +14,6 @@ use App\Enums\OnboardingUseCase;
 use App\Enums\Plan;
 use App\Enums\StripeSubscriptionStatus;
 use App\Enums\SubscriptionType;
-use App\Enums\WorkspaceRole;
 use App\Enums\WorkspaceSetupStep;
 use App\Events\WorkspaceCreated;
 use App\Events\WorkspaceDeleted;
@@ -34,7 +33,6 @@ use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -54,7 +52,7 @@ use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
 use Spatie\Onboard\Concerns\GetsOnboarded;
 use Spatie\Onboard\Concerns\Onboardable;
-use Spatie\Sluggable\HasSlug;
+use Spatie\Sluggable\HasSlugWithUlids;
 use Spatie\Sluggable\SlugOptions;
 
 /**
@@ -65,8 +63,6 @@ use Spatie\Sluggable\SlugOptions;
  * @property bool $auto_create_companies
  * @property AiSettings $ai_settings
  * @property Plan $plan
- * @property ?string $invite_link_token
- * @property ?CarbonImmutable $invite_link_token_expires_at
  * @property ?OnboardingUseCase $onboarding_use_case
  * @property ?string $onboarding_other_use_case
  * @property ?list<string> $onboarding_context
@@ -87,7 +83,6 @@ use Spatie\Sluggable\SlugOptions;
  * @property CarbonImmutable|null $trial_reminded_for
  * @property CarbonImmutable|null $pro_trial_used_at
  * @property CarbonImmutable|null $hosted_free_grandfathered_at
- * @property string $invite_link_default_role
  * @property-read Membership|null $membership the `workspace_user` row, populated only when the workspace was
  *     loaded through `User::workspaces()`; null on a workspace reached any other way
  */
@@ -106,10 +101,8 @@ use Spatie\Sluggable\SlugOptions;
     'onboarding_referral_detail',
     'onboarding_referral_prompt',
     'onboarding_step',
-    'invite_link_default_role',
 ])]
 #[Hidden([
-    'invite_link_token',
     'stripe_id',
     'pm_type',
     'pm_last_four',
@@ -122,8 +115,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
     /** @use HasFactory<WorkspaceFactory> */
     use HasFactory;
 
-    use HasSlug;
-    use HasUlids;
+    use HasSlugWithUlids;
     use InteractsWithMedia;
 
     public const string LOGO_MEDIA_COLLECTION = MediaCollection::Logo->value;
@@ -180,7 +172,7 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'home', 'welcome', 'features', 'demo', 'enterprise', 'pro',
         'careers', 'jobs', 'partners', 'affiliate', 'store', 'marketplace',
         'press', 'compare', 'alternatives', 'ai', 'ai-native-crm', 'self-hosted',
-        'crm-for-claude', 'crm-for-chatgpt', 'email-and-calendar',
+        'crm-for-claude', 'crm-for-chatgpt', 'crm-for-cleaning-business', 'email-and-calendar',
 
         // Communication
         'mail', 'email', 'contact', 'feedback', 'abuse', 'report',
@@ -203,11 +195,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'email-accounts', 'email-attachments', 'email-compose-images',
     ];
 
-    /**
-     * How many days an invite-link token stays valid after creation/rotation.
-     */
-    public const int INVITE_LINK_TTL_DAYS = 7;
-
     public const int PRO_TRIAL_DAYS = 14;
 
     public const int TRIAL_EXTENSION_DAYS = 7;
@@ -224,15 +211,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
         'created' => WorkspaceCreated::class,
         'updated' => WorkspaceUpdated::class,
         'deleted' => WorkspaceDeleted::class,
-    ];
-
-    /**
-     * The model's default attribute values.
-     *
-     * @var array<string, string|bool>
-     */
-    protected $attributes = [
-        'invite_link_default_role' => WorkspaceRole::Member->value,
     ];
 
     /**
@@ -255,7 +233,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'onboarding_step' => WorkspaceSetupStep::class,
             'activation_checklist_dismissed_at' => 'datetime',
             'setup_nudge_sent_at' => 'datetime',
-            'invite_link_token_expires_at' => 'datetime',
             'scheduled_deletion_at' => 'datetime',
             'deletion_reason' => DeletionReason::class,
             'paused_at' => 'datetime',
@@ -267,51 +244,6 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             'pro_trial_used_at' => 'datetime',
             'hosted_free_grandfathered_at' => 'datetime',
         ];
-    }
-
-    protected static function booted(): void
-    {
-        self::creating(function (Workspace $workspace): void {
-            if ($workspace->invite_link_token === null) {
-                $workspace->invite_link_token = Str::random(40);
-                $workspace->invite_link_token_expires_at = now()->addDays(self::INVITE_LINK_TTL_DAYS);
-            }
-        });
-    }
-
-    public function rotateInviteLink(): void
-    {
-        $this->forceFill([
-            'invite_link_token' => Str::random(40),
-            'invite_link_token_expires_at' => now()->addDays(self::INVITE_LINK_TTL_DAYS),
-        ])->save();
-    }
-
-    /**
-     * Clearing the token is what turns the link off: every lookup matches on the
-     * column, and no request token can equal null, so the link stops resolving
-     * without a second flag that could disagree with it.
-     */
-    public function disableInviteLink(): void
-    {
-        $this->forceFill([
-            'invite_link_token' => null,
-            'invite_link_token_expires_at' => null,
-        ])->save();
-    }
-
-    public function hasInviteLink(): bool
-    {
-        return $this->invite_link_token !== null;
-    }
-
-    public function isInviteLinkTokenExpired(): bool
-    {
-        if ($this->invite_link_token_expires_at === null) {
-            return true;
-        }
-
-        return $this->invite_link_token_expires_at->isPast();
     }
 
     /**
@@ -742,6 +674,12 @@ final class Workspace extends Model implements HasAvatar, HasMedia, Onboardable
             ->withPivot('role')
             ->withTimestamps()
             ->as('membership');
+    }
+
+    public function memberCount(): int
+    {
+        // The owner holds no membership row.
+        return Membership::query()->whereBelongsTo($this)->count() + 1;
     }
 
     /** @return Collection<int, User> */

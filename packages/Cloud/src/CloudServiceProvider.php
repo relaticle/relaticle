@@ -28,6 +28,7 @@ use Illuminate\Auth\Events\Verified;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Contracts\Foundation\Application;
 use Illuminate\Contracts\View\View as ViewContract;
+use Illuminate\Foundation\Bus\PendingDispatch;
 use Illuminate\Mail\Mailable;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\DB;
@@ -52,7 +53,7 @@ use Relaticle\Cloud\Billing\Commands\ProcessTrialsCommand;
 use Relaticle\Cloud\Billing\Commands\ScheduleInactiveTrialDeletionsCommand;
 use Relaticle\Cloud\Billing\Filament\Billing as BillingPage;
 use Relaticle\Cloud\Billing\Filament\BillingPanelHooks;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
 use Relaticle\Cloud\Billing\Listeners\CancelInactivityDeletionOnLogin;
 use Relaticle\Cloud\Billing\Listeners\SendInactiveWorkspaceDeletedMail;
 use Relaticle\Cloud\Billing\Listeners\SyncPlanOnStripeSubscriptionChange;
@@ -66,6 +67,10 @@ use Relaticle\Cloud\Billing\Mail\ProTrialEndingSoonMail;
 use Relaticle\Cloud\Billing\Notifications\ManagedInvoiceOverdueNotification;
 use Relaticle\Cloud\Billing\Notifications\PaymentFailedNotification;
 use Relaticle\Cloud\Billing\StripeBilling;
+use Relaticle\Cloud\Blog\BlogMcpStreams;
+use Relaticle\Cloud\Blog\Jobs\GenerateBlogCover;
+use Relaticle\Cloud\Commands\BlogMcpCommand;
+use Relaticle\Cloud\Console\Commands\BackfillBlogCoversCommand;
 use Relaticle\Cloud\Entitlements\PlanEntitlements;
 use Relaticle\Cloud\Marketing\Console\Commands\GenerateSitemapCommand;
 use Relaticle\Cloud\Marketing\Console\Commands\ReportStaleCompetitorFactsCommand;
@@ -77,6 +82,7 @@ use Relaticle\Cloud\Marketing\Services\DiscordService;
 use Relaticle\Cloud\Marketing\Services\DockerHubService;
 use Relaticle\Cloud\Marketing\Services\GitHubService;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
+use Relaticle\Ink\Models\Post;
 
 final class CloudServiceProvider extends ServiceProvider
 {
@@ -84,6 +90,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     public function register(): void
     {
+        $this->app->bind(BlogMcpStreams::class, static fn (): BlogMcpStreams => new BlogMcpStreams(STDIN, STDOUT));
         $this->app->bind(Entitlements::class, static fn (Application $app): Entitlements => Feature::active(Billing::class)
             ? $app->make(PlanEntitlements::class)
             : $app->make(SelfHostedEntitlements::class));
@@ -128,7 +135,14 @@ final class CloudServiceProvider extends ServiceProvider
         Event::listen(Login::class, [CancelInactivityDeletionOnLogin::class, 'handle']);
         Event::listen(WorkspaceDeleted::class, [SendInactiveWorkspaceDeletedMail::class, 'handle']);
 
-        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class]);
+        $this->commands([ProcessTrialsCommand::class, ScheduleInactiveTrialDeletionsCommand::class, AnnounceInactivityRuleCommand::class, GenerateSitemapCommand::class, ReportStaleCompetitorFactsCommand::class, BlogMcpCommand::class, BackfillBlogCoversCommand::class]);
+        $this->registerBlogPreviewRoute();
+        Post::saved(static function (Post $post): void {
+            $source = $post->getAttribute('featured_image');
+            if ($source && $post->isDirty('featured_image')) {
+                DB::afterCommit(static fn (): PendingDispatch => dispatch(new GenerateBlogCover($source)));
+            }
+        });
 
         $this->callAfterResolving(Schedule::class, static function (Schedule $schedule): void {
             $schedule->command('billing:process-trials')->everyFiveMinutes()->withoutOverlapping()->onOneServer();
@@ -179,7 +193,7 @@ final class CloudServiceProvider extends ServiceProvider
         // read the config key App\Features\Blog resolves from.
         config([
             'ink.features.public_routes' => (bool) config('relaticle.features.blog', false),
-            'ink.features.mcp' => true,
+            'ink.features.mcp' => false,
             'ink.locales' => config('app.available_locales'),
             'ink.default_locale' => LocalizedUrl::DEFAULT_LOCALE,
             'ink.middleware' => array_values(array_unique([...config('ink.middleware', ['web']), AddVaryAcceptHeader::class, SetPublicLocale::class])),
@@ -192,6 +206,13 @@ final class CloudServiceProvider extends ServiceProvider
                 'feed' => 'cloud::blog.feed',
             ],
         ]);
+    }
+
+    private function registerBlogPreviewRoute(): void
+    {
+        if (! config('ink.features.public_routes')) {
+            $this->loadRoutesFrom(base_path('vendor/relaticle/ink/routes/preview.php'));
+        }
     }
 
     private function speakTheLanguageOfALocalizedNotFound(): void
@@ -289,7 +310,8 @@ final class CloudServiceProvider extends ServiceProvider
             'App\Notifications\ManagedInvoiceOverdueNotification' => ManagedInvoiceOverdueNotification::class,
             'App\Mail\ProEndedMail' => ProEndedMail::class,
             'App\Mail\ProTrialEndingSoonMail' => ProTrialEndingSoonMail::class,
-            'App\Jobs\RefreshManagedRenewal' => RefreshManagedRenewal::class,
+            'App\Jobs\RefreshManagedRenewal' => RefreshRenewal::class,
+            'Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal' => RefreshRenewal::class,
             'Relaticle\SystemAdmin\Mail\ManagedPlanInvoiceMail' => ManagedPlanInvoiceMail::class,
             'App\Mail\NewContactSubmissionMail' => NewContactSubmissionMail::class,
         ];
@@ -356,7 +378,7 @@ final class CloudServiceProvider extends ServiceProvider
 
     private function registerCommunityCounts(): void
     {
-        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.community', 'cloud::marketing.press', 'cloud::marketing.self-hosted'], static function (ViewContract $view): void {
+        View::composer(['cloud::components.layout.community-links', 'cloud::marketing.home.partials.hero', 'cloud::marketing.home.partials.community', 'cloud::marketing.press', 'cloud::marketing.self-hosted', 'cloud::marketing.pricing'], static function (ViewContract $view): void {
             $gitHubService = resolve(GitHubService::class);
 
             $view->with([

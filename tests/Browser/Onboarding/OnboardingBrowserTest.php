@@ -22,6 +22,8 @@ const FOCUSED_HEADING = 'new Promise(resolve => { const end = Date.now() + 3000;
 
 const ACTION_MODALS_READY = 'new Promise(resolve => { const ready = () => document.querySelector(\'[x-data^="filamentActionModals"]\')?._x_dataStack !== undefined; const poll = () => ready() ? resolve(true) : setTimeout(poll, 25); poll(); })';
 
+const CREATE_WORKSPACE_SUBMIT = 'button[type="submit"]:visible:has-text("Continue")';
+
 function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWebpage
 {
     return loginViaBrowser($user)
@@ -31,7 +33,7 @@ function walkToMailboxStep(User $user, string $name, string $slug): AwaitableWeb
         ->type('[id="form.slug"]', $slug)
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertPathIs("/app/{$slug}/setup");
 }
@@ -106,7 +108,7 @@ it('walks a new owner through every setup screen to the setup conversation', fun
         ->type('[id="form.slug"]', 'my-first-workspace')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertPathIs('/app/my-first-workspace/setup')
         ->assertNoJavaScriptErrors()
@@ -205,12 +207,12 @@ it('moves the preview panel with the setup step', function (): void {
         ->assertScript($visibleStages, []);
 });
 
-it('changes the invite button when an address is typed and confirms the copied link', function (): void {
+it('changes the invite button when an address is typed', function (): void {
     Queue::fake();
 
     $user = User::factory()->create();
 
-    $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
+    walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
         ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
         ->waitForText('Help us customize your workspace')
@@ -219,46 +221,10 @@ it('changes the invite button when an address is typed and confirms the copied l
         ->press('button:visible:has-text("Continue")')
         ->waitForText('Invite your team')
         ->assertDontSee('Send invites and get started')
+        ->assertDontSee('Copy link')
         ->type('[id="form.emails"]', 'maya@acme.com')
         ->assertSee('Send invites and get started');
-
-    $page->assertSee('Copy link')
-        ->script('navigator.clipboard.writeText = () => Promise.resolve()');
-
-    $page->assertDontSee('Link copied.')
-        ->press('Copy link')
-        ->assertSee('Link copied.');
 });
-
-it('shows the invite link to copy by hand when the clipboard is unavailable', function (string $clipboard): void {
-    Queue::fake();
-
-    $user = User::factory()->create();
-    $manualLink = '[data-invite-link-manual]';
-
-    $page = walkToMailboxStep($user, 'Acme Sales', 'acme-sales')
-        ->assertScript(ACTION_MODALS_READY, true)
-        ->press("I'll add people and companies myself")
-        ->waitForText('Help us customize your workspace')
-        ->assertScript(asyncAlpineComponentsLoaded())
-        ->click('[for$="onboarding_use_case-other"]')
-        ->press('button:visible:has-text("Continue")')
-        ->waitForText('Invite your team')
-        ->assertMissing($manualLink);
-
-    $token = Workspace::query()->where('slug', 'acme-sales')->value('invite_link_token');
-
-    $page->script("(() => { {$clipboard} })()");
-
-    $page->press('Copy link')
-        ->assertVisible($manualLink)
-        ->assertScript("new URL(document.querySelector('{$manualLink}').value).pathname", route('workspaces.join', ['token' => $token], absolute: false))
-        ->assertScript("(field => field.selectionStart === 0 && field.selectionEnd === field.value.length)(document.querySelector('{$manualLink}'))", true)
-        ->assertDontSee('Link copied.');
-})->with([
-    'write rejected' => "navigator.clipboard.writeText = () => Promise.reject(new Error('denied'))",
-    'no clipboard api' => "Object.defineProperty(navigator, 'clipboard', { value: undefined, configurable: true })",
-]);
 
 it('stores the use case and its sub-option chosen in the browser', function (): void {
     Queue::fake();
@@ -272,7 +238,7 @@ it('stores the use case and its sub-option chosen in the browser', function (): 
         ->type('[id="form.name"]', 'Hiring Desk')
         ->press('button:visible:has-text("Continue")')
         ->waitForText('How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")
@@ -314,7 +280,7 @@ it('moves focus to the heading of each new wizard and setup step', function (): 
         ->assertScript(FOCUSED_HEADING, 'Create your workspace')
         ->press('button:visible:has-text("Continue")')
         ->assertScript(FOCUSED_HEADING, 'How did you hear about us?')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertScript(FOCUSED_HEADING, 'Start with the people you already email')
         ->assertScript(ACTION_MODALS_READY, true)
@@ -369,7 +335,7 @@ it('stores the assistant and the question behind an AI referral picked in the br
         ->assertScript(asyncAlpineComponentsLoaded())
         ->click('[id$="onboarding_referral_detail-claude"]')
         ->type('[id$="onboarding_referral_prompt"]', 'A CRM my assistant can update')
-        ->press('button:visible:has-text("Continue")')
+        ->press(CREATE_WORKSPACE_SUBMIT)
         ->waitForText('Start with the people you already email')
         ->assertScript(ACTION_MODALS_READY, true)
         ->press("I'll add people and companies myself")

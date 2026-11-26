@@ -104,7 +104,7 @@ it('builds pack checkout options with metadata and managed payments', function (
     expect($options)->toHaveKey('managed_payments.enabled', true)
         ->and($options['metadata']['team_id'])->toBe((string) $workspace->getKey())
         ->and($options['metadata']['credit_pack_price'])->toBe('price_credits_1k_test')
-        ->and($options['success_url'])->toContain('credits=success');
+        ->and($options['success_url'])->toEndWith('?credits={CHECKOUT_SESSION_ID}');
 });
 
 it('rejects an unknown pack key', function (): void {
@@ -167,7 +167,7 @@ describe('domain-routed app panel', function (): void {
         $options = invokePackCheckout('sessionOptions', [unsavedWorkspace(), 'price_credits_1k_test']);
 
         expect($options['cancel_url'])->toBe('http://app.example.com/acme/billing')
-            ->and($options['success_url'])->toBe('http://app.example.com/acme/billing?credits=success');
+            ->and($options['success_url'])->toBe('http://app.example.com/acme/billing?credits={CHECKOUT_SESSION_ID}');
     });
 
     it('links the trial reminder email at the billing route without a panel path prefix', function (): void {

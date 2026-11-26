@@ -11,9 +11,11 @@ use Carbon\CarbonImmutable;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Pennant\Feature;
 use Relaticle\Cloud\Marketing\Enums\ConnectableAssistant;
+use Relaticle\Cloud\Marketing\Support\IndexNow;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Documentation\Support\DocsRepository;
 use Relaticle\Documentation\Support\DocUrl;
@@ -29,8 +31,9 @@ final class GenerateSitemapCommand extends Command
     /**
      * Execute the console command.
      */
-    public function handle(DocsRepository $docsRepository): void
+    public function handle(DocsRepository $docsRepository, IndexNow $indexNow): void
     {
+        $previous = Storage::disk('public')->get('sitemap.xml');
         $sitemap = $this->crawlMarketingSitemap();
 
         $this->addMarketingUrls($sitemap);
@@ -41,6 +44,37 @@ final class GenerateSitemapCommand extends Command
         }
 
         $sitemap->writeToDisk('public', 'sitemap.xml');
+
+        if ($previous !== null) {
+            $indexNow->submit($this->changedUrls($previous, $sitemap->render()));
+        }
+    }
+
+    /** @return list<string> */
+    private function changedUrls(string $previousXml, string $currentXml): array
+    {
+        $before = $this->lastModifiedByUrl($previousXml);
+        $after = $this->lastModifiedByUrl($currentXml);
+
+        return array_keys(array_diff_assoc($after, $before) + array_diff_key($before, $after));
+    }
+
+    /** @return array<string, string> */
+    private function lastModifiedByUrl(string $xml): array
+    {
+        $document = simplexml_load_string($xml);
+
+        if ($document === false) {
+            return [];
+        }
+
+        $lastModified = [];
+
+        foreach ($document->url as $url) {
+            $lastModified[(string) $url->loc] = (string) $url->lastmod;
+        }
+
+        return $lastModified;
     }
 
     private function crawlMarketingSitemap(): Sitemap
@@ -50,6 +84,10 @@ final class GenerateSitemapCommand extends Command
         // pages) -- they're excluded as a deliberate, untested guard rather
         // than covered behavior.
         $excluded = ['/login', '/register', '/forgot-password', '/dashboard', '/discord'];
+
+        // The API reference renders client-side, so Google crawls it and declines to index it.
+        $excluded[] = parse_url(route('scribe'), PHP_URL_PATH);
+        $home = rtrim(route('home'), '/');
 
         return SitemapGenerator::create(config('app.url'))
             ->shouldCrawl(function (string $url) use ($excluded): bool {
@@ -71,12 +109,13 @@ final class GenerateSitemapCommand extends Command
 
                 return pathinfo($path, PATHINFO_EXTENSION) === '';
             })
+            ->hasCrawled(fn (Url $tag): ?Url => rtrim($tag->url, '/') === $home ? null : $tag)
             ->getSitemap();
     }
 
     private function addMarketingUrls(Sitemap $sitemap): void
     {
-        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
+        $names = ['home', 'pricing', 'press', 'ai', 'aiNativeCrm', 'crmForCleaningBusiness', 'selfHosted', 'security', 'contact', 'terms.show', 'policy.show', 'help.index', 'documentation.index'];
 
         foreach (ConnectableAssistant::cases() as $assistant) {
             $names[] = $assistant->routeName();

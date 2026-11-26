@@ -200,7 +200,7 @@ it('keeps a path-mounted admin Livewire update in the install default', function
     $admin = SystemAdministrator::factory()->create();
     $this->actingAs($admin, 'sysadmin');
 
-    $page = $this->get('/sysadmin')->assertOk()->getContent();
+    $page = $this->followingRedirects()->get('/sysadmin')->assertOk()->getContent();
     preg_match('/wire:snapshot="([^"]+)"/', $page, $match);
     $snapshot = html_entity_decode($match[1]);
     Auth::shouldUse('web');

@@ -39,7 +39,7 @@ return [
         ],
         'update_workspace_logo' => [
             'title' => 'Logo des Arbeitsbereichs',
-            'description' => 'Ihr Logo erscheint in der Arbeitsbereich-Auswahl, in Einladungen und auf der Beitrittsseite.',
+            'description' => 'Ihr Logo erscheint in der Arbeitsbereich-Auswahl, in Einladungen und auf der Einladungsseite.',
         ],
         'assistant' => [
             'description' => 'Legen Sie fest, was :assistant, der integrierte KI-Assistent, für die Mitglieder dieses Arbeitsbereichs tun darf.',
@@ -49,7 +49,7 @@ return [
         ],
         'add_workspace_member' => [
             'title' => 'Mitglieder einladen',
-            'description' => 'Senden Sie eine Einladung per E-Mail oder teilen Sie einen Link, über den Eingeladene selbst beitreten können.',
+            'description' => 'Laden Sie Menschen per E-Mail ein. Jede eingeladene Person erhält ihre eigene Einladung.',
         ],
         'workspace_members' => [
             'title' => 'Mitglieder',
@@ -67,12 +67,7 @@ return [
         'save' => 'Speichern',
         'invite_people' => 'Mitglieder einladen',
         'send_invitations' => 'Einladungen senden',
-        'invite_link' => 'Einladungslink',
         'close' => 'Schließen',
-        'copy_invite_link' => 'Link kopieren',
-        'rotate_invite_link' => 'Neuen Link erzeugen',
-        'disable_invite_link' => 'Link deaktivieren',
-        'enable_invite_link' => 'Link aktivieren',
         'update_workspace_role' => 'Rolle ändern',
         'compare_roles' => 'Rollen vergleichen',
         'compare_roles_help_link' => 'Vollständige Übersicht lesen',
@@ -113,18 +108,6 @@ return [
         'role_updated' => [
             'success' => 'Rolle aktualisiert.',
         ],
-        'invite_link_role_updated' => [
-            'success' => 'Wer diesem Link folgt, wird jetzt :role.',
-        ],
-        'invite_link_rotated' => [
-            'success' => 'Ein neuer Einladungslink wurde erzeugt. Der bisherige Link funktioniert nicht mehr.',
-        ],
-        'invite_link_disabled' => [
-            'success' => 'Der Link zum Arbeitsbereich ist deaktiviert. Laden Sie Mitglieder stattdessen per E-Mail ein.',
-        ],
-        'invite_link_enabled' => [
-            'success' => 'Der Link zum Arbeitsbereich ist aktiviert. Jeder, der ihn öffnet, kann beitreten.',
-        ],
         'resend_throttled' => 'Bitte warten Sie :seconds Sekunden, bevor Sie erneut senden.',
         'some_invites_failed' => [
             'title' => 'Einige Einladungen konnten nicht gesendet werden',
@@ -143,7 +126,6 @@ return [
         'email_already_invited' => 'Diese Person wurde bereits in den Arbeitsbereich eingeladen.',
         'email_already_member' => 'Dieses Mitglied gehört bereits zum Arbeitsbereich.',
         'only_owner_promotes_admins' => 'Nur der Inhaber des Arbeitsbereichs kann die Administratorrolle erteilen.',
-        'invite_link_role_cannot_be_admin' => 'Der Link zum Arbeitsbereich kann die Administratorrolle nicht erteilen. Laden Sie Administratoren stattdessen per E-Mail ein.',
         'no_valid_emails' => 'Geben Sie mindestens eine E-Mail-Adresse ein.',
         'too_many_invites' => 'Sie können höchstens :max Mitglieder auf einmal einladen.',
         'managed_plan_before_deleting' => 'Dieser Arbeitsbereich nutzt einen Tarif, den Relaticle abrechnet. Sprechen Sie uns an, um den Tarif zu beenden, bevor Sie den Arbeitsbereich löschen.',
@@ -165,14 +147,6 @@ return [
         ],
         'delete_workspace' => [
             'notice' => 'Der Arbeitsbereich wird zur Löschung vorgemerkt. Sie haben 30 Tage Zeit, die Löschung abzubrechen, bevor alle Daten endgültig entfernt werden.',
-        ],
-        'rotate_invite_link' => [
-            'heading' => 'Neuen Einladungslink erzeugen?',
-            'notice' => 'Der aktuelle Link funktioniert sofort nicht mehr. Wer ihn noch in einem Chat oder einer E-Mail hat, kann nicht beitreten.',
-        ],
-        'disable_invite_link' => [
-            'heading' => 'Link zum Arbeitsbereich deaktivieren?',
-            'notice' => 'Mit dem aktuellen Link kann niemand mehr beitreten, sobald er deaktiviert ist. Beim erneuten Aktivieren entsteht ein anderer Link, der alte bleibt also ungültig.',
         ],
         'cancel_deletion' => [
             'heading' => 'Löschung des Arbeitsbereichs abbrechen?',
@@ -358,37 +332,8 @@ return [
     ],
 
     'invitation' => [
+        'joining_as' => 'Beitritt als',
         'members' => '{1} 1 Mitglied ist bereits in diesem Arbeitsbereich|[2,*] :count Mitglieder sind bereits in diesem Arbeitsbereich',
-    ],
-
-    'invite_link' => [
-        'heading' => 'Einladungslink',
-        'description' => 'Teilen Sie einen Link, statt Adressen einzutippen. Jeder, der ihn öffnet, tritt diesem Arbeitsbereich bei.',
-        'url' => 'Link zum Arbeitsbereich',
-        'copied' => 'Link kopiert.',
-        'expires_in' => 'Funktioniert noch :time. Ein neuer Link setzt die Zeit zurück.',
-        'default_role' => 'Beitritt als',
-        'default_role_helper' => 'Wird gespeichert, sobald Sie die Rolle wählen. Administratoren laden Sie stattdessen per E-Mail ein.',
-        'lapsed' => [
-            'title' => 'Dieser Link ist abgelaufen (:time her)',
-            'notice' => 'Damit kann niemand beitreten. Erzeugen Sie einen neuen Link, um weiter Mitglieder einzuladen.',
-        ],
-        'disabled' => [
-            'title' => 'Der Link zum Arbeitsbereich ist deaktiviert',
-            'notice' => 'Einladungen per E-Mail sind der einzige Weg hinein. Beim Aktivieren des Links entsteht ein neuer.',
-        ],
-        'join' => [
-            'heading' => ':workspace beitreten',
-            'body' => 'Sie treten mit :role-Zugriff bei.',
-            'joining_as' => 'Beitritt als',
-            'action' => 'Arbeitsbereich beitreten',
-            'decline' => 'Jetzt nicht',
-        ],
-        'expired' => [
-            'heading' => 'Dieser Einladungslink funktioniert nicht mehr',
-            'body' => 'Er ist abgelaufen, wurde deaktiviert oder durch einen neuen ersetzt. Bitten Sie den Inhaber des Arbeitsbereichs, den aktuellen Link zu teilen.',
-            'action' => 'Zu meinem Arbeitsbereich',
-        ],
     ],
 
     'deletion_banner' => [
@@ -396,10 +341,6 @@ return [
     ],
 
     'pending_for_user' => [
-        'heading' => 'Sie wurden eingeladen, :workspace beizutreten',
-        'detail_with_inviter' => ':inviter hat Sie mit :role-Zugriff eingeladen.',
-        'detail' => 'Sie treten mit :role-Zugriff bei.',
-        'accept' => 'Arbeitsbereich beitreten',
         'decline' => 'Ablehnen',
         'declined' => 'Einladung abgelehnt.',
     ],

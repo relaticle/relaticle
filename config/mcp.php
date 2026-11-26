@@ -21,6 +21,9 @@ return [
         'https://claude.ai',
         'https://chatgpt.com',
         'https://console.mistral.ai',
+        'https://www.perplexity.ai',
+        'https://enterprise.perplexity.ai',
+        'https://app.maxforms.com',
         'http://localhost',
     ],
 

@@ -239,7 +239,7 @@ Der Server stellt 50 Tools bereit. Sie decken Kontokontext, entitätsübergreife
 
 Diese Tools erscheinen nur für eine Verbindung, die E-Mail-Zugriff erhalten hat. Die Lese-Tools zeigen die synchronisierten E-Mails, die ihr Benutzer sehen darf, in der Freigabestufe, die der Inhaber des Postfachs gewählt hat, dazu die eigenen Entwürfe und den Postausgang des Benutzers. Die Tools für Postfächer, Entwürfe, Senden und Postausgang arbeiten mit den eigenen Postfächern und E-Mails des Benutzers.
 
-Die beiden Lese-Tools brauchen Lesezugriff. Das Postfach-Tool erscheint für eine Verbindung, die entwerfen oder senden darf, und die drei Entwurfs-Tools für eine, die entwerfen darf. Die Tools zum Senden, Abbrechen, Neu-Terminieren und Wiederholen brauchen die Berechtigung zum Senden und eine Rolle, die über einen Assistenten senden darf. Ein terminiertes Senden erfolgt nie früher als die Haltefrist. Eine E-Mail geht an höchstens 20 Empfänger insgesamt, über An, CC und BCC zusammen. Ein Benutzer kann bis zu 10 Assistenten-E-Mails gleichzeitig eingeplant haben.
+Die beiden Lese-Tools brauchen Lesezugriff. Das Postfach-Tool erscheint für eine Verbindung, die entwerfen oder senden darf, und die drei Entwurfs-Tools für eine, die entwerfen darf. Die Tools zum Senden, Abbrechen, Neu-Terminieren und Wiederholen brauchen die Berechtigung zum Senden und eine Rolle, die über einen Assistenten senden darf. Ein terminiertes Senden erfolgt nie früher als die Haltefrist. Eine E-Mail geht an höchstens 20 Empfänger insgesamt, über An, CC und BCC zusammen. Ein Benutzer kann bis zu 10 Assistenten-E-Mails haben, die in den nächsten 24 Stunden versendet werden. Später eingeplante E-Mails zählen nicht zu diesem Limit.
 
 Eine eingeplante E-Mail bleibt an die Verbindung gebunden, die sie eingeplant hat. Sie wird nicht gesendet, wenn diese Verbindung bis zur Sendezeit widerrufen, gelöscht oder abgelaufen ist. Dasselbe gilt, wenn die Rolle ihres Benutzers das Senden über einen Assistenten nicht mehr erlaubt. Sie wartet dann mit dem Grund im Postausgang unter **Fehlgeschlagen**.
 
@@ -261,7 +261,7 @@ Eine eingeplante E-Mail bleibt an die Verbindung gebunden, die sie eingeplant ha
 
 | Tool | Beschreibung |
 |------|--------------|
-| `upload-file` | Speichert eine Datei im Arbeitsbereich aus einer öffentlichen https-URL, einem base64-Inhalt mit `filename` oder einer `upload_id`. Liefert `suggested_markdown`, um die Datei in ein Rich-Text-Attribut wie den Inhalt einer Notiz einzubetten, sowie `file_id` für die gespeicherte Datei. Erlaubte Typen: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, bis 10 MB. 60 Aufrufe pro Stunde und Arbeitsbereich. |
+| `upload-file` | Speichert eine Datei im Arbeitsbereich aus einem base64-Inhalt mit `filename` oder einer `upload_id`. Liefert `suggested_markdown`, um die Datei in ein Rich-Text-Attribut wie den Inhalt einer Notiz einzubetten, sowie `file_id` für die gespeicherte Datei. Erlaubte Typen: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, bis 10 MB. 60 Aufrufe pro Stunde und Arbeitsbereich. |
 | `create-upload-url` | Liefert eine fünf Minuten gültige signierte URL, an die Sie einen Dateiinhalt per `PUT` senden. Übergeben Sie die zurückgegebene `upload_id` dann innerhalb einer Stunde an `upload-file`. Ein bis dahin nicht gespeicherter Inhalt wird gelöscht. 60 Aufrufe pro Stunde und Arbeitsbereich. |
 
 Uploads bleiben 24 Stunden ausstehend. Speichern Sie einen Eintrag, dessen Rich-Text-Inhalt die Datei einbettet, wird die Datei zugeordnet. Nicht zugeordnete Dateien werden gelöscht.
@@ -397,6 +397,7 @@ Die flachen Namen des früheren Filters gibt es nicht mehr. Innerhalb von `filte
 
 ---
 
+{#schema-resources}
 ## Schema-Ressourcen
 
 Der Server stellt fünf Schema-Ressourcen bereit, die die Felder jeder Entität beschreiben, einschließlich der benutzerdefinierten Attribute, die Ihr Arbeitsbereich eingerichtet hat, dazu eine Zusammenfassungs-Ressource mit der Anzahl der Einträge:

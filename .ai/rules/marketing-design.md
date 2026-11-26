@@ -21,6 +21,7 @@ outside the roles.
 | `rail` | gray-200 | white 10% | `bg-rail gap-px` grids, `border-rail` frame lines |
 | `surface` | white | gray-950 | every cell |
 | `tint` | gray-50 | gray-900 | cells that hold product UI, link hover |
+| `highlight` | primary-50 at 60% on white | primary-500 at 8% on gray-950 | the recommended plan's column in a comparison table |
 
 Three treatments sit on top of the tokens. A page has at most one dark moment: the `closing-band` on
 the homepage, `/ai` and `/email-and-calendar`. `bg-hero-panel` is the
@@ -30,6 +31,9 @@ human moments (the homepage email visual), never behind body text.
 
 `bg-dots` is a 20px dot texture for the `tint` cells that hold product UI, so a mock has something to
 sit on. It never sits behind marketing copy. On `/ai` the showcase visuals and the Control cells use it.
+
+`highlight` is mixed opaque, so a sticky table header and the cells under it carry the same colour.
+It marks one column on a page and never sits behind a whole section.
 
 Cells inside a `gap-px` grid stay opaque. A translucent fill lets the rail color show through and
 turns the cell gray in dark mode. `canvas` is taken by the Scribe theme, which is why the third
@@ -55,12 +59,55 @@ product page takes a different composition, so no two read as copies:
 | `/self-hosted` | `stack`, `start` | `corners` light on `tint` |
 | `/email-and-calendar` | `split` | `around` light on `tint` |
 | `/ai-native-crm` | `stack`, centred | `dots` on `tint` |
+| `/pricing` | `stack`, centred, the plan cards as the visual | `seam` light and `dots` on `tint` |
 | homepage story | a `frame` section | `center` light on `tint`, dots inside |
 
 The homepage hero keeps its own rounded `bg-hero-panel` outside the rails, and no other page copies
 it. 19 product pages measured on 2026-11-08 (Linear, Stripe, Raycast, Resend, Attio, Intercom)
 put the product in the first screen on a frame or soft light; that is the bar. No test reads this,
 so a reviewer reads for a product page that repeats another's composition or a visual with no stage.
+
+## Product mocks
+
+A mock is the app's own screen, cropped. Build it from the running app, never from another mock or
+from memory. On 2026-11-23 a company list drawn from the `/ai` list mock reached review with bars the
+app does not have, and its hand-written Spanish chip read "en los próximos" where the app says
+"en menos de".
+
+- Open the real screen in the local app with seeded data and screenshot it before writing markup.
+  Review the mock beside that screenshot.
+- Keep the screen's rows in the app's order: the title row with Ask Rela, the view row, the Sort and
+  Filter row, then the content.
+- Measure each part in the browser (height, radius, font size, gap) and match it. The board is 300px
+  columns 12px apart, 48px when collapsed, with 276px cards and 20px badges
+  (`--_column-width` and `--_collapsed-width` in Flowforge's `flowforge-modern.css`). A list row is
+  41px, a toolbar button 32px, a filter chip 28px.
+- A mock crops and never rescales. It may drop the sidebar, rows and toolbar buttons. When the
+  columns do not fit at 300px, collapse the empty ones as the app does, or let the board scroll.
+- Every label the app renders comes from the app's own language key, so the German, Spanish and
+  French pages read as the app does: `filament/panel.tables.filters.*`,
+  `filament/panel.tables.views.*`, `filament/resources/{company,opportunity}.*`,
+  `flowforge::flowforge.add_card`, and `formats.iso.date_without_year` for a card date. Only sample
+  data lives in `packages/Cloud/lang`: record names, stage names, attribute names.
+- Icons come from their owner: `CustomFieldType::icon()` for an attribute column, `lucide-table-2`
+  and `lucide-square-kanban` for the list and board view tiles.
+- Dates are computed from today, so a mock never goes stale.
+
+A mock of an app screen is built from the shared components in `components/marketing`, never from
+page markup: `app-screen` (the title, view and filter rows), `app-board` (the opportunities board),
+`app-list` (a record list, with select badges and linked records), `app-plan` (the plan card, single
+and batch steps) and `chat-plan` (a message with its plan under it). Rela's side panel has its own:
+`rela-panel` and `rela-panel-header` (the panel and its header row), `rela-composer` (the empty message
+box), `rela-dock-field` (a field row on a single-record card), `rela-receipt-line` and `rela-settled`
+(the lines a decision leaves) and `rela-records` (the table a read renders). A page passes its sample
+data and nothing else, so a fix to a component reaches every page that shows that screen. No test reads a mock
+against the app, so a reviewer opens both and compares them.
+
+Words and options come from the class that owns them in the app: `ProposalEntity` for card titles,
+verbs and receipt verbs, `OpportunityField` and `TaskField` for attribute names and option colors.
+A proposal docks where the message box was, and the box stays hidden until the visitor decides. After
+the decision the app resumes the turn, so Rela's next reply follows the receipt. Only a create card offers
+the edit pencil (`ProposalCard::editableCodesOf()`), so a mock that demos fixing a field shows a create.
 
 ## Type roles
 
@@ -142,11 +189,14 @@ reach it. Change the header height and the token together. `html` also carries `
   to three short lines, rendered as hairline rows under the lead; each names something the help docs
   describe. A prop is never named `loop`: Blade's own `$loop` overwrites it after the
   facts `@foreach`.
-- `board-mock`: the opportunities board built from the live board's markup, with a card that
-  `motion.js` drags to the next stage. The hero tab and the press page keep the screenshot.
+- `board-mock`: `app-board` with sample data, with a card that `motion.js` drags to the next stage. `app-board`
+  carries the hooks the drag needs: a column's `count` before and after, a card's `attributes` and a column's drop
+  `slot`. The hero tab and the press page keep the screenshot.
 - `window`: the frame around a product fragment.
-- `chat-window`: a `window` with the Rela chip and the sample workspace name in its header. Every chat
-  fragment in the `/ai` showcases sits in one, so they read as the same product.
+- `app-screen`, `app-board`, `app-list`, `app-plan`, `chat-plan`: the app's own screens, rebuilt from the live
+  markup. The Product mocks section says how to build and check them.
+- `chat-window`: a `window` under `rela-panel-header`. Every chat fragment in the `/ai` showcases sits
+  in one, so they read as the same product.
 - The `/self-hosted` hero is that page's signature: an install configurator
   (`partials/self-hosted-install.blade.php`). A light terminal `window` holds the guide's quick start
   with an `APP_KEY` and `DB_PASSWORD` the browser generates through `crypto.getRandomValues`, and an
@@ -162,16 +212,29 @@ reach it. Change the header height and the token together. `html` also carries `
   (`partials/ai-native-checklist.blade.php`). Five checks, a toggle per check for the visitor's own CRM
   with a live "x of 5" readout, and Relaticle's answer beside each with a link to the page that proves
   it. `tests/Browser/Marketing/AiNativeChecklistTest.php` pins the score and the toggles.
+- The `/pricing` signature is a team cost calculator (`partials/pricing-team-cost.blade.php`) in its own
+  frame under the plan cards. A team-size slider and a per-seat price redraw three bars: a per-seat CRM,
+  Cloud Pro and Cloud Scale, each per month billed yearly, and one sentence states the yearly difference or
+  the team size where Cloud Pro becomes cheaper. The default seat price is `CompetitorFacts::medianSeatPrice()`
+  over every product with a `seat_price`, and the footnote names the count, never a product. The server
+  renders the default state, and the bars animate `clip-path` only. It renders only while billing is on.
+  `tests/Browser/Marketing/TeamCostCalculatorTest.php` pins the prices, the verdict and the break-even line.
+- The `/pricing` comparison shows only where the plans differ. What every plan includes sits on one
+  "On every plan" line above the table, the rows carry no group headings, and the recommended plan's
+  column takes `highlight` from the sticky header down. Self-hosting is not a column: it has its own row
+  under the plan cards.
 - The `/crm-for-{assistant}` hero is an ask gallery (`partials/assistant-playground.blade.php`): four
   asks as tabs, each showing the assistant's reply with the Relaticle tool it called, and for a write
   the record it produced with the assistant's actor chip. The client is fixed to the page's assistant,
   and the ChatGPT page prefixes every ask with `@Relaticle`. It carries no copy button, because the
   ChatGPT page must render no clipboard call. `tests/Browser/Marketing/AssistantPlaygroundTest.php`
   pins the tabs and the prefix.
-- The `/ai` hero is that page's signature: a list page with Rela's side panel docked beside it, as the
-  app renders it. An approved proposal changes the row in the list, because `ListOpportunities`,
-  `ListPeople` and `ManageTasks` re-render on `ai-write-completed`. A record page does not re-render, so
-  the hero never shows one changing live. `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows.
+- The `/ai` hero is that page's signature: a table view with Rela's side panel docked beside it, as the
+  app renders it at 420px in a 640px frame, with the example asks as tabs above the window. An approved proposal changes
+  the row in the list, because `ListOpportunities`, `ListPeople` and `ManageTasks` re-render on
+  `ai-write-completed`. The Pipeline board and a record page do not re-render, so the hero never shows
+  either changing live. Below `lg` only the panel shows, as the app covers the page on a phone.
+  `tests/Browser/Marketing/AiPlaygroundTest.php` pins the rows, the receipt and the hidden message box.
 - The 404 page stays plain: "Error 404" alone in a thin row above a rail, then the headline with generous
   space around it, one sentence (the suggestion when `MarketingNavigation::closestTo()` finds one) and at
   most two buttons, then the popular pages as linked cells. It carries no illustration; a drawn mark

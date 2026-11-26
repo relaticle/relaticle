@@ -4,15 +4,19 @@ declare(strict_types=1);
 
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Str;
+use Relaticle\Cloud\Blog\Jobs\GenerateBlogCover;
 use Relaticle\Cloud\CloudServiceProvider;
+use Relaticle\Cloud\Marketing\Support\BlogCategoryName;
 use Relaticle\Cloud\Marketing\Support\LocalizedUrl;
 use Relaticle\Ink\Models\Category;
 use Relaticle\Ink\Models\Post;
 use Relaticle\Ink\Models\Tag;
+use Symfony\Component\DomCrawler\Crawler;
 
-mutates(CloudServiceProvider::class);
+mutates(CloudServiceProvider::class, BlogCategoryName::class);
 
 beforeEach(function () {
     Http::fake([
@@ -36,6 +40,7 @@ describe('Blog pages', function () {
     });
 
     it('renders the post cover uncropped on the index', function () {
+        Queue::fake([GenerateBlogCover::class]);
         Post::factory()->published()->create(['featured_image' => 'ink/cover.png']);
 
         $this->get('/blog')
@@ -58,7 +63,8 @@ describe('Blog pages', function () {
 
         $this->get('/blog?page=2')
             ->assertStatus(200)
-            ->assertSee('<link rel="canonical" href="'.url('/blog').'?page=2" />', false);
+            ->assertSee('<link rel="canonical" href="'.url('/blog').'?page=2" />', false)
+            ->assertSee('<meta property="og:url" content="'.url('/blog').'?page=2"/>', false);
     });
 
     it('drops junk and non-page query params from the canonical', function () {
@@ -173,6 +179,22 @@ describe('Blog pages', function () {
             ->assertSee($taggedPost->title)
             ->assertSee('#'.$tag->name)
             ->assertDontSee($otherPost->title);
+    });
+
+    it('names the selected archive in its heading on each page', function () {
+        config(['ink.per_page' => 1]);
+        $category = Category::factory()->create();
+        $tag = Tag::factory()->create();
+        $posts = Post::factory()->published()->count(2)->create(['category_id' => $category->id]);
+        $tag->posts()->attach($posts);
+
+        foreach ([1, 2] as $page) {
+            $categoryPage = $this->get("/blog/category/{$category->slug}?page={$page}")->assertOk();
+            $tagPage = $this->get("/blog/tag/{$tag->slug}?page={$page}")->assertOk();
+
+            expect((new Crawler($categoryPage->getContent()))->filter('h1')->text())->toBe('Posts in '.$category->name)
+                ->and((new Crawler($tagPage->getContent()))->filter('h1')->text())->toBe('Posts tagged #'.$tag->name);
+        }
     });
 
     it('returns 404 for non-existent tag', function () {
@@ -312,10 +334,23 @@ describe('Blog pages', function () {
         Post::factory()->published()->count(3)->create();
 
         $this->get('/blog?page=99')
-            ->assertStatus(200)
+            ->assertNotFound()
             ->assertDontSee('No posts yet')
             ->assertSee('archive only goes up to page 1', escape: false)
-            ->assertSee(route('blog.index'));
+            ->assertSee('href="'.url('/blog').'?page=1"', false);
+    });
+
+    it('links empty German archives back to their own first page', function () {
+        $category = Category::factory()->create();
+        $tag = Tag::factory()->create();
+
+        foreach (['/de/blog', "/de/blog/category/{$category->slug}", "/de/blog/tag/{$tag->slug}"] as $path) {
+            $this->get($path)->assertOk();
+            $this->get($path.'?page=2')->assertNotFound()
+                ->assertSee('Das Archiv reicht nur bis Seite 1.')
+                ->assertSee('Zurück zur ersten Seite')
+                ->assertSee('href="'.url($path).'?page=1"', false);
+        }
     });
 });
 
@@ -415,6 +450,37 @@ describe('Blog languages', function () {
 
         expect(blogHreflangs($this->get('/blog?page=2')->getContent()))->not->toHaveKey('de')
             ->and(blogHreflangs($this->get('/blog')->getContent()))->toHaveKey('de');
+    });
+
+    it('names a category in the page language and keeps the stored name of one without a translation', function () {
+        $guides = Category::factory()->create(['name' => 'Guides', 'slug' => 'guides']);
+        $custom = Category::factory()->create(['name' => 'Release notes', 'slug' => 'release-notes']);
+        $german = Post::factory()->published()->create(['locale' => 'de', 'category_id' => $guides->id]);
+        Post::factory()->published()->create(['locale' => 'de', 'category_id' => $custom->id]);
+        Post::factory()->published()->create(['locale' => 'en', 'category_id' => $guides->id]);
+
+        $this->get('/de/blog')->assertOk()->assertSee('Leitfäden')->assertSee('Release notes');
+        $this->get("/de/blog/{$german->slug}")->assertOk()->assertSee('Leitfäden');
+        $this->get('/de/blog/category/guides')->assertOk()->assertSee('Leitfäden: CRM-Blog', false);
+        $this->get('/blog')->assertOk()->assertSee('Guides')->assertDontSee('Leitfäden');
+    });
+
+    it('describes the German feed and names its categories in German', function () {
+        $guides = Category::factory()->create(['name' => 'Guides', 'slug' => 'guides']);
+        $german = Post::factory()->published()->create(['locale' => 'de', 'category_id' => $guides->id]);
+        Post::factory()->published()->create(['locale' => 'en', 'category_id' => $guides->id]);
+
+        $this->get('/de/blog/feed')->assertOk()
+            ->assertSee('<title>Relaticle Engineering-Blog</title>', false)
+            ->assertSee('<description>Ausführliche Einblicke in den Bau eines Open-Source-CRM für KI-Agenten.</description>', false)
+            ->assertSee('<category>Leitfäden</category>', false)
+            ->assertSee(url("/de/blog/{$german->slug}"))
+            ->assertDontSee('Guides');
+        $this->get('/de/blog')->assertOk()
+            ->assertSee('title="Relaticle Engineering-Blog" href="'.url('/de/blog/feed').'"', false);
+        $this->get('/blog/feed')->assertOk()
+            ->assertSee('<title>Relaticle Engineering Blog</title>', false)
+            ->assertSee('<category>Guides</category>', false);
     });
 
     it('links the English blog index from a German page while no German post exists', function () {

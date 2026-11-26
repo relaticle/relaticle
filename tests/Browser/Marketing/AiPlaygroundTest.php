@@ -34,7 +34,12 @@ it('approves a batch with one record left out and reports what it moved', functi
     $page->wait(1);
 
     expect(aiPlayground($page, "[...root.querySelectorAll('[data-ai-batch-record]')].map((row) => row.innerText.replace(/\\s+/g, ' ').trim())"))
-        ->toBe(['Kovra renewal Qualification', 'Kovra add-on seats Proposal/Price Quote', 'Kovra platform expansion Qualification']);
+        ->toBe([
+            'Kovra renewal Stage Qualification Negotiation/Review',
+            'Kovra add-on seats Stage Proposal/Price Quote Negotiation/Review',
+            'Kovra platform expansion Stage Qualification Negotiation/Review',
+        ])
+        ->and(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-composer]')).display"))->toBe('none');
 
     $page->click('[aria-label="Leave out Kovra add-on seats"]');
 
@@ -44,12 +49,12 @@ it('approves a batch with one record left out and reports what it moved', functi
     $page->wait(0.5);
 
     expect(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-batch-decided]')).visibility"))->toBe('visible')
-        ->and(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-batch-card]')).visibility"))->toBe('hidden')
-        ->and(aiPlayground($page, "root.querySelector('[data-ai-scenario=\"batch\"] p[x-text]').innerText"))
-        ->toBe('Done. Moved 2 of 3 opportunities to Negotiation/Review.')
-        ->and(aiPlayground($page, "[...root.querySelectorAll('[data-ai-batch-decided] li')].filter((item) => item.offsetParent !== null).map((item) => item.innerText.replace(/\\s+/g, ' ').trim())"))
-        ->toBe(['Moved 2 opportunities to Negotiation/Review', 'Kovra add-on seats · left out'])
-        ->and(aiPlayground($page, "[...root.querySelectorAll('[data-ai-deal-stage]')].map((stage) => stage.innerText)"))
+        ->and(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-batch-card]')).display"))->toBe('none')
+        ->and(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-composer]')).display"))->not->toBe('none')
+        ->and(aiPlayground($page, "[...root.querySelectorAll('[data-ai-batch-decided] [data-mock-receipt-line]')].filter((line) => line.offsetParent !== null).map((line) => line.innerText.replace(/\\s+/g, ' ').trim())"))
+        ->toBe(['Moved 2 opportunities to Negotiation/Review · $86,000.00', 'Kovra add-on seats · left out'])
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-batch-followup]').innerText"))->toBe('Done. Moved 2 of 3 opportunities to Negotiation/Review.')
+        ->and(aiPlayground($page, "[...root.querySelectorAll('[data-ai-deal-row]')].map((row) => row.querySelector('td:last-child').innerText.trim())"))
         ->toBe(['Negotiation/Review', 'Proposal/Price Quote', 'Negotiation/Review']);
 
     $page->assertNoJavaScriptErrors();
@@ -69,7 +74,7 @@ it('counts a single kept opportunity in the singular', function (): void {
     $page->wait(0.5);
 
     expect(aiPlayground($page, "root.querySelector('[data-ai-batch-decided] p').innerText.trim()"))->toBe('Applied 1 change · just now')
-        ->and(aiPlayground($page, "root.querySelector('[data-ai-batch-decided] li').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Moved 1 opportunity to Negotiation/Review');
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-batch-decided] [data-mock-receipt-line]').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Moved 1 opportunity to Negotiation/Review · $24,000.00');
 
     $page->assertNoJavaScriptErrors();
 });
@@ -81,13 +86,14 @@ it('creates a person with only the fields the visitor keeps', function (): void 
 
     $page->click('#ai-ask-create');
     $page->wait(1);
-    $page->click('[aria-label="Leave out Company"]');
+    $page->click('[aria-label="Leave out Job Title"]');
     $page->click('[data-ai-create-confirm]');
 
-    expect(aiPlayground($page, "root.querySelector('[data-ai-scenario=\"create\"] p[x-text]').innerText"))->toBe('Sarah Chen has been created.')
-        ->and(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-create-done]')).visibility"))->toBe('visible')
+    expect(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-create-done]')).visibility"))->toBe('visible')
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-create-done] [data-mock-receipt-line]').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Created Sarah Chen · (Job Title left out)')
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-create-followup]').innerText"))->toBe('Sarah Chen has been created at Kovra Systems.')
         ->and(aiPlayground($page, "getComputedStyle(root.querySelector('[data-ai-person-row]')).visibility"))->toBe('visible')
-        ->and(aiPlayground($page, "root.querySelector('[data-ai-person-row]').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Sarah Chen VP of Engineering');
+        ->and(aiPlayground($page, "root.querySelector('[data-ai-person-row]').innerText.replace(/\\s+/g, ' ').trim()"))->toBe('Sarah Chen Kovra Systems');
 
     $page->assertNoJavaScriptErrors();
 });

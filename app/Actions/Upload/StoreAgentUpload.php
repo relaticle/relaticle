@@ -5,14 +5,11 @@ declare(strict_types=1);
 namespace App\Actions\Upload;
 
 use App\Enums\UploadSource;
-use App\Exceptions\SsrfGuardException;
 use App\Exceptions\UploadException;
 use App\Models\User;
 use App\Models\Workspace;
-use App\Support\Http\SsrfGuard;
 use App\Support\Media\TemporaryUploads;
 use App\Support\Media\UploadAllowlist;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
@@ -23,7 +20,7 @@ final readonly class StoreAgentUpload
     public function __construct(private StorePendingUpload $store) {}
 
     /**
-     * @param  array{source_url?: ?string, base64?: ?string, filename?: ?string, upload_id?: ?string}  $input
+     * @param  array{base64?: ?string, filename?: ?string, upload_id?: ?string}  $input
      */
     public function execute(User $user, Workspace $workspace, array $input): Media
     {
@@ -43,7 +40,7 @@ final readonly class StoreAgentUpload
         return $this->storeUpload($user, $workspace, $input);
     }
 
-    /** @param array{source_url?: ?string, base64?: ?string, filename?: ?string, upload_id?: ?string} $input */
+    /** @param array{base64?: ?string, filename?: ?string, upload_id?: ?string} $input */
     private function storeUpload(User $user, Workspace $workspace, array $input): Media
     {
         $temp = sys_get_temp_dir().'/agent-upload-'.Str::ulid();
@@ -66,15 +63,11 @@ final readonly class StoreAgentUpload
     }
 
     /**
-     * @param  array{source_url?: ?string, base64?: ?string, filename?: ?string, upload_id?: ?string}  $input
+     * @param  array{base64?: ?string, filename?: ?string, upload_id?: ?string}  $input
      * @return array{0: string, 1: UploadSource}
      */
     private function materialise(array $input, string $workspaceId, string $temp): array
     {
-        if (filled($input['source_url'] ?? null)) {
-            return [$this->fetch((string) $input['source_url'], $temp), UploadSource::Url];
-        }
-
         if (filled($input['base64'] ?? null)) {
             return [$this->decode((string) $input['base64'], (string) ($input['filename'] ?? 'upload'), $temp), UploadSource::Base64];
         }
@@ -89,23 +82,6 @@ final readonly class StoreAgentUpload
         }
 
         throw UploadException::noSource();
-    }
-
-    private function fetch(string $url, string $temp): string
-    {
-        try {
-            $response = SsrfGuard::pinnedClient($url)->sink($temp)->get($url);
-        } catch (SsrfGuardException) {
-            throw UploadException::urlNotAllowed();
-        } catch (ConnectionException) {
-            throw UploadException::unreachable();
-        }
-
-        throw_unless($response->successful(), UploadException::unreachable());
-
-        $name = basename((string) parse_url($url, PHP_URL_PATH));
-
-        return $name === '' ? 'download' : $name;
     }
 
     private function decode(string $base64, string $filename, string $temp): string

@@ -1,12 +1,18 @@
+@use(Relaticle\Cloud\Marketing\Support\BlogCategoryName)
 @use(Relaticle\Cloud\Marketing\Support\LocalizedUrl)
 @php
+    $archiveName = match (true) {
+        isset($category) => BlogCategoryName::of($category),
+        isset($tag) => '#'.$tag->name,
+        default => null,
+    };
     $title = match (true) {
-        isset($category) => __(':name: CRM Blog', ['name' => $category->name]),
+        isset($category) => __(':name: CRM Blog', ['name' => $archiveName]),
         isset($tag) => __(':name: CRM Blog Posts', ['name' => $tag->name]),
         default => __('CRM Guides, Comparisons and Engineering'),
     }.' - '.config('app.name');
     $description = match (true) {
-        isset($category) => __('Read Relaticle articles in :name on self-hosting, MCP and the code behind an open-source CRM.', ['name' => $category->name]),
+        isset($category) => __('Read Relaticle articles in :name on self-hosting, MCP and the code behind an open-source CRM.', ['name' => $archiveName]),
         isset($tag) => __('Read Relaticle posts tagged :name about using an open-source CRM, from setup to working with records.', ['name' => $tag->name]),
         default => __('Read Relaticle guides, comparisons and engineering posts on self-hosting, MCP, custom attributes and moving CRM records.'),
     };
@@ -16,7 +22,7 @@
     // so search and tracking params stay out. Search results are noindex,follow: they
     // are an infinite, low-value URL space that should not be indexed.
     $searchQuery = request()->query('q');
-    $currentPage = (int) request()->query('page', 1);
+    $currentPage = $posts->currentPage();
     $canonical = $currentPage > 1
         ? url()->current().'?page='.$currentPage
         : url()->current();
@@ -30,7 +36,7 @@
     :canonical="$canonical"
     :robots="$searchQuery ? 'noindex,follow' : null">
     @push('header')
-        <x-ink::feed-link />
+        <x-cloud::blog.feed-link />
     @endpush
 
     <x-cloud::marketing.hero align="start">
@@ -39,18 +45,19 @@
         </x-slot:eyebrow>
 
         <x-slot:title>
-            {{ __('Engineering Blog.') }}
-            <span class="text-gray-500 dark:text-gray-400">{{ __('How we build an open-source CRM.') }}</span>
+            @if($archiveName !== null)
+                {{ isset($category) ? __('Posts in') : __('Posts tagged') }}
+                <span class="wrap-anywhere text-gray-500 dark:text-gray-400">{{ $archiveName }}</span>
+            @else
+                {{ __('Engineering Blog.') }}
+                <span class="text-gray-500 dark:text-gray-400">{{ __('How we build an open-source CRM.') }}</span>
+            @endif
         </x-slot:title>
 
         <x-slot:aside>
             <p class="text-base leading-relaxed text-gray-500 md:text-lg dark:text-gray-400">
-                @if(isset($category))
-                    {{ __('Posts in') }} <span class="font-medium text-gray-950 dark:text-white">{{ $category->name }}</span>
-                    &middot; <a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
-                @elseif(isset($tag))
-                    {{ __('Posts tagged') }} <span class="font-medium text-gray-950 dark:text-white">#{{ $tag->name }}</span>
-                    &middot; <a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
+                @if($archiveName !== null)
+                    <a href="{{ LocalizedUrl::route('blog.index') }}" class="{{ $linkClass }}">{{ __('All posts') }}</a>
                 @else
                     {{ __('Deep dives into self-hosting, MCP, custom attributes and the code behind Relaticle.') }}
                 @endif
@@ -61,7 +68,7 @@
     <x-cloud::marketing.frame>
         @if($posts->isEmpty())
             <div class="flex flex-col items-start gap-4 px-6 py-12 md:px-10 md:py-16">
-                @if($posts->total() > 0)
+                @if($currentPage > $posts->lastPage())
                     <p class="type-prose text-gray-700 dark:text-gray-200">{{ __("That page doesn't exist. The archive only goes up to page :page.", ['page' => $posts->lastPage()]) }}</p>
                     <a href="{{ $posts->url(1) }}" class="{{ $linkClass }}">{{ __('Back to the first page') }}</a>
                 @elseif($searchQuery || isset($category) || isset($tag))

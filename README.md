@@ -25,7 +25,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-dark.png" />
-    <img src="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-light.png" alt="A chat with Rela, the built-in AI assistant: one request becomes three proposed changes (an opportunity moved to Financing, a task and a note) waiting for approval" />
+    <img src="https://raw.githubusercontent.com/Relaticle/relaticle/main/public/images/github-preview-light.png" alt="The opportunities pipeline with Rela, the built-in AI assistant, open beside it: one request becomes three proposed changes (the Linear Seat Expansion opportunity moved from Qualification to Needs Analysis, a task and a note) waiting for approval" />
   </picture>
   <br>
   <sub>One request to Rela, the built-in AI assistant: three changes, applied after you approve them.</sub>
@@ -127,7 +127,7 @@ See the [Self-Hosting Guide](https://relaticle.com/docs/self-hosting) for Docker
 
 # Internationalization
 
-Relaticle ships English-only in the main repository, but the codebase is fully i18n-ready. Self-host forks can drop a `lang/<locale>/` directory in place to translate the entire app. See [`docs/i18n.md`](docs/i18n.md) for the override workflow and CI guardrails.
+Relaticle ships in English, German, Spanish and French. Each user picks a language under Profile, Language. See [`docs/i18n.md`](docs/i18n.md) for what follows the language and how to fix a translation.
 
 # Documentation
 

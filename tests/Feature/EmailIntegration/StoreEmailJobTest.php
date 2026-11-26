@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Google\Service\Exception as GoogleServiceException;
 use GuzzleHttp\Psr7\Response as Psr7Response;
 use Illuminate\Contracts\Queue\Job as QueueJob;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Bus;
@@ -115,7 +116,7 @@ it('stores the message when a retried attempt succeeds after a failure', functio
     ]));
 
     $failing = Mockery::mock(MailServiceInterface::class);
-    $failing->shouldReceive('fetchMessage')->once()->andThrow(new GoogleServiceException('Backend Error', 500));
+    $failing->shouldReceive('fetchMessage')->once()->andThrow(new GoogleServiceException('Backend Error', 400));
 
     $failingFactory = Mockery::mock(MailServiceFactoryInterface::class);
     $failingFactory->shouldReceive('make')->once()->andReturn($failing);
@@ -133,6 +134,31 @@ it('stores the message when a retried attempt succeeds after a failure', functio
 
     expect(Email::query()->where('connected_account_id', $account->id)->count())->toBe(1);
 });
+
+it('releases and cools the mailbox down on a provider outage instead of reporting it', function (Throwable $exception): void {
+    config()->set('app.url', 'https://app.relaticle.com');
+    $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
+
+    $service = Mockery::mock(MailServiceInterface::class);
+    $service->shouldReceive('fetchMessage')->once()->andThrow($exception);
+
+    $factory = Mockery::mock(MailServiceFactoryInterface::class);
+    $factory->shouldReceive('make')->once()->andReturn($service);
+
+    $queueJob = Mockery::mock(QueueJob::class);
+    $queueJob->shouldReceive('release')->once()->with(Mockery::on(fn (int $seconds): bool => $seconds >= 60 && $seconds <= 90));
+
+    $job = new StoreEmailJob($account, 'msg-outage');
+    $job->setJob($queueJob);
+
+    $job->handle($factory, resolve(StoreEmailAction::class));
+
+    expect(ProviderRateLimit::remainingSeconds((string) $account->getKey()))->toBeBetween(55, 60);
+})->with([
+    'Graph 502' => fn (): RequestException => new RequestException(new Response(new Psr7Response(502, [], '{"error":{"code":"UnknownError","message":""}}'))),
+    'Graph HTML 400' => fn (): RequestException => new RequestException(new Response(new Psr7Response(400, ['Content-Type' => 'text/html'], '<!DOCTYPE HTML><TITLE>Bad Request</TITLE>'))),
+    'connect timeout' => fn (): ConnectionException => new ConnectionException('cURL error 28: Connection timed out after 10001 milliseconds'),
+]);
 
 it('releases a batched job instead of failing it on a 429', function (): void {
     $this->travelTo('2026-09-07 14:36:30');
@@ -279,13 +305,13 @@ it('skips storing when the provider reports the message as gone', function (Goog
     'Microsoft Graph 404' => fn (): RequestException => new RequestException(new Response(new Psr7Response(404, [], '{}'))),
 ]);
 
-it('still fails when the provider error is not a rate limit', function (): void {
+it('still fails when the provider error is neither a rate limit nor an outage', function (): void {
     $account = ConnectedAccount::withoutEvents(fn (): ConnectedAccount => ConnectedAccount::factory()->create());
 
     $service = Mockery::mock(MailServiceInterface::class);
     $service->shouldReceive('fetchMessage')
         ->once()
-        ->andThrow(new GoogleServiceException('Backend Error', 500));
+        ->andThrow(new GoogleServiceException('Backend Error', 400));
 
     $factory = Mockery::mock(MailServiceFactoryInterface::class);
     $factory->shouldReceive('make')->once()->andReturn($service);

@@ -72,12 +72,81 @@
                 ],
             ],
         ],
+        'zoho' => [
+            'badge' => __('Alternative'),
+            'opening' => __('Zoho CRM is free for up to three users. Zoho bills each of its four paid editions per user. It lists no self-hosted plan. Relaticle is an open-source CRM. Run it on your own server for free, or on a hosted plan priced per workspace with unlimited users. Its built-in AI assistant and its MCP server for Claude and ChatGPT both work self-hosted.'),
+            'sections' => [
+                [
+                    'heading' => __('License & pricing'),
+                    'body' => __('Zoho CRM is closed-source. Zoho CRM pricing: :zohoPricing. Relaticle is AGPL-3.0, and its hosted plans are priced per workspace. Relaticle pricing: :relaticlePricing.', ['zohoPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                ],
+                [
+                    'heading' => __('AI capabilities'),
+                    'body' => __('Zoho CRM\'s AI: :zohoAi. Relaticle\'s AI: :relaticleAi.', ['zohoAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                ],
+                [
+                    'heading' => __('Data ownership & deployment'),
+                    'body' => __('Zoho CRM: :zohoSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['zohoSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                ],
+                [
+                    'heading' => __('Extensibility'),
+                    'body' => __('Zoho CRM\'s extensibility: :zohoExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['zohoExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
+                ],
+            ],
+        ],
+        'dynamics' => [
+            'badge' => __('Alternative'),
+            'opening' => __('Microsoft Dynamics 365 Sales prices each plan per user, from Professional to Premium. Its sales agents come on every plan, and Copilot starts at Enterprise. Microsoft sells it as a cloud service. Relaticle is an open-source CRM. Run it on your own server for free, or on a hosted plan priced per workspace with unlimited users. Its built-in AI assistant and its MCP server for Claude and ChatGPT both work self-hosted.'),
+            'sections' => [
+                [
+                    'heading' => __('License & pricing'),
+                    'body' => __('Dynamics 365 Sales is closed-source. Dynamics 365 Sales pricing: :dynamicsPricing. Relaticle is AGPL-3.0 and charges per workspace for its hosted plans. Relaticle pricing: :relaticlePricing.', ['dynamicsPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                ],
+                [
+                    'heading' => __('AI capabilities'),
+                    'body' => __('Dynamics 365 Sales AI: :dynamicsAi. Relaticle\'s AI: :relaticleAi.', ['dynamicsAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                ],
+                [
+                    'heading' => __('Data ownership & deployment'),
+                    'body' => __('Dynamics 365 Sales: :dynamicsSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['dynamicsSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                ],
+                [
+                    'heading' => __('Extensibility'),
+                    'body' => __('Dynamics 365 Sales extensibility: :dynamicsExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['dynamicsExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
+                ],
+            ],
+        ],
+        'odoo' => [
+            'badge' => __('Alternative'),
+            'opening' => __('This page compares Relaticle with Odoo for CRM work. Odoo Community is open source under LGPL-3.0. Odoo Enterprise carries a separate license. Odoo prices its paid plans per user. On the Custom plan, you can host Enterprise yourself. Relaticle is an open-source CRM. Run it on your own server for free, or on a hosted plan priced per workspace with unlimited users. Both :name, the built-in AI assistant, and its MCP server for Claude and ChatGPT work self-hosted.', ['name' => (string) config('chat.assistant_name')]),
+            'sections' => [
+                [
+                    'heading' => __('License & pricing'),
+                    'body' => __('Odoo license: :odooLicense. Odoo pricing: :odooPricing. Relaticle is AGPL-3.0. Its hosted plans charge per workspace. Relaticle pricing: :relaticlePricing.', ['odooLicense' => $competitor['license'], 'odooPricing' => $competitor['pricing'], 'relaticlePricing' => $relaticle['pricing']]),
+                ],
+                [
+                    'heading' => __('AI capabilities'),
+                    'body' => __('Odoo\'s AI: :odooAi. Relaticle\'s AI: :relaticleAi.', ['odooAi' => $competitor['ai'], 'relaticleAi' => $relaticle['ai']]),
+                ],
+                [
+                    'heading' => __('Data ownership & deployment'),
+                    'body' => __('Odoo: :odooSelfHost. Relaticle: :relaticleStack. :relaticleSelfHost.', ['odooSelfHost' => $competitor['self_host'], 'relaticleStack' => $relaticle['stack'], 'relaticleSelfHost' => $relaticle['self_host']]),
+                ],
+                [
+                    'heading' => __('Extensibility'),
+                    'body' => __('Odoo\'s extensibility: :odooExtensibility. Relaticle\'s extensibility: :relaticleExtensibility.', ['odooExtensibility' => $competitor['extensibility'], 'relaticleExtensibility' => $relaticle['extensibility']]),
+                ],
+            ],
+        ],
     ][$competitorSlug];
 
     $titles = [
         'hubspot' => __('HubSpot Alternative'),
         'salesforce' => __('Salesforce Alternative'),
         'pipedrive' => __('Pipedrive Alternative'),
+        'zoho' => __('Zoho CRM Alternative'),
+        'dynamics' => __('Microsoft Dynamics 365 Alternative'),
+        'odoo' => __('Odoo Alternative'),
     ];
 
     /*
@@ -90,6 +159,9 @@
         'hubspot' => __('Open Source HubSpot Alternative, Self-Hosted | Relaticle'),
         'salesforce' => __('Open Source Salesforce Alternative, Self-Hosted | Relaticle'),
         'pipedrive' => __('Open Source Pipedrive Alternative, Self-Hosted | Relaticle'),
+        'zoho' => __('Open Source Zoho CRM Alternative, Self-Hosted | Relaticle'),
+        'dynamics' => __('Open Source Microsoft Dynamics 365 Alternative | Relaticle'),
+        'odoo' => __('Open Source Odoo Alternative | Relaticle'),
     ];
 
     /*
@@ -100,6 +172,9 @@
         'hubspot' => __('HubSpot is closed-source with no self-hosting option. Relaticle is AGPL-3.0, self-hostable free, flat-priced for unlimited users, with built-in AI and MCP.'),
         'salesforce' => __('Salesforce has no self-hosting option. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
         'pipedrive' => __('Pipedrive lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
+        'zoho' => __('Zoho CRM lists no self-hosted plan. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
+        'dynamics' => __('Dynamics 365 Sales charges per user. Relaticle is an open-source CRM with built-in AI: self-host it free, or pick a hosted plan with unlimited users.'),
+        'odoo' => __('Odoo prices its paid plans per user. Relaticle is an open-source CRM with built-in AI. Self-host it free, or pick a hosted plan with unlimited users.'),
     ];
 
     $title = $titles[$competitorSlug];
@@ -171,7 +246,7 @@
             <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">
                 <span>{{ __('Primary sources:') }}</span>
                 @foreach ($primarySources as $source)
-                    <a href="{{ $source['url'] }}" rel="nofollow noopener" target="_blank" class="{{ $linkClass }}">{{ $source['label'] }}</a>
+                    <a href="{{ $source['url'] }}" rel="noopener" target="_blank" class="{{ $linkClass }}">{{ $source['label'] }}</a>
                 @endforeach
             </p>
             <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1">

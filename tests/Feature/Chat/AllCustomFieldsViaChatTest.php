@@ -27,6 +27,7 @@ use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\Note\UpdateNoteTool;
 use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
+use Relaticle\Chat\Tools\Task\CreateTaskTool;
 use Relaticle\Chat\Tools\Task\ListTasksTool;
 use Relaticle\Chat\Tools\Task\UpdateTaskTool;
 use Relaticle\CustomFields\Services\TenantContextService;
@@ -446,3 +447,42 @@ it('resolves an option label identically whether filtering or writing', function
     'uppercased' => ['IN PROGRESS', true],
     'not an option' => ['Bananas', false],
 ]);
+
+function writeToolQueryCount(string $toolClass, array $records): int
+{
+    $tool = resolve($toolClass);
+    $tool->setConversationId('019df800-3333-7000-8000-000000000123');
+
+    DB::flushQueryLog();
+    DB::enableQueryLog();
+    $tool->handle(new Request(['records' => $records]));
+    $count = count(DB::getQueryLog());
+    DB::disableQueryLog();
+
+    return $count;
+}
+
+it('proposes a batch of task updates in a fixed number of queries however many records it carries', function (): void {
+    $tasks = Task::factory()->count(10)->for($this->workspace)->create();
+    $record = fn (Task $task): array => [
+        'id' => (string) $task->getKey(),
+        'custom_fields' => ['description' => 'New body', 'status' => 'In progress', 'priority' => 'High'],
+    ];
+
+    $three = writeToolQueryCount(UpdateTaskTool::class, $tasks->take(3)->map($record)->all());
+    $ten = writeToolQueryCount(UpdateTaskTool::class, $tasks->map($record)->all());
+
+    expect($ten)->toBeLessThanOrEqual($three);
+});
+
+it('proposes a batch of task creates in a fixed number of queries however many records it carries', function (): void {
+    $record = fn (int $n): array => [
+        'title' => "Task {$n}",
+        'custom_fields' => ['description' => 'Body', 'status' => 'In progress', 'priority' => 'High'],
+    ];
+
+    $three = writeToolQueryCount(CreateTaskTool::class, array_map($record, range(1, 3)));
+    $ten = writeToolQueryCount(CreateTaskTool::class, array_map($record, range(1, 10)));
+
+    expect($ten)->toBeLessThanOrEqual($three);
+});

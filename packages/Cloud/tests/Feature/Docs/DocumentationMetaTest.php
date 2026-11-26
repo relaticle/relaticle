@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Relaticle\Cloud\Docs\Http\Controllers\DocumentationController;
 use Relaticle\Cloud\Docs\Http\Controllers\HelpController;
+use Relaticle\Documentation\Support\DocsRepository;
 
 mutates(DocumentationController::class, HelpController::class);
 
@@ -12,7 +13,10 @@ it('uses the configured per-document description as the meta description', funct
 
     preg_match('/<meta name="description" content="([^"]*)"/', $html, $meta);
 
-    expect($meta[1] ?? null)->toBe('Get Docker Compose, Coolify, Dokploy and Laravel Cloud deployment steps for Relaticle, with PostgreSQL, Redis and Ollama setup.');
+    $description = app(DocsRepository::class)->find('docs/guides/self-hosting')->description;
+
+    expect($description)->not->toBeEmpty()
+        ->and($meta[1] ?? null)->toBe($description);
 });
 
 it('titles the documentation index with the brand-suffix convention', function (): void {

@@ -13,10 +13,11 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Support\PhoneSearch;
+use App\Support\RichTextSearch;
 use Illuminate\Testing\Fluent\AssertableJson;
 use Tests\Helpers\WorkspaceCustomField;
 
-mutates(SearchTool::class, FetchTool::class, PhoneSearch::class);
+mutates(SearchTool::class, FetchTool::class, PhoneSearch::class, RichTextSearch::class);
 
 beforeEach(function (): void {
     $this->user = User::factory()->withPersonalWorkspace()->create();
@@ -233,3 +234,20 @@ it('does not match phone digits held by a field that is not a phone', function (
             ->has('results', 0)
             ->etc());
 });
+
+it('finds a note by a word in its body but never by its markup', function (string $query, int $count): void {
+    $body = WorkspaceCustomField::byCode($this->workspace->getKey(), 'note', 'body');
+    Note::factory()->recycle([$this->user, $this->workspace])->create(['title' => 'Call recap'])
+        ->saveCustomFieldValue($body, '<p>Send a sample crate of <strong>kumquat</strong> to R&amp;D before the review.</p>');
+
+    RelaticleServer::actingAs($this->user)
+        ->tool(SearchTool::class, ['query' => $query])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json): AssertableJson => $json
+            ->has('results', $count)
+            ->etc());
+})->with([
+    'a word in the body' => ['kumquat', 1],
+    'an escaped ampersand' => ['R&D', 1],
+    'a tag name' => ['strong', 0],
+]);

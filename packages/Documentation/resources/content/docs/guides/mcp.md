@@ -239,7 +239,7 @@ The server provides 50 tools. They cover account context, cross-entity discovery
 
 These tools appear only for a connection that was given email access. The reading tools show the synced email its user may see, at the sharing level the mailbox owner chose, plus the user's own drafts and outbox. The mailbox, draft, send and outbox tools work on the user's own mailboxes and emails.
 
-The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails waiting at once.
+The two reading tools need read access. The mailbox tool appears for a connection allowed to draft or send, and the three draft tools for one allowed to draft. The send, cancel, reschedule and retry tools need the send permission and a role that may send through an assistant. A scheduled send never goes out sooner than the hold. An email goes to at most 20 recipients in total across To, CC and BCC. A user can have up to 10 assistant emails due to go out in the next 24 hours. Emails scheduled later don't count toward that limit.
 
 A queued email stays tied to the connection that queued it. It is not sent if that connection is revoked, deleted or expired by its send time. The same happens if its user's role no longer allows sending through an assistant. It then waits in the outbox under **Failed** with the reason.
 
@@ -261,7 +261,7 @@ A queued email stays tied to the connection that queued it. It is not sent if th
 
 | Tool | Description |
 |------|-------------|
-| `upload-file` | Store a file in the workspace from a public https URL, a base64 body with `filename`, or an `upload_id`. Returns `suggested_markdown` to embed the file in a rich-editor field such as a note body, plus `file_id` for the stored file. Allowed types: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, up to 10 MB. 60 calls per hour per workspace. |
+| `upload-file` | Store a file in the workspace from a base64 body with `filename`, or an `upload_id`. Returns `suggested_markdown` to embed the file in a rich-editor field such as a note body, plus `file_id` for the stored file. Allowed types: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, up to 10 MB. 60 calls per hour per workspace. |
 | `create-upload-url` | Get a five-minute signed URL to `PUT` a file body to, then pass the returned `upload_id` to `upload-file` within an hour. A body not stored by then is deleted. 60 calls per hour per workspace. |
 
 Uploads stay pending for 24 hours. Saving a record whose rich-editor body embeds the file claims it; unclaimed files are purged.
@@ -397,6 +397,7 @@ The flat names of the earlier filter no longer exist. Inside `filter`, keys such
 
 ---
 
+{#schema-resources}
 ## Schema Resources
 
 The server exposes five schema resources that describe each entity's fields, including any custom attributes your workspace has configured, plus a summary resource with record counts:

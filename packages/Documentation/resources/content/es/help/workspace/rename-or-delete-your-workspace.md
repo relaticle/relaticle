@@ -27,8 +27,7 @@ El selector de espacios de trabajo, en la parte superior de la barra lateral,
 enumera todos los espacios de trabajo de los que usted es miembro, y el cambio
 es instantáneo. **Crear espacio de trabajo**, en el mismo menú, inicia un asistente
 breve: póngale nombre, elija su identificador de URL, cuéntele a Relaticle para
-qué lo usará e invite a sus primeros miembros, por correo o copiando el enlace
-de acceso de 7 días.
+qué lo usará e invite a sus primeros miembros por correo.
 
 Clientes separados, negocios separados o un entorno de pruebas para experimentar:
 cada espacio de trabajo mantiene sus datos, atributos y plan completamente aparte.

@@ -63,6 +63,9 @@ return [
             'invoice.payment_failed',
             // Managed plans are granted when their first invoice is paid.
             'invoice.paid',
+            // A refunded or lost-dispute credit pack takes its unspent credits back.
+            'charge.refunded',
+            'charge.dispute.closed',
         ],
     ],
 

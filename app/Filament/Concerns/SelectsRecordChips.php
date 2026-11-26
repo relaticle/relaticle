@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Filament\Concerns;
 
+use App\Models\Company;
 use Closure;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -23,7 +24,7 @@ trait SelectsRecordChips
     {
         return function (Builder $query, ?string $search) use ($modifyQueryUsing): Builder {
             if ($query->getModel() instanceof HasMedia) {
-                $query->with('media');
+                $query->with($query->getModel() instanceof Company ? ['media', 'domainValue'] : ['media']);
             }
 
             if ($modifyQueryUsing instanceof Closure) {

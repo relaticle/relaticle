@@ -9,9 +9,11 @@ use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 use Relaticle\EmailIntegration\Actions\StoreEmailAction;
 use Relaticle\EmailIntegration\Data\MailDeltaResult;
+use Relaticle\EmailIntegration\Enums\EmailAccountStatus;
 use Relaticle\EmailIntegration\Enums\EmailDirection;
 use Relaticle\EmailIntegration\Enums\EmailFolder;
 use Relaticle\EmailIntegration\Exceptions\MailHistoryExpired;
+use Relaticle\EmailIntegration\Jobs\IncrementalEmailSyncJob;
 use Relaticle\EmailIntegration\Jobs\StoreEmailJob;
 use Relaticle\EmailIntegration\Models\ConnectedAccount;
 use Relaticle\EmailIntegration\Models\Email;
@@ -371,6 +373,90 @@ it('paginates delta with @odata.nextLink and surfaces new + read ids + new curso
             'inbox-folder-id' => graphFolderDeltaUrl('inbox-folder-id').'?$deltatoken=FRESH',
             'sent-folder-id' => graphFolderDeltaUrl('sent-folder-id').'?$deltatoken=SENT-FRESH',
         ]));
+});
+
+/**
+ * @return list<string>
+ */
+function graphFolderResolutionPaths(): array
+{
+    return Http::recorded()
+        ->map(fn (array $pair): string => parse_url((string) $pair[0]->url(), PHP_URL_PATH) ?: '')
+        ->filter(fn (string $path): bool => preg_match('#/me/mailFolders/(inbox|drafts|sentitems|junkemail|deleteditems|outbox|conversationhistory|clutter|syncissues)$#', $path) === 1)
+        ->values()
+        ->all();
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function graphIdleMailboxFakes(): array
+{
+    return [
+        ...graphMailFolderFakes(),
+        graphFolderDeltaUrl('inbox-folder-id').'?*' => Http::response(['value' => [], '@odata.deltaLink' => graphFolderDeltaUrl('inbox-folder-id').'?$deltatoken=INBOX2']),
+        graphFolderDeltaUrl('sent-folder-id').'?*' => Http::response(['value' => [], '@odata.deltaLink' => graphFolderDeltaUrl('sent-folder-id').'?$deltatoken=SENT2']),
+    ];
+}
+
+function runIncrementalMailSync(ConnectedAccount $account): void
+{
+    $account->update(['status' => EmailAccountStatus::ACTIVE, 'sync_cursor' => microsoftMailCursor()]);
+
+    (new IncrementalEmailSyncJob($account->fresh()))->handle(resolve(MailServiceFactoryInterface::class));
+}
+
+it('resolves the well-known folders once per mailbox, not once per sync job', function (): void {
+    Http::preventStrayRequests();
+    Http::fake(graphIdleMailboxFakes());
+    $account = makeAzureAccount();
+
+    runIncrementalMailSync($account);
+    $firstRun = count(graphFolderResolutionPaths());
+
+    runIncrementalMailSync($account);
+
+    expect($firstRun)->toBe(9)
+        ->and(graphFolderResolutionPaths())->toHaveCount(9);
+});
+
+it('does not ask again for a folder the mailbox does not have', function (): void {
+    Http::preventStrayRequests();
+    Http::fake(graphIdleMailboxFakes());
+    $account = makeAzureAccount();
+
+    resolve(MicrosoftGraphServiceFactory::class)->make($account)->fetchDelta(microsoftMailCursor());
+    resolve(MicrosoftGraphServiceFactory::class)->make($account)->fetchDelta(microsoftMailCursor());
+
+    $syncIssuesRequests = array_filter(graphFolderResolutionPaths(), fn (string $path): bool => str_ends_with($path, '/syncissues'));
+
+    expect($syncIssuesRequests)->toHaveCount(1);
+});
+
+it('never reads another mailbox\'s cached folder ids', function (): void {
+    Http::preventStrayRequests();
+    Http::fake(graphIdleMailboxFakes());
+    $first = makeAzureAccount();
+    $second = makeAzureAccount();
+
+    resolve(MicrosoftGraphServiceFactory::class)->make($first)->fetchDelta(microsoftMailCursor());
+    resolve(MicrosoftGraphServiceFactory::class)->make($second)->fetchDelta(microsoftMailCursor());
+
+    expect(graphFolderResolutionPaths())->toHaveCount(18);
+});
+
+it('resolves the folders for a message without extra requests once the mailbox is cached', function (): void {
+    Http::preventStrayRequests();
+    Http::fake([
+        ...graphWellKnownFolderFakes(),
+        'https://graph.microsoft.com/v1.0/me/messages/*' => Http::response(graphMessagePayload()),
+    ]);
+    $account = makeAzureAccount();
+
+    resolve(MicrosoftGraphServiceFactory::class)->make($account)->fetchMessage('MSG1');
+    resolve(MicrosoftGraphServiceFactory::class)->make($account)->fetchMessage('MSG1');
+
+    expect(graphFolderResolutionPaths())->toHaveCount(3);
 });
 
 it('throws MailHistoryExpired when Graph returns 410 for a folder delta', function (): void {

@@ -51,9 +51,6 @@ return [
             'label' => 'Éditeur d\'image',
         ],
     ],
-    'js_field' => [
-        'failed_to_load' => 'Ce champ n\'a pas pu être chargé. Rechargez la page et réessayez.',
-    ],
     'key_value' => [
         'actions' => [
             'move_down' => [

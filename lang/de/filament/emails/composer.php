@@ -82,6 +82,14 @@ return [
             'title' => 'Einige Dateien waren zu groß',
             'body' => 'Nicht angehängt: :files. Jede Datei muss kleiner als :max sein, alle Anhänge zusammen kleiner als :total.',
         ],
+        'attachment_empty' => [
+            'title' => 'Einige Dateien waren leer',
+            'body' => 'Nicht angehängt: :files. Eine leere Datei enthält nichts zum Senden.',
+        ],
+        'attachment_type_not_allowed' => [
+            'title' => 'Einige Dateien konnten nicht angehängt werden',
+            'body' => 'Nicht angehängt: :files. Hängen Sie eine PDF-, Office- oder OpenDocument-Datei, eine CSV- oder Textdatei, eine Kalendereinladung, ein Bild oder ein ZIP-Archiv an.',
+        ],
         'attachment_too_large_for_provider' => 'Jede Datei muss kleiner als :max sein, alle Anhänge zusammen nach der Kodierung kleiner als :total.',
         'attachment_unavailable' => [
             'title' => 'Einige Anhänge konnten nicht eingefügt werden',

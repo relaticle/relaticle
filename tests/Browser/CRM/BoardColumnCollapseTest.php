@@ -182,7 +182,7 @@ it('opens one column out of collapse all on a double-click and switches the bar 
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
 
-it('opens every column out of collapse all on a single click', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
+it('opens only the clicked column out of collapse all on a single click', function (string $model, string $fieldCode, string $path, CrmEntity $entity): void {
     $this->withVite();
 
     $user = User::factory()->withWorkspace()->create();
@@ -195,10 +195,11 @@ it('opens every column out of collapse all on a single click', function (string 
     $page->page()->locator("[data-column-root=\"{$ids[1]}\"][data-collapsed]")->click();
     waitForPage($page, fn (): bool => storedBoardState($user, $entity)?->columnsCollapsed === false);
 
-    $page->assertScript(boardWaitFor('document.querySelectorAll(".ff-column[data-collapsed]").length === 0'), true)
+    $page->assertScript(boardWaitFor("document.querySelector('[data-column-root=\"{$ids[1]}\"]').hasAttribute('data-collapsed') === false"), true)
+        ->assertScript('document.querySelectorAll(".ff-column[data-collapsed]").length', count($ids) - 1)
         ->assertScript('document.querySelector(\'[data-board-columns-option="expanded"]\').getAttribute("aria-pressed")', 'true');
 
-    expect(storedBoardState($user, $entity)->collapsedColumns)->toBe([]);
+    expect(storedBoardState($user, $entity)->collapsedColumns)->toEqualCanonicalizing(array_values(array_diff($ids, [$ids[1]])));
     $page->assertNoJavaScriptErrors();
 })->with('stage order boards');
 

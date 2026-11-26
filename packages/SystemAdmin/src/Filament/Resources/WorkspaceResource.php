@@ -175,10 +175,6 @@ final class WorkspaceResource extends Resource
                     TextEntry::make('onboarding_referral_prompt')
                         ->label('What They Asked')
                         ->placeholder('—'),
-                    TextEntry::make('invite_link_token_expires_at')
-                        ->label('Invite Link Expires')
-                        ->dateTime()
-                        ->placeholder('—'),
                     TextEntry::make('created_at')
                         ->dateTime(),
                     TextEntry::make('updated_at')

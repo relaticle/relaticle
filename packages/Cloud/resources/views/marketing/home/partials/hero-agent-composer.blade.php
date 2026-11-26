@@ -1,8 +1,8 @@
 {{-- Static twin of the real composer. Every control below mirrors
      packages/Chat/resources/views/livewire/chat/partials/_composer-bar.blade.php
      and _composer.blade.php: rounded-2xl container, attach on the lead side,
-     model picker with a chevron-up-down, the push-to-talk mic, and a ROUND
-     send button that reads gray while the composer is empty. --}}
+     model picker with a chevron-up-down, and the push-to-talk mic, filled while the
+     box is empty. The send button replaces that fill once a prompt is typed. --}}
 
 @php
     $heroDockIcons = [
@@ -31,20 +31,17 @@
                             <span class="font-semibold text-gray-900 dark:text-white">{{ __('Schedule demo with Kovra Systems') }}</span>
                         </p>
                     </div>
-                    <div class="pb-2 pe-3 ps-[3.125rem]">
-                            <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Status') }}</span>
-                                <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
-                                    <span class="text-gray-500 line-through decoration-gray-300 dark:text-gray-400 dark:decoration-gray-600">{{ __('To do') }}</span>
-                                    <x-lucide-arrow-right class="h-3 w-3 shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true"/>
-                                    <span class="text-gray-900 dark:text-white">{{ __('Done') }}</span>
-                                </span>
-                                <x-cloud::home.hero-dock-field/>
-                            </div>
+                    <div class="pb-2 pe-2 ps-[3.125rem]">
+                        <x-cloud::marketing.rela-dock-field
+                            :label="\App\Enums\CustomFields\TaskField::STATUS->getDisplayName()"
+                            :old="__('enums/custom-fields.task.status.options.to_do')"
+                            :value="__('enums/custom-fields.task.status.options.done')"
+                            excludable
+                        />
                     </div>
                 </div>
 
-                {{-- Create variant (exchange 3). The identity field has no leave-out control. --}}
+                {{-- Create variant (exchange 3). Only the job title can be left out, as on the real card. --}}
                 <div class="mcp-dock-create hidden">
                     <div class="flex items-start gap-2.5 px-4 pb-1.5 pt-3" data-proposal-record-chip data-record-type="people">
                         <span class="mt-px flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-gray-100 text-gray-500 dark:bg-white/10 dark:text-gray-400" aria-hidden="true">
@@ -53,32 +50,14 @@
                             </svg>
                         </span>
                         <p class="min-w-0 truncate text-sm leading-6">
-                            <span class="text-gray-500 dark:text-gray-400">{{ __('Create person') }}</span>
+                            <span class="text-gray-500 dark:text-gray-400">{{ \Relaticle\Chat\Enums\ProposalEntity::People->createLabel() }}</span>
                             <span class="font-semibold text-gray-900 dark:text-white">Sarah Chen</span>
                         </p>
                     </div>
-                    <div class="pb-2 pe-3 ps-[3.125rem]">
-                            <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Name') }}</span>
-                                <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
-                                    <span class="text-gray-900 dark:text-white">Sarah Chen</span>
-                                </span>
-                                <x-cloud::home.hero-dock-field :locked="true"/>
-                            </div>
-                            <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Job title') }}</span>
-                                <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
-                                    <span class="text-gray-900 dark:text-white">{{ __('VP of Engineering') }}</span>
-                                </span>
-                                <x-cloud::home.hero-dock-field/>
-                            </div>
-                            <div class="flex items-center gap-3 text-sm">
-                                <span class="w-24 shrink-0 truncate text-xs leading-8 text-gray-500 sm:w-28 dark:text-gray-400">{{ __('Company') }}</span>
-                                <span class="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 leading-8">
-                                    <span class="text-gray-900 dark:text-white">Kovra Systems</span>
-                                </span>
-                                <x-cloud::home.hero-dock-field/>
-                            </div>
+                    <div class="pb-2 pe-2 ps-[3.125rem]">
+                        <x-cloud::marketing.rela-dock-field :label="__('Name')" value="Sarah Chen" editable/>
+                        <x-cloud::marketing.rela-dock-field :label="__('filament/resources/person.fields.company.label')" value="Kovra Systems"/>
+                        <x-cloud::marketing.rela-dock-field :label="\App\Enums\CustomFields\PeopleField::JOB_TITLE->getDisplayName()" :value="__('VP of Engineering')" editable excludable/>
                     </div>
                 </div>
 
@@ -115,15 +94,11 @@
 
                         {{-- Push-to-talk. Present in the real composer whenever a
                              transcription provider key is configured. --}}
-                        <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 dark:text-gray-400">
+                        <span id="hero-composer-mic" class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary-600 text-white">
                             <x-lucide-mic class="h-4 w-4" aria-hidden="true"/>
                         </span>
 
-                        {{-- ROUND, and gray while empty: the real send button carries
-                             disabled:bg-gray-200 disabled:text-gray-400, so a
-                             saturated purple square never appears on an idle
-                             composer. The script tints it while a prompt is typed. --}}
-                        <button id="hero-composer-send" type="button" tabindex="-1" aria-hidden="true" class="flex h-7 w-7 items-center justify-center rounded-full bg-gray-200 text-gray-400 dark:bg-gray-700 dark:text-gray-500">
+                        <button id="hero-composer-send" type="button" tabindex="-1" aria-hidden="true" class="flex h-7 w-7 items-center justify-center rounded-full bg-primary-600 text-white" style="display: none">
                             <x-lucide-arrow-up class="h-4 w-4"/>
                         </button>
                     </div>

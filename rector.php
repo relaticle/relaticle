@@ -7,7 +7,6 @@ use Rector\Config\RectorConfig;
 use Rector\DeadCode\Rector\ClassMethod\RemoveUnusedPrivateMethodRector;
 use Rector\Php55\Rector\String_\StringClassNameToClassConstantRector;
 use Rector\Php81\Rector\Array_\ArrayToFirstClassCallableRector;
-use Rector\Php83\Rector\ClassMethod\AddOverrideAttributeToOverriddenMethodsRector;
 use Rector\Php85\Rector\Property\AddOverrideAttributeToOverriddenPropertiesRector;
 use Rector\Privatization\Rector\ClassMethod\PrivatizeFinalClassMethodRector;
 use RectorLaravel\Rector\Class_\AddHasFactoryToModelsRector;
@@ -33,10 +32,8 @@ return RectorConfig::configure()
     ])
     ->withSkip([
         __DIR__.'/packages/Cloud/tests',
-        AddOverrideAttributeToOverriddenMethodsRector::class,
-        // PHP 8.5 extends #[\Override] to properties. Skipped for the same reason as
-        // the method rule above: it would tag every Filament $navigationIcon/$slug
-        // override in the codebase without adding safety we rely on.
+        // PHP 8.5 extends #[\Override] to properties. It would tag every Filament
+        // $navigationIcon/$slug override without adding safety we rely on.
         AddOverrideAttributeToOverriddenPropertiesRector::class,
         // Rewrites imported `Builder<Model>` scope docblocks to fully qualified
         // `Builder<self>`, which regresses the docblock import rule for no type gain.

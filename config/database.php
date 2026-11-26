@@ -168,6 +168,10 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_DB', '0'),
+            'max_retries' => (int) env('REDIS_MAX_RETRIES', 4),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'exponential'),
+            'backoff_base' => (int) env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => (int) env('REDIS_BACKOFF_CAP', 1000),
         ],
 
         'cache' => [
@@ -177,6 +181,10 @@ return [
             'password' => env('REDIS_PASSWORD'),
             'port' => env('REDIS_PORT', '6379'),
             'database' => env('REDIS_CACHE_DB', '1'),
+            'max_retries' => (int) env('REDIS_MAX_RETRIES', 4),
+            'backoff_algorithm' => env('REDIS_BACKOFF_ALGORITHM', 'exponential'),
+            'backoff_base' => (int) env('REDIS_BACKOFF_BASE', 100),
+            'backoff_cap' => (int) env('REDIS_BACKOFF_CAP', 1000),
         ],
 
     ],

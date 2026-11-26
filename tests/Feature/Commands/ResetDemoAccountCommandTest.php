@@ -351,6 +351,8 @@ it('creates a deterministic reviewer workspace and safely refreshes it', functio
 
 it('queues exactly one logo fetch per company, including the fixtures seeded without model events', function (): void {
     Bus::fake([FetchFaviconForCompany::class]);
+    config()->set('services.logo_finder.url', 'https://logos.example.test');
+    config()->set('services.logo_finder.key', 'worker-secret');
 
     $this->artisan('demo:reset', ['--password' => 'runtime-secret-five'])->assertSuccessful();
 
@@ -415,6 +417,14 @@ it('stamps the rebuilt workspace, its records and their activity, as system', fu
 
     expect($activitySources)->toBe(['sample'])
         ->and($recordSources)->toBe(['sample']);
+});
+
+it('queues no logo fetch when no logo service is configured', function (): void {
+    Bus::fake([FetchFaviconForCompany::class]);
+
+    $this->artisan('demo:reset', ['--password' => 'runtime-secret-eight'])->assertSuccessful();
+
+    Bus::assertNotDispatched(FetchFaviconForCompany::class);
 });
 
 it('resets a demo account whose language was changed', function (): void {

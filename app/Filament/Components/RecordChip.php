@@ -34,7 +34,7 @@ final readonly class RecordChip implements Htmlable
         return new self(
             name: $name ?? (string) $record->getAttribute('name'),
             imageUrl: $image,
-            iconPath: $image === null ? $entity?->iconPath() : null,
+            iconPath: $entity?->iconPath(),
             circular: $entity !== CrmEntity::Company,
             size: $size,
         );

@@ -15,6 +15,7 @@ use App\Filament\CustomFields\DateTimeFieldType;
 use App\Filament\CustomFields\DomainFieldType;
 use App\Filament\CustomFields\RichEditorFieldType;
 use App\Filament\Tables\ResizableColumns;
+use App\Http\Controllers\Mcp\OAuthRegisterController;
 use App\Http\Middleware\EnforceAbsoluteSessionLifetime;
 use App\Http\Middleware\PreventRequestForgery;
 use App\Http\Middleware\ReadAcrossWorkspaces;
@@ -60,6 +61,7 @@ use App\Support\Migrations\TenantMigration;
 use App\Support\PanelIcons;
 use App\Support\Passport\ClientRepository;
 use App\Support\Passport\WorkspaceBearerTokenResponse;
+use App\Support\Redis\RetryingPhpRedisConnector;
 use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\Exports\ExportColumn;
@@ -93,6 +95,7 @@ use Illuminate\Foundation\Http\Middleware\PreventRequestForgery as BasePreventRe
 use Illuminate\Http\Request;
 use Illuminate\Log\Context\Repository as ContextRepository;
 use Illuminate\Notifications\Channels\DatabaseChannel;
+use Illuminate\Redis\RedisManager;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades;
 use Illuminate\Support\Facades\Config;
@@ -107,6 +110,7 @@ use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Knuckles\Scribe\Scribe;
 use Laravel\Cashier\Cashier;
+use Laravel\Mcp\Server\Http\Controllers\OAuthRegisterController as BaseOAuthRegisterController;
 use Laravel\Passport\AccessToken as PassportAccessToken;
 use Laravel\Passport\ClientRepository as BaseClientRepository;
 use Laravel\Passport\Passport;
@@ -212,6 +216,10 @@ final class AppServiceProvider extends ServiceProvider
         $this->app->bind(\Filament\Auth\Http\Responses\Contracts\LoginResponse::class, LoginResponse::class);
         $this->app->bind(\Filament\Actions\Exports\Models\Export::class, Export::class);
         $this->app->bind(BasePreventRequestForgery::class, PreventRequestForgery::class);
+        $this->app->bind(BaseOAuthRegisterController::class, OAuthRegisterController::class);
+        $this->callAfterResolving('redis', function (RedisManager $redis): void {
+            $redis->extend('phpredis', fn (): RetryingPhpRedisConnector => new RetryingPhpRedisConnector);
+        });
     }
 
     private function registerNotificationBindings(): void

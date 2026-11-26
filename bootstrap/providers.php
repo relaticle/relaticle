@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Providers\AppServiceProvider;
-use App\Providers\FaviconServiceProvider;
 use App\Providers\Filament\AppPanelProvider;
 use App\Providers\FortifyServiceProvider;
 use App\Providers\HealthServiceProvider;
@@ -20,7 +19,6 @@ use Relaticle\SystemAdmin\SystemAdminPanelProvider;
 
 return [
     AppServiceProvider::class,
-    FaviconServiceProvider::class,
     AppPanelProvider::class,
     FortifyServiceProvider::class,
     HealthServiceProvider::class,

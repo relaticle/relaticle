@@ -1,29 +1,61 @@
+@php($modalId = \App\Livewire\App\Workspaces\PendingInvitationsForUser::MODAL_ID)
+
 <div>
-    @foreach($this->invitations as $invitation)
-        @php($roleName = \App\Enums\WorkspaceRole::labelFor($invitation->role))
+    @if ($asksOnThisPage)
+        <x-filament::modal
+            :id="$modalId"
+            :aria-labelledby="$modalId . '-heading'"
+            width="md"
+            class="fi-invitation-modal"
+            :close-button="false"
+            :close-by-escaping="false"
+            :close-by-clicking-away="false"
+        >
+            @if ($invitation)
+                @php($workspace = $invitation->workspace)
+                @php($roleName = \App\Enums\WorkspaceRole::labelFor($invitation->role))
 
-        <x-filament::section class="mb-6">
-            <x-slot name="heading">
-                {{ __('workspaces.pending_for_user.heading', ['workspace' => $invitation->workspace->name]) }}
-            </x-slot>
+                <x-workspaces.invitation-panel heading-tag="h2" :heading-id="$modalId . '-heading'">
+                    <x-slot:icon>
+                        <x-workspaces.invitation-icon :src="$workspace->getFilamentAvatarUrl()" />
+                    </x-slot:icon>
 
-            <p class="text-sm text-gray-500 dark:text-gray-400">
-                @if($invitation->inviter)
-                    {{ __('workspaces.pending_for_user.detail_with_inviter', ['inviter' => $invitation->inviter->name, 'role' => $roleName]) }}
-                @else
-                    {{ __('workspaces.pending_for_user.detail', ['role' => $roleName]) }}
-                @endif
-            </p>
+                    <x-slot:heading>
+                        {{ __('workspaces.accept.ready.heading', ['workspace' => $workspace->name]) }}
+                    </x-slot:heading>
 
-            <div class="mt-4 flex gap-3">
-                <x-filament::button wire:click="accept('{{ $invitation->id }}')">
-                    {{ __('workspaces.pending_for_user.accept') }}
-                </x-filament::button>
+                    <x-slot:description>
+                        @if ($invitation->inviter)
+                            {{ __('workspaces.accept.ready.body_with_inviter', ['inviter' => $invitation->inviter->name, 'workspace' => $workspace->name, 'role' => $roleName]) }}
+                        @else
+                            {{ __('workspaces.accept.ready.body', ['workspace' => $workspace->name, 'role' => $roleName]) }}
+                        @endif
+                    </x-slot:description>
 
-                <x-filament::button color="gray" wire:click="decline('{{ $invitation->id }}')">
-                    {{ __('workspaces.pending_for_user.decline') }}
-                </x-filament::button>
-            </div>
-        </x-filament::section>
-    @endforeach
+                    <x-slot:details>
+                        <x-workspaces.invitation-details
+                            :account-email="$this->authUser()->email"
+                            :member-count="$memberCount"
+                            :role-description="\App\Enums\WorkspaceRole::tryFrom($invitation->role)?->description()"
+                        />
+                    </x-slot:details>
+
+                    <x-slot:actions>
+                        <x-filament::button wire:click="accept('{{ $invitation->id }}')" class="w-full justify-center">
+                            {{ __('workspaces.accept.ready.action', ['workspace' => $workspace->name]) }}
+                        </x-filament::button>
+
+                        <x-filament::link tag="button" color="gray" wire:click="decline('{{ $invitation->id }}')" class="mt-3 block w-full text-center">
+                            {{ __('workspaces.pending_for_user.decline') }}
+                        </x-filament::link>
+                    </x-slot:actions>
+                </x-workspaces.invitation-panel>
+
+                <div
+                    wire:key="pending-invitation-{{ $invitation->id }}"
+                    x-init="$nextTick(() => $dispatch('open-modal', { id: @js($modalId) }))"
+                ></div>
+            @endif
+        </x-filament::modal>
+    @endif
 </div>

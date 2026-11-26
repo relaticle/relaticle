@@ -9,6 +9,8 @@
     .hero-agent-preview .overflow-y-auto {
         scrollbar-width: none;
         -ms-overflow-style: none;
+    }
+    .hero-agent-preview .overflow-y-auto:not(:focus-within) {
         -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 28px, #000 calc(100% - 20px), transparent 100%);
                 mask-image: linear-gradient(to bottom, transparent 0, #000 28px, #000 calc(100% - 20px), transparent 100%);
     }
@@ -42,7 +44,8 @@
             <img src="{{ resolve(\App\Services\AvatarService::class)->generateAuto('Marcus Reid', 64) }}" alt="" class="h-6 w-6 shrink-0 rounded-full">
         </div>
 
-        <div x-ref="messagesScroll" class="flex-1 overflow-y-auto p-4 sm:p-6 md:px-8 md:py-6">
+        <div x-ref="messagesScroll" tabindex="0" x-on:focus="if ($root.dataset.demoState !== 'done') play()"
+             class="flex-1 overflow-y-auto p-4 sm:p-6 md:px-8 md:py-6 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary dark:focus-visible:outline-primary-400">
             <div class="mx-auto w-full max-w-3xl space-y-5 sm:space-y-6">
                 @include('cloud::marketing.home.partials.hero-agent-conversation')
             </div>
@@ -93,7 +96,7 @@
                 this.stop();
                 this.reset();
 
-                if (reducedMotion) {
+                if (reducedMotion || this.$refs.messagesScroll.matches(':focus-within')) {
                     this.showFinal();
                     this.setState('done');
 
@@ -214,7 +217,7 @@
                 this.setShellActive('chat');
 
                 const scroller = this.$refs.messagesScroll;
-                scroller.scrollTop = scroller.scrollHeight;
+                scroller.scrollTop = scroller.matches(':focus') ? 0 : scroller.scrollHeight;
             },
 
             async cycle(step, wait) {
@@ -405,11 +408,11 @@
             },
 
             setSendActive(composer, active) {
-                const button = this.find(`#hero-${composer}-send`);
+                const mic = this.find(`#hero-${composer}-mic`);
 
-                button.classList.toggle('bg-primary-600', active);
-                button.classList.toggle('text-white', active);
-                ['bg-gray-200', 'text-gray-400', 'dark:bg-gray-700', 'dark:text-gray-500'].forEach((token) => button.classList.toggle(token, !active));
+                this.find(`#hero-${composer}-send`).style.display = active ? '' : 'none';
+                ['bg-primary-600', 'text-white'].forEach((token) => mic.classList.toggle(token, !active));
+                ['text-gray-500', 'dark:text-gray-400'].forEach((token) => mic.classList.toggle(token, active));
             },
 
             clearComposer(composer) {

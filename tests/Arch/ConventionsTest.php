@@ -713,7 +713,6 @@ it('reads workspace authorization only through the capability map', function ():
         'app/Enums/WorkspaceRole.php',
         'app/Actions/Jetstream/RemoveWorkspaceMember.php',
         'tests/Feature/CRM/WorkspaceAuthorizationTest.php',
-        'tests/Feature/Workspaces/InviteLinkTokenTest.php',
         'tests/Feature/Workspaces/RemoveWorkspaceMemberTest.php',
         'tests/Feature/Workspaces/UpdateWorkspaceMemberRoleTest.php',
         'tests/Feature/Workspaces/WorkspaceMembersCrossTenantTest.php',
@@ -1160,6 +1159,7 @@ it('keeps runtime file access off local-only disks and paths', function (): void
         'app/Providers/AppServiceProvider.php',
         'app/Support/Media/RichContentAttachments.php',
         'packages/Chat/src/Actions/StoreChatAttachment.php',
+        'packages/Cloud/src/Marketing/Console/Commands/GenerateSitemapCommand.php',
         'packages/Documentation/src/Http/Controllers/OpenApiSpecController.php',
     ];
     $offenders = [];

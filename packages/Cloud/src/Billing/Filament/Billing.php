@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Cloud\Billing\Filament;
 
+use App\Contracts\Billing as BillingContract;
 use App\Contracts\Entitlements;
+use App\Data\SubscriptionEnding;
 use App\Enums\BillingStatus;
 use App\Enums\Plan;
 use App\Enums\WorkspaceCapability;
@@ -12,31 +14,35 @@ use App\Features\Billing as BillingFeature;
 use App\Filament\Pages\Concerns\HasWorkspaceSettingsNavigation;
 use App\Models\User;
 use App\Models\Workspace;
+use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Cache;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Number;
-use Laravel\Cashier\Subscription;
 use Laravel\Pennant\Feature;
 use Livewire\Attributes\Url;
 use Override;
 use Relaticle\Chat\Models\AiCreditBalance;
+use Relaticle\Chat\Models\AiCreditTransaction;
 use Relaticle\Chat\Services\CreditService;
 use Relaticle\Cloud\Billing\Actions\CreateCreditPackCheckout;
 use Relaticle\Cloud\Billing\Actions\ExtendEndedTrial;
+use Relaticle\Cloud\Billing\Actions\GrantPurchasedCredits;
+use Relaticle\Cloud\Billing\Actions\KeepWorkspaceSubscription;
 use Relaticle\Cloud\Billing\Actions\StartProTrial;
 use Relaticle\Cloud\Billing\CreditPackCatalog;
-use Relaticle\Cloud\Billing\Jobs\RefreshManagedRenewal;
+use Relaticle\Cloud\Billing\Data\BillingSummary;
+use Relaticle\Cloud\Billing\Jobs\RefreshRenewal;
+use Relaticle\Cloud\Billing\Livewire\Concerns\StartsSubscriptionCheckout;
+use Relaticle\Cloud\Billing\Queries\BillingSummaryQuery;
 use Relaticle\Cloud\Billing\Queries\InactiveTrialWorkspacesQuery;
 use Throwable;
 
 final class Billing extends Page
 {
     use HasWorkspaceSettingsNavigation;
+    use StartsSubscriptionCheckout;
 
     protected static string|\BackedEnum|null $navigationIcon = 'lucide-credit-card';
 
@@ -47,6 +53,10 @@ final class Billing extends Page
     public const string CHECKOUT_SUCCESS = 'success';
 
     public const string CHECKOUT_REOPENED = 'reopened';
+
+    public const string KEEP_SUBSCRIPTION_ACTION = 'keepSubscription';
+
+    private const string CHECKOUT_SESSION_PREFIX = 'cs_';
 
     #[Url]
     public ?string $checkout = null;
@@ -174,6 +184,50 @@ final class Billing extends Page
         }
     }
 
+    public function keepSubscriptionAction(): Action
+    {
+        return Action::make(self::KEEP_SUBSCRIPTION_ACTION)
+            ->label(fn (): string => $this->subscriptionEnding()->keepLabel ?? '')
+            ->visible(fn (): bool => $this->subscriptionEnding() instanceof SubscriptionEnding
+                && $this->user()->hasWorkspaceCapability($this->workspace()->getKey(), WorkspaceCapability::BillingManage))
+            ->requiresConfirmation()
+            ->modalIcon('lucide-rotate-ccw')
+            ->modalIconColor('primary')
+            ->modalHeading(fn (): string => $this->subscriptionEnding()->heading ?? '')
+            ->modalDescription(fn (): string => $this->subscriptionEnding()->terms ?? '')
+            ->modalSubmitActionLabel(fn (): string => $this->subscriptionEnding()->keepLabel ?? '')
+            ->modalSubmitAction(fn (Action $action): Action => $action->color('primary'))
+            ->modalCancelActionLabel(__('cloud::billing.keep.dismiss'))
+            ->action(fn () => $this->keepSubscription());
+    }
+
+    private function keepSubscription(): void
+    {
+        $ending = $this->subscriptionEnding();
+
+        try {
+            $kept = resolve(KeepWorkspaceSubscription::class)->execute($this->user(), $this->workspace());
+        } catch (AuthorizationException) {
+            return;
+        } catch (Throwable $exception) {
+            report($exception);
+            $kept = false;
+        }
+
+        if (! $kept || ! $ending instanceof SubscriptionEnding) {
+            Notification::make()->title(__('cloud::billing.keep.failed'))->danger()->send();
+
+            return;
+        }
+
+        Notification::make()->title($ending->keptMessage)->success()->send();
+    }
+
+    private function subscriptionEnding(): ?SubscriptionEnding
+    {
+        return resolve(BillingContract::class)->subscriptionEnding($this->workspace());
+    }
+
     public function buyCredits(CreateCreditPackCheckout $createCheckout, string $pack): void
     {
         $workspace = $this->workspace();
@@ -188,14 +242,6 @@ final class Billing extends Page
             report($exception);
             $this->notifyCheckoutFailed();
         }
-    }
-
-    private function notifyCheckoutFailed(): void
-    {
-        Notification::make()
-            ->title(__('cloud::billing.errors.checkout_failed'))
-            ->danger()
-            ->send();
     }
 
     /** @return array<string, mixed> */
@@ -216,7 +262,7 @@ final class Billing extends Page
             'subscription' => $subscription,
             'managedSubscription' => $managedSubscription,
             'managedPastDue' => $managedSubscription?->pastDue() ?? false,
-            'renewalLabel' => $this->renewalLabel($managedSubscription),
+            'summary' => $this->summary($workspace),
             'pastDue' => $workspace->billingStatus() === BillingStatus::PastDue,
             'onGrace' => $subscription?->onGracePeriod() ?? false,
             'trialAvailable' => $this->trialAvailable(),
@@ -224,30 +270,36 @@ final class Billing extends Page
             'isGrandfathered' => $isGrandfathered,
             'balance' => AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->first(),
             'activating' => in_array($this->checkout, [self::CHECKOUT_SUCCESS, self::CHECKOUT_REOPENED], true) && ! $workspace->subscribed() && ! $workspace->plan->isManaged(),
-            'creditsFulfilling' => $this->credits === 'success',
+            'creditsFulfilling' => $this->creditsFulfilling($workspace),
             'availablePacks' => resolve(CreditPackCatalog::class)->purchasable(),
             ...($hasHostedAccess ? [] : $this->pausedViewData($workspace)),
         ];
     }
 
-    private function renewalLabel(?Subscription $managedSubscription): ?string
+    private function summary(Workspace $workspace): BillingSummary
     {
-        if (! $managedSubscription instanceof Subscription || ! $managedSubscription->active() || $managedSubscription->pastDue() || $managedSubscription->onGracePeriod()) {
-            return null;
+        $summary = resolve(BillingSummaryQuery::class)->forWorkspace(
+            $workspace,
+            $this->user()->hasWorkspaceCapability($workspace->getKey(), WorkspaceCapability::BillingManage),
+        );
+
+        if ($summary->refreshSubscriptionId !== null) {
+            dispatch(new RefreshRenewal($summary->refreshSubscriptionId));
         }
 
-        $renewal = Cache::get(RefreshManagedRenewal::CACHE_PREFIX.$managedSubscription->stripe_id);
+        return $summary;
+    }
 
-        if (! is_array($renewal)) {
-            dispatch(new RefreshManagedRenewal($managedSubscription->stripe_id));
-
-            return null;
+    private function creditsFulfilling(Workspace $workspace): bool
+    {
+        if ($this->credits === null || ! str_starts_with($this->credits, self::CHECKOUT_SESSION_PREFIX)) {
+            return false;
         }
 
-        return __('cloud::billing.managed.renews', [
-            'date' => Date::createFromTimestamp($renewal['renews_at'])->isoFormat('ll'),
-            'amount' => Number::currency($renewal['amount'] / 100, strtoupper($renewal['currency']), precision: $renewal['amount'] % 100 === 0 ? 0 : 2),
-        ]);
+        return AiCreditTransaction::query()
+            ->where('workspace_id', $workspace->getKey())
+            ->where('idempotency_key', GrantPurchasedCredits::IDEMPOTENCY_PREFIX.$this->credits)
+            ->doesntExist();
     }
 
     /** @return array{billingStatus: BillingStatus, deletesWhenInactive: bool, lapsedPlan: ?Plan, mailboxSyncPaused: bool, trialExtensionAvailable: bool, otherWorkspaces: Collection<int, Workspace>} */

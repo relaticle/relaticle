@@ -1,8 +1,8 @@
 ---
 title: Self-Hosting Guide
-description: Get Docker Compose, Coolify, Dokploy and Laravel Cloud deployment steps for Relaticle, with PostgreSQL, Redis and Ollama setup.
+description: Get Docker Compose, Coolify, Dokploy, Laravel Cloud and Selfhost.dev deployment steps for Relaticle, with PostgreSQL, Redis and Ollama setup.
 order: 1
-updated: "2026-10-31"
+updated: "2026-11-23"
 ---
 
 Deploy Relaticle on your own infrastructure with Docker or manually.
@@ -183,6 +183,7 @@ One setting applies to both providers.
 |----------|---------|-------------|
 | `EMAIL_SYNC_INITIAL_DAYS` | | Limits the first import to the last N days. Leave unset to import the whole mailbox. |
 
+{#ai-assistant}
 ### AI Assistant
 
 Rela works with cloud providers, a self-hosted server, or both. Models appear in the chat model picker only when their provider is configured. With none configured, the assistant cannot answer.
@@ -279,6 +280,7 @@ The panel opens on the **Instance** dashboard at `{APP_URL}/sysadmin/instance`, 
 
 ---
 
+{#reverse-proxy-and-ssl}
 ## Reverse Proxy and SSL
 
 The app container serves HTTP on port 8080 internally. Place a reverse proxy in front to handle SSL termination and route traffic to the container.
@@ -403,6 +405,48 @@ php artisan make:filament-user
 ```
 
 Your Relaticle instance is now live at `https://crm.yourdomain.com/app`.
+
+---
+
+## Deploying on Selfhost.dev
+
+[Selfhost.dev](https://selfhost.dev/) deploys open-source apps on managed cloud servers, so there is no server to provision or container to configure. It also handles deploy notifications, monitoring and custom domains.
+
+Relaticle is available as a one-click template on Selfhost.dev. It deploys the same six containers defined in its `compose.yml`, configures the required environment variables and creates your admin account during deployment. No key generation, terminal commands or extra setup is needed.
+
+### 1. Create an Account
+
+Sign up at [console.selfhost.dev](https://console.selfhost.dev/).
+
+### 2. Open the Relaticle Template
+
+Visit the [Relaticle deployment page](https://console.selfhost.dev/deploy/relaticle?src=relaticle_docs), or search for **Relaticle** under **Templates** in the **Projects** section of the dashboard.
+
+### 3. Review the Deploy Settings
+
+All settings are preconfigured, and you can change any of them before deploying:
+
+1. **Server**: your machine type, region and server size (4 GB RAM by default). The region cannot be changed after deployment
+2. **Login**: your account email is prefilled; change it if you'd prefer a different address. Selfhost.dev generates a secure password for your Relaticle admin account. Both are shown in the service details after deployment
+
+`APP_KEY`, the database password and `APP_URL` are generated and configured automatically.
+
+### 4. Deploy
+
+Click **Deploy**. Selfhost.dev provisions your server, pulls the container images and starts all six containers. Once the database migrations complete, your admin account is created.
+
+### 5. Use Your Own Domain (Optional)
+
+Your Relaticle instance comes with a ready-to-use HTTPS address. To use your own domain instead:
+
+1. Open the Relaticle service in your project and go to **Settings** → **Domain**
+2. Enter your domain (e.g., `crm.yourdomain.com`) under **Your domain** and click **Add domain**
+3. Add the A record Selfhost.dev shows to your domain's DNS settings
+4. Click **Check now**. Selfhost.dev verifies the record, applies your domain and provisions its HTTPS certificate automatically
+
+### 6. Sign In
+
+Open the Relaticle service in your project and click **Open Relaticle**. Sign in with the email and password shown in its **Credentials** section, then follow Relaticle's short onboarding (your company name and a few details) to set up your workspace.
 
 ---
 

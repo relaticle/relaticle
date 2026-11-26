@@ -19,7 +19,7 @@ RUN composer install \
 ###########################################
 # Stage 2: Build frontend assets
 ###########################################
-FROM node:26-alpine@sha256:9bd229b644e391df00fb989efa732335aefc6170a05d8c163c5c8ca9870da401 AS frontend
+FROM node:26-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS frontend
 
 WORKDIR /app
 
@@ -43,7 +43,7 @@ RUN --mount=type=bind,from=composer,source=/app/vendor,target=/app/vendor \
 ###########################################
 # Stage 3: Production image
 ###########################################
-FROM serversideup/php:8.5-fpm-nginx@sha256:0b3d79815a1c8f06bb923a4cfdaf515ff9b466271c41428d61f08b29e6c4ac5a AS production
+FROM serversideup/php:8.5.13-fpm-nginx@sha256:22d2467a32fdb5a0924791657d089a1bd495eded6e239a36d712363850de78a0 AS production
 
 LABEL org.opencontainers.image.title="Relaticle CRM"
 LABEL org.opencontainers.image.description="Modern, open-source CRM platform"
@@ -121,5 +121,21 @@ ENV AUTORUN_LARAVEL_OPTIMIZE=false
 ENV CACHE_STORE=redis
 ENV PHP_OPCACHE_ENABLE=1
 ENV SSL_MODE=off
+
+# A worker container runs its artisan command as PID 1 and no nginx, so the base image's
+# HTTP check alone would mark Horizon, the scheduler and Reverb unhealthy on hosts that cannot override it.
+COPY --chmod=755 <<'SH' /usr/local/bin/healthcheck-relaticle
+#!/bin/sh
+case "$(tr '\0' ' ' < /proc/1/cmdline)" in
+    *horizon*) exec healthcheck-horizon ;;
+    *schedule:work*) exec healthcheck-schedule ;;
+    *reverb:start*) exec healthcheck-reverb ;;
+    *queue:work*) exec healthcheck-queue ;;
+esac
+exec curl --insecure --silent --location --show-error --fail "http://localhost:${NGINX_HTTP_PORT}${HEALTHCHECK_PATH}"
+SH
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --start-interval=3s --retries=3 \
+    CMD ["healthcheck-relaticle"]
 
 EXPOSE 8080

@@ -5,12 +5,12 @@
 .scribe
 /node_modules
 /public/build
-/public/build-next
-/public/build-previous
 /public/hot
 /public/storage
 /public/sitemap.xml
 /storage/*.key
+/storage/*.key.*
+/.env.fetch.*
 /vendor
 .env
 .env.backup

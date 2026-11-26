@@ -26,8 +26,7 @@ Le sélecteur d'espace de travail, en haut de la barre latérale, liste tous les
 de travail dont vous êtes membre, et le changement est instantané. **Créer un espace
 de travail**, dans le même menu, lance un assistant court : donnez-lui un nom,
 choisissez son identifiant d'URL, indiquez à Relaticle l'usage que vous en ferez et
-invitez vos premiers membres, par e-mail ou en copiant le lien d'invitation valable
-7 jours.
+invitez vos premiers membres par e-mail.
 
 Clients distincts, activités distinctes, ou bac à sable pour essayer des choses :
 chaque espace de travail garde entièrement pour lui ses données, ses attributs et son

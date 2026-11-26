@@ -53,6 +53,10 @@ return [
         'site_id' => env('FATHOM_ANALYTICS_SITE_ID'),
     ],
 
+    'indexnow' => [
+        'key' => env('INDEXNOW_KEY'),
+    ],
+
     'turnstile' => [
         'key' => env('TURNSTILE_SITE_KEY'),
         'secret' => env('TURNSTILE_SECRET_KEY'),
@@ -101,5 +105,14 @@ return [
             'large' => ['price' => env('STRIPE_PRICE_CREDITS_5K'), 'credits' => 5_000],
             'bulk' => ['price' => env('STRIPE_PRICE_CREDITS_20K'), 'credits' => 20_000],
         ],
+    ],
+
+    'logo_finder' => [
+        'url' => env('LOGO_FINDER_URL'),
+        'key' => env('LOGO_FINDER_KEY'),
+    ],
+
+    'brandfetch' => [
+        'client_id' => env('BRANDFETCH_CLIENT_ID'),
     ],
 ];

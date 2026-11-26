@@ -219,7 +219,7 @@ describe('Feature counts', function () {
 
         expect($text)->not->toMatch('/\d+[ -](?:first-party )?(?:MCP )?tools?\b/i')
             ->not->toMatch('/\d+ (?:custom )?field types\b/i');
-    })->with(['/', '/pricing', '/press', '/ai-native-crm', '/crm-for-claude', '/crm-for-chatgpt', '/alternatives/hubspot', '/compare/relaticle-vs-espocrm']);
+    })->with(['/', '/pricing', '/press', '/ai-native-crm', '/crm-for-cleaning-business', '/crm-for-claude', '/crm-for-chatgpt', '/alternatives/hubspot', '/compare/relaticle-vs-espocrm']);
 });
 
 describe('Community redirects', function () {
@@ -480,36 +480,47 @@ describe('Hero AI tab: entry phase', function () {
 });
 
 describe('Page metadata', function () {
-    it('keeps the title, description and heading of :path within search-result bounds', function (string $path, bool $expectsHeading) {
-        $html = $this->get($path)->assertOk()->getContent();
+    it('keeps the title, description and heading of :path within search-result bounds in each language', function (string $path, bool $expectsHeading, bool $translated = true) {
+        withHostedBilling();
+        config()->set('services.gmail.client_id', 'gmail-client');
+        config()->set('services.azure.client_id', 'azure-client');
 
-        preg_match('/<title>(.*?)<\/title>/s', $html, $title);
-        preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
+        foreach ($translated ? config('app.available_locales') : ['en'] as $locale) {
+            $url = rtrim(($locale === 'en' ? '' : '/'.$locale).$path, '/') ?: '/';
+            $html = $this->get($url)->assertOk()->getContent();
 
-        $titleText = html_entity_decode(trim($title[1] ?? ''));
-        $descriptionText = html_entity_decode($description[1] ?? '');
+            preg_match('/<title>(.*?)<\/title>/s', $html, $title);
+            preg_match('/<meta name="description" content="([^"]*)"/', $html, $description);
 
-        expect(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$path} title: {$titleText}")
-            ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(20, "{$path} title: {$titleText}")
-            ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$path} description: {$descriptionText}")
-            ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$path} description: {$descriptionText}")
-            ->and($titleText.$descriptionText)->not->toContain("\u{2014}");
+            $titleText = html_entity_decode(trim($title[1] ?? ''));
+            $descriptionText = html_entity_decode($description[1] ?? '');
 
-        if ($expectsHeading) {
-            expect(substr_count($html, '<h1'))->toBe(1, "{$path} must render exactly one h1");
+            expect(mb_strlen($titleText))->toBeLessThanOrEqual(60, "{$url} title: {$titleText}")
+                ->and(mb_strlen($titleText))->toBeGreaterThanOrEqual(20, "{$url} title: {$titleText}")
+                ->and(mb_strlen($descriptionText))->toBeLessThanOrEqual(160, "{$url} description: {$descriptionText}")
+                ->and(mb_strlen($descriptionText))->toBeGreaterThanOrEqual(70, "{$url} description: {$descriptionText}")
+                ->and($titleText.$descriptionText)->not->toContain("\u{2014}");
+
+            if ($expectsHeading) {
+                expect(substr_count($html, '<h1'))->toBe(1, "{$url} must render exactly one h1");
+            }
         }
     })->with([
         ['/', true],
         ['/pricing', true],
         ['/ai', true],
         ['/ai-native-crm', true],
+        ['/crm-for-cleaning-business', true],
         ['/crm-for-claude', true],
         ['/crm-for-chatgpt', true],
         ['/self-hosted', true],
         ['/security', true],
         ['/press', true],
         ['/contact', true],
-        ['/developers/api', false],
+        ['/email-and-calendar', true],
+        ['/developers', false],
+        ['/help', true],
+        ['/developers/api', false, false],
         ['/blog', true],
         ['/compare/relaticle-vs-twenty', true],
         ['/compare/relaticle-vs-espocrm', true],
@@ -517,6 +528,9 @@ describe('Page metadata', function () {
         ['/alternatives/hubspot', true],
         ['/alternatives/salesforce', true],
         ['/alternatives/pipedrive', true],
+        ['/alternatives/zoho', true],
+        ['/alternatives/dynamics', true],
+        ['/alternatives/odoo', true],
         ['/privacy-policy', true],
         ['/terms-of-service', true],
     ]);
@@ -541,6 +555,7 @@ describe('Page metadata', function () {
         '/pricing',
         '/ai',
         '/ai-native-crm',
+        '/crm-for-cleaning-business',
         '/crm-for-claude',
         '/crm-for-chatgpt',
         '/self-hosted',
@@ -555,6 +570,9 @@ describe('Page metadata', function () {
         '/alternatives/hubspot',
         '/alternatives/salesforce',
         '/alternatives/pipedrive',
+        '/alternatives/zoho',
+        '/alternatives/dynamics',
+        '/alternatives/odoo',
         '/privacy-policy',
         '/terms-of-service',
     ]);
@@ -580,10 +598,11 @@ describe('Canonical', function () {
         // The page-aware canonical belongs to the blog listing, not to the shared
         // guest layout: a crawler-discovered ?page=N on pricing or the homepage
         // used to self-canonicalise into an indexable duplicate.
-        $this->get($path.'?page=7')
+        $this->get($path.'?page=7&plan=enterprise&utm_source=search')
             ->assertStatus(200)
-            ->assertSee('<link rel="canonical" href="'.url($path).'" />', false);
-    })->with(['/pricing', '/terms-of-service', '/privacy-policy']);
+            ->assertSee('<link rel="canonical" href="'.url($path).'" />', false)
+            ->assertSee('<meta property="og:url" content="'.url($path).'"/>', false);
+    })->with(['/pricing', '/terms-of-service', '/privacy-policy', '/contact', '/de/contact', '/es/contact', '/fr/contact']);
 });
 
 describe('Signup attribution', function () {

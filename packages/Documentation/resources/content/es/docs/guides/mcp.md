@@ -239,7 +239,7 @@ El servidor ofrece 50 herramientas. Cubren el contexto de la cuenta, el descubri
 
 Estas herramientas aparecen solo para una conexión a la que se dio acceso al correo. Las herramientas de lectura muestran el correo sincronizado que su usuario puede ver, con el nivel de uso compartido que eligió el propietario del buzón, además de los borradores y la bandeja de salida del propio usuario. Las herramientas de buzón, borrador, envío y bandeja de salida trabajan sobre los buzones y correos del propio usuario.
 
-Las dos herramientas de lectura necesitan acceso de lectura. La herramienta de buzón aparece para una conexión con permiso de redactar o enviar, y las tres herramientas de borrador para una con permiso de redactar. Las herramientas de envío, cancelación, reprogramación y reintento necesitan el permiso de envío y un rol que pueda enviar mediante un asistente. Un envío programado nunca sale antes de la retención. Un correo va a un máximo de 20 destinatarios en total entre Para, CC y CCO. Un usuario puede tener hasta 10 correos del asistente en espera a la vez.
+Las dos herramientas de lectura necesitan acceso de lectura. La herramienta de buzón aparece para una conexión con permiso de redactar o enviar, y las tres herramientas de borrador para una con permiso de redactar. Las herramientas de envío, cancelación, reprogramación y reintento necesitan el permiso de envío y un rol que pueda enviar mediante un asistente. Un envío programado nunca sale antes de la retención. Un correo va a un máximo de 20 destinatarios en total entre Para, CC y CCO. Un usuario puede tener hasta 10 correos del asistente programados para salir en las próximas 24 horas. Los correos programados para más tarde no cuentan para ese límite.
 
 Un correo en cola sigue ligado a la conexión que lo puso en cola. No se envía si esa conexión se revoca, se elimina o vence antes de la hora de envío. Lo mismo ocurre si el rol de su usuario ya no permite enviar mediante un asistente. Entonces espera en la bandeja de salida, en **Fallidos**, con el motivo.
 
@@ -261,7 +261,7 @@ Un correo en cola sigue ligado a la conexión que lo puso en cola. No se envía 
 
 | Herramienta | Descripción |
 |------|-------------|
-| `upload-file` | Almacena un archivo en el espacio de trabajo desde una URL https pública, un cuerpo base64 con `filename` o un `upload_id`. Devuelve `suggested_markdown` para incrustar el archivo en un campo de editor de texto enriquecido, como el cuerpo de una nota, además de `file_id` para el archivo almacenado. Tipos permitidos: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, de hasta 10 MB. 60 llamadas por hora por espacio de trabajo. |
+| `upload-file` | Almacena un archivo en el espacio de trabajo desde un cuerpo base64 con `filename` o un `upload_id`. Devuelve `suggested_markdown` para incrustar el archivo en un campo de editor de texto enriquecido, como el cuerpo de una nota, además de `file_id` para el archivo almacenado. Tipos permitidos: pdf, doc, docx, xlsx, pptx, jpg, jpeg, png, gif, webp, de hasta 10 MB. 60 llamadas por hora por espacio de trabajo. |
 | `create-upload-url` | Obtiene una URL firmada, válida cinco minutos, a la que enviar un cuerpo de archivo con `PUT`. Luego se pasa el `upload_id` devuelto a `upload-file` dentro de una hora. Un cuerpo no almacenado para entonces se elimina. 60 llamadas por hora por espacio de trabajo. |
 
 Las subidas quedan pendientes durante 24 horas. Guardar un registro cuyo cuerpo de editor de texto enriquecido incrusta el archivo lo reclama. Los archivos no reclamados se purgan.
@@ -397,6 +397,7 @@ Los nombres planos del filtro anterior ya no existen. Dentro de `filter`, claves
 
 ---
 
+{#schema-resources}
 ## Recursos de esquema
 
 El servidor expone cinco recursos de esquema que describen los campos de cada entidad, incluidos los atributos personalizados que haya configurado su espacio de trabajo, además de un recurso de resumen con los conteos de registros:
