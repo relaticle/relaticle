@@ -128,14 +128,6 @@ final class People extends Model implements HasCustomFields, HasMedia, HasTimeli
             ->acceptsMimeTypes(UploadAllowlist::mimeTypes());
     }
 
-    /**
-     * @return BelongsTo<People, $this>
-     */
-    public function mergedInto(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'merged_into_id')->withTrashed();
-    }
-
     /** @param Builder<self> $query */
     #[Scope]
     protected function notMerged(Builder $query): void

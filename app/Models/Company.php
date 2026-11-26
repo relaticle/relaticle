@@ -244,14 +244,6 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         self::restoring(fn (self $record): ?bool => $record->merged_into_id === null ? null : false);
     }
 
-    /**
-     * @return BelongsTo<Company, $this>
-     */
-    public function mergedInto(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'merged_into_id')->withTrashed();
-    }
-
     /** @param Builder<self> $query */
     #[Scope]
     protected function notMerged(Builder $query): void
