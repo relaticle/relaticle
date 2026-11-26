@@ -170,6 +170,15 @@ it('allows remote https images so an email body can show its own', function (): 
         ->and($policy)->not->toMatch('/(script|connect|frame)-src [^;]*\\bhttps:(?= |;)/');
 });
 
+it('allows blob workers so the file upload can draw an image preview', function (): void {
+    config()->set('app.csp.mode', 'enforce');
+
+    $policy = (string) $this->get('/app/login')->headers->get('Content-Security-Policy');
+
+    expect($policy)->toContain("worker-src 'self' blob:;")
+        ->and($policy)->not->toMatch('/script-src [^;]*\\bblob:/');
+});
+
 it('enforces frame-ancestors on the login page and the consent screen in every mode', function (string $mode): void {
     config()->set('app.csp.mode', $mode);
     $user = User::factory()->withPersonalWorkspace()->create();
