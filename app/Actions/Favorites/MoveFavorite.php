@@ -17,7 +17,7 @@ final readonly class MoveFavorite
         $workspaceId = $favorite->workspace_id;
 
         abort_unless($favorite->isOwnedBy($user, $workspaceId) && $user->belongsToWorkspaceId($workspaceId), 403);
-        abort_if($folder instanceof Favorite && ($favorite->isFolder() || ! $folder->isFolder() || $folder->parent_id !== null || ! $folder->isOwnedBy($user, $workspaceId)), 403);
+        abort_if($folder instanceof Favorite && ! $this->canMoveInto($user, $favorite, $folder), 403);
 
         $parentId = $folder?->getKey();
         $after = $this->sibling($user, $after, $favorite, $parentId);
@@ -45,6 +45,14 @@ final readonly class MoveFavorite
                 'position' => DecimalPosition::calculate($after?->position, $before?->position),
             ]);
         });
+    }
+
+    private function canMoveInto(User $user, Favorite $favorite, Favorite $folder): bool
+    {
+        return ! $favorite->isFolder()
+            && $folder->isFolder()
+            && $folder->parent_id === null
+            && $folder->isOwnedBy($user, $favorite->workspace_id);
     }
 
     private function sibling(User $user, ?Favorite $neighbour, Favorite $favorite, ?string $parentId): ?Favorite
