@@ -96,7 +96,7 @@
             @foreach($conversations as $conversation)
                 @php
                     $chatUrl = \App\Filament\Pages\ChatConversation::getUrl(['conversationId' => $conversation->id]);
-                    $isActive = request()->url() === $chatUrl;
+                    $isActive = \Livewire\Livewire::originalUrl() === $chatUrl;
                     $renameUrl = route('chat.rename', ['conversationId' => $conversation->id]);
                     $rawTitle = $conversation->title ?: __('Untitled chat');
                 @endphp
