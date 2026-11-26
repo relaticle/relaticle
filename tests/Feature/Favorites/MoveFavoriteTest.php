@@ -9,6 +9,7 @@ use App\Models\Favorite;
 use App\Models\User;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
+use Symfony\Component\HttpKernel\Exception\HttpException;
 
 mutates(MoveFavorite::class, FavoritesSidebarNav::class);
 
@@ -145,4 +146,25 @@ it('refuses a member outside the workspace', function (): void {
     Livewire::test(FavoritesSidebarNav::class)
         ->call('move', 'missing', null, null, null)
         ->assertForbidden();
+});
+
+it("refuses moving another member's favorite even when it reaches the action", function (): void {
+    $other = User::factory()->create();
+    $this->workspace->users()->attach($other, ['role' => 'admin']);
+    $theirs = favoriteFor($other, $this->workspace, Company::factory()->recycle([$this->user, $this->workspace])->create(), 1);
+
+    expect(fn (): mixed => resolve(MoveFavorite::class)->execute($this->user, $theirs, null, movedFavorite(2)))->toThrow(HttpException::class);
+
+    expect($theirs->fresh()->position)->toBe($theirs->position);
+});
+
+it('refuses a favorite into a folder that sits inside another folder', function (): void {
+    $outer = favoriteFolderFor($this->user, $this->workspace, 'Outer', 1);
+    $nested = favoriteFolderFor($this->user, $this->workspace, 'Nested', 2);
+    $nested->update(['parent_id' => $outer->getKey()]);
+    $moved = movedFavorite(3);
+
+    expect(fn (): mixed => resolve(MoveFavorite::class)->execute($this->user, $moved, $nested))->toThrow(HttpException::class);
+
+    expect($moved->fresh()->parent_id)->toBeNull();
 });
