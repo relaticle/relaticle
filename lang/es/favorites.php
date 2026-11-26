@@ -19,9 +19,4 @@ return [
         'menu' => 'Opciones de carpeta',
         'empty' => 'Sin elementos',
     ],
-    'entities' => [
-        'company' => 'Empresa',
-        'people' => 'Persona',
-        'opportunity' => 'Oportunidad',
-    ],
 ];

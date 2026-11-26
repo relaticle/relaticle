@@ -34,7 +34,7 @@ it('lists favorites with their name and entity label', function (): void {
 
     Livewire::test(FavoritesSidebarNav::class)
         ->assertSee(__('favorites.group'))
-        ->assertSeeInOrder(['Acme Corp', __('favorites.entities.company'), 'Dana Whitfield', __('favorites.entities.people')])
+        ->assertSeeInOrder(['Acme Corp', CrmEntity::Company->label(), 'Dana Whitfield', CrmEntity::People->label()])
         ->assertSeeHtml('href="'.e($urls->buildOrFail(CrmEntity::Company, $company->getKey(), $this->workspace)).'"')
         ->assertSeeHtml('href="'.e($urls->buildOrFail(CrmEntity::People, $person->getKey(), $this->workspace)).'"');
 });

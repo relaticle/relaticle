@@ -19,9 +19,4 @@ return [
         'menu' => 'Folder options',
         'empty' => 'No items',
     ],
-    'entities' => [
-        'company' => 'Company',
-        'people' => 'Person',
-        'opportunity' => 'Opportunity',
-    ],
 ];

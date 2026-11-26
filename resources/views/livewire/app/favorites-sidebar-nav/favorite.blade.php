@@ -32,7 +32,7 @@
         {{ \Filament\Support\generate_icon_html($entity->icon(), attributes: new \Filament\Support\View\ComponentAttributeBag(['class' => 'fi-sidebar-item-icon']), size: \Filament\Support\Enums\IconSize::Large) }}
         <span x-show="$store.sidebar.isOpen" title="{{ $name }}" class="fi-sidebar-item-label flex min-w-0 items-baseline gap-2">
             <span class="truncate">{{ $name }}</span>
-            <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ __('favorites.entities.'.$entity->value) }}</span>
+            <span class="shrink-0 text-xs text-gray-500 dark:text-gray-400">{{ $entity->label() }}</span>
         </span>
     </a>
 

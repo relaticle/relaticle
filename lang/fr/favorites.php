@@ -19,9 +19,4 @@ return [
         'menu' => 'Options du dossier',
         'empty' => 'Aucun élément',
     ],
-    'entities' => [
-        'company' => 'Entreprise',
-        'people' => 'Personne',
-        'opportunity' => 'Opportunité',
-    ],
 ];

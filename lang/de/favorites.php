@@ -19,9 +19,4 @@ return [
         'menu' => 'Ordneroptionen',
         'empty' => 'Keine Einträge',
     ],
-    'entities' => [
-        'company' => 'Unternehmen',
-        'people' => 'Person',
-        'opportunity' => 'Verkaufschance',
-    ],
 ];
