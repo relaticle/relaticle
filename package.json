@@ -1,6 +1,6 @@
 {
     "private": true,
-    "packageManager": "pnpm@12.21.0",
+    "packageManager": "pnpm@12.23.0",
     "type": "module",
     "engines": {
         "node": ">=22.22.0"
@@ -39,9 +39,9 @@
         "@tiptap/pm": "^3.35.0",
         "@tiptap/suggestion": "^3.35.0",
         "alpinejs": "^3.17.5",
-        "dompurify": "^3.4.18",
+        "dompurify": "^3.5.0",
         "laravel-echo": "^2.6.3",
-        "marked": "^18.2.1",
+        "marked": "^18.3.0",
         "motion": "^14.14.0",
         "pusher-js": "^8.6.0",
         "shiki": "^4.6.0"

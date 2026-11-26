@@ -32,7 +32,7 @@ trait HasActivityTimeline
                 ->causer('creator'));
 
         if (Feature::active(EmailIntegration::class)) {
-            $timeline->fromRelation('emails', (new EmailTimelineSource(auth()->user()))(...));
+            $timeline->fromRelation('emails', new EmailTimelineSource(auth()->user())(...));
         }
 
         return $timeline;
