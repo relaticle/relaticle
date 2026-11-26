@@ -316,7 +316,9 @@ trait HasRecordPageLayout
     private function recordActions(): Actions
     {
         return Actions::make([
-            ToggleFavoriteAction::make()->record($this->crmRecord()),
+            ToggleFavoriteAction::make()
+                ->link()
+                ->record($this->crmRecord()),
             EditAction::make()
                 ->icon('lucide-square-pen')
                 ->color('gray')
