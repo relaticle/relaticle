@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Jetstream;
 
 use App\Enums\WorkspaceRole;
+use App\Models\Favorite;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Notifications\WorkspaceMemberRemovedNotification;
@@ -32,6 +33,8 @@ final readonly class RemoveWorkspaceMember implements RemovesTeamMembers
             $workspace->removeUser($workspaceMember);
 
             $workspaceMember->notifications()->where('workspace_id', $workspace->getKey())->delete();
+
+            Favorite::query()->ownedBy($workspaceMember, $workspace->getKey())->delete();
         });
 
         event(new TeamMemberRemoved($workspace, $workspaceMember));
