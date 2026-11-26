@@ -98,15 +98,27 @@
                 @endif
 
                 <span class="min-w-0 flex-1">
-                    <span @class([
-                        'block truncate text-sm leading-6',
-                        'text-gray-400 line-through dark:text-gray-500' => $isOut,
-                    ])>
-                        @if ($showVerb)
+                    @if ($step['mergeLinks'] !== null)
+                        <span @class([
+                            'flex min-w-0 items-center gap-1 text-sm leading-6',
+                            'text-gray-400 line-through dark:text-gray-500' => $isOut,
+                        ])>
                             <span @class(['text-gray-500 dark:text-gray-400' => ! $isOut])>{{ $verb }}</span>
-                        @endif
-                        <span @class(['font-semibold', 'text-gray-900 dark:text-white' => ! $isOut])>{{ $lineName }}</span>
-                    </span>
+                            <span @class(['min-w-0 font-semibold', 'text-gray-900 dark:text-white' => ! $isOut])>
+                                @include('chat::livewire.chat.partials._dock-merge-pair', ['pair' => $step['mergeLinks']])
+                            </span>
+                        </span>
+                    @else
+                        <span @class([
+                            'block truncate text-sm leading-6',
+                            'text-gray-400 line-through dark:text-gray-500' => $isOut,
+                        ])>
+                            @if ($showVerb)
+                                <span @class(['text-gray-500 dark:text-gray-400' => ! $isOut])>{{ $verb }}</span>
+                            @endif
+                            <span @class(['font-semibold', 'text-gray-900 dark:text-white' => ! $isOut])>{{ $lineName }}</span>
+                        </span>
+                    @endif
 
                     @if ($sharedChange !== [] && ! $isOut)
                         <span class="block text-xs leading-5 text-gray-500 dark:text-gray-400">
@@ -194,7 +206,13 @@
                                         'text-gray-900 dark:text-white' => ! $rowOut,
                                         'text-gray-400 line-through dark:text-gray-500' => $rowOut,
                                     ])
-                                >{{ $item['label'] }}</span>
+                                >
+                                    @if ($item['mergeLinks'] !== null)
+                                        @include('chat::livewire.chat.partials._dock-merge-pair', ['pair' => $item['mergeLinks']])
+                                    @else
+                                        {{ $item['label'] }}
+                                    @endif
+                                </span>
 
                                 @if ($linkedFrom !== null)
                                     <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">{{ __('linked from :step', ['step' => $linkedFrom]) }}</span>

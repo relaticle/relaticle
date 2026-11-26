@@ -109,12 +109,54 @@ it('shows each pair with both names on a card that reads as a merge', function (
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->dispatch('proposal:set-active', id: ($this->proposal)()->getKey(), context: 'conversation')
-        ->assertSeeText('Secondary 1 into Primary 1')
-        ->assertSeeText('Secondary 2 into Primary 2')
+        ->assertSeeTextInOrder(['Secondary 1', 'into', 'Primary 1'])
+        ->assertSeeTextInOrder(['Secondary 2', 'into', 'Primary 2'])
         ->assertSeeText('Merge 2 pairs')
         ->assertSeeText('Merge')
         ->assertDontSeeText('Delete')
         ->assertDontSeeHtml('toggleField');
+})->with('mergeable entities');
+
+it('links both records of every pair so each opens in a new tab', function (string $model, string $tool, string $entity): void {
+    $pairs = ($this->pairs)($model, 2);
+    ($this->propose)($tool, $pairs);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ($this->proposal)()->getKey())
+        ->assertSeeHtmlInOrder([
+            "href=\"/r/{$entity}/{$pairs[0][1]->getKey()}\"",
+            'aria-label="Open Secondary 1 in a new tab"',
+            "href=\"/r/{$entity}/{$pairs[0][0]->getKey()}\"",
+            'aria-label="Open Primary 1 in a new tab"',
+            "href=\"/r/{$entity}/{$pairs[1][1]->getKey()}\"",
+            "href=\"/r/{$entity}/{$pairs[1][0]->getKey()}\"",
+        ])
+        ->assertSeeHtml('target="_blank"')
+        ->assertSeeHtml('rel="noopener"');
+})->with('mergeable entities');
+
+it('links both records of a single pair in the card header', function (string $model, string $tool, string $entity): void {
+    [$pair] = ($this->pairs)($model, 1);
+    ($this->propose)($tool, [$pair]);
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ($this->proposal)()->getKey())
+        ->assertSeeHtmlInOrder([
+            "href=\"/r/{$entity}/{$pair[1]->getKey()}\"",
+            "href=\"/r/{$entity}/{$pair[0]->getKey()}\"",
+        ]);
+})->with('mergeable entities');
+
+it('keeps a pair whose record was deleted after the proposal as a plain label', function (string $model, string $tool, string $entity): void {
+    $pairs = ($this->pairs)($model, 2);
+    ($this->propose)($tool, $pairs);
+    $pairs[0][1]->delete();
+
+    Livewire::test(ProposalCard::class, ['context' => 'conversation'])
+        ->call('setActive', ($this->proposal)()->getKey())
+        ->assertSeeText('Secondary 1 into Primary 1')
+        ->assertDontSeeHtml("href=\"/r/{$entity}/{$pairs[0][0]->getKey()}\"")
+        ->assertSeeHtml("href=\"/r/{$entity}/{$pairs[1][0]->getKey()}\"");
 })->with('mergeable entities');
 
 it('shows merges inside a plan as merge steps with no field rows', function (): void {
@@ -128,7 +170,7 @@ it('shows merges inside a plan as merge steps with no field rows', function (): 
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->call('setActive', PendingAction::query()->where('user_id', $this->user->getKey())->firstOrFail()->getKey())
-        ->assertSeeText('Secondary 1 into Primary 1')
+        ->assertSeeTextInOrder(['Secondary 1', 'into', 'Primary 1'])
         ->assertSeeText('Merge')
         ->assertDontSeeText('Name')
         ->assertDontSeeHtml('toggleField');
@@ -266,7 +308,7 @@ it('shows a single pair without field rows', function (string $model, string $to
 
     Livewire::test(ProposalCard::class, ['context' => 'conversation'])
         ->call('setActive', ($this->proposal)()->getKey())
-        ->assertSeeText('Secondary 1 into Primary 1')
+        ->assertSeeTextInOrder(['Secondary 1', 'into', 'Primary 1'])
         ->assertDontSeeHtml('data-proposal-field-row');
 })->with('mergeable entities');
 

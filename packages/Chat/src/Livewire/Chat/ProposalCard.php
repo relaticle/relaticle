@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Relaticle\Chat\Livewire\Chat;
 
+use App\Enums\CrmEntity;
 use App\Livewire\BaseLivewireComponent;
+use App\Models\Scopes\WorkspaceScope;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Field;
@@ -529,6 +531,9 @@ final class ProposalCard extends BaseLivewireComponent
     /** @var array<string, array<int, array{name: string, url: string}>>|null */
     private ?array $repeatsCache = null;
 
+    /** @var array<string, array<int, array{secondary: array{name: string, url: string}, primary: array{name: string, url: string}}>> */
+    private array $mergeLinksCache = [];
+
     /**
      * Per-request memo for editableCodes(), keyed by entity type.
      *
@@ -620,6 +625,7 @@ final class ProposalCard extends BaseLivewireComponent
             'needsOwnApproval' => $step->needsOwnApproval(),
             'isBatch' => ProposalPayload::from($step)->isBatch,
             'items' => $this->batchItemViews($step),
+            'mergeLinks' => ProposalPayload::from($step)->isBatch ? null : ($this->mergeLinksOf($step)[0] ?? null),
             'excludableCodes' => $this->excludableCodesOf($step),
             'titleKey' => $entity->titleKey(),
             'titleLabels' => $entity->titleLabels(),
@@ -730,7 +736,7 @@ final class ProposalCard extends BaseLivewireComponent
      * One row per still-undecided record of a batch step. Every record is its
      * own visible row, so nothing can be approved or left out unseen.
      *
-     * @return list<array{index: int, summary: string, label: string, fields: list<array<string, mixed>>}>
+     * @return list<array{index: int, summary: string, label: string, mergeLinks: array{secondary: array{name: string, url: string}, primary: array{name: string, url: string}}|null, fields: list<array<string, mixed>>}>
      */
     private function batchItemViews(PendingAction $step): array
     {
@@ -749,9 +755,66 @@ final class ProposalCard extends BaseLivewireComponent
                 'index' => $index,
                 'summary' => is_string($summary) ? $summary : '',
                 'label' => $this->itemLabel($step->entity_type, $payload->recordAtOrEmpty($index), $display),
+                'mergeLinks' => $this->mergeLinksOf($step)[$index] ?? null,
                 'fields' => $this->withOverwrittenValues($step, $index, $this->visibleRows($step, is_array($fields) ? array_values($fields) : [])),
             ];
         }, $this->unresolvedIndices($step));
+    }
+
+    /**
+     * @return array<int, array{secondary: array{name: string, url: string}, primary: array{name: string, url: string}}>
+     */
+    private function mergeLinksOf(PendingAction $step): array
+    {
+        if ($step->operation !== PendingActionOperation::Merge) {
+            return [];
+        }
+
+        return $this->mergeLinksCache[(string) $step->getKey()] ??= $this->loadMergeLinks($step);
+    }
+
+    /**
+     * @return array<int, array{secondary: array{name: string, url: string}, primary: array{name: string, url: string}}>
+     */
+    private function loadMergeLinks(PendingAction $step): array
+    {
+        $entity = CrmEntity::tryFrom($step->entity_type->value);
+
+        if (! $entity instanceof CrmEntity) {
+            return [];
+        }
+
+        $payload = ProposalPayload::from($step);
+        $pairs = [];
+
+        foreach (range(0, $payload->count() - 1) as $index) {
+            $record = $payload->recordAtOrEmpty($index);
+            $primary = $record['_record_id'] ?? null;
+            $secondary = $record['_merge_with'] ?? null;
+
+            if (is_scalar($primary) && is_scalar($secondary)) {
+                $pairs[$index] = ['secondary' => (string) $secondary, 'primary' => (string) $primary];
+            }
+        }
+
+        $names = $entity->model()::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $step->workspace_id)
+            ->whereKey(collect($pairs)->flatten()->unique()->values()->all())
+            ->pluck($entity->titleColumn(), 'id');
+        $references = resolve(RecordReferenceResolver::class);
+        $links = [];
+
+        foreach ($pairs as $index => $ids) {
+            if ($names->has($ids['secondary']) && $names->has($ids['primary'])) {
+                $links[$index] = array_map(static fn (string $id): array => [
+                    'name' => (string) $names->get($id),
+                    'url' => $references->referenceUrl($entity->value, $id),
+                ], $ids);
+            }
+        }
+
+        return $links;
     }
 
     /**

@@ -325,6 +325,7 @@
         "[json] Off": "ca7981b46ecf2c1787b6d76d81d9fd7fa0ca95842e2fcc2a452869891a9334d1",
         "[json] On": "130011756125313c72f2cab730db4347e2841526d236a89cb25f38789fa49229",
         "[json] Once a workspace is deleted, all of its resources and data will be permanently deleted. Before deleting this workspace, please download any data or information regarding this workspace that you wish to retain.": "15e0257fe7bc2e98a9e9372e0800815fd21cfe89132e0e811af57cfe81e73b32",
+        "[json] Open :name in a new tab": "b451963a33b6b4cf9ac47b3d46afbf1a97877229d21911fc9ec3d9897c5844eb",
         "[json] Open all :total in :title": "ffb9d98c105a2b77c8ea6edc10aa95ccde861106e988c9edec703ed3bcb6bea8",
         "[json] Open all chats": "5abc79c50dd5509ee9e847a05e5eea397f487fd08582cce2e7c842ed553cdc0e",
         "[json] Open in full page": "6ab860a5c265d44b1c9f21775883164b0e77653ab64a317fd0ef8a0e2eb47bde",

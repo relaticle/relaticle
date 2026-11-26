@@ -344,6 +344,7 @@
     "Oldest first": "Más antiguos primero",
     "On": "Activado",
     "Once a workspace is deleted, all of its resources and data will be permanently deleted. Before deleting this workspace, please download any data or information regarding this workspace that you wish to retain.": "Una vez eliminado un espacio de trabajo, todos sus recursos y datos se eliminarán de forma permanente. Antes de eliminar este espacio de trabajo, descargue los datos o la información que desee conservar.",
+    "Open :name in a new tab": "Abrir :name en una pestaña nueva",
     "Open all :total in :title": "Abrir los :total en :title",
     "Open all chats": "Abrir todos los chats",
     "Open in full page": "Abrir en página completa",
