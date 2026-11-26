@@ -39,6 +39,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -168,6 +169,26 @@ it('keeps the current company\'s value where both hold one', function (): void {
     mergeWith($kept, $duplicate)->assertHasNoActionErrors();
 
     expect(mergeCompanyValue(mergedRecord(), 'linkedin'))->toBe(['https://linkedin.com/company/kept']);
+});
+
+it('carries deactivated attribute values to the new company with the same rule', function (): void {
+    $notes = CustomField::factory()->create(['tenant_id' => $this->workspace->getKey(), 'entity_type' => 'company', 'code' => 'legacy_notes', 'name' => 'Legacy notes', 'type' => 'text']);
+    $tags = CustomField::factory()->create(['tenant_id' => $this->workspace->getKey(), 'entity_type' => 'company', 'code' => 'legacy_tags', 'name' => 'Legacy tags', 'type' => 'tags-input']);
+    $kept = mergeCompanyRecord($this->workspace, $this->user);
+    $duplicate = mergeCompanyRecord($this->workspace, $this->user);
+    $kept->saveCustomFieldValue($tags, ['Enterprise']);
+    $duplicate->saveCustomFieldValue($tags, ['EU', 'enterprise']);
+    $duplicate->saveCustomFieldValue($notes, 'Signed in 2019');
+    $notes->update(['active' => false]);
+    $tags->update(['active' => false]);
+
+    mergeWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $notes->update(['active' => true]);
+    $tags->update(['active' => true]);
+
+    expect(mergeCompanyValue(mergedRecord(), 'legacy_notes'))->toBe('Signed in 2019')
+        ->and(mergeCompanyValue(mergedRecord(), 'legacy_tags'))->toBe(['Enterprise', 'EU']);
 });
 
 it('combines multi-select values with the kept record first', function (): void {
@@ -694,10 +715,10 @@ it('counts domains the way the field stores them before applying the limit', fun
         ->and(WorkspaceCustomField::byCode($this->workspace->getKey(), 'company', 'domains')->settings->max_values)->toBe(5);
 });
 
-it('locks both companies with one select in id order, whichever one is kept', function (): void {
+it('locks the companies, then their opportunities, then their people, each in id order', function (): void {
     $locks = [];
     DB::listen(function (QueryExecuted $query) use (&$locks): void {
-        if (str_contains($query->sql, 'for update') && str_contains($query->sql, ' in (')) {
+        if (str_ends_with($query->sql, 'for update') && str_contains($query->sql, ' in (') && preg_match('/from "(companies|opportunities|people)"/', $query->sql) === 1) {
             $locks[] = $query;
         }
     });
@@ -709,9 +730,8 @@ it('locks both companies with one select in id order, whichever one is kept', fu
 
         mergeWith($current, $other, $keepPicked)->assertHasNoActionErrors();
 
-        expect($locks)->toHaveCount(1, $kept)
-            ->and($locks[0]->sql)->toStartWith('select * from "companies"')
-            ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
+        expect(array_map(fn (QueryExecuted $lock): string => Str::betweenFirst($lock->sql, 'from "', '"'), $locks))->toBe(['companies', 'opportunities', 'people'], $kept)
+            ->and(collect($locks)->every(fn (QueryExecuted $lock): bool => str_ends_with($lock->sql, 'order by "id" asc for update')))->toBeTrue()
             ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());
     }
 });

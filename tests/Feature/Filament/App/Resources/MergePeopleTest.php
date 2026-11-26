@@ -37,6 +37,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Relaticle\CustomFields\Data\CustomFieldSettingsData;
 use Relaticle\CustomFields\Services\TenantContextService;
 use Spatie\MediaLibrary\MediaCollections\Models\Media;
@@ -69,6 +70,20 @@ function mergePeopleWith(People $current, People $picked, bool $keepPicked = fal
     return livewire(ViewPeople::class, ['record' => $current->getKey()])
         ->callAction(mergeRecordAction(), data: ['picked_id' => $picked->getKey(), 'keep_picked' => $keepPicked]);
 }
+
+it('carries a deactivated attribute value to the new person', function (): void {
+    $field = CustomField::factory()->create(['tenant_id' => $this->workspace->getKey(), 'entity_type' => 'people', 'code' => 'legacy_title', 'name' => 'Legacy title', 'type' => 'text']);
+    $kept = mergePersonRecord($this->workspace, $this->user);
+    $duplicate = mergePersonRecord($this->workspace, $this->user);
+    $duplicate->saveCustomFieldValue($field, 'Head of Operations');
+    $field->update(['active' => false]);
+
+    mergePeopleWith($kept, $duplicate)->assertHasNoActionErrors();
+
+    $field->update(['active' => true]);
+
+    expect(mergePersonValue(mergedRecord(), 'legacy_title'))->toBe('Head of Operations');
+});
 
 it('rolls back the new person and every moved link when the final write fails validation', function (): void {
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
@@ -449,10 +464,10 @@ it('counts emails case-insensitively before applying the limit', function (): vo
         ->and(WorkspaceCustomField::byCode($this->workspace->getKey(), 'people', 'emails')->settings->max_values)->toBe(5);
 });
 
-it('locks both people with one select in id order, whichever one is kept', function (): void {
+it('locks the opportunities that name either person before both people, each in id order', function (): void {
     $locks = [];
     DB::listen(function (QueryExecuted $query) use (&$locks): void {
-        if (str_contains($query->sql, 'for update') && str_contains($query->sql, ' in (')) {
+        if (str_ends_with($query->sql, 'for update') && str_contains($query->sql, ' in (') && preg_match('/from "(opportunities|people)"/', $query->sql) === 1) {
             $locks[] = $query;
         }
     });
@@ -464,9 +479,8 @@ it('locks both people with one select in id order, whichever one is kept', funct
 
         mergePeopleWith($current, $other, $keepPicked)->assertHasNoActionErrors();
 
-        expect($locks)->toHaveCount(1, $kept)
-            ->and($locks[0]->sql)->toStartWith('select * from "people"')
-            ->and($locks[0]->sql)->toEndWith('order by "id" asc for update')
-            ->and($locks[0]->bindings)->toContain($current->getKey(), $other->getKey());
+        expect(array_map(fn (QueryExecuted $lock): string => Str::betweenFirst($lock->sql, 'from "', '"'), $locks))->toBe(['opportunities', 'people'], $kept)
+            ->and(collect($locks)->every(fn (QueryExecuted $lock): bool => str_ends_with($lock->sql, 'order by "id" asc for update')))->toBeTrue()
+            ->and($locks[1]->bindings)->toContain($current->getKey(), $other->getKey());
     }
 });

@@ -29,18 +29,27 @@ final readonly class CombineRecordValues
         $other->loadMissing('customFieldValues.customField');
 
         $customFields = [];
+        $inactiveCustomFields = [];
         $overLimit = [];
         $raises = [];
         $attachmentUuids = [];
 
-        foreach ($this->activeFields($priority) as $field) {
+        foreach ($this->fields($priority) as $field) {
+            if (! $field->isActive()) {
+                $this->bindInactiveField($field, $priority, $other);
+            }
+
             $value = $this->combine(
                 $field,
                 $this->swapOriginalsForMerged($field, $priority->getCustomFieldValue($field), $priority, $other, $merged),
                 $this->swapOriginalsForMerged($field, $other->getCustomFieldValue($field), $priority, $other, $merged),
             );
 
-            $customFields[$field->code] = $value;
+            if ($field->isActive()) {
+                $customFields[$field->code] = $value;
+            } else {
+                $inactiveCustomFields[] = ['field' => $field, 'value' => $value];
+            }
 
             array_push($attachmentUuids, ...$this->mediaLookup->referencedUuids($field->type, $value));
 
@@ -59,7 +68,7 @@ final readonly class CombineRecordValues
             $raises[$field->code] = count($value);
         }
 
-        return new MergedValues($this->attributes($priority, $other), $customFields, $overLimit, $raises, array_values(array_unique($attachmentUuids)));
+        return new MergedValues($this->attributes($priority, $other), $customFields, $inactiveCustomFields, $overLimit, $raises, array_values(array_unique($attachmentUuids)));
     }
 
     /**
@@ -107,11 +116,17 @@ final readonly class CombineRecordValues
     /**
      * @return iterable<CustomField>
      */
-    private function activeFields(Company|People $record): iterable
+    private function fields(Company|People $record): iterable
     {
-        return $this->workspaceFields
-            ->forEntity($record->loadMissing('workspace')->workspace, $record->getMorphClass())
-            ->where('active', true);
+        return $this->workspaceFields->forEntity($record->loadMissing('workspace')->workspace, $record->getMorphClass());
+    }
+
+    private function bindInactiveField(CustomField $field, Company|People ...$records): void
+    {
+        // The package scopes a value's field relation to active fields, so its value reads as null until the field is bound.
+        foreach ($records as $record) {
+            $record->customFieldValues->where('custom_field_id', $field->getKey())->each->setRelation('customField', $field);
+        }
     }
 
     private function swapOriginalsForMerged(CustomField $field, mixed $value, Company|People $priority, Company|People $other, Company|People|null $merged): mixed

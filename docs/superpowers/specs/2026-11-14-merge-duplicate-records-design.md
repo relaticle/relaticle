@@ -242,7 +242,10 @@ does not do.
 All of it runs in one database transaction.
 
 1. Lock both originals with one select in id order (`lockForUpdate`), so two members merging the
-   same records, in either direction, wait instead of interleaving or deadlocking.
+   same records, in either direction, wait instead of interleaving or deadlocking. The rows the
+   merge repoints are locked in the order email linking takes them: companies, then opportunities,
+   then people, each in id order. A people merge locks the opportunities naming either person
+   before the people (decided 2026-11-26, after a reproduced 40P01 against email linking).
 2. Insert the new record with its name, workspace, `creator_id` and `creation_source` (decisions 10
    and 11), with model events muted. It comes before the values are combined, because a record-type
    value that names an original is rewritten to the new record's id. That writes no `created` activity row, runs no
@@ -338,9 +341,10 @@ an original into the record it already went into.
   entries, because the new record took them over. Its emails or
   domains now belong to the new record, so restore hits the existing `RestoreConflictMessage`, which
   is the right outcome.
-- **Inactive custom attributes** are not merged. A value an original holds in a deactivated field
-  stays on that original, so reactivating the field shows it there and not on the new record
-  (decided 2026-11-18).
+- **Inactive custom attributes** merge by the same rule as active ones: the priority's value wins,
+  the other fills gaps, lists combine. Reactivating the field shows the value on the new record.
+  An original cannot be opened after a merge (decision 14), so a value left there would be lost
+  to every reader (decided 2026-11-26, replacing the 2026-11-18 rule).
 - **Shared emails and meetings** are counted in batches of 500, so a merge's memory stays flat
   however many the two records share: about 3 MB at 3,000 shared emails, measured 2026-11-18.
 - **Force-deleting an original later** is safe. `people.company_id` and `opportunities.company_id`

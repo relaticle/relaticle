@@ -61,7 +61,10 @@ final readonly class MergeRecords
                 $priority->delete();
                 $other->delete();
 
-                return $this->saveMergedValues($user, $merged, $mergedValues);
+                $merged = $this->saveMergedValues($user, $merged, $mergedValues);
+                $this->saveInactiveValues($merged, $mergedValues);
+
+                return $merged;
             });
             $this->moveHistory->execute($user, $merged, $origin, $priority, $other);
 
@@ -140,6 +143,26 @@ final readonly class MergeRecords
         };
     }
 
+    private function saveInactiveValues(Company|People $merged, MergedValues $mergedValues): void
+    {
+        foreach ($mergedValues->inactiveCustomFields as ['field' => $field, 'value' => $value]) {
+            if (in_array($value, [null, '', []], true)) {
+                continue;
+            }
+
+            // The package refuses to write an inactive field through the model, so the row is written with the field bound.
+            $row = $merged->customFieldValues()->firstOrNew(['custom_field_id' => $field->getKey(), 'tenant_id' => $merged->workspace_id]);
+            $row->setRelation('customField', $field);
+
+            if ($field->settings->encrypted) {
+                $row->mergeCasts([$field->getValueColumn() => 'encrypted']);
+            }
+
+            $row->setValue($value);
+            $row->save();
+        }
+    }
+
     /**
      * @template TRecord of Company|People
      *
@@ -149,9 +172,16 @@ final readonly class MergeRecords
      */
     private function lock(Company|People $priority, Company|People $other): array
     {
+        $ids = [$priority->getKey(), $other->getKey()];
+
+        // Companies, then opportunities, then people: the order email linking takes the same rows in.
+        if ($priority instanceof People) {
+            $this->lockLinkedRows('opportunities', 'contact_id', $priority->workspace_id, $ids);
+        }
+
         /** @var Collection<string, TRecord> $locked */
         $locked = $priority->newQueryWithoutRelationships()
-            ->whereKey([$priority->getKey(), $other->getKey()])
+            ->whereKey($ids)
             // One lock order for every merge, so two opposite merges of the same pair wait instead of deadlocking.
             ->orderBy($priority->getKeyName())
             ->lockForUpdate()
@@ -162,7 +192,25 @@ final readonly class MergeRecords
             throw $this->unavailable();
         }
 
+        if ($priority instanceof Company) {
+            $this->lockLinkedRows('opportunities', 'company_id', $priority->workspace_id, $ids);
+            $this->lockLinkedRows('people', 'company_id', $priority->workspace_id, $ids);
+        }
+
         return [$locked[(string) $priority->getKey()], $locked[(string) $other->getKey()]];
+    }
+
+    /**
+     * @param  list<mixed>  $recordIds
+     */
+    private function lockLinkedRows(string $table, string $column, string $workspaceId, array $recordIds): void
+    {
+        DB::table($table)
+            ->where('workspace_id', $workspaceId)
+            ->whereIn($column, $recordIds)
+            ->orderBy('id')
+            ->lockForUpdate()
+            ->pluck('id');
     }
 
     private function assertWithinLimits(MergedValues $mergedValues): void

@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\CompaniesMergeController;
 use App\Http\Controllers\Api\V1\PeopleMergeController;
 use App\Http\Requests\Api\V1\MergeRecordsRequest;
 use App\Models\Company;
+use App\Models\CustomField;
 use App\Models\People;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -76,6 +77,23 @@ it('merges two records into a new one and answers 404 for both originals', funct
     $this->getJson("/api/v1/{$path}/{$mergedId}")->assertOk();
     $this->getJson("/api/v1/{$path}/{$primary->getKey()}")->assertNotFound();
     $this->getJson("/api/v1/{$path}/{$secondary->getKey()}")->assertNotFound();
+})->with('mergeApiEntities');
+
+it('carries a deactivated attribute value to the new record', function (string $path): void {
+    Sanctum::actingAs($this->user, ['create', 'update', 'delete']);
+    $field = CustomField::factory()->create(['tenant_id' => $this->workspace->getKey(), 'entity_type' => mergeApiField($path)[0], 'code' => 'legacy_note', 'name' => 'Legacy note', 'type' => 'text']);
+    $primary = mergeApiMake($path, $this->user);
+    $secondary = mergeApiMake($path, $this->user);
+    $secondary->saveCustomFieldValue($field, 'Signed in 2019');
+    $field->update(['active' => false]);
+
+    $mergedId = $this->postJson("/api/v1/{$path}/merge", mergeApiBody($primary, $secondary))->assertOk()->json('data.id');
+
+    $field->update(['active' => true]);
+
+    $this->getJson("/api/v1/{$path}/{$mergedId}")
+        ->assertOk()
+        ->assertJsonPath('data.attributes.custom_fields.legacy_note', 'Signed in 2019');
 })->with('mergeApiEntities');
 
 it('refuses the same id twice on secondary_record_id', function (string $path): void {
