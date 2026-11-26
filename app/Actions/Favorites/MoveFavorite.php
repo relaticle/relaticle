@@ -6,6 +6,7 @@ namespace App\Actions\Favorites;
 
 use App\Models\Favorite;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Relaticle\Flowforge\Services\DecimalPosition;
 
@@ -23,7 +24,7 @@ final readonly class MoveFavorite
         $before = $this->sibling($user, $before, $favorite, $parentId);
 
         if ($after instanceof Favorite && $before instanceof Favorite && DecimalPosition::greaterThan($after->position, $before->position)) {
-            $before = null;
+            $before = $this->siblings($user, $favorite, $parentId)->where('position', '>', $after->position)->first();
         }
 
         if (! $after instanceof Favorite && ! $before instanceof Favorite) {
@@ -60,16 +61,23 @@ final readonly class MoveFavorite
 
     private function rebalance(User $user, Favorite $favorite, ?string $parentId): void
     {
-        $siblings = Favorite::query()->ownedBy($user, $favorite->workspace_id)
-            ->where('parent_id', $parentId)
-            ->whereKeyNot($favorite->getKey())
-            ->orderBy('position')
-            ->get();
+        $siblings = $this->siblings($user, $favorite, $parentId)->get();
 
         $positions = DecimalPosition::generateSequence($siblings->count());
 
         foreach ($siblings as $index => $sibling) {
             $sibling->update(['position' => $positions[$index]]);
         }
+    }
+
+    /**
+     * @return Builder<Favorite>
+     */
+    private function siblings(User $user, Favorite $favorite, ?string $parentId): Builder
+    {
+        return Favorite::query()->ownedBy($user, $favorite->workspace_id)
+            ->where('parent_id', $parentId)
+            ->whereKeyNot($favorite->getKey())
+            ->orderBy('position');
     }
 }
