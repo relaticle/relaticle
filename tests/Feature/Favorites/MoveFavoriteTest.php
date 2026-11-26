@@ -95,6 +95,15 @@ it('keeps a favorite directly after its first neighbour when another tab reorder
     expect(favoriteOrder($this->user, $this->workspace))->toBe([$a->getKey(), $b->getKey(), $moved->getKey(), $c->getKey()]);
 });
 
+it('keeps a favorite directly after its first neighbour when another tab put a favorite between its neighbours', function (): void {
+    [$a, $inserted, $b, $moved] = [movedFavorite(10), movedFavorite(12), movedFavorite(20), movedFavorite(30)];
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->call('move', $moved->getKey(), null, $a->getKey(), $b->getKey());
+
+    expect(favoriteOrder($this->user, $this->workspace))->toBe([$a->getKey(), $moved->getKey(), $inserted->getKey(), $b->getKey()]);
+});
+
 it('rebalances the list when two neighbours leave no room between them', function (): void {
     [$a, $b] = [movedFavorite(1), movedFavorite(2)];
     $b->update(['position' => '1.00005']);

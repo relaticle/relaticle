@@ -21,11 +21,9 @@ final readonly class MoveFavorite
 
         $parentId = $folder?->getKey();
         $after = $this->sibling($user, $after, $favorite, $parentId);
-        $before = $this->sibling($user, $before, $favorite, $parentId);
-
-        if ($after instanceof Favorite && $before instanceof Favorite && DecimalPosition::greaterThan($after->position, $before->position)) {
-            $before = $this->siblings($user, $favorite, $parentId)->where('position', '>', $after->position)->first();
-        }
+        $before = $after instanceof Favorite
+            ? $this->siblings($user, $favorite, $parentId)->where('position', '>', $after->position)->first()
+            : $this->sibling($user, $before, $favorite, $parentId);
 
         if (! $after instanceof Favorite && ! $before instanceof Favorite) {
             if ($favorite->parent_id !== $parentId) {
