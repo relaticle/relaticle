@@ -23,7 +23,6 @@ return new class extends Migration
             $table->decimal('position', 20, 10);
             $table->timestamps();
 
-            $table->index(['user_id', 'workspace_id', 'parent_id', 'position']);
             $table->index(['record_type', 'record_id']);
             $table->index('parent_id');
             $table->unique(['user_id', 'workspace_id', 'record_type', 'record_id']);
