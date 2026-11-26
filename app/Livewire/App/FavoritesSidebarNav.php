@@ -18,6 +18,7 @@ use App\Models\User;
 use App\Models\Workspace;
 use App\Queries\Favorites\FavoritesQuery;
 use Filament\Actions\Action;
+use Filament\Actions\CreateAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Illuminate\Contracts\View\View;
@@ -49,23 +50,23 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
         $this->changed();
     }
 
-    public function createFolderAction(): Action
+    public function createFolderAction(): CreateAction
     {
-        return Action::make('createFolder')
+        return CreateAction::make('createFolder')
+            ->model(Favorite::class)
             ->label(__('favorites.actions.new_folder'))
             ->modalHeading(__('favorites.actions.new_folder'))
             ->modalWidth('sm')
             ->schema($this->folderNameSchema())
-            ->action(function (array $data, CreateFavoriteFolder $createFavoriteFolder): void {
+            ->successNotification(null)
+            ->using(function (array $data, CreateFavoriteFolder $createFavoriteFolder): Favorite {
                 $workspace = Filament::getTenant();
+                abort_unless($workspace instanceof Workspace, 403);
 
-                if (! $workspace instanceof Workspace) {
-                    return;
-                }
-
-                $createFavoriteFolder->execute($this->authUser(), $workspace, $data['name']);
-
-                $this->changed();
+                return $createFavoriteFolder->execute($this->authUser(), $workspace, $data['name']);
+            })
+            ->after(function (array $arguments): void {
+                ($arguments['another'] ?? false) ? $this->dispatch('favorites-folder-created') : $this->changed();
             });
     }
 

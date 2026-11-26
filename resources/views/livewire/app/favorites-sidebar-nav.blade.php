@@ -5,6 +5,7 @@
 <li
     x-data="{
         label: @js($groupLabel),
+        isStale: false,
         neighbour(item, direction) {
             let sibling = item[direction]
             while (sibling && ! sibling.dataset.favoriteKey) {
@@ -17,6 +18,9 @@
             this.$wire.move(key, item.parentElement.dataset.favoriteFolder ?? null, this.neighbour(item, 'previousElementSibling'), this.neighbour(item, 'nextElementSibling'))
         },
     }"
+    {{-- Refreshing re-mounts this component and its modal, so Create & create another defers it until the modal closes. --}}
+    x-on:favorites-folder-created.window="isStale = true"
+    x-on:modal-closed="if (isStale) { isStale = false; $wire.dispatch('refresh-sidebar'); $wire.dispatch('favorites-updated') }"
     data-group-label="{{ $groupLabel }}"
     x-bind:class="{ 'fi-collapsed': $store.sidebar.groupIsCollapsed(label) }"
     {{-- -ml-2 offsets this hook, a sibling of Filament's .fi-sidebar-nav-groups list (margin-left: -8px). --}}

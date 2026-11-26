@@ -45,6 +45,36 @@ it('creates an empty folder after the first favorite', function (): void {
         ->and(favoriteOrder($this->user, $this->workspace))->toBe([$first->getKey(), $folder->getKey()]);
 });
 
+it('creates a folder and keeps the modal open, emptied, to create another', function (): void {
+    favoriteFor($this->user, $this->workspace, folderCompany('Acme Corp'), 1);
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->mountAction('createFolder')
+        ->fillForm(['name' => 'Q4 renewals'])
+        ->callMountedAction(['another' => true])
+        ->assertHasNoFormErrors()
+        ->assertDispatched('favorites-folder-created')
+        ->assertNotDispatched('refresh-sidebar')
+        ->assertActionMounted('createFolder')
+        ->assertActionDataSet(['name' => null])
+        ->fillForm(['name' => 'Partners'])
+        ->callMountedAction()
+        ->assertSet('mountedActions', []);
+
+    expect(Favorite::query()->folders()->orderBy('position')->pluck('name')->all())->toBe(['Q4 renewals', 'Partners']);
+});
+
+it('labels the folder modal buttons Create and Create & create another', function (): void {
+    favoriteFor($this->user, $this->workspace, folderCompany('Acme Corp'), 1);
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->mountAction('createFolder')
+        ->assertMountedActionModalSee([
+            __('filament-actions::create.single.modal.actions.create.label'),
+            __('filament-actions::create.single.modal.actions.create_another.label'),
+        ]);
+});
+
 it('refuses a blank or too long folder name', function (string $name): void {
     Livewire::test(FavoritesSidebarNav::class)
         ->callAction('createFolder', data: ['name' => $name])
