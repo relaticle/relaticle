@@ -59,6 +59,7 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
             ->modalHeading(__('favorites.actions.new_folder'))
             ->modalWidth('sm')
             ->schema($this->folderNameSchema())
+            ->createAnother(false)
             ->successNotification(null)
             ->using(function (array $data, CreateFavoriteFolder $createFavoriteFolder): Favorite {
                 $workspace = Filament::getTenant();
@@ -72,8 +73,8 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
                     ]);
                 }
             })
-            ->after(function (array $arguments): void {
-                ($arguments['another'] ?? false) ? $this->dispatch('favorites-folder-created') : $this->changed();
+            ->after(function (): void {
+                $this->changed();
             });
     }
 

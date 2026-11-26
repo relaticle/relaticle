@@ -47,8 +47,7 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
 ### Folders
 
 - The group header carries a `lucide-folder-plus` button. It opens a modal in the center of the page
-  that asks for a name. **Create** saves an empty folder. **Create & create another** saves it and keeps
-  the modal open, emptied. The sidebar refreshes once the modal closes, because a refresh re-mounts it.
+  that asks for a name. **Create** saves an empty folder.
 - A member drags a favorite into a folder, out of it, or into another folder. Dragging also reorders
   favorites and folders, and the order is kept.
 - While dragging, a dashed line in the primary color marks where the row will land.
