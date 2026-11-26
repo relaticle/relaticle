@@ -54,7 +54,7 @@ final readonly class ConditionsFilter
         $zone = FilamentTimezone::get();
         $tree = (new FilterRuleCompiler)->compile($rules, FilterFieldCatalog::for($entity, $user), $user, $zone);
 
-        (new TreeFilter($entity, $user, ViewerZone::strict($zone)))($query, $tree, self::NAME);
+        new TreeFilter($entity, $user, ViewerZone::strict($zone))($query, $tree, self::NAME);
 
         return $query;
     }
