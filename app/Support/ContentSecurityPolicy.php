@@ -57,6 +57,8 @@ final readonly class ContentSecurityPolicy
             'font-src' => ["'self'", 'data:', ...$assets],
             'connect-src' => ["'self'", self::FATHOM, ...self::reverbOrigins(), ...$storage],
             'media-src' => ["'self'", 'blob:', ...$storage],
+            // FilePond draws its image preview in a worker it loads from a blob URL.
+            'worker-src' => ["'self'", 'blob:'],
             'frame-src' => ["'self'", self::TURNSTILE],
         ];
 
