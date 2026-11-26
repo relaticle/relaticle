@@ -23,6 +23,7 @@ use Filament\Facades\Filament;
 use Filament\Forms\Components\TextInput;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Validation\ValidationException;
 
 // Listens to nothing, like ChatSidebarNav: nested in Filament's sidebar, its own
 // re-render never reaches the DOM, so every change dispatches `refresh-sidebar`.
@@ -63,7 +64,13 @@ final class FavoritesSidebarNav extends BaseLivewireComponent
                 $workspace = Filament::getTenant();
                 abort_unless($workspace instanceof Workspace, 403);
 
-                return $createFavoriteFolder->execute($this->authUser(), $workspace, $data['name']);
+                try {
+                    return $createFavoriteFolder->execute($this->authUser(), $workspace, $data['name']);
+                } catch (ValidationException $exception) {
+                    throw ValidationException::withMessages([
+                        "{$this->getMountedActionSchema()?->getStatePath()}.name" => $exception->errors()['name'] ?? [],
+                    ]);
+                }
             })
             ->after(function (array $arguments): void {
                 ($arguments['another'] ?? false) ? $this->dispatch('favorites-folder-created') : $this->changed();

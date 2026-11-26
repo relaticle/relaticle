@@ -75,6 +75,18 @@ it('labels the folder modal buttons Create and Create & create another', functio
         ]);
 });
 
+it('refuses a folder once the member has the most folders allowed', function (): void {
+    foreach (range(1, Favorite::MAX_FOLDERS) as $position) {
+        favoriteFolderFor($this->user, $this->workspace, "Folder {$position}", $position);
+    }
+
+    Livewire::test(FavoritesSidebarNav::class)
+        ->callAction('createFolder', data: ['name' => 'One more'])
+        ->assertHasFormErrors(['name']);
+
+    expect(Favorite::query()->folders()->count())->toBe(Favorite::MAX_FOLDERS);
+});
+
 it('refuses a blank or too long folder name', function (string $name): void {
     Livewire::test(FavoritesSidebarNav::class)
         ->callAction('createFolder', data: ['name' => $name])

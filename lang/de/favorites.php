@@ -18,5 +18,6 @@ return [
         'delete_body' => 'Die Favoriten in diesem Ordner werden auf die oberste Ebene der Liste verschoben.',
         'menu' => 'Ordneroptionen',
         'empty' => 'Keine Einträge',
+        'limit' => 'Sie können bis zu :max Ordner anlegen.',
     ],
 ];

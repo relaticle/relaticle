@@ -43,6 +43,8 @@ final class Favorite extends Model
 
     public const int NAME_MAX_LENGTH = 60;
 
+    public const int MAX_FOLDERS = 50;
+
     /** @var WeakMap<Model, array<array-key, ?self>>|null */
     private static ?WeakMap $ownedFor = null;
 

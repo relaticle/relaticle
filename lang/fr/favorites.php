@@ -18,5 +18,6 @@ return [
         'delete_body' => 'Les favoris de ce dossier passent au premier niveau de la liste.',
         'menu' => 'Options du dossier',
         'empty' => 'Aucun élément',
+        'limit' => 'Vous pouvez avoir jusqu\'à :max dossiers.',
     ],
 ];

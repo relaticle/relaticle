@@ -18,5 +18,6 @@ return [
         'delete_body' => 'Los favoritos de esta carpeta pasan al nivel superior de la lista.',
         'menu' => 'Opciones de carpeta',
         'empty' => 'Sin elementos',
+        'limit' => 'Puede tener hasta :max carpetas.',
     ],
 ];

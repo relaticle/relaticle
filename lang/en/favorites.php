@@ -18,5 +18,6 @@ return [
         'delete_body' => 'The favorites in this folder move to the top level of the list.',
         'menu' => 'Folder options',
         'empty' => 'No items',
+        'limit' => 'You can have up to :max folders.',
     ],
 ];
