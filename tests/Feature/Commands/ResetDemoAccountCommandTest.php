@@ -133,6 +133,7 @@ it('clears reviewer leftovers and restores credits without touching another work
 
         Import::factory()->create(['workspace_id' => $workspace->getKey(), 'user_id' => $user->getKey()]);
         WorkspaceInvitation::factory()->create(['workspace_id' => $workspace->getKey()]);
+        favoriteFor($user, $workspace, Company::factory()->recycle([$workspace])->create(), 1, favoriteFolderFor($user, $workspace, 'Q4 renewals', 1));
 
         return $conversationId;
     };
@@ -152,6 +153,9 @@ it('clears reviewer leftovers and restores credits without touching another work
         expect(DB::table($table)->where('workspace_id', $workspace->getKey())->count())->toBe(0, $table)
             ->and(DB::table($table)->where('workspace_id', $otherWorkspace->getKey())->count())->toBe(1, $table);
     }
+
+    expect(DB::table('favorites')->where('workspace_id', $workspace->getKey())->count())->toBe(0)
+        ->and(DB::table('favorites')->where('workspace_id', $otherWorkspace->getKey())->count())->toBe(2);
 
     $balance = AiCreditBalance::query()->where('workspace_id', $workspace->getKey())->firstOrFail();
     $rebuiltOpportunity = Opportunity::query()

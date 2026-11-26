@@ -238,6 +238,7 @@ final class ResetDemoAccountCommand extends Command
         DB::table('failed_import_rows')->where('workspace_id', $workspaceId)->delete();
         DB::table('imports')->where('workspace_id', $workspaceId)->delete();
         DB::table('exports')->where('workspace_id', $workspaceId)->delete();
+        DB::table('favorites')->where('workspace_id', $workspaceId)->delete();
         DB::table('workspace_invitations')->where('workspace_id', $workspaceId)->delete();
         Activity::query()->withoutGlobalScopes()->where('workspace_id', $workspaceId)->delete();
 
