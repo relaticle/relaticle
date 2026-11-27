@@ -25,15 +25,6 @@ final class RichEditorFieldType extends BaseFieldType
     /** @var list<string> */
     private const array FLOATING_TOOLBAR = ['bold', 'italic', 'underline', 'strike', 'code', 'highlight', 'link'];
 
-    // TipTap detaches a hidden floating toolbar, and Filament's dropdown then rewrites its trigger's ARIA
-    // on every mutation it sees. That loops forever in WebKit, so a detached dropdown keeps its trigger.
-    private const string KEEP_TRIGGER_WHILE_DETACHED = <<<'JS'
-        const getTrigger = $data.getTrigger;
-        $data.getTrigger = function () {
-            return this.$el.isConnected || ! this.activeTrigger ? getTrigger.call(this) : this.activeTrigger;
-        };
-        JS;
-
     // The floating UI plugin keeps the open panel's positioning loop in a closure that re-attaching the
     // toolbar orphans, and the loop then throws on every scroll. Closing the panel on teardown stops it.
     private const string CLOSE_PANEL_ON_DESTROY = <<<'JS'
@@ -115,7 +106,7 @@ final class RichEditorFieldType extends BaseFieldType
                 ['paragraph', 'h1', 'h2', 'h3'],
             )
                 ->textualButtons()
-                ->extraAttributes(['x-init' => self::KEEP_TRIGGER_WHILE_DETACHED.self::CLOSE_PANEL_ON_DESTROY]),
+                ->extraAttributes(['x-init' => self::CLOSE_PANEL_ON_DESTROY]),
             ...self::FLOATING_TOOLBAR,
         ];
     }
