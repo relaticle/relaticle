@@ -155,6 +155,19 @@ final class PersonaCatalog
     }
 
     /**
+     * @return Collection<string, WorkspaceRole>
+     */
+    public static function seededMembers(): Collection
+    {
+        $members = self::all()->flatMap(fn (Persona $persona): array => $persona->members);
+        $emails = User::query()->whereIn('email', $members->pluck('email'))->pluck('email');
+
+        return $members
+            ->filter(fn (array $member): bool => $emails->contains($member['email']))
+            ->mapWithKeys(fn (array $member): array => [$member['email'] => WorkspaceRole::from($member['role'])]);
+    }
+
+    /**
      * @param  array<int, string>  $slugs
      * @return Collection<int, Persona>
      */

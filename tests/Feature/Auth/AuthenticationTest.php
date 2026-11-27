@@ -6,6 +6,7 @@ use App\Actions\Auth\AuthenticatePasskey;
 use App\Actions\Auth\BeginAuthentication;
 use App\Actions\Auth\CancelAuthentication;
 use App\Actions\Auth\ConfirmIdentity;
+use App\Enums\WorkspaceRole;
 use App\Features\SocialAuth;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Auth\ResetPassword;
@@ -1524,6 +1525,17 @@ it('lists each seeded local account as a login link form on the local login page
         ->assertOk()
         ->assertSee(route('loginLinkLogin'), false)
         ->assertSee('value="owner@relaticle.test"', false);
+});
+
+it('lists each seeded local teammate with its role under its workspace owner', function (): void {
+    User::factory()->create(['email' => 'owner@relaticle.test']);
+    User::factory()->create(['email' => 'admin@relaticle.test']);
+    $this->app->detectEnvironment(fn (): string => 'local');
+
+    $this->get(Filament::getPanel('app')->getLoginUrl())
+        ->assertOk()
+        ->assertSeeInOrder(['value="owner@relaticle.test"', 'value="admin@relaticle.test"', WorkspaceRole::Admin->label()], false)
+        ->assertDontSee('value="member@relaticle.test"', false);
 });
 
 it('lists no local accounts on the login page outside the local environment', function (): void {
