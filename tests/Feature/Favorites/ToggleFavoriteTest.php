@@ -80,14 +80,14 @@ it('does not duplicate a favorite starred twice', function (): void {
     expect(Favorite::query()->ownedBy($this->user, $this->workspace->getKey())->count())->toBe(1);
 });
 
-it('appends a new favorite after existing items', function (): void {
+it('puts a new favorite above existing items', function (): void {
     $folder = favoriteFolderFor($this->user, $this->workspace, 'Q4 renewals', 1);
     $existing = favoriteFor($this->user, $this->workspace, Company::factory()->recycle([$this->user, $this->workspace])->create(), 2);
     $company = Company::factory()->recycle([$this->user, $this->workspace])->create();
 
     $favorite = resolve(AddFavoriteRecord::class)->execute($this->user, $company);
 
-    expect(favoriteOrder($this->user, $this->workspace))->toBe([$folder->getKey(), $existing->getKey(), $favorite->getKey()]);
+    expect(favoriteOrder($this->user, $this->workspace))->toBe([$favorite->getKey(), $folder->getKey(), $existing->getKey()]);
 });
 
 it('adds and removes a favorite from the record menu', function (): void {
@@ -173,7 +173,7 @@ it('adds a favorite straight into a chosen folder once a folder exists', functio
         ->assertActionHidden(($this->menu)('addFavoriteToTop'))
         ->assertActionVisible(($this->menu)('moveFavoriteToTop'));
 
-    expect(favoriteOrder($this->user, $this->workspace, $folder))->toBe([$inFolder->getKey(), Favorite::ownedFor($this->user, $company)->getKey()]);
+    expect(favoriteOrder($this->user, $this->workspace, $folder))->toBe([Favorite::ownedFor($this->user, $company)->getKey(), $inFolder->getKey()]);
 });
 
 it('adds a favorite to the top level from the folder picker', function (): void {
@@ -183,7 +183,7 @@ it('adds a favorite to the top level from the folder picker', function (): void 
     livewire(ViewCompany::class, ['record' => $company->getKey()])
         ->callAction(($this->menu)('addFavoriteToTop'));
 
-    expect(favoriteOrder($this->user, $this->workspace))->toBe([$folder->getKey(), Favorite::ownedFor($this->user, $company)->getKey()]);
+    expect(favoriteOrder($this->user, $this->workspace))->toBe([Favorite::ownedFor($this->user, $company)->getKey(), $folder->getKey()]);
 });
 
 it("refuses adding a favorite into another member's folder", function (): void {

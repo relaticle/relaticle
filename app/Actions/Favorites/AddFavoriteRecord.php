@@ -28,7 +28,7 @@ final readonly class AddFavoriteRecord
         return Favorite::query()->withoutGlobalScopes()->firstOrCreate($keys, fn (): array => [
             'kind' => FavoriteKind::Record,
             'parent_id' => $folder?->getKey(),
-            'position' => Favorite::nextPosition($user, $record->workspace_id, $folder?->getKey()),
+            'position' => Favorite::positionAtStart($user, $record->workspace_id, $folder?->getKey()),
         ]);
     }
 }

@@ -128,6 +128,13 @@ final class Favorite extends Model
         return $last === null ? DecimalPosition::forEmptyColumn() : DecimalPosition::after((string) $last);
     }
 
+    public static function positionAtStart(User $user, string $workspaceId, ?string $parentId): string
+    {
+        $first = self::query()->ownedBy($user, $workspaceId)->where('parent_id', $parentId)->min('position');
+
+        return $first === null ? DecimalPosition::forEmptyColumn() : DecimalPosition::before((string) $first);
+    }
+
     /**
      * @param  Builder<self>  $query
      */

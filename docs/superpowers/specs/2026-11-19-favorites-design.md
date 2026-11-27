@@ -35,12 +35,12 @@ Taken after a review against Attio's favorites. Each one changes the spec in #11
   pages. On a favorite the star is filled and the action reads **Remove from favorites**.
 - The header's "..." menu repeats it. On a record that is not a favorite it offers **Add to favorites**.
   When the member has a folder, **Add to favorites** opens the same folder submenu as **Move favorite to**,
-  and the favorite lands at the end of the chosen folder or of the top level.
+  and the favorite lands at the top of the chosen folder or of the top level.
   On a favorite it offers **Move favorite to** (`lucide-star`), when a folder exists, and **Remove from
   favorites** (`lucide-star-off`).
 - **Move favorite to** opens a submenu to its right. **No folder** (`lucide-square-slash`) comes first,
   then each folder (`lucide-folder`). The current place carries the menu check.
-- A new favorite lands at the end of the group's top level. It never goes into a folder on its own.
+- A new favorite lands at the top of the group's top level. It never goes into a folder on its own.
 - Each entry shows the record's name, its entity icon and a label (Company, Person, Opportunity).
   Clicking it opens the record page. A `lucide-star-off` button shows on hover and removes it.
 
