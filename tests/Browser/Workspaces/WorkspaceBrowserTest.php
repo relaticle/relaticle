@@ -108,13 +108,34 @@ it('reloads an invitation page the browser restores from its back-forward cache'
 
     $invitee = User::factory()->withPersonalWorkspace()->create(['email' => 'invitee@example.test']);
 
-    $restoreAfterSubmitting = "(() => { window.restoredWithoutReload = true; document.querySelector('form#join-workspace').dispatchEvent(new CustomEvent('form-processing-started', { detail: { message: '' } })); window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); return true; })()";
-
     $page = visitAs($invitee, "/invitations/{$rawToken}", 1440, 900);
 
-    $page->script($restoreAfterSubmitting);
+    $page->script("(() => { window.restoredWithoutReload = true; document.querySelector('form#join-workspace').dispatchEvent(new CustomEvent('form-processing-started', { detail: { message: '' } })); })()");
+
+    $page->assertScript("document.querySelector('form#join-workspace button').classList.contains('fi-processing')", true);
+
+    $page->script("window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))");
 
     $page->wait(1.5)
         ->assertScript('window.restoredWithoutReload === undefined', true)
         ->assertScript("document.querySelector('form#join-workspace button').classList.contains('fi-processing')", false);
+});
+
+it('lets the switch-account button on a wrong-account invitation submit once', function (): void {
+    $this->withVite();
+
+    $workspace = Workspace::factory()->create();
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'invited@example.test', 'role' => 'member']);
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    $signedIn = User::factory()->withPersonalWorkspace()->create(['email' => 'someone-else@example.test']);
+
+    $submitsLetThrough = "(() => { const form = document.querySelector('form#switch-account'); let sent = 0; form.addEventListener('submit', (event) => { if (! event.defaultPrevented) { sent++; } }); const button = form.querySelector('button[type=submit]'); button.click(); button.click(); return sent; })()";
+
+    visitAs($signedIn, "/invitations/{$rawToken}", 1440, 900)
+        ->assertScript($submitsLetThrough, 1)
+        ->wait(2)
+        ->assertPathIs('/app/login')
+        ->assertNoJavaScriptErrors();
 });
