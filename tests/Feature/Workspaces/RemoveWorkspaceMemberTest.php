@@ -5,6 +5,8 @@ declare(strict_types=1);
 use App\Actions\Jetstream\RemoveWorkspaceMember;
 use App\Enums\WorkspaceRole;
 use App\Features\EmailIntegration;
+use App\Models\Company;
+use App\Models\Favorite;
 use App\Models\Notification as NotificationRow;
 use App\Models\User;
 use App\Models\Workspace;
@@ -291,6 +293,24 @@ test('removing a member deletes their notifications from that workspace only', f
 
     expect($member->notifications()->pluck('id')->all())->toEqualCanonicalizing([$otherWorkspaceRow->getKey(), $accountRow->getKey()])
         ->and($owner->notifications()->pluck('id')->all())->toBe([$teammateRow->getKey()]);
+});
+
+test('removing a member deletes their favorites and folders from that workspace only', function () {
+    $owner = User::factory()->withWorkspace()->create();
+    $workspace = $owner->currentWorkspace;
+    $otherWorkspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $workspace->users()->attach($member = User::factory()->create(), ['role' => 'member']);
+    $otherWorkspace->users()->attach($member, ['role' => 'member']);
+    $company = Company::factory()->recycle([$owner, $workspace])->create();
+
+    $folder = favoriteFolderFor($member, $workspace, 'Q4 renewals', 1);
+    favoriteFor($member, $workspace, $company, 2, $folder);
+    $kept = favoriteFor($member, $otherWorkspace, Company::factory()->recycle([$otherWorkspace])->create(), 1);
+    $teammate = favoriteFor($owner, $workspace, $company, 1);
+
+    resolve(RemoveWorkspaceMember::class)->remove($owner, $workspace, $member);
+
+    expect(Favorite::query()->withoutGlobalScopes()->pluck('id')->all())->toEqualCanonicalizing([$kept->getKey(), $teammate->getKey()]);
 });
 
 test('removing a member keeps them in the workspace when the notification purge fails', function () {

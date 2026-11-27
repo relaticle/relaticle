@@ -91,6 +91,11 @@ enum CrmEntity: string
         };
     }
 
+    public function label(): string
+    {
+        return __('workspaces.activity.types.'.$this->value);
+    }
+
     /** The singular English noun that tool errors and proposal cards use for the record. */
     public function singularName(): string
     {
