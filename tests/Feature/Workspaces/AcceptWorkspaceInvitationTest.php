@@ -383,6 +383,61 @@ test('a replayed accept attaches exactly one membership', function (): void {
     expect($this->workspace->users()->where('users.id', $invitee->id)->count())->toBe(1);
 });
 
+test('a second join click after the invitation was accepted lands in the workspace, not on the expired page', function (): void {
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->withPersonalWorkspace()->create(['email' => 'invitee@example.test']);
+
+    $this->actingAs($invitee)->post(route('workspace-invitations.token.join', ['token' => $raw]));
+
+    $redirect = $this->actingAs($invitee)
+        ->post(route('workspace-invitations.token.join', ['token' => $raw]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->workspace]));
+
+    $this->get($redirect->headers->get('Location'))
+        ->assertOk()
+        ->assertSee(__('workspaces.accept.already_member', ['workspace' => $this->workspace->name]));
+});
+
+test('opening the invitation link again after joining lands in the workspace', function (): void {
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+
+    $this->actingAs($invitee)->post(route('workspace-invitations.token.join', ['token' => $raw]));
+
+    $this->actingAs($invitee)
+        ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->workspace]));
+});
+
+test('an accepted invitation link still reads as no longer valid to anyone who is not a member', function (): void {
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'invitee@example.test']);
+    $this->actingAs($invitee)->post(route('workspace-invitations.token.join', ['token' => $raw]));
+
+    $this->actingAs($this->user)
+        ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
+        ->assertOk()
+        ->assertViewHas('state', 'expired');
+
+    $this->workspace->users()->detach($invitee);
+
+    $this->actingAs($invitee->fresh())
+        ->post(route('workspace-invitations.token.join', ['token' => $raw]))
+        ->assertOk()
+        ->assertViewHas('state', 'expired');
+
+    expect($this->workspace->fresh()->hasUser($invitee->fresh()))->toBeFalse();
+});
+
 test('an invitation revoked in flight refuses instead of reporting a join that did not happen', function (): void {
     $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
     $invitation->issueToken();

@@ -152,6 +152,21 @@ test('accepting from the card joins the workspace', function (): void {
     expect(WorkspaceInvitation::query()->whereKey($invitation->id)->exists())->toBeFalse();
 });
 
+test('the emailed link for an invitation accepted from the card lands in the workspace', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'later@example.test', 'role' => 'member']);
+    $raw = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    livewire(PendingInvitationsForUser::class)->call('accept', $invitation->id);
+
+    $this->get(route('workspace-invitations.token.accept', ['token' => $raw]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+});
+
 test('accepting still joins a workspace other than the ambient panel tenant', function (): void {
     $originalScopes = User::getAllGlobalScopes();
 

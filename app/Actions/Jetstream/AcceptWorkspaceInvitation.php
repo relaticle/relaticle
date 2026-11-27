@@ -51,6 +51,8 @@ final readonly class AcceptWorkspaceInvitation
             }
 
             $locked->delete();
+            // Before commit: a request that already sees the row gone must also see this.
+            $locked->rememberAcceptance();
 
             return true;
         });

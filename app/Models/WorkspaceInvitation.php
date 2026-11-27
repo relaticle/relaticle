@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -77,6 +78,25 @@ final class WorkspaceInvitation extends Model
     public static function findByRawToken(string $rawToken): ?self
     {
         return self::query()->where('token', hash('sha256', $rawToken))->first();
+    }
+
+    // Accepting deletes the row. This marker lets the used link, clicked or opened again,
+    // still reach the workspace it joined, for as long as the link itself would have lived.
+    public function rememberAcceptance(): void
+    {
+        Cache::put(self::acceptanceKey((string) $this->token), $this->workspace_id, $this->expires_at);
+    }
+
+    public static function acceptedWorkspaceId(string $rawToken): ?string
+    {
+        $workspaceId = Cache::get(self::acceptanceKey(hash('sha256', $rawToken)));
+
+        return is_string($workspaceId) ? $workspaceId : null;
+    }
+
+    private static function acceptanceKey(string $tokenHash): string
+    {
+        return "workspace-invitation-accepted:{$tokenHash}";
     }
 
     /**
