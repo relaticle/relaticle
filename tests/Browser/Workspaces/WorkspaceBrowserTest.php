@@ -3,12 +3,13 @@
 declare(strict_types=1);
 
 use App\Filament\Pages\CreateWorkspace;
+use App\Http\Controllers\AcceptWorkspaceInvitationController;
 use App\Livewire\App\Workspaces\PendingInvitationsForUser;
 use App\Models\User;
 use App\Models\Workspace;
 use App\Models\WorkspaceInvitation;
 
-mutates(CreateWorkspace::class, PendingInvitationsForUser::class);
+mutates(CreateWorkspace::class, PendingInvitationsForUser::class, AcceptWorkspaceInvitationController::class);
 
 it('can create a new workspace through the browser', function (): void {
     $user = User::factory()->withWorkspace()->create();
@@ -75,5 +76,24 @@ it('asks a pending invitee to join or decline in a modal only those two buttons 
         ->assertScript($isOpen, true)
         ->click("{$modal} button.fi-btn")
         ->assertPathBeginsWith("/app/{$second->workspace->slug}")
+        ->assertNoJavaScriptErrors();
+});
+
+it('joins once and says so when the emailed Join button is clicked twice', function (): void {
+    $this->withVite();
+
+    $workspace = Workspace::factory()->create();
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->withPersonalWorkspace()->create(['email' => 'invitee@example.test']);
+
+    $submitsLetThrough = "(() => { const form = document.querySelector('form'); let sent = 0; form.addEventListener('submit', (event) => { if (! event.defaultPrevented) { sent++; } }); const join = form.querySelector('button[type=submit]'); join.click(); join.click(); return sent; })()";
+
+    visitAs($invitee, "/invitations/{$rawToken}", 1440, 900)
+        ->assertScript($submitsLetThrough, 1)
+        ->waitForText(__('workspaces.accept.joined', ['workspace' => $workspace->name]))
+        ->assertPathBeginsWith("/app/{$workspace->slug}")
         ->assertNoJavaScriptErrors();
 });
