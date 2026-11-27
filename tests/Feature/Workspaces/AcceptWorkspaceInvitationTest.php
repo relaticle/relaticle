@@ -384,9 +384,7 @@ test('a replayed accept attaches exactly one membership', function (): void {
 });
 
 test('a second join click after the invitation was accepted lands in the workspace, not on the expired page', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
-    $raw = $invitation->issueToken();
-    $invitation->save();
+    $raw = rawTokenFor($this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']));
 
     $invitee = User::factory()->withPersonalWorkspace()->create(['email' => 'invitee@example.test']);
 
@@ -402,9 +400,7 @@ test('a second join click after the invitation was accepted lands in the workspa
 });
 
 test('opening the invitation link again after joining lands in the workspace', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
-    $raw = $invitation->issueToken();
-    $invitation->save();
+    $raw = rawTokenFor($this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']));
 
     $invitee = User::factory()->create(['email' => 'invitee@example.test']);
 
@@ -416,9 +412,7 @@ test('opening the invitation link again after joining lands in the workspace', f
 });
 
 test('an accepted invitation link still reads as no longer valid to anyone who is not a member', function (): void {
-    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
-    $raw = $invitation->issueToken();
-    $invitation->save();
+    $raw = rawTokenFor($this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']));
 
     $invitee = User::factory()->create(['email' => 'invitee@example.test']);
     $this->actingAs($invitee)->post(route('workspace-invitations.token.join', ['token' => $raw]));
