@@ -7,6 +7,7 @@ use App\Data\StageOptionSettings;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
+use App\Features\EmailIntegration;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
@@ -140,7 +141,7 @@ test('the tab strip hides admin-only tabs from members without the admin role', 
         ->not->toContain(__('workspaces.tabs.activity'))
         ->and(workspaceTabLabels(resolve(ImportHistory::class)))
         ->toContain(__('workspaces.tabs.import_history'))
-        ->toContain(__('workspaces.tabs.billing'))
+        ->not->toContain(__('workspaces.tabs.billing'))
         ->not->toContain(__('workspaces.tabs.activity'));
 });
 
@@ -437,6 +438,70 @@ test('the tenant menu lists billing directly under workspace settings', function
     expect($items)->toBe(['profile', 'billing', 'register'])
         ->and($panel->getTenantMenuItems()['billing']->getSort())->toBeLessThan(0);
 });
+
+function visibleWorkspaceSettingsMenuItem(): ?Action
+{
+    $panel = Filament::getPanel('app');
+    Filament::setCurrentPanel($panel);
+
+    return $panel->getTenantMenuItems()['profile'] ?? null;
+}
+
+function actAsWorkspaceRole(object $test, WorkspaceRole $role): void
+{
+    $user = User::factory()->create();
+    $test->workspace->users()->attach($user, ['role' => $role->value]);
+
+    $test->actingAs($user);
+    Filament::setTenant($test->workspace);
+}
+
+test('the tenant menu opens workspace settings on the first tab each role can open', function (?WorkspaceRole $role, string $page): void {
+    withHostedBilling();
+
+    if ($role instanceof WorkspaceRole) {
+        actAsWorkspaceRole($this, $role);
+    }
+
+    $settings = visibleWorkspaceSettingsMenuItem();
+
+    expect($settings)->toBeInstanceOf(Action::class)
+        ->and($settings->getLabel())->toBe(__('workspaces.edit_workspace'))
+        ->and($settings->getUrl())->toBe($page::getUrl(tenant: $this->workspace));
+})->with([
+    'owner' => [null, EditWorkspace::class],
+    'admin' => [WorkspaceRole::Admin, Members::class],
+    'member' => [WorkspaceRole::Member, EmailAccountsPage::class],
+    'viewer' => [WorkspaceRole::Viewer, EmailAccountsPage::class],
+]);
+
+test('the tenant menu hides workspace settings from a role that can open no settings tab', function (): void {
+    withHostedBilling();
+    Feature::define(EmailIntegration::class, false);
+
+    actAsWorkspaceRole($this, WorkspaceRole::Viewer);
+
+    expect(visibleWorkspaceSettingsMenuItem())->toBeNull();
+});
+
+test('only a role that manages billing sees billing in the tenant menu and the tab strip', function (?WorkspaceRole $role, bool $seesBilling): void {
+    withHostedBilling();
+
+    if ($role instanceof WorkspaceRole) {
+        actAsWorkspaceRole($this, $role);
+    }
+
+    $panel = Filament::getPanel('app');
+    Filament::setCurrentPanel($panel);
+
+    expect(array_key_exists('billing', $panel->getTenantMenuItems()))->toBe($seesBilling)
+        ->and(in_array(__('workspaces.tabs.billing'), workspaceTabLabels(resolve(EditWorkspace::class)), true))->toBe($seesBilling);
+})->with([
+    'owner' => [null, true],
+    'admin' => [WorkspaceRole::Admin, false],
+    'member' => [WorkspaceRole::Member, false],
+    'viewer' => [WorkspaceRole::Viewer, false],
+]);
 
 test('the legacy team urls redirect permanently to their workspace pages', function (?string $legacyPage, string $page): void {
     $this->get(route('filament.app.team.redirect', ['tenant' => $this->workspace->slug, 'page' => $legacyPage]))

@@ -3,6 +3,7 @@
 
 @if (app()->isLocal() && Route::has('loginLinkLogin'))
     @php($personas = PersonaCatalog::seeded())
+    @php($members = PersonaCatalog::seededMembers())
 
     @if ($personas->isNotEmpty())
         <div class="mt-6">
@@ -12,33 +13,23 @@
 
             <div class="divide-y divide-gray-200 rounded-lg border border-gray-200 dark:divide-white/10 dark:border-white/10">
                 @foreach ($personas as $persona)
-                    <div
-                        class="relative flex items-center justify-between gap-3 px-3 py-2"
-                        title="{{ $persona->purpose }}"
-                    >
-                        <form method="POST" action="{{ route('loginLinkLogin') }}">
-                            @csrf
-                            <input type="hidden" name="email" value="{{ $persona->email }}">
-                            <input type="hidden" name="redirect_url" value="{{ url()->getAppUrl() }}">
+                    @include('filament.auth.developer_login_row', [
+                        'email' => $persona->email,
+                        'title' => $persona->purpose,
+                        'label' => $persona->expect?->getLabel() ?? __('No workspace'),
+                        'color' => $persona->expect?->getColor() ?? 'gray',
+                        'teammate' => false,
+                    ])
 
-                            <button
-                                type="submit"
-                                class="cursor-pointer font-mono text-xs text-gray-600 after:absolute after:inset-0 hover:underline dark:text-gray-300"
-                            >
-                                {{ $persona->email }}
-                            </button>
-                        </form>
-
-                        @if ($persona->expect)
-                            <x-filament::badge :color="$persona->expect->getColor()">
-                                {{ $persona->expect->getLabel() }}
-                            </x-filament::badge>
-                        @else
-                            <x-filament::badge color="gray">
-                                {{ __('No workspace') }}
-                            </x-filament::badge>
-                        @endif
-                    </div>
+                    @foreach ($members->only(array_column($persona->members, 'email')) as $email => $role)
+                        @include('filament.auth.developer_login_row', [
+                            'email' => $email,
+                            'title' => $role->description(),
+                            'label' => $role->label(),
+                            'color' => 'gray',
+                            'teammate' => true,
+                        ])
+                    @endforeach
                 @endforeach
             </div>
         </div>

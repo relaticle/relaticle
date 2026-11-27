@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Concerns;
 
 use App\Contracts\Billing;
+use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
+use App\Models\User;
 use App\Models\Workspace;
 use Closure;
 use Filament\Facades\Filament;
@@ -43,6 +45,17 @@ trait HasWorkspaceSettingsNavigation
      */
     public function getSubNavigation(): array
     {
+        return [
+            ...static::workspaceSettingsTabs(),
+            $this->billingNavigationItem(),
+        ];
+    }
+
+    /**
+     * @return list<NavigationItem>
+     */
+    public static function workspaceSettingsTabs(): array
+    {
         /** @var Workspace $tenant */
         $tenant = Filament::getTenant();
 
@@ -51,28 +64,28 @@ trait HasWorkspaceSettingsNavigation
                 ->label(__('workspaces.tabs.general'))
                 ->icon('lucide-settings')
                 ->url(fn (): string => EditWorkspace::getUrl())
-                ->isActiveWhen($this->isCurrentPage(EditWorkspace::class))
+                ->isActiveWhen(static::isCurrentPage(EditWorkspace::class))
                 ->visible(fn (): bool => EditWorkspace::canView($tenant)),
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.members'))
                 ->icon('lucide-users')
                 ->url(fn (): string => Members::getUrl())
-                ->isActiveWhen($this->isCurrentPage(Members::class))
+                ->isActiveWhen(static::isCurrentPage(Members::class))
                 ->visible(fn (): bool => Members::canAccess()),
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.custom_fields'))
                 ->icon(CustomFields::NAVIGATION_ICON)
                 ->url(fn (): string => CustomFields::getUrl())
-                ->isActiveWhen($this->isCurrentPage(CustomFields::class))
+                ->isActiveWhen(static::isCurrentPage(CustomFields::class))
                 ->visible(fn (): bool => CustomFields::canAccess()),
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.email'))
                 ->icon('lucide-mail')
                 ->url(fn (): string => EmailAccountsPage::getUrl())
-                ->isActiveWhen($this->isCurrentPage(
+                ->isActiveWhen(static::isCurrentPage(
                     EmailAccountsPage::class,
                     EmailAccountSettingsPage::class,
                     EmailPrivacySettingsPage::class,
@@ -85,23 +98,33 @@ trait HasWorkspaceSettingsNavigation
                 ->label(__('workspaces.tabs.import_history'))
                 ->icon('lucide-upload')
                 ->url(fn (): string => ImportHistory::getUrl())
-                ->isActiveWhen($this->isCurrentPage(ImportHistory::class))
+                ->isActiveWhen(static::isCurrentPage(ImportHistory::class))
                 ->visible(fn (): bool => ImportHistory::canAccess()),
 
             NavigationItem::make()
                 ->label(__('workspaces.tabs.activity'))
                 ->icon('lucide-clock')
                 ->url(fn (): string => ActivityLog::getUrl())
-                ->isActiveWhen($this->isCurrentPage(ActivityLog::class))
+                ->isActiveWhen(static::isCurrentPage(ActivityLog::class))
                 ->visible(fn (): bool => ActivityLog::canAccess()),
-
-            $this->billingNavigationItem($tenant),
         ];
     }
 
-    private function billingNavigationItem(Workspace $tenant): NavigationItem
+    public static function workspaceBillingUrl(): ?string
     {
-        $billingUrl = $this->billingUrl($tenant);
+        $tenant = Filament::getTenant();
+        $user = auth()->user();
+
+        if (! $tenant instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($tenant->getKey(), WorkspaceCapability::BillingManage)) {
+            return null;
+        }
+
+        return resolve(Billing::class)->url($tenant);
+    }
+
+    private function billingNavigationItem(): NavigationItem
+    {
+        $billingUrl = static::workspaceBillingUrl();
 
         return NavigationItem::make()
             ->label(__('workspaces.tabs.billing'))
@@ -109,11 +132,6 @@ trait HasWorkspaceSettingsNavigation
             ->url($billingUrl)
             ->isActiveWhen(fn (): bool => static::getSlug() === self::BILLING_SLUG)
             ->visible($billingUrl !== null);
-    }
-
-    private function billingUrl(Workspace $tenant): ?string
-    {
-        return resolve(Billing::class)->url($tenant);
     }
 
     /**
@@ -125,7 +143,7 @@ trait HasWorkspaceSettingsNavigation
      * @param  class-string  ...$pages
      * @return Closure(): bool
      */
-    private function isCurrentPage(string ...$pages): Closure
+    private static function isCurrentPage(string ...$pages): Closure
     {
         return fn (): bool => in_array(static::class, $pages, true);
     }
