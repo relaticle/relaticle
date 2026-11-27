@@ -141,7 +141,7 @@ test('the tab strip hides admin-only tabs from members without the admin role', 
         ->not->toContain(__('workspaces.tabs.activity'))
         ->and(workspaceTabLabels(resolve(ImportHistory::class)))
         ->toContain(__('workspaces.tabs.import_history'))
-        ->toContain(__('workspaces.tabs.billing'))
+        ->not->toContain(__('workspaces.tabs.billing'))
         ->not->toContain(__('workspaces.tabs.activity'));
 });
 
@@ -475,7 +475,7 @@ test('the tenant menu opens workspace settings on the first tab each role can op
     'viewer' => [WorkspaceRole::Viewer, EmailAccountsPage::class],
 ]);
 
-test('the tenant menu hides workspace settings when billing is the only tab the role can open', function (): void {
+test('the tenant menu hides workspace settings from a role that can open no settings tab', function (): void {
     withHostedBilling();
     Feature::define(EmailIntegration::class, false);
 
@@ -483,6 +483,25 @@ test('the tenant menu hides workspace settings when billing is the only tab the 
 
     expect(visibleWorkspaceSettingsMenuItem())->toBeNull();
 });
+
+test('only a role that manages billing sees billing in the tenant menu and the tab strip', function (?WorkspaceRole $role, bool $seesBilling): void {
+    withHostedBilling();
+
+    if ($role instanceof WorkspaceRole) {
+        actAsWorkspaceRole($this, $role);
+    }
+
+    $panel = Filament::getPanel('app');
+    Filament::setCurrentPanel($panel);
+
+    expect(array_key_exists('billing', $panel->getTenantMenuItems()))->toBe($seesBilling)
+        ->and(in_array(__('workspaces.tabs.billing'), workspaceTabLabels(resolve(EditWorkspace::class)), true))->toBe($seesBilling);
+})->with([
+    'owner' => [null, true],
+    'admin' => [WorkspaceRole::Admin, false],
+    'member' => [WorkspaceRole::Member, false],
+    'viewer' => [WorkspaceRole::Viewer, false],
+]);
 
 test('the legacy team urls redirect permanently to their workspace pages', function (?string $legacyPage, string $page): void {
     $this->get(route('filament.app.team.redirect', ['tenant' => $this->workspace->slug, 'page' => $legacyPage]))

@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Filament\Pages\Concerns;
 
 use App\Contracts\Billing;
+use App\Enums\WorkspaceCapability;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
 use App\Filament\Pages\Workspace\Members;
+use App\Models\User;
 use App\Models\Workspace;
 use Closure;
 use Filament\Facades\Filament;
@@ -43,12 +45,9 @@ trait HasWorkspaceSettingsNavigation
      */
     public function getSubNavigation(): array
     {
-        /** @var Workspace $tenant */
-        $tenant = Filament::getTenant();
-
         return [
             ...static::workspaceSettingsTabs(),
-            $this->billingNavigationItem($tenant),
+            $this->billingNavigationItem(),
         ];
     }
 
@@ -111,9 +110,21 @@ trait HasWorkspaceSettingsNavigation
         ];
     }
 
-    private function billingNavigationItem(Workspace $tenant): NavigationItem
+    public static function workspaceBillingUrl(): ?string
     {
-        $billingUrl = $this->billingUrl($tenant);
+        $tenant = Filament::getTenant();
+        $user = auth()->user();
+
+        if (! $tenant instanceof Workspace || ! $user instanceof User || ! $user->hasWorkspaceCapability($tenant->getKey(), WorkspaceCapability::BillingManage)) {
+            return null;
+        }
+
+        return resolve(Billing::class)->url($tenant);
+    }
+
+    private function billingNavigationItem(): NavigationItem
+    {
+        $billingUrl = static::workspaceBillingUrl();
 
         return NavigationItem::make()
             ->label(__('workspaces.tabs.billing'))
@@ -121,11 +132,6 @@ trait HasWorkspaceSettingsNavigation
             ->url($billingUrl)
             ->isActiveWhen(fn (): bool => static::getSlug() === self::BILLING_SLUG)
             ->visible($billingUrl !== null);
-    }
-
-    private function billingUrl(Workspace $tenant): ?string
-    {
-        return resolve(Billing::class)->url($tenant);
     }
 
     /**

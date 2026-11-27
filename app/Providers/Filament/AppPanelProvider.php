@@ -6,7 +6,6 @@ namespace App\Providers\Filament;
 
 use App\ActivityLog\AppEventPalette;
 use App\ActivityLog\AppEventRenderer;
-use App\Contracts\Billing;
 use App\Enums\AccentColor;
 use App\Enums\SupportFormType;
 use App\Enums\WorkspaceCapability;
@@ -469,13 +468,6 @@ final class AppPanelProvider extends PanelProvider
         return $action->url($url)->visible($url !== null);
     }
 
-    private function billingUrl(): ?string
-    {
-        $workspace = Filament::getTenant();
-
-        return $workspace instanceof Workspace ? resolve(Billing::class)->url($workspace) : null;
-    }
-
     private function inviteMembersModal(): string
     {
         $workspace = Filament::getTenant();
@@ -736,8 +728,8 @@ final class AppPanelProvider extends PanelProvider
                     ->label(fn (): string => __('billing.title'))
                     ->icon('lucide-credit-card')
                     ->sort(-1)
-                    ->url(fn (): ?string => $this->billingUrl())
-                    ->visible(fn (): bool => $this->billingUrl() !== null),
+                    ->url(fn (): ?string => EditWorkspace::workspaceBillingUrl())
+                    ->visible(fn (): bool => EditWorkspace::workspaceBillingUrl() !== null),
             ]);
     }
 
