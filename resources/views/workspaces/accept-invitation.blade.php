@@ -25,10 +25,16 @@
         </x-slot:details>
 
         <x-slot:actions>
-            <form method="POST" action="{{ $joinUrl }}">
+            <form
+                id="join-workspace"
+                method="POST"
+                action="{{ $joinUrl }}"
+                x-data
+                x-on:submit="$dispatch('form-processing-started', { message: @js(__('workspaces.accept.ready.action', ['workspace' => $workspaceName])) })"
+            >
                 @csrf
 
-                <x-filament::button type="submit" class="w-full justify-center">
+                <x-filament::button type="submit" form="join-workspace" class="w-full justify-center">
                     {{ __('workspaces.accept.ready.action', ['workspace' => $workspaceName]) }}
                 </x-filament::button>
             </form>
@@ -53,10 +59,16 @@
         </x-slot:description>
 
         <x-slot:actions>
-            <form method="POST" action="{{ $switchUrl }}">
+            <form
+                id="switch-account"
+                method="POST"
+                action="{{ $switchUrl }}"
+                x-data
+                x-on:submit="$dispatch('form-processing-started', { message: @js(__('workspaces.accept.wrong_account.switch')) })"
+            >
                 @csrf
 
-                <x-filament::button type="submit" class="w-full justify-center">
+                <x-filament::button type="submit" form="switch-account" class="w-full justify-center">
                     {{ __('workspaces.accept.wrong_account.switch') }}
                 </x-filament::button>
             </form>

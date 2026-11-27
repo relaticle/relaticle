@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 
 /**
@@ -68,7 +69,7 @@ final class WorkspaceInvitation extends Model
     {
         $rawToken = Str::random(40);
 
-        $this->token = hash('sha256', $rawToken);
+        $this->token = self::hashToken($rawToken);
         $this->expires_at = now()->addDays((int) config('jetstream.invitation_expiry_days', 2));
 
         return $rawToken;
@@ -76,7 +77,34 @@ final class WorkspaceInvitation extends Model
 
     public static function findByRawToken(string $rawToken): ?self
     {
-        return self::query()->where('token', hash('sha256', $rawToken))->first();
+        return self::query()->where('token', self::hashToken($rawToken))->first();
+    }
+
+    // Accepting deletes the row, so this lets the used link still reach the workspace it joined.
+    public function rememberAcceptance(): void
+    {
+        if ($this->token === null) {
+            return;
+        }
+
+        Cache::put(self::acceptanceKey($this->token), $this->workspace_id, $this->expires_at);
+    }
+
+    public static function acceptedWorkspaceId(string $rawToken): ?string
+    {
+        $workspaceId = Cache::get(self::acceptanceKey(self::hashToken($rawToken)));
+
+        return is_string($workspaceId) ? $workspaceId : null;
+    }
+
+    private static function hashToken(string $rawToken): string
+    {
+        return hash('sha256', $rawToken);
+    }
+
+    private static function acceptanceKey(string $tokenHash): string
+    {
+        return "workspace-invitation-accepted:{$tokenHash}";
     }
 
     /**

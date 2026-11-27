@@ -60,6 +60,12 @@ final readonly class AcceptWorkspaceInvitationController
     {
         $user = $this->user($request);
 
+        $joined = $invitation instanceof WorkspaceInvitation ? null : $this->workspaceJoinedThroughLink($request, $user);
+
+        if ($joined instanceof Workspace) {
+            return $this->enterWorkspace($user, $joined);
+        }
+
         if (! $invitation instanceof WorkspaceInvitation || $invitation->isExpired()) {
             Log::warning('Invalid or expired invitation accessed', [
                 'invitation_id' => $invitation?->id,
@@ -84,9 +90,7 @@ final readonly class AcceptWorkspaceInvitationController
         }
 
         if ($user->belongsToWorkspace($invitation->workspace)) {
-            $user->switchWorkspace($invitation->workspace);
-
-            return $this->redirectToWorkspace($invitation->workspace, __('workspaces.accept.already_member', ['workspace' => $invitation->workspace->name]));
+            return $this->enterWorkspace($user, $invitation->workspace);
         }
 
         if ($invitation->workspace->isScheduledOnRequest()) {
@@ -104,6 +108,20 @@ final readonly class AcceptWorkspaceInvitationController
             'memberCount' => $invitation->workspace->memberCount(),
             'joinUrl' => route('workspace-invitations.token.join', ['token' => $request->route('token')]),
         ]);
+    }
+
+    private function workspaceJoinedThroughLink(Request $request, User $user): ?Workspace
+    {
+        $workspaceId = WorkspaceInvitation::acceptedWorkspaceId((string) $request->route('token'));
+
+        return $user->belongsToWorkspaceId($workspaceId) ? Workspace::query()->find($workspaceId) : null;
+    }
+
+    private function enterWorkspace(User $user, Workspace $workspace): RedirectResponse
+    {
+        $user->switchWorkspace($workspace);
+
+        return $this->redirectToWorkspace($workspace, __('workspaces.accept.already_member', ['workspace' => $workspace->name]));
     }
 
     private function user(Request $request): User
