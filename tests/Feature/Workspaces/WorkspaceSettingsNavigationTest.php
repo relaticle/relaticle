@@ -7,6 +7,7 @@ use App\Data\StageOptionSettings;
 use App\Enums\CustomFields\OpportunityField;
 use App\Enums\WorkspaceRole;
 use App\Features\Billing as BillingFeature;
+use App\Features\EmailIntegration;
 use App\Filament\Pages\EditWorkspace;
 use App\Filament\Pages\Workspace\ActivityLog;
 use App\Filament\Pages\Workspace\CustomFields;
@@ -436,6 +437,51 @@ test('the tenant menu lists billing directly under workspace settings', function
 
     expect($items)->toBe(['profile', 'billing', 'register'])
         ->and($panel->getTenantMenuItems()['billing']->getSort())->toBeLessThan(0);
+});
+
+function visibleWorkspaceSettingsMenuItem(): ?Action
+{
+    $panel = Filament::getPanel('app');
+    Filament::setCurrentPanel($panel);
+
+    return $panel->getTenantMenuItems()['profile'] ?? null;
+}
+
+function actAsWorkspaceRole(object $test, WorkspaceRole $role): void
+{
+    $user = User::factory()->create();
+    $test->workspace->users()->attach($user, ['role' => $role->value]);
+
+    $test->actingAs($user);
+    Filament::setTenant($test->workspace);
+}
+
+test('the tenant menu opens workspace settings on the first tab each role can open', function (?WorkspaceRole $role, string $page): void {
+    withHostedBilling();
+
+    if ($role instanceof WorkspaceRole) {
+        actAsWorkspaceRole($this, $role);
+    }
+
+    $settings = visibleWorkspaceSettingsMenuItem();
+
+    expect($settings)->toBeInstanceOf(Action::class)
+        ->and($settings->getLabel())->toBe(__('workspaces.edit_workspace'))
+        ->and($settings->getUrl())->toBe($page::getUrl(tenant: $this->workspace));
+})->with([
+    'owner' => [null, EditWorkspace::class],
+    'admin' => [WorkspaceRole::Admin, Members::class],
+    'member' => [WorkspaceRole::Member, EmailAccountsPage::class],
+    'viewer' => [WorkspaceRole::Viewer, EmailAccountsPage::class],
+]);
+
+test('the tenant menu hides workspace settings when billing is the only tab the role can open', function (): void {
+    withHostedBilling();
+    Feature::define(EmailIntegration::class, false);
+
+    actAsWorkspaceRole($this, WorkspaceRole::Viewer);
+
+    expect(visibleWorkspaceSettingsMenuItem())->toBeNull();
 });
 
 test('the legacy team urls redirect permanently to their workspace pages', function (?string $legacyPage, string $page): void {

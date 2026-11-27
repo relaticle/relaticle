@@ -21,7 +21,7 @@ return [
                 'App\Mcp\Tools\SearchTool::handle' => 77,
                 'App\Providers\AppServiceProvider::configureFilament' => 72,
                 'App\Providers\AppServiceProvider::register' => 67,
-                'App\Providers\Filament\AppPanelProvider::panel' => 239,
+                'App\Providers\Filament\AppPanelProvider::panel' => 225,
                 'App\Providers\HealthServiceProvider::boot' => 63,
                 'App\Services\AvatarService::getInitials' => 70,
                 'App\Support\CustomFieldOptionPlan::validated' => 92,

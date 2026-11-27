@@ -64,6 +64,7 @@ use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\DisableBladeIconComponents;
 use Filament\Http\Middleware\DispatchServingFilamentEvent;
 use Filament\Navigation\NavigationGroup;
+use Filament\Navigation\NavigationItem;
 use Filament\Notifications\Notification;
 use Filament\Panel;
 use Filament\PanelProvider;
@@ -459,6 +460,15 @@ final class AppPanelProvider extends PanelProvider
             );
     }
 
+    private function linkFirstWorkspaceSettingsTab(Action $action): Action
+    {
+        $url = collect(EditWorkspace::workspaceSettingsTabs())
+            ->first(fn (NavigationItem $tab): bool => $tab->isVisible())
+            ?->getUrl();
+
+        return $action->url($url)->visible($url !== null);
+    }
+
     private function billingUrl(): ?string
     {
         $workspace = Filament::getTenant();
@@ -706,6 +716,13 @@ final class AppPanelProvider extends PanelProvider
             [],
         ]);
 
+        $this->registerTenancy($panel);
+
+        return $panel;
+    }
+
+    private function registerTenancy(Panel $panel): void
+    {
         $panel
             ->tenant(Workspace::class, slugAttribute: 'slug', ownershipRelationship: 'workspace')
             ->tenantRegistration(CreateWorkspace::class)
@@ -714,6 +731,7 @@ final class AppPanelProvider extends PanelProvider
             // workspace switcher, next to Workspace Settings (sort -2), instead
             // of stranding it below the workspace list.
             ->tenantMenuItems([
+                'profile' => $this->linkFirstWorkspaceSettingsTab(...),
                 Action::make('billing')
                     ->label(fn (): string => __('billing.title'))
                     ->icon('lucide-credit-card')
@@ -721,8 +739,6 @@ final class AppPanelProvider extends PanelProvider
                     ->url(fn (): ?string => $this->billingUrl())
                     ->visible(fn (): bool => $this->billingUrl() !== null),
             ]);
-
-        return $panel;
     }
 
     /**
