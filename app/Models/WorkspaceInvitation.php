@@ -80,11 +80,14 @@ final class WorkspaceInvitation extends Model
         return self::query()->where('token', hash('sha256', $rawToken))->first();
     }
 
-    // Accepting deletes the row. This marker lets the used link, clicked or opened again,
-    // still reach the workspace it joined, for as long as the link itself would have lived.
+    // Accepting deletes the row, so this lets the used link still reach the workspace it joined.
     public function rememberAcceptance(): void
     {
-        Cache::put(self::acceptanceKey((string) $this->token), $this->workspace_id, $this->expires_at);
+        if ($this->token === null) {
+            return;
+        }
+
+        Cache::put(self::acceptanceKey($this->token), $this->workspace_id, $this->expires_at);
     }
 
     public static function acceptedWorkspaceId(string $rawToken): ?string
