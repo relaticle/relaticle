@@ -97,3 +97,24 @@ it('joins once and says so when the emailed Join button is clicked twice', funct
         ->assertPathBeginsWith("/app/{$workspace->slug}")
         ->assertNoJavaScriptErrors();
 });
+
+it('reloads an invitation page the browser restores from its back-forward cache', function (): void {
+    $this->withVite();
+
+    $workspace = Workspace::factory()->create();
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
+    $rawToken = $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->withPersonalWorkspace()->create(['email' => 'invitee@example.test']);
+
+    $restoreAfterSubmitting = "(() => { window.restoredWithoutReload = true; document.querySelector('form#join-workspace').dispatchEvent(new CustomEvent('form-processing-started', { detail: { message: '' } })); window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true })); return true; })()";
+
+    $page = visitAs($invitee, "/invitations/{$rawToken}", 1440, 900);
+
+    $page->script($restoreAfterSubmitting);
+
+    $page->wait(1.5)
+        ->assertScript('window.restoredWithoutReload === undefined', true)
+        ->assertScript("document.querySelector('form#join-workspace button').classList.contains('fi-processing')", false);
+});
