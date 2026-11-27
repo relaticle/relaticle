@@ -399,16 +399,36 @@ test('a second join click after the invitation was accepted lands in the workspa
         ->assertSee(__('workspaces.accept.already_member', ['workspace' => $this->workspace->name]));
 });
 
-test('opening the invitation link again after joining lands in the workspace', function (): void {
+test('opening the invitation link again after joining switches back to the workspace', function (): void {
     $raw = rawTokenFor($this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']));
+
+    $invitee = User::factory()->withPersonalWorkspace()->create(['email' => 'invitee@example.test']);
+
+    $this->actingAs($invitee)->post(route('workspace-invitations.token.join', ['token' => $raw]));
+
+    $invitee->switchWorkspace($invitee->personalWorkspace());
+
+    $this->actingAs($invitee->fresh())
+        ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->workspace]));
+
+    expect($invitee->fresh()->current_workspace_id)->toBe($this->workspace->id);
+});
+
+test('a used invitation link reads as no longer valid once it would have expired', function (): void {
+    $invitation = $this->workspace->workspaceInvitations()->make(['email' => 'invitee@example.test', 'role' => 'member']);
+    $raw = rawTokenFor($invitation);
 
     $invitee = User::factory()->create(['email' => 'invitee@example.test']);
 
     $this->actingAs($invitee)->post(route('workspace-invitations.token.join', ['token' => $raw]));
 
+    $this->travelTo($invitation->expires_at->addMinute());
+
     $this->actingAs($invitee)
         ->get(route('workspace-invitations.token.accept', ['token' => $raw]))
-        ->assertRedirect(Dashboard::getUrl(['tenant' => $this->workspace]));
+        ->assertOk()
+        ->assertViewHas('state', 'expired');
 });
 
 test('an accepted invitation link still reads as no longer valid to anyone who is not a member', function (): void {
