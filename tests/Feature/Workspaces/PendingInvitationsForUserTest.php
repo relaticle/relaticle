@@ -167,6 +167,29 @@ test('the emailed link for an invitation accepted from the card lands in the wor
         ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
 });
 
+test('a cache outage does not stop the card from joining the workspace', function (): void {
+    $workspace = User::factory()->withWorkspace()->create()->currentWorkspace;
+    $invitation = $workspace->workspaceInvitations()->make(['email' => 'later@example.test', 'role' => 'member']);
+    $invitation->issueToken();
+    $invitation->save();
+
+    $invitee = User::factory()->create(['email' => 'later@example.test']);
+    $this->actingAs($invitee);
+
+    $card = livewire(PendingInvitationsForUser::class);
+
+    config([
+        'database.redis.unreachable' => [...config('database.redis.default'), 'port' => 1],
+        'cache.stores.unreachable' => ['driver' => 'redis', 'connection' => 'unreachable'],
+        'cache.default' => 'unreachable',
+    ]);
+
+    $card->call('accept', $invitation->id)
+        ->assertRedirect(Dashboard::getUrl(['tenant' => $workspace]));
+
+    expect($invitee->fresh()->belongsToWorkspace($workspace))->toBeTrue();
+});
+
 test('accepting still joins a workspace other than the ambient panel tenant', function (): void {
     $originalScopes = User::getAllGlobalScopes();
 

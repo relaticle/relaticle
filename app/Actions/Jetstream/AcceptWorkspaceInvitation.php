@@ -51,8 +51,9 @@ final readonly class AcceptWorkspaceInvitation
             }
 
             $locked->delete();
-            // Before commit: a request that already sees the row gone must also see this.
-            $locked->rememberAcceptance();
+            // Written before commit so a request that finds the row gone always finds the marker,
+            // and rescued because the marker is a courtesy that must never block the join.
+            rescue($locked->rememberAcceptance(...));
 
             return true;
         });
