@@ -60,7 +60,9 @@ final readonly class AcceptWorkspaceInvitationController
     {
         $user = $this->user($request);
 
-        if (! $invitation instanceof WorkspaceInvitation && ($joined = $this->workspaceJoinedThroughLink($request, $user)) instanceof Workspace) {
+        $joined = $invitation instanceof WorkspaceInvitation ? null : $this->workspaceJoinedThroughLink($request, $user);
+
+        if ($joined instanceof Workspace) {
             return $this->enterWorkspace($user, $joined);
         }
 
@@ -111,9 +113,8 @@ final readonly class AcceptWorkspaceInvitationController
     private function workspaceJoinedThroughLink(Request $request, User $user): ?Workspace
     {
         $workspaceId = WorkspaceInvitation::acceptedWorkspaceId((string) $request->route('token'));
-        $workspace = $workspaceId === null ? null : Workspace::query()->find($workspaceId);
 
-        return $workspace instanceof Workspace && $user->belongsToWorkspace($workspace) ? $workspace : null;
+        return $user->belongsToWorkspaceId($workspaceId) ? Workspace::query()->find($workspaceId) : null;
     }
 
     private function enterWorkspace(User $user, Workspace $workspace): RedirectResponse
