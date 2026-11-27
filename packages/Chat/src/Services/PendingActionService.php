@@ -11,6 +11,7 @@ use App\Actions\CustomFields\CreateCustomField;
 use App\Actions\CustomFields\DeleteCustomField;
 use App\Actions\CustomFields\SetCustomFieldOptions;
 use App\Actions\CustomFields\UpdateCustomField;
+use App\Actions\Merge\MergeRecords;
 use App\Actions\Note\CreateNote;
 use App\Actions\Note\DeleteNote;
 use App\Actions\Note\UpdateNote;
@@ -26,12 +27,14 @@ use App\Actions\Task\DeleteTask;
 use App\Actions\Task\UpdateTask;
 use App\Actions\Workspace\CreateWorkspaceInvitation;
 use App\Enums\CreationSource;
+use App\Enums\CrmEntity;
 use App\Features\SetupConversation;
 use App\Models\Company;
 use App\Models\CustomField;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
+use App\Models\Scopes\WorkspaceScope;
 use App\Models\Task;
 use App\Models\User;
 use App\Models\Workspace;
@@ -100,6 +103,7 @@ final readonly class PendingActionService
         SetCustomFieldOptions::class,
         DeleteCustomField::class,
         CreateWorkspaceInvitation::class,
+        MergeRecords::class,
         RemoveSampleData::class,
         SaveAssistantEmailDraft::class,
         SendAssistantEmail::class,
@@ -521,6 +525,10 @@ final readonly class PendingActionService
             throw new RuntimeException("Action class {$pendingAction->action_class} does not have an execute method");
         }
 
+        if ($pendingAction->operation === PendingActionOperation::Merge) {
+            return $this->executeMerge($action, $user, $pendingAction, $record);
+        }
+
         if ($pendingAction->operation === PendingActionOperation::Delete) {
             $model = $this->resolveBatchDeleteModel($pendingAction, $record);
             $action->execute($user, $model);
@@ -834,6 +842,34 @@ final readonly class PendingActionService
     }
 
     /**
+     * The new records an approved merge created: the originals are gone, so these are what a later turn may link.
+     *
+     * @return list<array{id: string, label: string|null, url: string}>
+     */
+    private function mergedRecords(PendingAction $action): array
+    {
+        $resultData = is_array($action->result_data) ? $action->result_data : [];
+        $resultIds = ProposalPayload::from($action)->isBatch
+            ? array_column(is_array($resultData['items'] ?? null) ? $resultData['items'] : [], 'id')
+            : [$resultData['id'] ?? null];
+        $ids = array_values(array_filter($resultIds, is_string(...)));
+        $entity = CrmEntity::from($action->entity_type->value);
+        $resolver = resolve(RecordReferenceResolver::class);
+
+        return array_values($entity->model()::query()
+            ->withoutGlobalScope(WorkspaceScope::class)
+            ->where('workspace_id', $action->workspace_id)
+            ->whereKey($ids)
+            ->get()
+            ->map(fn (Model $record): array => [
+                'id' => (string) $record->getKey(),
+                'label' => (string) $record->{$entity->titleColumn()},
+                'url' => $resolver->referenceUrl($action->entity_type->value, (string) $record->getKey()),
+            ])
+            ->all());
+    }
+
+    /**
      * Approved records with the label and citation url the read tools use, so a
      * later turn can name and link a record it created without a re-fetch.
      *
@@ -843,6 +879,10 @@ final readonly class PendingActionService
     {
         if ($action->status !== PendingActionStatus::Approved) {
             return [];
+        }
+
+        if ($action->operation === PendingActionOperation::Merge) {
+            return $this->mergedRecords($action);
         }
 
         // A delete leaves no record to cite. The single-record path is safe by
@@ -969,6 +1009,7 @@ final readonly class PendingActionService
             PendingActionOperation::Create => $this->executeCreate($action, $user, $pendingAction, $excludedFields),
             PendingActionOperation::Update => $this->executeUpdate($action, $user, $pendingAction, $excludedFields),
             PendingActionOperation::Delete => $this->executeDelete($action, $user, $pendingAction),
+            PendingActionOperation::Merge => $this->executeMerge($action, $user, $pendingAction, $pendingAction->action_data),
         };
     }
 
@@ -1016,7 +1057,7 @@ final readonly class PendingActionService
      * Exclusions the card may actually apply: real field codes only. The list is
      * client-writable state, so this guard is the defense, not the checkbox UI:
      * payload markers are untouchable, the entity's title key is never optional
-     * (a create without it fails validation), and a delete has no per-field
+     * (a create without it fails validation), and a delete or a merge has no per-field
      * writes to exclude.
      *
      * @param  array<array-key, mixed>  $excludedFields
@@ -1024,7 +1065,7 @@ final readonly class PendingActionService
      */
     private function sanitizedExclusions(PendingAction $pendingAction, array $excludedFields): array
     {
-        if ($pendingAction->operation === PendingActionOperation::Delete || $pendingAction->entity_type->isIndivisible()) {
+        if (! $pendingAction->operation->writesFields() || $pendingAction->entity_type->isIndivisible()) {
             return [];
         }
 
@@ -1067,6 +1108,23 @@ final readonly class PendingActionService
         }
 
         return $record;
+    }
+
+    /**
+     * @param  array<string, mixed>  $pair
+     */
+    private function executeMerge(object $action, User $user, PendingAction $pendingAction, array $pair): Model
+    {
+        throw_unless($action instanceof MergeRecords, RuntimeException::class, "Action class {$pendingAction->action_class} cannot merge records");
+
+        $modelClass = $this->resolveModelClass($pair);
+        $primary = $this->ownedQuery($modelClass, $pendingAction)->find(ProposalPayload::recordIdOf($pair, 'merge pair'));
+        $secondary = $this->ownedQuery($modelClass, $pendingAction)->find(ProposalPayload::mergeWithOf($pair));
+
+        throw_unless($primary instanceof Company || $primary instanceof People, ProposalNotResolvable::recordNotFound());
+        throw_unless($secondary instanceof Company || $secondary instanceof People, ProposalNotResolvable::recordNotFound());
+
+        return $action->execute($user, $primary, $secondary);
     }
 
     private function executeDelete(object $action, User $user, PendingAction $pendingAction): mixed

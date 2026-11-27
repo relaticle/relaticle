@@ -2,7 +2,7 @@
 title: Einen gelöschten Eintrag wiederherstellen
 description: Löschen lässt sich rückgängig machen. Filtern Sie jede Liste auf gelöschte Einträge und stellen Sie sie wieder her. Nur endgültiges Löschen ist final.
 order: 4
-updated: "2026-11-13"
+updated: "2026-11-20"
 related: [help/records/company-records, help/records/export-your-data]
 ---
 
@@ -33,6 +33,14 @@ und auch der Relaticle-Support kann ihn nicht zurückholen. Im Zweifel
 
 ## Gut zu wissen
 
+- Ein zusammengeführter Eintrag liegt nicht im Papierkorb und kann nicht wiederhergestellt
+  werden. Das Zusammenführen ist endgültig, siehe
+  [Doppelte Einträge zusammenführen](/de/help/records/merge-duplicate-records).
+- Bei Unternehmen, Personen und Verkaufschancen zeigt die Seite eines gelöschten Eintrags
+  **Dieser Eintrag wurde gelöscht** und eine Schaltfläche **Zurück**. Das Wiederherstellen
+  beginnt im Listenfilter **Gelöschte Einträge**. Dort öffnet eine gelöschte Zeile beim
+  Klicken nichts. Markieren Sie sie und nutzen Sie **Ausgewählte wiederherstellen**.
+  Aufgaben und Notizen verhalten sich wie bisher.
 - Gelöschte Einträge erscheinen weder in Listen, in der Suche und auf dem Board
   noch in den Antworten des KI-Assistenten.
 - Wird ein Unternehmen gelöscht, werden die daran hängenden Personen, Aufgaben

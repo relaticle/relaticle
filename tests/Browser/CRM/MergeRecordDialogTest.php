@@ -1,0 +1,199 @@
+<?php
+
+declare(strict_types=1);
+
+use App\Filament\Actions\MergeRecordAction;
+use App\Models\Company;
+use App\Models\Opportunity;
+use App\Models\People;
+use App\Models\User;
+use Filament\Facades\Filament;
+use Relaticle\CustomFields\Services\TenantContextService;
+
+mutates(MergeRecordAction::class);
+
+beforeEach(function (): void {
+    $this->withVite();
+    $this->user = User::factory()->withWorkspace()->create();
+    $this->actingAs($this->user);
+    $this->workspace = $this->user->currentWorkspace;
+    Filament::setTenant($this->workspace);
+    TenantContextService::setTenantId($this->workspace->getKey());
+});
+
+afterEach(function (): void {
+    TenantContextService::setTenantId(null);
+});
+
+it('merges the current company and a duplicate picked from the dialog into a new company', function (): void {
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightline.health']);
+    mergeDialogCompany($this->workspace, $this->user, 'Northwind Traders');
+
+    $page = openMergeDialog($this->user, $this->workspace, $kept)
+        ->assertSeeIn('[data-merge-right]', 'Brightline Health')
+        ->assertVisible('[data-merge-picker]')
+        ->assertScript(MERGE_SUBMIT_DISABLED, true)
+        ->assertScript('document.querySelector("[data-merge-swap]").disabled', true);
+
+    $page->click('[data-merge-picker]')
+        ->assertAttribute('.fi-merge-pop input', 'placeholder', 'Search by name or domain')
+        ->assertAttribute('.fi-merge-pop input', 'aria-activedescendant', 'merge-option-0')
+        ->type('.fi-merge-pop input', 'zzzz')
+        ->wait(1.2)
+        ->assertAttributeMissing('.fi-merge-pop input', 'aria-activedescendant')
+        ->assertAttributeMissing('.fi-merge-pop input', 'aria-controls')
+        ->keys('.fi-merge-pop input', 'Escape');
+
+    pickInMergeDialog($page, 'brightline.health', 'Brightline Health Inc.')
+        ->assertSeeIn('[data-merge-left]', 'Brightline Health Inc.')
+        ->assertSeeIn('[data-merge-result]', 'brightlinehealth.com')
+        ->assertSeeIn('[data-merge-result]', 'brightline.health')
+        ->assertScript(MERGE_SUBMIT_DISABLED, false)
+        ->click('.fi-modal-footer-actions button[type=submit]')
+        ->assertSee('Records merged')
+        ->assertNoJavaScriptErrors();
+
+    $page->assertPathIs("/app/{$this->workspace->slug}/companies/".mergedRecord()->getKey());
+
+    expect(Company::withTrashed()->find($kept->getKey())?->trashed())->toBeTrue()
+        ->and(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
+});
+
+it('lets the other company win when the member swaps the two', function (): void {
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Northwind', ['northwind.com']);
+    $other = mergeDialogCompany($this->workspace, $this->user, 'Northwind Traders', ['northwindtraders.com']);
+
+    $page = openMergeDialog($this->user, $this->workspace, $current);
+
+    pickInMergeDialog($page, 'Traders', 'Northwind Traders')
+        ->click('[data-merge-swap]')
+        ->assertSeeIn('[data-merge-right]', 'Northwind Traders')
+        ->assertSeeIn('[data-merge-left] [data-merge-name]', 'Northwind')
+        ->click('.fi-modal-footer-actions button[type=submit]')
+        ->assertSee('Records merged')
+        ->assertNoJavaScriptErrors();
+
+    $page->assertPathIs("/app/{$this->workspace->slug}/companies/".mergedRecord()->getKey());
+
+    expect(mergedRecord()->name)->toBe('Northwind Traders')
+        ->and(Company::withTrashed()->find($current->getKey())?->trashed())->toBeTrue()
+        ->and(Company::withTrashed()->find($other->getKey())?->trashed())->toBeTrue();
+});
+
+it('names the raised limit and keeps merging enabled when the lists pass it', function (): void {
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Acme', ['a1.com', 'a2.com', 'a3.com']);
+    mergeDialogCompany($this->workspace, $this->user, 'Acme Holdings', ['b1.com', 'b2.com', 'b3.com']);
+
+    $page = openMergeDialog($this->user, $this->workspace, $current);
+
+    pickInMergeDialog($page, 'Holdings', 'Acme Holdings')
+        ->assertSeeIn('[data-merge-raise]', 'Companies can now hold 6 Domains')
+        ->assertScript(MERGE_SUBMIT_DISABLED, false)
+        ->assertNoJavaScriptErrors();
+});
+
+it('disables merging and names the list over the ceiling', function (): void {
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Acme', array_map(fn (int $number): string => "a{$number}.com", range(1, 11)));
+    mergeDialogCompany($this->workspace, $this->user, 'Acme Holdings', array_map(fn (int $number): string => "b{$number}.com", range(1, 10)));
+
+    $page = openMergeDialog($this->user, $this->workspace, $current);
+
+    pickInMergeDialog($page, 'Holdings', 'Acme Holdings')
+        ->assertSeeIn('[data-merge-over-limit]', 'Domains can hold at most 20')
+        ->assertScript(MERGE_SUBMIT_DISABLED, true)
+        ->assertNoJavaScriptErrors();
+});
+
+it('shows domains as links that open a new tab and a logo in the list and the card', function (): void {
+    $current = mergeDialogCompany($this->workspace, $this->user, 'Globex', ['globex.com']);
+    $other = mergeDialogCompany($this->workspace, $this->user, 'Globex Europe', ['globex.eu']);
+    $other->addMediaFromString(onePixelPng())->usingFileName('logo.png')->toMediaCollection(Company::LOGO_MEDIA_COLLECTION);
+
+    $links = <<<'JS'
+        [...document.querySelectorAll('[data-merge-dialog] [data-merge-details] a')].map((link) => [link.getAttribute('href'), link.target, link.rel])
+        JS;
+
+    $page = openMergeDialog($this->user, $this->workspace, $current)
+        ->click('[data-merge-picker]')
+        ->assertPresent('.fi-merge-pop li:has-text("Globex Europe") img');
+
+    expect($page->script($links))->toBe([['https://globex.com', '_blank', 'noopener noreferrer'], ['https://globex.com', '_blank', 'noopener noreferrer']]);
+
+    $visibleInResultTile = <<<'JS'
+        [...document.querySelector('[data-merge-result] span[aria-hidden="true"]').children].filter((child) => child.checkVisibility()).map((child) => child.tagName.toLowerCase())
+        JS;
+
+    expect($page->script($visibleInResultTile))->toBe(['svg']);
+
+    $page->click('.fi-merge-pop li:has-text("Globex Europe")')
+        ->wait(1.2)
+        ->assertPresent('[data-merge-left] img');
+
+    expect($page->script($links))->toContain(['https://globex.eu', '_blank', 'noopener noreferrer'])
+        ->and($page->script($visibleInResultTile))->toHaveCount(1)
+        ->and($page->script('document.querySelectorAll(\'[data-merge-result] span[aria-hidden="true"] img\').length'))->toBe(1);
+    $page->assertNoJavaScriptErrors();
+});
+
+it('merges a duplicate person picked from the dialog and shows emails and contact opportunities', function (): void {
+    $kept = mergeDialogPerson($this->workspace, $this->user, 'Dana Whitfield', ['dana@brightline.com']);
+    $duplicate = mergeDialogPerson($this->workspace, $this->user, 'Dana W.', ['dana@gmail.com']);
+    mergeDialogPerson($this->workspace, $this->user, 'Marcus Chen', ['marcus@northwind.com']);
+    Opportunity::factory()->recycle([$this->user, $this->workspace])->create(['contact_id' => $duplicate->getKey()]);
+
+    $page = openMergeDialog($this->user, $this->workspace, $kept)
+        ->assertSeeIn('[data-merge-right]', 'dana@brightline.com')
+        ->click('[data-merge-picker]')
+        ->assertAttribute('.fi-merge-pop input', 'placeholder', 'Search by name or email')
+        ->keys('.fi-merge-pop input', 'Escape');
+
+    pickInMergeDialog($page, 'dana@gmail', 'Dana W.')
+        ->assertSeeIn('[data-merge-left]', 'dana@gmail.com')
+        ->assertSeeIn('[data-merge-result]', 'dana@brightline.com')
+        ->assertSeeIn('[data-merge-result]', 'dana@gmail.com')
+        ->assertScript('document.querySelector("[data-merge-result] [data-merge-counts] li .sr-only").textContent', '1 opportunity as point of contact')
+        ->assertScript(MERGE_SUBMIT_DISABLED, false)
+        ->click('.fi-modal-footer-actions button[type=submit]')
+        ->assertSee('Records merged')
+        ->assertNoJavaScriptErrors();
+
+    $page->assertPathIs("/app/{$this->workspace->slug}/people/".mergedRecord()->getKey());
+
+    expect(People::withTrashed()->find($kept->getKey())?->trashed())->toBeTrue()
+        ->and(People::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
+});
+
+it('opens the merge from the duplicate prompt with the duplicate picked', function (): void {
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    $duplicate = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health Inc.', ['brightlinehealth.com', 'brightline.health']);
+
+    $page = visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
+        ->assertSee('1 possible duplicate')
+        ->click('[data-duplicate-prompt] .fi-section-header')
+        ->assertSee('Shares brightlinehealth.com')
+        ->click('[data-duplicate-prompt] li button:has-text("Merge")')
+        ->assertVisible('[data-merge-dialog]')
+        ->assertSeeIn('[data-merge-left]', 'Brightline Health Inc.')
+        ->assertSeeIn('[data-merge-result]', 'brightline.health')
+        ->assertScript(MERGE_SUBMIT_DISABLED, false)
+        ->click('.fi-modal-footer-actions button[type=submit]')
+        ->assertSee('Records merged')
+        ->assertNotPresent('[data-duplicate-prompt]')
+        ->assertNoJavaScriptErrors();
+
+    $page->assertPathIs("/app/{$this->workspace->slug}/companies/".mergedRecord()->getKey());
+
+    expect(Company::withTrashed()->find($duplicate->getKey())?->trashed())->toBeTrue();
+});
+
+it('keeps a long duplicate name inside the record rail', function (): void {
+    $kept = mergeDialogCompany($this->workspace, $this->user, 'Brightline Health', ['brightlinehealth.com']);
+    mergeDialogCompany($this->workspace, $this->user, str_repeat('Brightline Health Holdings International ', 4), ['brightlinehealth.com']);
+
+    visitAs($this->user, "/app/{$this->workspace->slug}/companies/{$kept->getKey()}", 1440, 900)
+        ->click('[data-duplicate-prompt] .fi-section-header')
+        ->assertVisible('[data-duplicate-prompt] li button')
+        ->assertScript("[...document.querySelectorAll('[data-duplicate-prompt] li')].every((row) => row.getBoundingClientRect().right <= document.querySelector('.fi-record-rail').getBoundingClientRect().right)", true)
+        ->assertNoJavaScriptErrors();
+});

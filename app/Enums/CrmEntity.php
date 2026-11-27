@@ -182,6 +182,34 @@ enum CrmEntity: string
         };
     }
 
+    public function identity(): ?RecordIdentity
+    {
+        return match ($this) {
+            self::Company => RecordIdentity::Domains,
+            self::People => RecordIdentity::Emails,
+            self::Opportunity, self::Task, self::Note => null,
+        };
+    }
+
+    /** @return array<string, string> */
+    public function mergeCountIcons(): array
+    {
+        return match ($this) {
+            self::Company => [
+                'people' => 'lucide-users',
+                'opportunities' => self::Opportunity->icon(),
+                'notes' => self::Note->icon(),
+                'tasks' => self::Task->icon(),
+            ],
+            self::People => [
+                'contactOpportunities' => self::Opportunity->icon(),
+                'notes' => self::Note->icon(),
+                'tasks' => self::Task->icon(),
+            ],
+            self::Opportunity, self::Task, self::Note => [],
+        };
+    }
+
     /** @return list<self> */
     public static function linkable(): array
     {

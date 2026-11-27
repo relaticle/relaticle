@@ -3,11 +3,13 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\V1\CompaniesController;
+use App\Http\Controllers\Api\V1\CompaniesMergeController;
 use App\Http\Controllers\Api\V1\CompaniesUpsertController;
 use App\Http\Controllers\Api\V1\CustomFieldsController;
 use App\Http\Controllers\Api\V1\NotesController;
 use App\Http\Controllers\Api\V1\OpportunitiesController;
 use App\Http\Controllers\Api\V1\PeopleController;
+use App\Http\Controllers\Api\V1\PeopleMergeController;
 use App\Http\Controllers\Api\V1\PeopleUpsertController;
 use App\Http\Controllers\Api\V1\TasksController;
 use App\Http\Middleware\EnsureHostedWorkspaceAccess;
@@ -26,7 +28,7 @@ Route::prefix('v1')
             return new UserResource($request->user());
         });
 
-        // Registered before the resource routes so `upsert` is never read as a record key.
+        // Registered before the resource routes so `upsert` and `merge` are never read as a record key.
         Route::post('companies/upsert', CompaniesUpsertController::class)
             ->middleware(EnsureTokenHasAbility::class.':create,update')
             ->name('companies.upsert');
@@ -34,6 +36,14 @@ Route::prefix('v1')
         Route::post('people/upsert', PeopleUpsertController::class)
             ->middleware(EnsureTokenHasAbility::class.':create,update')
             ->name('people.upsert');
+
+        Route::post('companies/merge', CompaniesMergeController::class)
+            ->middleware(EnsureTokenHasAbility::class.':create,update,delete')
+            ->name('companies.merge');
+
+        Route::post('people/merge', PeopleMergeController::class)
+            ->middleware(EnsureTokenHasAbility::class.':create,update,delete')
+            ->name('people.merge');
 
         foreach (['companies' => CompaniesController::class, 'people' => PeopleController::class, 'opportunities' => OpportunitiesController::class, 'tasks' => TasksController::class, 'notes' => NotesController::class] as $resource => $controller) {
             Route::post("{$resource}/query", [$controller, 'index'])->name("{$resource}.query");

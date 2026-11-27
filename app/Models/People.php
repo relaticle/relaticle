@@ -20,11 +20,14 @@ use Carbon\CarbonImmutable;
 use Database\Factories\PeopleFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUlids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Relaticle\ActivityLog\Contracts\HasTimeline;
@@ -39,6 +42,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 
 /**
  * @property CarbonImmutable|null $deleted_at
+ * @property string|null $merged_into_id
  * @property CreationSource $creation_source
  * @property CarbonImmutable|null $last_email_at
  * @property CarbonImmutable|null $last_interaction_at
@@ -89,12 +93,25 @@ final class People extends Model implements HasCustomFields, HasMedia, HasTimeli
         ];
     }
 
+    protected static function booting(): void
+    {
+        self::restoring(fn (self $record): ?bool => $record->merged_into_id === null ? null : false);
+    }
+
     /**
      * @return BelongsTo<Company, $this>
      */
     public function company(): BelongsTo
     {
         return $this->belongsTo(Company::class);
+    }
+
+    /**
+     * @return HasMany<Opportunity, $this>
+     */
+    public function contactOpportunities(): HasMany
+    {
+        return $this->hasMany(Opportunity::class, 'contact_id');
     }
 
     /**
@@ -109,6 +126,13 @@ final class People extends Model implements HasCustomFields, HasMedia, HasTimeli
     {
         $this->addMediaCollection(MediaCollection::Attachments->value)
             ->acceptsMimeTypes(UploadAllowlist::mimeTypes());
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function notMerged(Builder $query): void
+    {
+        $query->whereNull('merged_into_id');
     }
 
     /**
@@ -131,7 +155,7 @@ final class People extends Model implements HasCustomFields, HasMedia, HasTimeli
                 'id', 'workspace_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at',
                 'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
-                'outbound_email_count', 'meeting_count', 'last_meeting_at', 'company_id',
+                'outbound_email_count', 'meeting_count', 'last_meeting_at', 'company_id', 'merged_into_id',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);

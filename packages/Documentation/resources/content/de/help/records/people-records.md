@@ -3,7 +3,7 @@ title: Personeneinträge
 description: Personen mit eindeutigen E-Mail-Adressen, Telefon, Position und Unternehmensverknüpfung, eigenständig oder aus einem Unternehmen heraus angelegt.
 order: 2
 updated: "2026-11-12"
-related: [help/records/company-records, help/getting-started/add-your-first-person]
+related: [help/records/company-records, help/getting-started/add-your-first-person, help/records/merge-duplicate-records]
 ---
 
 Eine Person ist jemand, mit dem Sie arbeiten: ihre E-Mail-Adressen, Telefonnummer,

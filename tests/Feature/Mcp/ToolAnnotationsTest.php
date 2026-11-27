@@ -16,7 +16,9 @@ use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
+use App\Mcp\Tools\Company\MergeCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
+use App\Mcp\Tools\Concerns\MergesRecords;
 use App\Mcp\Tools\CreateUploadUrlTool;
 use App\Mcp\Tools\Email\CancelEmailTool;
 use App\Mcp\Tools\Email\CreateEmailDraftTool;
@@ -50,6 +52,7 @@ use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\DeletePeopleTool;
 use App\Mcp\Tools\People\GetPeopleTool;
 use App\Mcp\Tools\People\ListPeopleTool;
+use App\Mcp\Tools\People\MergePeopleTool;
 use App\Mcp\Tools\People\UpdatePeopleTool;
 use App\Mcp\Tools\SearchTool;
 use App\Mcp\Tools\Task\AttachTaskToEntitiesTool;
@@ -111,11 +114,13 @@ $toolContracts = [
     CreateCompanyTool::class => ['title' => 'Create Company', 'name' => 'create-company-tool', 'annotations' => $createAnnotations],
     UpdateCompanyTool::class => ['title' => 'Update Company', 'name' => 'update-company-tool', 'annotations' => $updateAnnotations],
     DeleteCompanyTool::class => ['title' => 'Delete Company', 'name' => 'delete-company-tool', 'annotations' => $deleteAnnotations],
+    MergeCompaniesTool::class => ['title' => 'Merge Companies', 'name' => 'merge-companies-tool', 'annotations' => $deleteAnnotations],
     ListPeopleTool::class => ['title' => 'List People', 'name' => 'list-people-tool', 'annotations' => $readAnnotations],
     GetPeopleTool::class => ['title' => 'Get Person', 'name' => 'get-people-tool', 'annotations' => $readAnnotations],
     CreatePeopleTool::class => ['title' => 'Create Person', 'name' => 'create-people-tool', 'annotations' => $createAnnotations],
     UpdatePeopleTool::class => ['title' => 'Update Person', 'name' => 'update-people-tool', 'annotations' => $updateAnnotations],
     DeletePeopleTool::class => ['title' => 'Delete Person', 'name' => 'delete-people-tool', 'annotations' => $deleteAnnotations],
+    MergePeopleTool::class => ['title' => 'Merge People', 'name' => 'merge-people-tool', 'annotations' => $deleteAnnotations],
     ListOpportunitiesTool::class => ['title' => 'List Opportunities', 'name' => 'list-opportunities-tool', 'annotations' => $readAnnotations],
     GetOpportunityTool::class => ['title' => 'Get Opportunity', 'name' => 'get-opportunity-tool', 'annotations' => $readAnnotations],
     CreateOpportunityTool::class => ['title' => 'Create Opportunity', 'name' => 'create-opportunity-tool', 'annotations' => $createAnnotations],
@@ -158,6 +163,7 @@ mutates(...array_merge(
         BaseRelationshipTool::class,
         BaseAttachTool::class,
         BaseDetachTool::class,
+        MergesRecords::class,
     ],
     array_keys($toolContracts),
 ));
@@ -169,7 +175,7 @@ it('publishes the exact explicit title and stable technical name for every regis
     $registeredTools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($registeredTools)->toBeArray()->toHaveCount(50);
+    expect($registeredTools)->toBeArray()->toHaveCount(52);
     expect($registeredTools)->toEqualCanonicalizing(array_keys($toolContracts));
 
     foreach ($registeredTools as $toolClass) {
@@ -191,7 +197,7 @@ it('declares an output schema on every registered tool', function (): void {
     $tools = new ReflectionClass(RelaticleServer::class)
         ->getDefaultProperties()['tools'];
 
-    expect($tools)->toBeArray()->toHaveCount(50);
+    expect($tools)->toBeArray()->toHaveCount(52);
 
     foreach ($tools as $toolClass) {
         $definition = resolve($toolClass)->toArray();

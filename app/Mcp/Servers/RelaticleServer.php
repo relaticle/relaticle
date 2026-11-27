@@ -17,6 +17,7 @@ use App\Mcp\Tools\Company\CreateCompanyTool;
 use App\Mcp\Tools\Company\DeleteCompanyTool;
 use App\Mcp\Tools\Company\GetCompanyTool;
 use App\Mcp\Tools\Company\ListCompaniesTool;
+use App\Mcp\Tools\Company\MergeCompaniesTool;
 use App\Mcp\Tools\Company\UpdateCompanyTool;
 use App\Mcp\Tools\CreateUploadUrlTool;
 use App\Mcp\Tools\Email\CancelEmailTool;
@@ -51,6 +52,7 @@ use App\Mcp\Tools\People\CreatePeopleTool;
 use App\Mcp\Tools\People\DeletePeopleTool;
 use App\Mcp\Tools\People\GetPeopleTool;
 use App\Mcp\Tools\People\ListPeopleTool;
+use App\Mcp\Tools\People\MergePeopleTool;
 use App\Mcp\Tools\People\UpdatePeopleTool;
 use App\Mcp\Tools\SearchTool;
 use App\Mcp\Tools\Task\AttachTaskToEntitiesTool;
@@ -101,11 +103,13 @@ final class RelaticleServer extends Server
         CreateCompanyTool::class,
         UpdateCompanyTool::class,
         DeleteCompanyTool::class,
+        MergeCompaniesTool::class,
         ListPeopleTool::class,
         GetPeopleTool::class,
         CreatePeopleTool::class,
         UpdatePeopleTool::class,
         DeletePeopleTool::class,
+        MergePeopleTool::class,
         ListOpportunitiesTool::class,
         GetOpportunityTool::class,
         CreateOpportunityTool::class,

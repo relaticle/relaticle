@@ -31,6 +31,7 @@ use Relaticle\Chat\Enums\WebAccess;
 use Relaticle\Chat\Tools\BaseReadListTool;
 use Relaticle\Chat\Tools\Company\CreateCompanyTool;
 use Relaticle\Chat\Tools\Company\DeleteCompanyTool;
+use Relaticle\Chat\Tools\Company\MergeCompaniesTool;
 use Relaticle\Chat\Tools\Company\UpdateCompanyTool;
 use Relaticle\Chat\Tools\CustomField\CreateCustomFieldTool;
 use Relaticle\Chat\Tools\CustomField\DeleteCustomFieldTool;
@@ -44,6 +45,7 @@ use Relaticle\Chat\Tools\Opportunity\UpdateOpportunityTool;
 use Relaticle\Chat\Tools\People\CreatePersonTool;
 use Relaticle\Chat\Tools\People\DeletePersonTool;
 use Relaticle\Chat\Tools\People\ListPeopleTool;
+use Relaticle\Chat\Tools\People\MergePeopleTool;
 use Relaticle\Chat\Tools\People\UpdatePersonTool;
 use Relaticle\Chat\Tools\SearchDocsTool;
 use Relaticle\Chat\Tools\Task\DeleteTaskTool;
@@ -1041,7 +1043,7 @@ it('leaves the chatgpt plugin line out when the install has no plugin', function
         ->not->toContain('chatgpt_plugin:');
 });
 
-it('drops only the delete tools in setup mode and keeps updates and field definitions', function (): void {
+it('drops only the delete and merge tools in setup mode and keeps updates and field definitions', function (): void {
     $names = fn (CrmAssistant $agent): array => array_map(fn (object $tool): string => $tool::class, $agent->tools());
 
     $normal = $names(resolve(CrmAssistant::class));
@@ -1054,6 +1056,8 @@ it('drops only the delete tools in setup mode and keeps updates and field defini
         ->not->toContain(DeleteTaskTool::class)
         ->not->toContain(DeleteNoteTool::class)
         ->not->toContain(DeleteCustomFieldTool::class)
+        ->not->toContain(MergeCompaniesTool::class)
+        ->not->toContain(MergePeopleTool::class)
         ->toContain(UpdatePersonTool::class)
         ->toContain(UpdateCompanyTool::class)
         ->toContain(UpdateOpportunityTool::class)
@@ -1068,7 +1072,7 @@ it('drops only the delete tools in setup mode and keeps updates and field defini
         ->toContain(GuideToPageTool::class)
         ->toContain(SearchDocsTool::class)
         ->toContain(ListPeopleTool::class)
-        ->and($setup)->toHaveCount(count($normal) - 6);
+        ->and($setup)->toHaveCount(count($normal) - 8);
 });
 
 it('carries the setup mode instructions in the cached static block', function (): void {
@@ -1264,6 +1268,20 @@ it('makes the send tool the exception to batching and to one approval for a turn
         ->toContain('SendEmailTool is the exception to batching: it takes one email per call, so call it once per email')
         ->toContain('Never call the same write tool twice in one turn for the same entity type, except SendEmailTool')
         ->toContain('approves once, except that each email to send and each invitation proposal is approved on its own');
+});
+
+it('sends duplicate companies and people to the merge tools and never promises an undo', function (): void {
+    expect(resolve(CrmAssistant::class)->staticInstructions())
+        ->toContain('## Merging duplicates')
+        ->toContain('When two records are the same company or the same person, propose a merge with MergeCompaniesTool or MergePeopleTool.')
+        ->toContain('Never propose a delete, and never an update that copies fields across.')
+        ->toContain('Pass the record whose values win as `primary_id`.')
+        ->toContain('the merge creates a new record holding both, and never say either original is kept or survives')
+        ->toContain('Never say a merge can be undone.')
+        ->toContain('With three copies, propose the first merge now.')
+        ->toContain('Propose the next one only after the first is approved, using the new record from <resolved_actions> as primary or secondary.')
+        ->not->toContain('record to keep')
+        ->toContain('Merging duplicates happens on the record page too: the merge tools are absent here');
 });
 
 it('limits the citations exception to the two import links after the fence of an attached csv preview', function (): void {

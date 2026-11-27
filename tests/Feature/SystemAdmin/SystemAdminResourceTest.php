@@ -75,6 +75,47 @@ it('rejects administrator moves of customer records between workspaces', functio
     expect($record->refresh()->workspace_id)->toBe($this->workspace->getKey());
 })->with('customer record edit pages');
 
+it('refuses to open a merged company or person for editing', function (string $modelClass, string $pageClass): void {
+    $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
+    $target = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);
+    $merged = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);
+    $merged->delete();
+    $modelClass::withTrashed()->whereKey($merged->getKey())->update(['merged_into_id' => $target->getKey()]);
+
+    livewire($pageClass, ['record' => $merged->getKey()])->assertForbidden();
+    livewire($pageClass, ['record' => $target->getKey()])->assertSuccessful();
+})->with([
+    'company' => [Company::class, EditCompany::class],
+    'person' => [People::class, EditPeople::class],
+]);
+
+it('leaves a merged company or person visible but out of reach of delete and edit actions', function (string $modelClass, string $listClass, string $viewClass): void {
+    $this->actingAs(SystemAdministrator::factory()->create(), 'sysadmin');
+    $target = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);
+    $merged = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);
+    $merged->delete();
+    $modelClass::withTrashed()->whereKey($merged->getKey())->update(['merged_into_id' => $target->getKey()]);
+    $deletedAt = $modelClass::withTrashed()->findOrFail($merged->getKey())->deleted_at;
+    $this->travel(5)->minutes();
+
+    livewire($listClass)
+        ->filterTable('trashed', true)
+        ->assertCanSeeTableRecords([$merged, $target])
+        ->assertTableActionHidden('edit', $merged)
+        ->assertTableActionVisible('edit', $target)
+        ->selectTableRecords([$merged->getKey(), $target->getKey()])
+        ->callAction(TestAction::make('delete')->table()->bulk());
+
+    livewire($viewClass, ['record' => $merged->getKey()])->assertActionHidden('edit');
+    livewire($viewClass, ['record' => $target->getKey()])->assertActionVisible('edit');
+
+    expect($modelClass::withTrashed()->findOrFail($merged->getKey())->deleted_at->equalTo($deletedAt))->toBeTrue()
+        ->and($modelClass::withTrashed()->findOrFail($target->getKey())->trashed())->toBeTrue();
+})->with([
+    'company' => [Company::class, ListCompanies::class, ViewCompany::class],
+    'person' => [People::class, ListPeople::class, ViewPeople::class],
+]);
+
 it('lets administrators edit ordinary customer records', function (string $modelClass, string $pageClass, string $field): void {
     $this->actingAs(SystemAdministrator::factory()->administrator()->create(), 'sysadmin');
     $record = $modelClass::factory()->for($this->workspace)->create(['creator_id' => $this->workspaceOwner->getKey()]);

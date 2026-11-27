@@ -119,9 +119,12 @@ final class OpportunityResource extends Resource
                     ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->defaultSort('created_at', 'desc')
+            ->recordUrl(fn (Opportunity $record): ?string => $record->trashed() || ! self::canView($record) ? null : self::getUrl('view', ['record' => $record]))
             ->recordActions([
                 RowActions::withoutMenu([
-                    PreviewRecordAction::make()->page(ViewOpportunity::class),
+                    PreviewRecordAction::make()
+                        ->page(ViewOpportunity::class)
+                        ->hidden(fn (Opportunity $record): bool => $record->trashed()),
                 ]),
             ])
             ->toolbarActions([
@@ -184,6 +187,13 @@ final class OpportunityResource extends Resource
     public static function getNavigationIcon(): string
     {
         return CrmEntity::Opportunity->icon();
+    }
+
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        $query = parent::getGlobalSearchEloquentQuery();
+
+        return $query->whereNull($query->qualifyColumn('deleted_at'));
     }
 
     public static function getEloquentQuery(): Builder

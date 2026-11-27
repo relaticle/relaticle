@@ -1708,7 +1708,7 @@ export const transcriptModule = ({ messagesUrl, messageSearchUrlTemplate, messag
             text = this.plural(receipt.moved, done.length).replace(':value', () => action.moved_to);
         }
 
-        const names = operation === 'delete'
+        const names = operation === 'delete' || operation === 'merge'
             ? done.map((item) => this.proposalItemLabel(item, action) || item.summary).filter(Boolean).join(', ')
             : (action.moved_total ?? '');
 

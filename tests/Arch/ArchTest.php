@@ -9,6 +9,7 @@ use App\Filament\RelationManagers\BaseActivityTimelineRelationManager;
 use App\Http\Requests\Api\V1\BaseCrmEntityRequest;
 use App\Http\Requests\Api\V1\IndexCustomFieldsRequest;
 use App\Http\Requests\Api\V1\IndexRequest;
+use App\Http\Requests\Api\V1\MergeRecordsRequest;
 use App\Livewire\BaseLivewireComponent;
 use App\Mcp\Tools\BaseAttachTool;
 use App\Mcp\Tools\BaseCreateTool;
@@ -449,6 +450,7 @@ arch('CRM API write requests share the custom field contract')
         BaseCrmEntityRequest::class,
         IndexCustomFieldsRequest::class,
         IndexRequest::class,
+        MergeRecordsRequest::class,
     ]);
 
 arch('API controllers must not use Eloquent query methods directly')

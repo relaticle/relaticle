@@ -109,9 +109,12 @@ final class PeopleResource extends Resource
             ->emptyStateActions([FilteredEmptyState::clearAction()])
             ->columns(self::columns())
             ->defaultSort('created_at', 'desc')
+            ->recordUrl(fn (People $record): ?string => $record->trashed() || ! self::canView($record) ? null : self::getUrl('view', ['record' => $record]))
             ->recordActions([
                 RowActions::withoutMenu([
-                    PreviewRecordAction::make()->page(ViewPeople::class),
+                    PreviewRecordAction::make()
+                        ->page(ViewPeople::class)
+                        ->hidden(fn (People $record): bool => $record->trashed()),
                 ]),
             ])
             ->toolbarActions([
@@ -220,10 +223,26 @@ final class PeopleResource extends Resource
         return RecordChip::forRecord($record);
     }
 
+    public static function getGlobalSearchEloquentQuery(): Builder
+    {
+        $query = parent::getGlobalSearchEloquentQuery();
+
+        return $query->whereNull($query->qualifyColumn('deleted_at'));
+    }
+
     public static function getEloquentQuery(): Builder
     {
         return parent::getEloquentQuery()
             ->with(['company.media', 'company.domainValue', 'customFieldValues.customField.options'])
+            ->withoutGlobalScopes([
+                SoftDeletingScope::class,
+            ])
+            ->scopes('notMerged');
+    }
+
+    public static function getRecordRouteBindingEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
             ->withoutGlobalScopes([
                 SoftDeletingScope::class,
             ]);

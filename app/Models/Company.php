@@ -23,6 +23,7 @@ use Filament\Models\Contracts\HasAvatar;
 use finfo;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\ObservedBy;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Attributes\ScopedBy;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
@@ -48,6 +49,7 @@ use Spatie\MediaLibrary\InteractsWithMedia;
 /**
  * @property string $name
  * @property CarbonImmutable|null $deleted_at
+ * @property string|null $merged_into_id
  * @property CreationSource $creation_source
  * @property CarbonImmutable|null $last_email_at
  * @property CarbonImmutable|null $last_interaction_at
@@ -237,6 +239,18 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
         return $this->morphToMany(Task::class, 'taskable')->using(Taskable::class);
     }
 
+    protected static function booting(): void
+    {
+        self::restoring(fn (self $record): ?bool => $record->merged_into_id === null ? null : false);
+    }
+
+    /** @param Builder<self> $query */
+    #[Scope]
+    protected function notMerged(Builder $query): void
+    {
+        $query->whereNull('merged_into_id');
+    }
+
     /**
      * @return array<string, string>
      */
@@ -257,7 +271,7 @@ final class Company extends Model implements HasAvatar, HasCustomFields, HasMedi
                 'id', 'workspace_id', 'creator_id', 'creation_source', 'custom_fields',
                 'created_at', 'updated_at', 'deleted_at',
                 'last_email_at', 'last_interaction_at', 'email_count', 'inbound_email_count',
-                'outbound_email_count', 'meeting_count', 'last_meeting_at', 'account_owner_id',
+                'outbound_email_count', 'meeting_count', 'last_meeting_at', 'account_owner_id', 'merged_into_id',
             ])
             ->useLogName('crm')
             ->setDescriptionForEvent(fn (string $eventName): string => $eventName);

@@ -14,8 +14,9 @@ use RuntimeException;
  * `pending_actions.action_data` is a four-arm union encoded as marker keys: a
  * single create is the record itself, a single update adds `_record_id` and
  * `_model_class`, a single delete is `_record_ids`, and any multi-record
- * proposal is `_batch` + `records`. Every reader used to re-derive that union
- * inline, which let them disagree on the same row: the dock counted a malformed
+ * proposal is `_batch` + `records`. A merge pair is a `_record_id` (the primary),
+ * `_model_class` and `_merge_with` (the secondary), alone or as a batch item.
+ * Every reader used to re-derive that union inline, which let them disagree on the same row: the dock counted a malformed
  * batch as one record while approval refused it outright.
  *
  * Reading is deliberately split by consequence. `recordAtOrEmpty()` is lenient
@@ -180,6 +181,20 @@ final readonly class ProposalPayload
         throw_if(! is_string($recordId) && ! is_int($recordId), RuntimeException::class, "Missing or invalid _record_id in {$context}");
 
         return (string) $recordId;
+    }
+
+    /**
+     * The secondary record id carried by one merge pair.
+     *
+     * @param  array<string, mixed>  $record
+     */
+    public static function mergeWithOf(array $record): string
+    {
+        $secondaryId = $record['_merge_with'] ?? null;
+
+        throw_if(! is_string($secondaryId) && ! is_int($secondaryId), RuntimeException::class, 'Missing or invalid _merge_with in merge pair');
+
+        return (string) $secondaryId;
     }
 
     /**

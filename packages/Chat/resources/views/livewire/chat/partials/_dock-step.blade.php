@@ -7,10 +7,11 @@
 @php
     $stepId = $step['id'];
     $entityIcon = \Relaticle\Chat\Support\RecordChipRenderer::iconPath($step['entity_type']);
-    $isDelete = $step['operation'] === 'delete';
+    $writesFields = \Relaticle\Chat\Enums\PendingActionOperation::from($step['operation'])->writesFields();
     $verb = match ($step['operation']) {
         'update' => __('Update'),
         'delete' => __('Delete'),
+        'merge' => __('Merge'),
         default => $step['createLabel'],
     };
     $lineName = $step['isBatch'] || $step['recordLabel'] === '' ? $step['summary'] : $step['recordLabel'];
@@ -97,15 +98,27 @@
                 @endif
 
                 <span class="min-w-0 flex-1">
-                    <span @class([
-                        'block truncate text-sm leading-6',
-                        'text-gray-400 line-through dark:text-gray-500' => $isOut,
-                    ])>
-                        @if ($showVerb)
+                    @if ($step['mergeLinks'] !== null)
+                        <span @class([
+                            'flex min-w-0 items-center gap-1 text-sm leading-6',
+                            'text-gray-400 line-through dark:text-gray-500' => $isOut,
+                        ])>
                             <span @class(['text-gray-500 dark:text-gray-400' => ! $isOut])>{{ $verb }}</span>
-                        @endif
-                        <span @class(['font-semibold', 'text-gray-900 dark:text-white' => ! $isOut])>{{ $lineName }}</span>
-                    </span>
+                            <span @class(['min-w-0 font-semibold', 'text-gray-900 dark:text-white' => ! $isOut])>
+                                @include('chat::livewire.chat.partials._dock-merge-pair', ['pair' => $step['mergeLinks']])
+                            </span>
+                        </span>
+                    @else
+                        <span @class([
+                            'block truncate text-sm leading-6',
+                            'text-gray-400 line-through dark:text-gray-500' => $isOut,
+                        ])>
+                            @if ($showVerb)
+                                <span @class(['text-gray-500 dark:text-gray-400' => ! $isOut])>{{ $verb }}</span>
+                            @endif
+                            <span @class(['font-semibold', 'text-gray-900 dark:text-white' => ! $isOut])>{{ $lineName }}</span>
+                        </span>
+                    @endif
 
                     @if ($sharedChange !== [] && ! $isOut)
                         <span class="block text-xs leading-5 text-gray-500 dark:text-gray-400">
@@ -193,7 +206,13 @@
                                         'text-gray-900 dark:text-white' => ! $rowOut,
                                         'text-gray-400 line-through dark:text-gray-500' => $rowOut,
                                     ])
-                                >{{ $item['label'] }}</span>
+                                >
+                                    @if ($item['mergeLinks'] !== null)
+                                        @include('chat::livewire.chat.partials._dock-merge-pair', ['pair' => $item['mergeLinks']])
+                                    @else
+                                        {{ $item['label'] }}
+                                    @endif
+                                </span>
 
                                 @if ($linkedFrom !== null)
                                     <span class="shrink-0 text-xs text-gray-400 dark:text-gray-500">{{ __('linked from :step', ['step' => $linkedFrom]) }}</span>
@@ -227,7 +246,7 @@
                                 @include('chat::livewire.chat.partials._dock-overwrite-notice', ['notice' => $step['repeatNotices'][$rowIndex]['text'], 'noticeUrl' => $step['repeatNotices'][$rowIndex]['url'], 'noticeKind' => 'repeat', 'class' => 'my-1'])
                             @endif
 
-                            @if (! $rowOut && ! $isDelete)
+                            @if (! $rowOut && $writesFields)
                                 @include('chat::livewire.chat.partials._dock-line-values', [
                                     'fields' => $rowFields,
                                     'stepId' => $stepId,
@@ -245,7 +264,7 @@
             @elseif ($isPlan)
                 <div class="pb-2.5 pe-3 ps-[3.125rem]">
                     @include('chat::livewire.chat.partials._dock-line-values', [
-                        'fields' => $isDelete ? [] : $step['fields'],
+                        'fields' => $writesFields ? $step['fields'] : [],
                         'stepId' => $stepId,
                         'titleKey' => $step['titleKey'],
                         'titleLabels' => $step['titleLabels'],
@@ -255,7 +274,7 @@
                         'refLinks' => $step['refLinks'],
                     ])
                 </div>
-            @elseif ($step['fields'] !== [])
+            @elseif ($writesFields && $step['fields'] !== [])
                 <div class="pb-2 pe-2 ps-[3.125rem]">
                     @foreach ($step['fields'] as $row)
                         <div data-proposal-field-row>

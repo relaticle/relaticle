@@ -22,6 +22,11 @@ return [
             'label' => 'Aufgabe',
             'inline' => 'Aufgabe',
         ],
+        'record_merged' => [
+            'label' => 'Zusammengeführt',
+            'description' => '2 Einträge wurden in diesen Eintrag zusammengeführt',
+            'description_by' => ':causer hat 2 Einträge in diesen Eintrag zusammengeführt',
+        ],
         'meeting.created' => [
             'label' => 'Meeting angesetzt',
             'inline' => 'Meeting angesetzt',

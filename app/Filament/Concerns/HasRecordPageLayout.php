@@ -8,17 +8,20 @@ use App\Enums\CrmEntity;
 use App\Filament\Actions\CopyToClipboardAction;
 use App\Filament\Actions\CreateTaskAction;
 use App\Filament\Actions\EditTaskAction;
+use App\Filament\Actions\MergeRecordAction;
 use App\Filament\Components\Infolists\RecordChipEntry;
 use App\Filament\Components\Infolists\RecordDetails;
 use App\Filament\Components\Infolists\RecordOverview;
 use App\Filament\Components\RecordChip;
 use App\Filament\Resources\NoteResource\Forms\NoteForm;
 use App\Filament\Resources\TaskResource\Forms\TaskForm;
+use App\Livewire\App\Records\DuplicateRecordsPrompt;
 use App\Models\Company;
 use App\Models\Note;
 use App\Models\Opportunity;
 use App\Models\People;
 use App\Models\Task;
+use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
@@ -29,6 +32,7 @@ use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Flex;
 use Filament\Schemas\Components\Group;
+use Filament\Schemas\Components\Livewire;
 use Filament\Schemas\Components\Tabs\Tab;
 use Filament\Schemas\Components\View;
 use Filament\Schemas\Schema;
@@ -42,6 +46,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\HtmlString;
 use Livewire\Attributes\Locked;
 use Livewire\Attributes\On;
+use Relaticle\Documentation\Support\DocUrl;
 use Relaticle\EmailIntegration\Filament\Actions\ComposeEmailAction;
 use Relaticle\EmailIntegration\Filament\Infolists\CommunicationIntelligenceInfolist;
 
@@ -74,8 +79,19 @@ trait HasRecordPageLayout
         }
     }
 
+    protected function fillForm(): void
+    {
+        if (! $this->isUnavailable()) {
+            parent::fillForm();
+        }
+    }
+
     public function infolist(Schema $schema): Schema
     {
+        if ($this->isUnavailable()) {
+            return $schema->components([]);
+        }
+
         if ($this->isEmbedded) {
             return $schema->components([$this->quickActions()]);
         }
@@ -93,6 +109,7 @@ trait HasRecordPageLayout
                 ->verticallyAlignCenter()
                 ->extraAttributes(['class' => 'fi-record-header']),
             $this->quickActions(),
+            $this->duplicatePrompt(),
             RecordDetails::section($this->crmRecord(), static::nativeDetailEntries()),
             CommunicationIntelligenceInfolist::section()
                 ->contained(false)
@@ -103,6 +120,10 @@ trait HasRecordPageLayout
 
     public function content(Schema $schema): Schema
     {
+        if ($this->isUnavailable()) {
+            return $schema->components([$this->unavailableNotice()]);
+        }
+
         if ($this->isEmbedded) {
             return $schema->components([
                 View::make('filament.app.record-preview-title')
@@ -148,7 +169,24 @@ trait HasRecordPageLayout
 
     public function getHeading(): string|Htmlable
     {
-        return $this->isEmbedded ? '' : $this->getRecordTitle();
+        if ($this->isEmbedded) {
+            return '';
+        }
+
+        return $this->isUnavailable() ? $this->unavailableHeading() : $this->getRecordTitle();
+    }
+
+    public function getTitle(): string|Htmlable
+    {
+        return $this->isUnavailable() ? $this->unavailableHeading() : parent::getTitle();
+    }
+
+    /**
+     * @return array<int, Action|ActionGroup>
+     */
+    protected function getHeaderActions(): array
+    {
+        return $this->isUnavailable() ? [] : parent::getHeaderActions();
     }
 
     public function getHeadingStart(): Htmlable
@@ -238,6 +276,30 @@ trait HasRecordPageLayout
             ->extraAttributes(['class' => 'fi-record-rail-quick-actions']);
     }
 
+    #[On('merge-duplicate')]
+    public function mergeDuplicate(string $duplicate): void
+    {
+        $this->mountAction('mergeDuplicate', ['duplicate' => $duplicate]);
+    }
+
+    public function mergeDuplicateAction(): MergeRecordAction
+    {
+        return MergeRecordAction::make('mergeDuplicate')
+            ->record($this->getRecord())
+            ->fillForm(fn (array $arguments): array => ['picked_id' => $arguments['duplicate'] ?? null, 'keep_picked' => false]);
+    }
+
+    private function duplicatePrompt(): Livewire
+    {
+        $record = $this->crmRecord();
+
+        return Livewire::make(DuplicateRecordsPrompt::class)
+            ->data(['lazy' => 'on-load'])
+            ->key('duplicatePrompt')
+            ->extraAttributes(['class' => 'fi-record-duplicates'])
+            ->visible(fn (): bool => MergeRecordAction::canMerge($record));
+    }
+
     private function quickCreateAction(CreateAction $action, string $label): CreateAction
     {
         return $action
@@ -299,6 +361,46 @@ trait HasRecordPageLayout
         return $manager::getBadge($this->crmRecord(), static::class);
     }
 
+    private function mergedIntoId(): ?string
+    {
+        $record = $this->getRecord();
+
+        return $record instanceof Company || $record instanceof People ? $record->merged_into_id : null;
+    }
+
+    private function isUnavailable(): bool
+    {
+        return $this->mergedIntoId() !== null || $this->crmRecord()->trashed();
+    }
+
+    private function unavailableHeading(): string
+    {
+        return __('filament/record-page.unavailable.'.$this->unavailableKind().'.heading');
+    }
+
+    private function unavailableKind(): string
+    {
+        return $this->mergedIntoId() === null ? 'deleted' : 'merged';
+    }
+
+    private function unavailableNotice(): View
+    {
+        $mergedIntoId = $this->mergedIntoId();
+        $kind = $this->unavailableKind();
+
+        return View::make('filament.app.record-unavailable')->viewData([
+            'icon' => $mergedIntoId === null ? 'lucide-trash-2' : 'lucide-git-merge',
+            'heading' => $this->unavailableHeading(),
+            'body' => __("filament/record-page.unavailable.{$kind}.body"),
+            'actionLabel' => __("filament/record-page.unavailable.{$kind}.action"),
+            'actionIcon' => $mergedIntoId === null ? 'lucide-arrow-left' : 'lucide-arrow-right',
+            'actionUrl' => $mergedIntoId === null
+                ? static::getResource()::getUrl('index')
+                : static::getResource()::getUrl('view', ['record' => $mergedIntoId]),
+            'helpUrl' => $mergedIntoId === null ? null : DocUrl::helpPage('records', 'merge-duplicate-records'),
+        ]);
+    }
+
     private function crmRecord(): Company|People|Opportunity
     {
         /** @var Company|People|Opportunity */
@@ -319,6 +421,7 @@ trait HasRecordPageLayout
                 }),
             ActionGroup::make([
                 ActionGroup::make([
+                    MergeRecordAction::make(),
                     CopyToClipboardAction::make('copyPageUrl')
                         ->label(__('filament/record-page.actions.copy_page_url'))
                         ->copies(

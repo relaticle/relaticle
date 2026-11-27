@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+use App\Models\Company;
+use App\Models\Scopes\WorkspaceScope;
 use Relaticle\Chat\Enums\MessageOrigin;
 use Tests\Evals\Scorers\OneClosingQuestionAtMost;
 use Tests\Evals\Scorers\TextMatches;
@@ -100,6 +102,25 @@ it('proposes deleting only the company and never claims a cascade', function ():
         ->prompt('Delete Company 04')
         ->toHaveToolCalls(['DeleteCompanyTool' => []])
         ->toPassJudge('The reply proposes deleting the company only. It never says the people, tasks or notes linked to it are deleted too.');
+})->group('test');
+
+it('merges two duplicate companies and never says either is kept or that it can be undone', function (): void {
+    $w = EvalWorkspace::seed();
+    $duplicateIds = Company::query()
+        ->withoutGlobalScope(WorkspaceScope::class)
+        ->where('workspace_id', $w->workspace->getKey())
+        ->where('name', 'Duplicate Co')
+        ->pluck('id')
+        ->map(fn (mixed $id): string => (string) $id)
+        ->sort()
+        ->values()
+        ->all();
+
+    expect((new RelaTurn($w))(...))
+        ->prompt('The two Duplicate Co companies are the same company, clean it up')
+        ->toHaveToolCalls(['MergeCompaniesTool' => fn (array $arguments): bool => count($arguments['merges'] ?? []) === 1
+            && collect([$arguments['merges'][0]['primary_id'] ?? null, $arguments['merges'][0]['secondary_id'] ?? null])->sort()->values()->all() === $duplicateIds])
+        ->toPassJudge('The reply says the merge creates a new record holding both companies. It never says either original is kept or survives, and never says the merge can be undone.');
 })->group('test');
 
 it('proposes instead of asking when every field is given', function (): void {

@@ -2,7 +2,7 @@
 title: Restaurer un enregistrement supprimé
 description: Supprimer est réversible. Filtrez une liste sur les enregistrements supprimés et restaurez-les ; seule la suppression définitive est irréversible.
 order: 4
-updated: "2026-11-13"
+updated: "2026-11-20"
 related: [help/records/company-records, help/records/export-your-data]
 ---
 
@@ -35,6 +35,14 @@ Relaticle ne peut pas le récupérer. Au moindre doute,
 
 ## Bon à savoir
 
+- Un enregistrement fusionné n'est pas dans la corbeille et ne peut pas être restauré.
+  La fusion est définitive, voir
+  [Fusionner des enregistrements en double](/fr/help/records/merge-duplicate-records).
+- Pour les entreprises, les personnes et les opportunités, la page d'un enregistrement
+  supprimé affiche **Cette fiche a été supprimée** et un bouton **Retour**. La restauration
+  part du filtre **Enregistrements supprimés** de la liste. Là, une ligne supprimée
+  n'ouvre rien au clic. Cochez-la et utilisez **Restaurer la sélection**. Les tâches et
+  les notes ne changent pas.
 - Les enregistrements supprimés n'apparaissent pas dans les listes, la
   recherche, le board ni les réponses de l'assistant IA.
 - Supprimer une entreprise ne supprime pas les personnes, tâches ou notes qui

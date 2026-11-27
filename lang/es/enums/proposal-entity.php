@@ -124,6 +124,10 @@ return [
             'task' => 'Eliminar :count tarea|Eliminar :count tareas',
             'note' => 'Eliminar :count nota|Eliminar :count notas',
         ],
+        'merge' => [
+            'company' => 'Fusionar :count par de empresas|Fusionar :count pares de empresas',
+            'people' => 'Fusionar :count par de personas|Fusionar :count pares de personas',
+        ],
     ],
     'batch_summary' => [
         'create' => [
@@ -149,6 +153,10 @@ return [
             'task' => 'Eliminar :count tarea|Eliminar :count tareas',
             'note' => 'Eliminar :count nota|Eliminar :count notas',
         ],
+        'merge' => [
+            'company' => 'Fusionar :count par de empresas|Fusionar :count pares de empresas',
+            'people' => 'Fusionar :count par de personas|Fusionar :count pares de personas',
+        ],
     ],
     'delete_title' => [
         'company' => 'Eliminar empresa',
@@ -164,6 +172,15 @@ return [
         'task' => 'Eliminar tarea ":name"',
         'note' => 'Eliminar nota ":name"',
     ],
+    'merge_title' => [
+        'company' => 'Fusionar empresas',
+        'people' => 'Fusionar personas',
+    ],
+    'merge_summary' => [
+        'company' => 'Fusionar empresa ":pair"',
+        'people' => 'Fusionar persona ":pair"',
+    ],
+    'merge_pair' => ':secondary en :primary',
     'receipt_batch' => [
         'create' => [
             'company' => 'Se creó :count empresa|Se crearon :count empresas',
@@ -189,6 +206,10 @@ return [
             'task' => 'Se eliminó :count tarea|Se eliminaron :count tareas',
             'note' => 'Se eliminó :count nota|Se eliminaron :count notas',
             'custom_field' => 'Se eliminó :count atributo personalizado|Se eliminaron :count atributos personalizados',
+        ],
+        'merge' => [
+            'company' => ':count par de empresas fusionado|:count pares de empresas fusionados',
+            'people' => ':count par de personas fusionado|:count pares de personas fusionados',
         ],
     ],
 ];

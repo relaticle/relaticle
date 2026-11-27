@@ -30,5 +30,10 @@ return [
             'label' => 'Réunion annulée',
             'inline' => 'réunion annulée',
         ],
+        'record_merged' => [
+            'label' => 'Fusionné',
+            'description' => '2 fiches ont été fusionnées dans celle-ci',
+            'description_by' => ':causer a fusionné 2 fiches dans celle-ci',
+        ],
     ],
 ];

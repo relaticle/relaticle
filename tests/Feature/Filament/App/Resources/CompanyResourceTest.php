@@ -14,6 +14,7 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\RichEditor;
 use Filament\Forms\Components\Select;
+use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Component;
 use Filament\Tables\Columns\Column;
 use Illuminate\Database\Eloquent\Model;
@@ -409,4 +410,30 @@ it('heads every column but the record name with an icon and an escaped label', f
                 && str_contains($label, '&lt;b&gt;Tier&lt;/b&gt;')
                 && ! str_contains($label, '<b>Tier</b>');
         });
+});
+
+it('refuses to restore a deleted company whose domain another company now holds', function (): void {
+    $domainsField = CustomField::query()->withoutGlobalScopes()
+        ->where('tenant_id', $this->workspace->getKey())
+        ->where('entity_type', 'company')
+        ->where('code', 'domains')
+        ->firstOrFail();
+    $deleted = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'Old Acme']);
+    $deleted->saveCustomFieldValue($domainsField, ['acme.test'], $this->workspace);
+    $deleted->delete();
+    $holder = Company::factory()->recycle([$this->user, $this->workspace])->create(['name' => 'New Acme']);
+    $holder->saveCustomFieldValue($domainsField, ['acme.test'], $this->workspace);
+
+    livewire(ListCompanies::class)
+        ->filterTable('trashed', false)
+        ->selectTableRecords([$deleted])
+        ->callAction([['name' => 'restore', 'context' => ['table' => true, 'bulk' => true]]])
+        ->assertNotified(
+            Notification::make()
+                ->warning()
+                ->title('1 record wasn\'t restored')
+                ->body('Old Acme: acme.test in Domains now belongs to New Acme.'),
+        );
+
+    expect(Company::withTrashed()->findOrFail($deleted->getKey())->trashed())->toBeTrue();
 });

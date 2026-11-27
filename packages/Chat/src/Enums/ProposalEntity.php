@@ -46,6 +46,21 @@ enum ProposalEntity: string
         return __("enums/proposal-entity.delete_summary.{$this->value}", ['name' => $name]);
     }
 
+    public function mergeTitle(): string
+    {
+        return __("enums/proposal-entity.merge_title.{$this->value}");
+    }
+
+    public function mergeSummary(string $pair): string
+    {
+        return __("enums/proposal-entity.merge_summary.{$this->value}", ['pair' => $pair]);
+    }
+
+    public function mergePair(string $secondary, string $primary): string
+    {
+        return __('enums/proposal-entity.merge_pair', ['secondary' => $secondary, 'primary' => $primary]);
+    }
+
     public function plural(int $count): string
     {
         return trans_choice("enums/proposal-entity.plural.{$this->value}", $count);
@@ -170,7 +185,7 @@ enum ProposalEntity: string
     {
         return match ($this) {
             self::EmailDraftDelete => true,
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => $operation === PendingActionOperation::Delete,
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::Email, self::EmailDraft, self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::CustomField, self::SampleData, self::WebAccess => in_array($operation, [PendingActionOperation::Delete, PendingActionOperation::Merge], true),
         };
     }
 
@@ -180,9 +195,11 @@ enum ProposalEntity: string
             self::Email => __('Send email'),
             self::EmailDraftDelete => trans_choice('Delete draft|Delete :count drafts', $count, ['count' => $count]),
             self::SampleData => __('Remove sample data'),
-            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField => $operation === PendingActionOperation::Delete
-                ? __('Delete :count :entities', ['count' => $count, 'entities' => $this->plural($count)])
-                : __('Approve'),
+            self::Company, self::People, self::Opportunity, self::Task, self::Note, self::CustomField => match ($operation) {
+                PendingActionOperation::Delete => __('Delete :count :entities', ['count' => $count, 'entities' => $this->plural($count)]),
+                PendingActionOperation::Merge => trans_choice('Merge :count pair|Merge :count pairs', $count, ['count' => $count]),
+                PendingActionOperation::Create, PendingActionOperation::Update => __('Approve'),
+            },
             self::EmailDraft => __('Approve'),
             self::EmailDraftSend, self::EmailCancel, self::EmailReschedule, self::EmailRetry, self::WorkspaceInvitation, self::WebAccess => $this->action($operation, $count),
         };

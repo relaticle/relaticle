@@ -1,8 +1,8 @@
 @php
     $causerName = $entry->causer?->name ?? null;
     $fallbackTitle = $palette->getLabel();
-    $title = $entry->title ?? $fallbackTitle;
-    $description = $entry->description
+    $title ??= $entry->title ?? $fallbackTitle;
+    $description ??= $entry->description
         ?? ($causerName
             ? sprintf('%s %s', $causerName, $palette->inlineLabel())
             : $fallbackTitle);

@@ -2,7 +2,7 @@
 title: REST-API
 description: Verbinden Sie sich mit der Relaticle-REST-API über ein persönliches Zugriffstoken, mit Berechtigungen, Ratenlimits, Upserts und Endpunkt-Referenz.
 order: 3
-updated: "2026-10-06"
+updated: "2026-11-20"
 ---
 
 Relaticle hat eine REST-API für Unternehmen, Personen, Verkaufschancen, Aufgaben, Notizen und benutzerdefinierte Attribute. Nutzen Sie sie, um Einträge mit einem anderen System abzugleichen oder eine eigene Integration zu bauen. Die [API-Referenz](/developers/api) listet jeden Endpunkt, jeden Parameter und jede Antwort. Die OpenAPI-Spezifikation finden Sie unter [/openapi.json](/openapi.json).
@@ -128,6 +128,21 @@ Ein Telefon braucht eine Landesvorwahl. Ein Telefon ohne Landesvorwahl liefert `
 ```
 
 Der Wert wird ohne Beachtung der Groß- und Kleinschreibung abgeglichen, auch innerhalb von Feldern mit mehreren Werten. Eine Domain stimmt mit oder ohne Schema oder `www.` überein. Die API liefert `201`, wenn sie einen Eintrag erstellt, und `200`, wenn sie einen aktualisiert. Enthalten mehrere Einträge den Wert, schreibt sie nichts und liefert `409` mit den passenden IDs. Ein Upsert braucht die Berechtigungen `create` und `update`.
+
+## Zwei Einträge zusammenführen
+
+`POST /v1/people/merge` und `POST /v1/companies/merge` führen zwei Einträge derselben Art zu einem neuen Eintrag zusammen. Senden Sie die IDs beider Einträge:
+
+```json
+{
+  "primary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3a",
+  "secondary_record_id": "01jz8x0m6v1b4n7q2r5t8w9y3b"
+}
+```
+
+Der primäre Eintrag gewinnt bei jedem Konflikt, und der sekundäre Eintrag füllt die Werte, die der primäre leer lässt. Verknüpfungen, Notizen, Aufgaben, E-Mails und der Verlauf wandern zum neuen Eintrag. Die Antwort ist der neue Eintrag mit `200`. Beide alten IDs antworten danach mit `404`. Speichern Sie also die neue ID.
+
+Eine Zusammenführung liefert `422`, wenn eine ID fehlt, keine gültige ID ist, die andere ID wiederholt oder einen Eintrag benennt, der nicht existiert, gelöscht ist, bereits zusammengeführt wurde oder zu einem anderen Arbeitsbereich gehört. Der Fehler trägt den Namen des Feldes mit der fehlerhaften ID. Außerdem liefert sie `422` auf `records`, wenn ein Feld mit mehreren Werten nach der Zusammenführung mehr als 20 Werte enthielte. Hat ein solches Feld ein niedrigeres Limit, wird es auf die zusammengeführten Werte angehoben. Eine Zusammenführung braucht die Berechtigungen `create`, `update` und `delete`.
 
 ## Ratenlimits der API
 

@@ -125,15 +125,17 @@ final class PreviewRecordAction extends ViewAction
             return $unplaced;
         }
 
-        $window = is_numeric($position) ? $this->windowAround($query, $record, (int) $position) : null;
-        $pagePosition = $window === null ? $this->positionOnCurrentPage($record, $livewire) : null;
-        $window ??= $pagePosition === null ? null : $this->windowAround($query, $record, $pagePosition);
+        $live = $query->clone()->whereNull($record->qualifyColumn('deleted_at'));
+
+        $window = is_numeric($position) ? $this->windowAround($live, $record, (int) $position) : null;
+        $pagePosition = $window === null ? $this->livePositionOnCurrentPage($query, $record, $livewire) : null;
+        $window ??= $pagePosition === null ? null : $this->windowAround($live, $record, $pagePosition);
 
         if ($window === null) {
             return $unplaced;
         }
 
-        return [...$window, 'total' => $livewire->getAllTableRecordsCount()];
+        return [...$window, 'total' => $live->toBase()->getCountForPagination()];
     }
 
     /**
@@ -160,6 +162,24 @@ final class PreviewRecordAction extends ViewAction
             'previousKey' => $keys[$index - 1] ?? null,
             'nextKey' => $keys[$index + 1] ?? null,
         ];
+    }
+
+    /**
+     * @param  Builder<Model>  $query
+     */
+    private function livePositionOnCurrentPage(Builder $query, Model $record, ListRecords $livewire): ?int
+    {
+        $position = $this->positionOnCurrentPage($record, $livewire);
+
+        if ($position === null) {
+            return null;
+        }
+
+        return $query->clone()->toBase()
+            ->limit($position)
+            ->pluck($record->qualifyColumn('deleted_at'))
+            ->filter(fn (mixed $deletedAt): bool => $deletedAt === null)
+            ->count();
     }
 
     private function positionOnCurrentPage(Model $record, ListRecords $livewire): ?int

@@ -124,6 +124,10 @@ return [
             'task' => 'Supprimer :count tâche|Supprimer :count tâches',
             'note' => 'Supprimer :count note|Supprimer :count notes',
         ],
+        'merge' => [
+            'company' => 'Fusionner :count paire d\'entreprises|Fusionner :count paires d\'entreprises',
+            'people' => 'Fusionner :count paire de personnes|Fusionner :count paires de personnes',
+        ],
     ],
     'batch_summary' => [
         'create' => [
@@ -149,6 +153,10 @@ return [
             'task' => 'Supprimer :count tâche|Supprimer :count tâches',
             'note' => 'Supprimer :count note|Supprimer :count notes',
         ],
+        'merge' => [
+            'company' => 'Fusionner :count paire d\'entreprises|Fusionner :count paires d\'entreprises',
+            'people' => 'Fusionner :count paire de personnes|Fusionner :count paires de personnes',
+        ],
     ],
     'delete_title' => [
         'company' => 'Supprimer l\'entreprise',
@@ -164,6 +172,15 @@ return [
         'task' => 'Supprimer la tâche « :name »',
         'note' => 'Supprimer la note « :name »',
     ],
+    'merge_title' => [
+        'company' => 'Fusionner des entreprises',
+        'people' => 'Fusionner des personnes',
+    ],
+    'merge_summary' => [
+        'company' => 'Fusionner l\'entreprise « :pair »',
+        'people' => 'Fusionner la personne « :pair »',
+    ],
+    'merge_pair' => ':secondary dans :primary',
     'receipt_batch' => [
         'create' => [
             'company' => ':count entreprise créée|:count entreprises créées',
@@ -189,6 +206,10 @@ return [
             'task' => ':count tâche supprimée|:count tâches supprimées',
             'note' => ':count note supprimée|:count notes supprimées',
             'custom_field' => ':count attribut personnalisé supprimé|:count attributs personnalisés supprimés',
+        ],
+        'merge' => [
+            'company' => ':count paire d\'entreprises fusionnée|:count paires d\'entreprises fusionnées',
+            'people' => ':count paire de personnes fusionnée|:count paires de personnes fusionnées',
         ],
     ],
 ];
