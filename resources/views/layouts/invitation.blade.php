@@ -2,7 +2,7 @@
 
 <x-layouts::filament-standalone :title="$title">
     {{-- Back can restore this page from the browser cache with Join still spinning, so ask the server again. --}}
-    <div class="flex min-h-screen flex-col" x-data x-on:pageshow.window="if ($event.persisted) window.location.reload()">
+    <div class="flex min-h-screen flex-col" x-data x-on:pageshow.window="if ($event.persisted) window.location.replace(window.location.href)">
         <header class="flex justify-center px-6 pt-10">
             <a href="{{ url('/') }}" aria-label="{{ config('app.name') }}">
                 <x-brand.logo-lockup size="lg" class="text-black dark:text-white" />
